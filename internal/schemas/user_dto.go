@@ -1,0 +1,10 @@
+package dto
+
+type UserResponse struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"` // optional
+	IsPremium bool   `json:"is_premium"`
+}

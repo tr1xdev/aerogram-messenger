@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1;chatpb";
+
+service ChatService {
+  rpc CreateChat(CreateChatRequest) returns (CreateChatResponse);
+  rpc GetMyChats(GetMyChatsRequest) returns (GetMyChatsResponse);
+  rpc PinChat(PinChatRequest) returns (PinChatResponse);
+  rpc GetChat(GetChatRequest) returns (GetChatResponse);
+}
+
+enum ChatType {
+  CHAT_TYPE_UNSPECIFIED = 0;
+  CHAT_TYPE_PRIVATE = 1;
+  CHAT_TYPE_GROUP = 2;
+  CHAT_TYPE_CHANNEL = 3;
+}
+
+message GetChatRequest {
+  optional string chat_id = 1;
+  optional string slug = 2;
+  string user_id = 3;
+}
+
+message GetChatResponse {
+  Chat chat = 1;
+}
+
+message Chat {
+  string id = 1;
+  ChatType type = 2;
+  string title = 3;
+  string slug = 4;
+  int32 members_count = 5;
+  string last_message_id = 6;
+}
+
+message CreateChatRequest {
+  ChatType type = 1;
+  repeated string participant_ids = 2;
+  optional string title = 3;
+  optional string slug = 4;
+  string creator_id = 5;
+}
+
+message CreateChatResponse {
+  Chat chat = 1;
+}
+
+message GetMyChatsRequest {
+  string user_id = 1;
+}
+
+message GetMyChatsResponse {
+  repeated Chat chats = 1;
+}
+
+message PinChatRequest {
+  string chat_id = 1;
+  string user_id = 2;
+  bool pinned = 3;
+}
+
+message PinChatResponse {
+  bool success = 1;
+}
