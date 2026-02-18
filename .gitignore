@@ -24,9 +24,9 @@ frontend/node_modules
 .env
 
 # Editor/IDE
- .idea/
- .vscode/
- .zed/
+.idea/
+.vscode/
+.zed/
 
 # Shared
 TODO.md
