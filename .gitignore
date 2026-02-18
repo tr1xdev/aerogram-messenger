@@ -14,10 +14,11 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Go workspace file
+# Go and Node.js workspace file
 go.work
 go.work.sum
 go.sum
+frontend/node_modules
 
 # env file
 .env
