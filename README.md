@@ -1,30 +1,33 @@
-# Aerogram API 🚀
+# Messenger App
 
-Aerogram is a modern, high-performance messaging backend. It serves as a learning playground for building scalable systems using a **Hybrid API Architecture**: GraphQL for flexible client-side interactions and gRPC for robust, type-safe internal communication.
+![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go) ![React Version](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react) ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat&logo=typescript) ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat&logo=tailwind-css) ![License](https://img.shields.io/badge/license-Apache-green)
 
-
+A full-stack, real-time messenger application built with a focus on performance and scalable architecture. This project implements a monorepo structure containing a Go-based GraphQL/gRPC backend and a React-based frontend.
 
 ---
 
-## 🏗 Architecture Overview
+## 🚀 Features
 
-The project is structured to demonstrate real-world backend patterns:
-
-* **Hybrid Gateway:** A central API that handles GraphQL queries/subscriptions and upgrades connections for WebSockets.
-* **Internal gRPC Services:** Core business logic (Auth, Chat, Presence) is isolated into services that communicate via gRPC.
-* **Real-time Core:** Redis-backed Pub/Sub manages user presence and instant message delivery.
--   **Middleware Layer:** Global authentication and session validation before reaching business logic.
+* **Secure Authentication**: Email verification via OTP (One-Time Password) powered by Resend.
+* **Real-time Messaging**: High-performance communication with focused low latency.
+* **Chat Management**: Dynamic chat lists, global user search, and profile management.
+* **Hybrid API Architecture**: Leveraging GraphQL for flexible data fetching and gRPC for efficient service communication.
+* **Type Safety**: Full-stack type safety using Zod (frontend) and Protobuf/GQLGen (backend).
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Backend:** [Go](https://go.dev/) (Golang)
-- **Primary Database:** [PostgreSQL](https://www.postgresql.org/) + [GORM](https://gorm.io/)
-- **Cache & Real-time:** [Redis](https://redis.io/) (Pub/Sub & TTL-based status)
-- **API Interfaces:** - [gqlgen](https://github.com/99designs/gqlgen) (GraphQL)
-  - [gRPC](https://grpc.io/) & [Protobuf](https://developers.google.com/protocol-buffers)
-  - [Chi](https://github.com/go-chi/chi) (HTTP Routing)
-- **Documentation:** [Swagger/OpenAPI](https://swagger.io/)
+### Backend (Go)
+* **API**: `chi` (Router), `99designs/gqlgen` (GraphQL)
+* **Storage**: `PostgreSQL` (GORM), `Redis` (Caching & Pub/Sub)
+* **Communication**: `gRPC` + `Protobuf` (managed via Buf)
+* **Infrastructure**: `Viper`, `godotenv`, `google/uuid`
+* **Email**: `Resend API`
+
+### Frontend (React)
+* **State & Logic**: `Zustand`, `TanStack Query` (React Query)
+* **UI & Forms**: `Tailwind CSS`, `React Hook Form` + `Zod`
+* **Build Tool**: `Vite`
 
 ---
