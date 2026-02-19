@@ -20,14 +20,11 @@ go.work.sum
 go.sum
 frontend/node_modules
 
-# env file
+# Configuration files
 .env
+config.yaml
 
 # Editor/IDE
 .idea/
 .vscode/
 .zed/
-
-# Shared
-TODO.md
-config.yaml
