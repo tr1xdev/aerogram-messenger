@@ -1,0 +1,4 @@
+{
+  "routesDirectory": "src/app/routes",
+  "routeTreeFile": "src/routeTree.gen.ts"
+}
