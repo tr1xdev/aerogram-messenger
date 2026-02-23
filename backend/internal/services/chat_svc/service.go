@@ -56,7 +56,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&dialog).Error; err != nil {
-			return err
+			return status.Error(codes.Internal, "failed to initialize chat")
 		}
 
 		for _, userID := range req.ParticipantIds {
@@ -72,7 +72,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 			}
 
 			if err := tx.Create(&member).Error; err != nil {
-				return err
+				return status.Error(codes.Internal, "failed to register chat members")
 			}
 		}
 
@@ -99,7 +99,7 @@ func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) 
 		Find(&dialogs).Error
 
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, "failed to retrieve conversation list")
 	}
 
 	res := make([]*chatpb.Chat, 0, len(dialogs))
@@ -112,7 +112,6 @@ func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) 
 
 func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chatpb.GetChatResponse, error) {
 	var dialog models.Dialog
-
 	q := s.db.Model(&models.Dialog{})
 
 	if req.ChatId != nil {
@@ -120,7 +119,7 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 	} else if req.Slug != nil {
 		q = q.Where("username = ?", *req.Slug)
 	} else {
-		return nil, status.Error(codes.InvalidArgument, "chat_id or slug required")
+		return nil, status.Error(codes.InvalidArgument, "chat ID or slug is required")
 	}
 
 	if err := q.First(&dialog).Error; err != nil {
@@ -133,7 +132,7 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 		Count(&count)
 
 	if count == 0 {
-		return nil, status.Error(codes.PermissionDenied, "forbidden")
+		return nil, status.Error(codes.PermissionDenied, "unauthorized access to this chat")
 	}
 
 	return &chatpb.GetChatResponse{
@@ -147,7 +146,7 @@ func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chat
 		Update("is_pinned", req.Pinned).Error
 
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, "failed to update pin status")
 	}
 
 	return &chatpb.PinChatResponse{Success: true}, nil
