@@ -11,6 +11,8 @@ import (
 	"errors"
 	"time"
 
+	"google.golang.org/grpc/status"
+
 	"github.com/aerogram-org/aerogram-api/internal/graph/model"
 	authpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/auth/v1"
 	chatpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1"
@@ -91,10 +93,12 @@ func (r *mutationResolver) SignUp(ctx context.Context, input model.SignUpInput) 
 		LastName:  input.LastName,
 		Username:  input.Username,
 	}
+
 	resp, err := r.authClient.SignUp(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, mapGRPCError(err)
 	}
+
 	return &model.AuthPayload{UserID: &resp.UserId}, nil
 }
 
@@ -105,8 +109,9 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		Password: input.Password,
 	})
 	if err != nil {
-		return nil, err
+		return nil, mapGRPCError(err)
 	}
+
 	return &model.AuthPayload{UserID: &resp.UserId}, nil
 }
 
@@ -117,8 +122,9 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEm
 		Code:   input.Code,
 	})
 	if err != nil {
-		return nil, err
+		return nil, mapGRPCError(err)
 	}
+
 	return &model.VerifyEmailPayload{
 		AccessToken:  resp.AccessToken,
 		RefreshToken: resp.RefreshToken,
@@ -528,6 +534,16 @@ func (r *subscriptionResolver) MessageRead(ctx context.Context, chatID string) (
 		}
 	}()
 	return readChan, nil
+}
+
+func mapGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if st, ok := status.FromError(err); ok {
+		return errors.New(st.Message())
+	}
+	return err
 }
 
 // Status is the resolver for the status field.
