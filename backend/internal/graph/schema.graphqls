@@ -50,7 +50,7 @@ input VerifyEmailInput {
 
 input UpdateUserInput {
    firstName: String
-   lastName: String
+   lastName: String # TODO: Make it optional
    username: String
 }
 
