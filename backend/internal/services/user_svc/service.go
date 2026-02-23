@@ -7,6 +7,8 @@ import (
 	userpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1"
 	"github.com/aerogram-org/aerogram-api/internal/models"
 	"github.com/aerogram-org/aerogram-api/internal/repositories"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -33,17 +35,11 @@ func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*us
 	case *userpb.UserInfoRequest_Username:
 		err = s.db.Where("username = ?", v.Username).First(&u).Error
 	default:
-		return &userpb.UserInfoResponse{
-			Response: &userpb.UserInfoResponse_Error{
-				Error: &errorspb.CommonError{
-					Message: "identifier is required",
-				},
-			},
-		}, nil
+		return nil, status.Error(codes.InvalidArgument, "identifier is required")
 	}
 
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return &userpb.UserInfoResponse{
 				Response: &userpb.UserInfoResponse_Error{
 					Error: &errorspb.CommonError{
@@ -53,7 +49,7 @@ func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*us
 				},
 			}, nil
 		}
-		return nil, err
+		return nil, status.Error(codes.Internal, "failed to query user profile")
 	}
 
 	return &userpb.UserInfoResponse{
