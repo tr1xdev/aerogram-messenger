@@ -1,63 +1,73 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
+import { useVerifyEmail, parseApiError } from "@/features/auth/lib/use-auth";
 import { Button } from "@/components/ui/button";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 
 export const Route = createFileRoute("/otp")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    userId: (search.userId as string) || "",
+  }),
   component: OtpPage,
 });
 
 function OtpPage() {
-  const params = Route.useSearch() as { userId?: string };
-  const navigate = useNavigate();
-  const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
-  const [loading, setLoading] = useState(false);
-
-  const updateDigit = (i: number, value: string) => {
-    if (!/^\d?$/.test(value)) return;
-    const newDigits = [...digits];
-    newDigits[i] = value;
-    setDigits(newDigits);
-    if (value && i < 5) {
-      const next = document.getElementById(`otp-${i + 1}`);
-      next?.focus();
-    }
-  };
+  const { userId } = Route.useSearch();
+  const [code, setCode] = useState("");
+  const { mutate, isPending, error } = useVerifyEmail();
 
   const handleSubmit = () => {
-    if (digits.join("").length !== 6) return;
-    setLoading(true);
-    setTimeout(() => navigate({ to: "/" }), 600);
+    if (code.length !== 6) return;
+    mutate({ input: { userID: userId, code } });
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="w-full max-w-sm text-center space-y-4">
-        <h2 className="text-xl font-semibold">Verify Code</h2>
-        <p className="text-sm text-muted-foreground">Enter the 6‑digit code</p>
-
-        <div className="flex justify-between gap-2">
-          {digits.map((digit, i) => (
-            <Input
-              key={i}
-              id={`otp-${i}`}
-              value={digit}
-              onChange={(e) => updateDigit(i, e.target.value)}
-              className="w-12 h-12 text-center text-lg"
-              maxLength={1}
-            />
-          ))}
+      <div className="w-full max-w-sm text-center space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold">Verify Code</h2>
+          <p className="text-sm text-muted-foreground">
+            Enter the 6‑digit code sent to your email
+          </p>
         </div>
 
-        <Button className="w-full" onClick={handleSubmit} disabled={loading}>
-          {loading ? "Verifying…" : "Confirm"}
+        {error && (
+          <div className="rounded-md bg-destructive/15 p-3 text-sm font-medium text-destructive text-left">
+            {parseApiError(error)}
+          </div>
+        )}
+
+        <div className="flex justify-center">
+          <InputOTP
+            maxLength={6}
+            value={code}
+            onChange={(value) => setCode(value)}
+            disabled={isPending}
+          >
+            <InputOTPGroup>
+              <InputOTPSlot index={0} />
+              <InputOTPSlot index={1} />
+              <InputOTPSlot index={2} />
+              <InputOTPSlot index={3} />
+              <InputOTPSlot index={4} />
+              <InputOTPSlot index={5} />
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+
+        <Button
+          className="w-full"
+          onClick={handleSubmit}
+          disabled={code.length !== 6 || isPending}
+        >
+          {isPending ? "Verifying…" : "Confirm"}
         </Button>
 
-        {params.userId && (
-          <p className="text-xs text-muted-foreground break-all">
-            {params.userId}
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground italic">ID: {userId}</p>
       </div>
     </div>
   );

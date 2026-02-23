@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-
+import { useLogin, parseApiError } from "@/features/auth/lib/use-auth";
 import {
   Field,
   FieldGroup,
@@ -34,20 +34,21 @@ export const Route = createFileRoute("/login")({
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { mutate, isPending, error } = useLogin();
+
   const form = useForm<LoginInputs>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = () => {
-    const fakeUserId = crypto.randomUUID();
-    navigate({ to: "/otp", search: { userId: fakeUserId } });
+  const onSubmit = (data: LoginInputs) => {
+    mutate({ input: data });
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6 md:p-10">
       <Card className="w-full max-w-sm">
-        <CardHeader className="">
+        <CardHeader>
           <CardTitle>Login to your account</CardTitle>
           <CardDescription>
             Enter your email and password to sign in
@@ -55,6 +56,12 @@ export function LoginPage() {
         </CardHeader>
 
         <CardContent>
+          {error && (
+            <div className="mb-6 rounded-md bg-destructive/15 p-3 text-sm font-medium text-destructive">
+              {parseApiError(error)}
+            </div>
+          )}
+
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex flex-col gap-6"
@@ -67,6 +74,7 @@ export function LoginPage() {
                   id="email"
                   type="email"
                   placeholder="you@example.com"
+                  disabled={isPending}
                 />
                 {form.formState.errors.email && (
                   <FieldDescription className="text-destructive">
@@ -82,6 +90,7 @@ export function LoginPage() {
                   id="password"
                   type="password"
                   placeholder="••••••••"
+                  disabled={isPending}
                 />
                 {form.formState.errors.password && (
                   <FieldDescription className="text-destructive">
@@ -91,10 +100,15 @@ export function LoginPage() {
               </Field>
 
               <Field>
-                <Button type="submit" className="w-full">
-                  Login
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending ? "Logging in..." : "Login"}
                 </Button>
-                <Button variant="outline" className="w-full">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  type="button"
+                  disabled={isPending}
+                >
                   Login with Google
                 </Button>
                 <FieldDescription className="text-center">

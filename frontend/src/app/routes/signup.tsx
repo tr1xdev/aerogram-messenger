@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-
+import { useSignUp, parseApiError } from "@/features/auth/lib/use-auth";
 import {
   Field,
   FieldGroup,
@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/card";
 
 const signupSchema = z.object({
-  name: z.string().min(2, { message: "Name is required" }),
+  first_name: z.string().min(2, { message: "First name is required" }),
+  last_name: z.string().optional(),
   email: z.string().email({ message: "Please enter a valid email" }),
   password: z
     .string()
@@ -35,14 +36,15 @@ export const Route = createFileRoute("/signup")({
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const { mutate, isPending, error } = useSignUp();
+
   const form = useForm<SignupInputs>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { name: "", email: "", password: "" },
+    defaultValues: { first_name: "", last_name: "", email: "", password: "" },
   });
 
-  const onSubmit = () => {
-    const fakeUserId = crypto.randomUUID();
-    navigate({ to: "/otp", search: { userId: fakeUserId } });
+  const onSubmit = (data: SignupInputs) => {
+    mutate({ input: { ...data, username: data.email.split("@")[0] } });
   };
 
   return (
@@ -54,24 +56,40 @@ export function SignupPage() {
         </CardHeader>
 
         <CardContent>
+          {error && (
+            <div className="mb-6 rounded-md bg-destructive/15 p-3 text-sm font-medium text-destructive text-left">
+              {parseApiError(error)}
+            </div>
+          )}
+
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex flex-col gap-6"
           >
             <FieldGroup>
-              <Field className="w-full">
-                <FieldLabel htmlFor="name">Name</FieldLabel>
-                <Input
-                  {...form.register("name")}
-                  id="name"
-                  placeholder="Your full name"
-                />
-                {form.formState.errors.name && (
-                  <FieldDescription className="text-destructive">
-                    {form.formState.errors.name.message}
-                  </FieldDescription>
-                )}
-              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field>
+                  <FieldLabel htmlFor="first_name">First Name</FieldLabel>
+                  <Input
+                    {...form.register("first_name")}
+                    id="first_name"
+                    disabled={isPending}
+                  />
+                  {form.formState.errors.first_name && (
+                    <FieldDescription className="text-destructive">
+                      {form.formState.errors.first_name.message}
+                    </FieldDescription>
+                  )}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="last_name">Last Name</FieldLabel>
+                  <Input
+                    {...form.register("last_name")}
+                    id="last_name"
+                    disabled={isPending}
+                  />
+                </Field>
+              </div>
 
               <Field className="w-full">
                 <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -80,6 +98,7 @@ export function SignupPage() {
                   id="email"
                   type="email"
                   placeholder="you@example.com"
+                  disabled={isPending}
                 />
                 {form.formState.errors.email && (
                   <FieldDescription className="text-destructive">
@@ -94,7 +113,7 @@ export function SignupPage() {
                   {...form.register("password")}
                   id="password"
                   type="password"
-                  placeholder="••••••••"
+                  disabled={isPending}
                 />
                 {form.formState.errors.password && (
                   <FieldDescription className="text-destructive">
@@ -104,9 +123,18 @@ export function SignupPage() {
               </Field>
 
               <Field>
-                <Button type="submit" className="w-full">
-                  Sign up
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending ? "Creating account..." : "Sign up"}
                 </Button>
+                <FieldDescription className="text-center mt-2">
+                  Already have an account?{" "}
+                  <a
+                    onClick={() => navigate({ to: "/login" })}
+                    className="cursor-pointer text-primary underline"
+                  >
+                    Log in
+                  </a>
+                </FieldDescription>
               </Field>
             </FieldGroup>
           </form>
