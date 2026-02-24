@@ -2,6 +2,8 @@ import "./index.css";
 import ReactDOM from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ApolloProvider } from "@apollo/client/react";
+import { client as apolloClient } from "@/app/api/apollo-client";
 import { routeTree } from "./routeTree.gen";
 
 const queryClient = new QueryClient();
@@ -20,7 +22,9 @@ declare module "@tanstack/react-router" {
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <QueryClientProvider client={queryClient}>
-    <RouterProvider router={router} />
-  </QueryClientProvider>,
+  <ApolloProvider client={apolloClient}>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  </ApolloProvider>,
 );
