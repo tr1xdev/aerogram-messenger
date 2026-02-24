@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/aerogram-org/aerogram-api/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc/metadata"
 )
@@ -33,80 +35,44 @@ func GetSessionID(ctx context.Context) string {
 	return ""
 }
 
-func ParseToken(tokenString string) (string, error) {
-	secret := os.Getenv("JWT_SECRET")
+func AuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+			authHeader := r.Header.Get("Authorization")
+			tokenString := ""
 
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(secret), nil
-	})
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+			}
 
-	if err != nil || !token.Valid {
-		return "", err
-	}
+			ctx := r.Context()
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		if userID, ok := claims["sub"].(string); ok {
-			return userID, nil
-		}
-	}
-	return "", fmt.Errorf("invalid token claims")
-}
-
-func AuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		secret := os.Getenv("JWT_SECRET")
-
-		md := metadata.New(map[string]string{
-			"x-real-ip":       getIP(r),
-			"x-client-device": r.UserAgent(),
-		})
-
-		ctx := metadata.NewOutgoingContext(r.Context(), md)
-
-		tokenString := ""
-		authHeader := r.Header.Get("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
-		}
-
-		if tokenString == "" {
-			tokenString = r.URL.Query().Get("token")
-		}
-
-		if tokenString != "" {
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-				return []byte(secret), nil
-			})
-
-			if err == nil && token.Valid {
-				if claims, ok := token.Claims.(jwt.MapClaims); ok {
-					userID, okUID := claims["sub"].(string)
-					sessionID, okSID := claims["sid"].(string)
-
-					if okUID {
-						ctx = context.WithValue(ctx, AuthUserIDKey, userID)
-						ctx = context.WithValue(ctx, AuthTokenKey, token)
+			if tokenString != "" {
+				token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+						return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 					}
-					if okSID {
-						ctx = context.WithValue(ctx, AuthSessionIDKey, sessionID)
+					return []byte(secret), nil
+				}, jwt.WithLeeway(30*time.Second))
+
+				if err == nil && token.Valid {
+					if claims, ok := token.Claims.(jwt.MapClaims); ok {
+						userID, _ := claims["sub"].(string)
+						sessionID, _ := claims["sid"].(string)
+
+						if userID != "" {
+							ctx = context.WithValue(ctx, AuthUserIDKey, userID)
+							ctx = context.WithValue(ctx, AuthSessionIDKey, sessionID)
+							ctx = context.WithValue(ctx, AuthTokenKey, tokenString)
+
+							md := metadata.Pairs("user-id", userID, "session-id", sessionID)
+							ctx = metadata.NewOutgoingContext(ctx, md)
+						}
 					}
 				}
 			}
-		}
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-func getIP(r *http.Request) string {
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		return ip
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
 	}
-	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-		return strings.Split(ip, ",")[0]
-	}
-	return r.RemoteAddr
 }

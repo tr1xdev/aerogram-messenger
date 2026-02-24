@@ -45,7 +45,6 @@ type ResolverRoot interface {
 	Query() QueryResolver
 	Session() SessionResolver
 	Subscription() SubscriptionResolver
-	User() UserResolver
 }
 
 type DirectiveRoot struct {
@@ -87,12 +86,14 @@ type ComplexityRoot struct {
 		CreateDirectChat func(childComplexity int, userID string) int
 		DeleteMessage    func(childComplexity int, id string) int
 		Login            func(childComplexity int, input model.LoginInput) int
+		Logout           func(childComplexity int) int
 		MarkAsRead       func(childComplexity int, chatID string, lastMessageID string) int
 		PinChat          func(childComplexity int, id string, pinned bool) int
 		RefreshToken     func(childComplexity int, token string) int
 		SendMessage      func(childComplexity int, chatID string, text string, replyToID *string) int
 		SendTypingEvent  func(childComplexity int, chatID string) int
 		SignUp           func(childComplexity int, input model.SignUpInput) int
+		TerminateSession func(childComplexity int, id string) int
 		UpdateMessage    func(childComplexity int, id string, text string) int
 		UpdateUser       func(childComplexity int, input model.UpdateUserInput) int
 		VerifyEmail      func(childComplexity int, input model.VerifyEmailInput) int
@@ -149,7 +150,7 @@ type ComplexityRoot struct {
 
 type MessageResolver interface {
 	ChatID(ctx context.Context, obj *models.Message) (string, error)
-
+	Sender(ctx context.Context, obj *models.Message) (*models.User, error)
 	Text(ctx context.Context, obj *models.Message) (string, error)
 	SentAt(ctx context.Context, obj *models.Message) (string, error)
 	IsRead(ctx context.Context, obj *models.Message) (bool, error)
@@ -171,6 +172,8 @@ type MutationResolver interface {
 	CreateDirectChat(ctx context.Context, userID string) (*model.Chat, error)
 	SendTypingEvent(ctx context.Context, chatID string) (bool, error)
 	MarkAsRead(ctx context.Context, chatID string, lastMessageID string) (bool, error)
+	TerminateSession(ctx context.Context, id string) (bool, error)
+	Logout(ctx context.Context) (bool, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*models.User, error)
@@ -187,9 +190,6 @@ type SubscriptionResolver interface {
 	MessageAdded(ctx context.Context, chatID string) (<-chan *models.Message, error)
 	UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error)
 	MessageRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
-}
-type UserResolver interface {
-	Status(ctx context.Context, obj *models.User) (string, error)
 }
 
 type executableSchema struct {
@@ -384,6 +384,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.Login(childComplexity, args["input"].(model.LoginInput)), true
+	case "Mutation.logout":
+		if e.complexity.Mutation.Logout == nil {
+			break
+		}
+
+		return e.complexity.Mutation.Logout(childComplexity), true
 	case "Mutation.markAsRead":
 		if e.complexity.Mutation.MarkAsRead == nil {
 			break
@@ -450,6 +456,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.SignUp(childComplexity, args["input"].(model.SignUpInput)), true
+	case "Mutation.terminateSession":
+		if e.complexity.Mutation.TerminateSession == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_terminateSession_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.TerminateSession(childComplexity, args["id"].(string)), true
 	case "Mutation.updateMessage":
 		if e.complexity.Mutation.UpdateMessage == nil {
 			break
@@ -975,6 +992,17 @@ func (ec *executionContext) field_Mutation_signUp_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_terminateSession_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -1638,7 +1666,7 @@ func (ec *executionContext) _Message_sender(ctx context.Context, field graphql.C
 		field,
 		ec.fieldContext_Message_sender,
 		func(ctx context.Context) (any, error) {
-			return obj.Sender, nil
+			return ec.resolvers.Message().Sender(ctx, obj)
 		},
 		nil,
 		ec.marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser,
@@ -1651,8 +1679,8 @@ func (ec *executionContext) fieldContext_Message_sender(_ context.Context, field
 	fc = &graphql.FieldContext{
 		Object:     "Message",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -2539,6 +2567,76 @@ func (ec *executionContext) fieldContext_Mutation_markAsRead(ctx context.Context
 	if fc.Args, err = ec.field_Mutation_markAsRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_terminateSession(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_terminateSession,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().TerminateSession(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_terminateSession(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_terminateSession_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_logout,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().Logout(ctx)
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_logout(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -3522,7 +3620,7 @@ func (ec *executionContext) _User_status(ctx context.Context, field graphql.Coll
 		field,
 		ec.fieldContext_User_status,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().Status(ctx, obj)
+			return obj.Status, nil
 		},
 		nil,
 		ec.marshalNString2string,
@@ -3535,8 +3633,8 @@ func (ec *executionContext) fieldContext_User_status(_ context.Context, field gr
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -5444,10 +5542,41 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "sender":
-			out.Values[i] = ec._Message_sender(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_sender(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "text":
 			field := field
 
@@ -5756,6 +5885,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "markAsRead":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_markAsRead(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "terminateSession":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_terminateSession(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "logout":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_logout(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -6133,58 +6276,27 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._User_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "email":
 			out.Values[i] = ec._User_email(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "first_name":
 			out.Values[i] = ec._User_first_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "last_name":
 			out.Values[i] = ec._User_last_name(ctx, field, obj)
 		case "username":
 			out.Values[i] = ec._User_username(ctx, field, obj)
 		case "status":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._User_status(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._User_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

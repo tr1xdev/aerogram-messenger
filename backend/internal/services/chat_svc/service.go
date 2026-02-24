@@ -7,6 +7,7 @@ import (
 	"github.com/aerogram-org/aerogram-api/internal/models"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
@@ -20,7 +21,25 @@ func NewServer(db *gorm.DB) *Server {
 	return &Server{db: db}
 }
 
+func (s *Server) getUserID(ctx context.Context, reqID string) string {
+	if reqID != "" {
+		return reqID
+	}
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		if ids := md.Get("user-id"); len(ids) > 0 {
+			return ids[0]
+		}
+	}
+	return ""
+}
+
 func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) (*chatpb.CreateChatResponse, error) {
+	creatorID := s.getUserID(ctx, req.CreatorId)
+	if creatorID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+	}
+
 	if req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
 		var existingID string
 		s.db.Raw(`
@@ -49,7 +68,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		Type:         s.mapProtoTypeToModel(req.Type),
 		Name:         req.Title,
 		Username:     req.Slug,
-		CreatorID:    &req.CreatorId,
+		CreatorID:    &creatorID,
 		MembersCount: len(req.ParticipantIds),
 		IsActive:     true,
 	}
@@ -61,7 +80,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 
 		for _, userID := range req.ParticipantIds {
 			role := models.RoleMember
-			if userID == req.CreatorId {
+			if userID == creatorID {
 				role = models.RoleOwner
 			}
 
@@ -89,12 +108,17 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 }
 
 func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) (*chatpb.GetMyChatsResponse, error) {
+	userID := s.getUserID(ctx, req.UserId)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+	}
+
 	var dialogs []models.Dialog
 
 	err := s.db.
 		Table("dialogs").
 		Joins("JOIN dialog_members ON dialog_members.dialog_id = dialogs.id").
-		Where("dialog_members.user_id = ? AND dialogs.deleted_at IS NULL", req.UserId).
+		Where("dialog_members.user_id = ? AND dialogs.deleted_at IS NULL", userID).
 		Order("dialogs.last_message_at DESC").
 		Find(&dialogs).Error
 
@@ -111,6 +135,11 @@ func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) 
 }
 
 func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chatpb.GetChatResponse, error) {
+	userID := s.getUserID(ctx, req.UserId)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+	}
+
 	var dialog models.Dialog
 	q := s.db.Model(&models.Dialog{})
 
@@ -128,7 +157,7 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 
 	var count int64
 	s.db.Model(&models.DialogMember{}).
-		Where("dialog_id = ? AND user_id = ?", dialog.ID, req.UserId).
+		Where("dialog_id = ? AND user_id = ?", dialog.ID, userID).
 		Count(&count)
 
 	if count == 0 {
@@ -141,8 +170,13 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 }
 
 func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chatpb.PinChatResponse, error) {
+	userID := s.getUserID(ctx, req.UserId)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+	}
+
 	err := s.db.Model(&models.DialogMember{}).
-		Where("dialog_id = ? AND user_id = ?", req.ChatId, req.UserId).
+		Where("dialog_id = ? AND user_id = ?", req.ChatId, userID).
 		Update("is_pinned", req.Pinned).Error
 
 	if err != nil {

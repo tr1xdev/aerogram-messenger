@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aerogram-org/aerogram-api/internal/config"
@@ -59,11 +60,16 @@ func (s *Server) getMetadata(ctx context.Context) (string, string) {
 }
 
 func (s *Server) createAccessToken(userID, sessionID string, verified bool) (string, error) {
-	secret := os.Getenv("JWT_SECRET")
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	if secret == "" {
 		return "", status.Error(codes.Internal, "security configuration missing")
 	}
+
 	ttl := s.cfg.JWT.TTL()
+	if ttl == 0 {
+		ttl = time.Hour * 24
+	}
+
 	claims := jwt.MapClaims{
 		"sub":      userID,
 		"sid":      sessionID,
@@ -71,6 +77,7 @@ func (s *Server) createAccessToken(userID, sessionID string, verified bool) (str
 		"exp":      time.Now().Add(ttl).Unix(),
 		"iat":      time.Now().Unix(),
 	}
+
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return t.SignedString([]byte(secret))
 }
@@ -297,4 +304,30 @@ func (s *Server) RefreshToken(ctx context.Context, req *authpb.RefreshTokenReque
 		AccessToken:  accessToken,
 		RefreshToken: newRawRefresh,
 	}, nil
+}
+
+func (s *Server) GetUser(ctx context.Context, req *authpb.GetUserRequest) (*authpb.GetUserResponse, error) {
+	var user models.User
+	if err := s.db.WithContext(ctx).Where("id = ?", req.UserId).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
+		return nil, status.Error(codes.Internal, "database error")
+	}
+
+	res := &authpb.GetUserResponse{
+		Id:        user.ID,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		Status:    user.Status,
+	}
+
+	if user.LastName != "" {
+		res.LastName = &user.LastName
+	}
+	if user.Username != "" {
+		res.Username = &user.Username
+	}
+
+	return res, nil
 }

@@ -2,6 +2,7 @@ package user_svc
 
 import (
 	"context"
+	"errors"
 
 	errorspb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/errors/v1"
 	userpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1"

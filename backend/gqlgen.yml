@@ -17,6 +17,11 @@ resolver:
    filename_template: "{name}.resolvers.go"
 
 autobind:
-   # - "github.com/aerogram-org/aerogram-api/internal/graph/model"
    - "github.com/aerogram-org/aerogram-api/internal/models"
    - "github.com/aerogram-org/aerogram-api/internal/schemas"
+
+models:
+   Message:
+      fields:
+         sender:
+            resolver: true

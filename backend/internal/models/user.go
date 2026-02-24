@@ -13,6 +13,7 @@ type User struct {
 	LastName           string `gorm:"type:varchar(50)"`
 	Email              string `gorm:"type:varchar(255);uniqueIndex;not null"`
 	Password           string `gorm:"type:text;not null"`
+	Status             string `gorm:"type:varchar(20);default:'OFFLINE'"`
 	IsPremium          bool   `gorm:"type:bool;not null"`
 	IsEmailVerified    bool   `gorm:"type:bool;default:false"`
 	VerificationToken  string `gorm:"type:text"`

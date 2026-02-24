@@ -2,10 +2,12 @@ package graph
 
 import (
 	"context"
+	"errors"
 
 	"github.com/aerogram-org/aerogram-api/internal/graph/model"
 	chatpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1"
 	"github.com/aerogram-org/aerogram-api/internal/models"
+	"google.golang.org/grpc/status"
 )
 
 func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb.Chat) (*model.Chat, error) {
@@ -53,6 +55,20 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		var msg models.Message
 		if err := r.db.WithContext(ctx).First(&msg, "id = ?", pbChat.LastMessageId).Error; err == nil {
 			lastMsg = &msg
+
+			for _, u := range users {
+				if u.ID == msg.AuthorID {
+					lastMsg.Sender = u
+					break
+				}
+			}
+
+			if lastMsg.Sender == nil {
+				author, err := r.userRepo.GetByID(msg.AuthorID)
+				if err == nil {
+					lastMsg.Sender = author
+				}
+			}
 		}
 	}
 
@@ -73,4 +89,14 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		UnreadCount:  int(unreadCount),
 		IsPinned:     isPinned,
 	}, nil
+}
+
+func mapGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if st, ok := status.FromError(err); ok {
+		return errors.New(st.Message())
+	}
+	return err
 }
