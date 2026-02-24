@@ -85,14 +85,15 @@ func main() {
 	srv := initGraphQL(db, userRepo, rdb, presenceRepo, conn)
 
 	router := chi.NewRouter()
+
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:5173", "http://127.0.0.1:5173", "*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight"},
 		AllowCredentials: true,
 	}))
 
-	router.Use(middleware.AuthMiddleware)
+	router.Use(middleware.AuthMiddleware(cfg))
 	router.Get("/ws/presence", handlers.HandlePresence(presenceRepo))
 	api.SetupRoutes(router, srv)
 
