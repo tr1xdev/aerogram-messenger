@@ -11,12 +11,17 @@
       "preview": "vite preview"
    },
    "dependencies": {
+      "@apollo/client": "^4.1.5",
       "@hookform/resolvers": "^5.2.2",
       "@tailwindcss/vite": "^4.2.0",
       "@tanstack/react-query": "^5.90.21",
       "@tanstack/react-router": "^1.161.1",
+      "@tanstack/router-plugin": "^1.162.4",
+      "@tanstack/router-vite-plugin": "^1.162.4",
       "class-variance-authority": "^0.7.1",
       "clsx": "^2.1.1",
+      "graphql": "^16.12.0",
+      "graphql-ws": "^6.0.7",
       "input-otp": "^1.4.2",
       "lucide-react": "^0.574.0",
       "path": "^0.12.7",
