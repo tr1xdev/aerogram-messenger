@@ -1,6 +1,6 @@
 import { GraphQLClient } from "graphql-request";
 
-const endpoint = "http://localhost:8080/query";
+const endpoint = import.meta.env.VITE_API_URL || "http://localhost:8080/query";
 
 export const gqlClient = new GraphQLClient(endpoint, {
   headers: () => {
