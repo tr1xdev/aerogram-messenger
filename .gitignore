@@ -47,6 +47,9 @@ go.sum
 # Node.js frontend
 frontend/node_modules
 
+# Tanstack temp files
+frontend/.tanstack/
+
 # Configuration files
 .env
 config.yaml
