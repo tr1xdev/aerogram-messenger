@@ -1,4 +1,11 @@
-import { useRef, useLayoutEffect, useMemo, useState, useEffect } from "react";
+import {
+  useRef,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, Send, ArrowDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,7 +30,9 @@ function ChatPage() {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const isAtBottom = useRef(true);
+  const lastMessageId = useRef<string | null>(null);
 
   const { input, setInput, resetInput } = useChatStore();
   const { data: me } = useMe();
@@ -39,49 +48,74 @@ function ChatPage() {
     );
   }, [messages]);
 
-  const getViewport = () =>
-    scrollRef.current?.querySelector<HTMLDivElement>(
-      "[data-radix-scroll-area-viewport]",
-    );
+  const getViewport = useCallback(
+    () =>
+      scrollRef.current?.querySelector<HTMLDivElement>(
+        "[data-radix-scroll-area-viewport]",
+      ),
+    [],
+  );
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
-    const viewport = getViewport();
-    if (viewport) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior });
-    }
-  };
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "smooth") => {
+      const viewport = getViewport();
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+      }
+    },
+    [getViewport],
+  );
 
   useEffect(() => {
     const viewport = getViewport();
     if (!viewport) return;
 
-    const handleScroll = () => {
-      const threshold = 150;
-      const bottomReached =
+    const onScroll = () => {
+      const threshold = 100;
+      const isBottom =
         viewport.scrollHeight - viewport.scrollTop <=
         viewport.clientHeight + threshold;
 
-      isAtBottom.current = bottomReached;
-      setShowScrollButton(!bottomReached);
+      if (isAtBottom.current !== isBottom) {
+        isAtBottom.current = isBottom;
+        setShowScrollButton(!isBottom);
+      }
+
+      if (isBottom && unreadCount > 0) {
+        setUnreadCount(0);
+      }
     };
 
-    viewport.addEventListener("scroll", handleScroll, { passive: true });
-    return () => viewport.removeEventListener("scroll", handleScroll);
-  }, [msgsLoading]);
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", onScroll);
+  }, [getViewport, unreadCount]);
 
   useLayoutEffect(() => {
     if (isAtBottom.current) {
       scrollToBottom("instant");
     }
-  }, [sortedMessages.length]);
+  }, [sortedMessages.length, scrollToBottom]);
 
-  const handleSend = async () => {
+  useEffect(() => {
+    if (sortedMessages.length === 0) return;
+    const latest = sortedMessages[sortedMessages.length - 1];
+
+    if (lastMessageId.current && lastMessageId.current !== latest.id) {
+      if (!isAtBottom.current) {
+        setTimeout(() => setUnreadCount((prev) => prev + 1), 0);
+      }
+    }
+    lastMessageId.current = latest.id;
+  }, [sortedMessages]);
+
+  const handleSend = () => {
     if (!input.trim() || isSending) return;
-    await sendMessage(input, {
+    sendMessage(input, {
       onSuccess: () => {
         resetInput();
         isAtBottom.current = true;
-        setTimeout(() => scrollToBottom("smooth"), 50);
+        setUnreadCount(0);
+        setTimeout(() => scrollToBottom("smooth"), 100);
       },
     });
   };
@@ -187,17 +221,25 @@ function ChatPage() {
         </ScrollArea>
 
         {showScrollButton && (
-          <Button
-            size="icon"
-            variant="secondary"
-            className="absolute bottom-6 right-6 h-10 w-10 rounded-full shadow-lg border z-50 animate-in fade-in zoom-in duration-200"
-            onClick={() => {
-              isAtBottom.current = true;
-              scrollToBottom("smooth");
-            }}
-          >
-            <ArrowDown className="h-5 w-5" />
-          </Button>
+          <div className="absolute bottom-6 right-6 z-50">
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-10 w-10 rounded-full shadow-lg border relative animate-in fade-in zoom-in duration-200"
+              onClick={() => {
+                isAtBottom.current = true;
+                setUnreadCount(0);
+                scrollToBottom("smooth");
+              }}
+            >
+              <ArrowDown className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </Button>
+          </div>
         )}
       </div>
 
