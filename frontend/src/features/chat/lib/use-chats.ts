@@ -9,44 +9,25 @@ import {
   SEND_MESSAGE,
   MARK_AS_READ,
 } from "@/features/chat/api/chat.gql";
+import type { Chat, Message, User } from "@/entities/chat/model/types";
 
-export type ChatType = "PRIVATE" | "GROUP" | "CHANNEL";
-
-export interface User {
-  id: string;
-  username: string;
-  first_name: string;
-  last_name?: string;
-  status: string;
-}
-
-export interface Message {
-  id: string;
-  chatId: string;
-  text: string;
-  sentAt: string;
-  isRead: boolean;
-  isEdited: boolean;
-  sender: User;
-}
-
-export interface Chat {
-  id: string;
-  type: ChatType;
-  title: string;
-  unreadCount: number;
-  lastMessage?: {
-    id: string;
-    text: string;
-    sentAt: string;
-    sender: {
-      first_name: string;
-    };
-  };
-}
-
-export const useMessageHistory = (chatId: string, limit = 50, offset = 0) => {
+export const useMyChats = () => {
+  const isAuth = useAuthStore((s) => s.isAuth);
   return useQuery({
+    queryKey: ["chats", isAuth],
+    queryFn: async () => {
+      const response = await gqlClient.request<{ myChats: Chat[] }>(
+        GET_MY_CHATS,
+      );
+      return response.myChats;
+    },
+    enabled: !!isAuth,
+    staleTime: 30000,
+  });
+};
+
+export const useMessageHistory = (chatId: string, limit = 50, offset = 0) =>
+  useQuery({
     queryKey: ["messages", chatId, limit, offset],
     queryFn: async () => {
       const response = await gqlClient.request<{ messageHistory: Message[] }>(
@@ -57,26 +38,19 @@ export const useMessageHistory = (chatId: string, limit = 50, offset = 0) => {
     },
     enabled: !!chatId,
   });
-};
 
 export const useSendMessage = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (variables: {
-      chatId: string;
-      text: string;
-      replyToId?: string;
-    }) => {
-      const response = await gqlClient.request<{ sendMessage: Message }>(
+    mutationFn: async (vars: { chatId: string; text: string }) => {
+      const res = await gqlClient.request<{ sendMessage: Message }>(
         SEND_MESSAGE,
-        variables,
+        vars,
       );
-      return response.sendMessage;
+      return res.sendMessage;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["messages", variables.chatId],
-      });
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["messages", vars.chatId] });
       queryClient.invalidateQueries({ queryKey: ["chats"] });
     },
   });
@@ -85,68 +59,45 @@ export const useSendMessage = () => {
 export const useMarkAsRead = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (variables: {
-      chatID: string;
-      lastMessageID: string;
-    }) => {
-      const response = await gqlClient.request<{ markAsRead: boolean }>(
+    mutationFn: async (vars: { chatID: string; lastMessageID: string }) => {
+      const res = await gqlClient.request<{ markAsRead: boolean }>(
         MARK_AS_READ,
-        variables,
+        vars,
       );
-      return response.markAsRead;
+      return res.markAsRead;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chats"] }),
   });
 };
 
-export const useMyChats = () => {
-  const isAuth = useAuthStore((state) => state.isAuth);
-  const token = localStorage.getItem("access_token");
-  return useQuery({
-    queryKey: ["chats", isAuth, token?.slice(-5)],
-    queryFn: async () => {
-      const response = await gqlClient.request<{ myChats: Chat[] }>(
-        GET_MY_CHATS,
-      );
-      return response.myChats;
-    },
-    enabled: !!isAuth && !!token,
-    retry: 1,
-    staleTime: 30000,
-  });
-};
-
-export const useSearchUsers = (username: string) => {
-  return useQuery({
-    queryKey: ["users", "search", username],
+export const useSearchUsers = (username: string) =>
+  useQuery({
+    queryKey: ["users", username],
     queryFn: async () => {
       if (!username || username.length < 2) return [];
-      const response = await gqlClient.request<{ searchUsers: User[] }>(
+      const res = await gqlClient.request<{ searchUsers: User[] }>(
         SEARCH_USERS,
         { username },
       );
-      return response.searchUsers;
+      return res.searchUsers;
     },
     enabled: username.length >= 2,
   });
-};
 
 export const useCreateChat = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (userID: string) => {
-      const response = await gqlClient.request<{ createDirectChat: Chat }>(
+      const res = await gqlClient.request<{ createDirectChat: Chat }>(
         CREATE_DIRECT_CHAT,
         { userID },
       );
-      return response.createDirectChat;
+      return res.createDirectChat;
     },
-    onSuccess: (newChat) => {
-      queryClient.setQueryData(["chats", true], (old: Chat[] | undefined) => {
-        return old ? [newChat, ...old] : [newChat];
-      });
+    onSuccess: (chat) => {
+      queryClient.setQueryData(["chats", true], (old?: Chat[]) =>
+        old ? [chat, ...old] : [chat],
+      );
       queryClient.invalidateQueries({ queryKey: ["chats"] });
     },
   });
