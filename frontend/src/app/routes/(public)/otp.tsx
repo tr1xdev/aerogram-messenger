@@ -8,7 +8,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 
-export const Route = createFileRoute("/otp")({
+export const Route = createFileRoute("/(public)/otp")({
   validateSearch: (search: Record<string, unknown>) => ({
     userId: (search.userId as string) || "",
   }),

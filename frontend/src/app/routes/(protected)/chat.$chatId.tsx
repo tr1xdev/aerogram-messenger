@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useRef, useLayoutEffect, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, Send } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useChatStore } from "@/store/chat";
-import { useChatSubscription } from "@/features/chat/lib/use-chat-subscription";
+import { useChatSubscriptionWrapper } from "@/features/chat/lib/hooks";
 import {
   useChatHistory,
   useChatActions,
@@ -15,93 +16,70 @@ import {
   useChatDetails,
 } from "@/features/chat/lib/use-messages";
 import { cn } from "@/lib/utils";
-import type { User, Message } from "@/entities/chat/model/types";
+import type { Message } from "@/entities/chat/model/types";
 
-export const Route = createFileRoute("/chat/$chatId")({
-  component: ChatPage,
-});
-
-export function ChatPage() {
+function ChatPage() {
   const { chatId } = Route.useParams();
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
   const { input, setInput, resetInput } = useChatStore();
-
   const { data: me } = useMe();
   const { data: chat, isLoading: chatLoading } = useChatDetails(chatId);
   const { data: messages, isLoading: msgsLoading } = useChatHistory(chatId);
   const { sendMessage, isSending } = useChatActions(chatId);
-  const { lastStatusUpdate } = useChatSubscription(chatId);
+  useChatSubscriptionWrapper(chatId);
 
-  const onlineStatus = useMemo(() => {
-    if (lastStatusUpdate) return lastStatusUpdate.status;
-    if (!chat || chat.type !== "PRIVATE" || !chat.members || !me)
-      return "offline";
-    const other = chat.members.find((m: User) => m.id !== me.id);
-    return other?.status ?? "offline";
-  }, [chat, me, lastStatusUpdate]);
-
-  const sortedMessages = useMemo(
-    () =>
-      messages
-        ? [...messages].sort(
-            (a, b) =>
-              new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
-          )
-        : [],
-    [messages],
-  );
+  const sortedMessages = useMemo(() => {
+    if (!messages) return [];
+    return [...messages].sort(
+      (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
+    );
+  }, [messages]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [sortedMessages, msgsLoading]);
+  }, [sortedMessages.length]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isSending) return;
+    await sendMessage(input, { onSuccess: () => resetInput() });
+  };
 
   return (
-    <div className="flex flex-col h-dvh w-full bg-background overflow-hidden">
-      <header className="flex h-14 items-center gap-3 px-4 border-b shrink-0 bg-background/95 backdrop-blur z-20">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate({ to: "/" })}
-          className="h-8 w-8"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-
-        {chatLoading ? (
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-4 w-24" />
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 overflow-hidden">
-            <Avatar className="h-8 w-8 border">
-              <AvatarImage src={chat?.photoUrl || ""} />
-              <AvatarFallback className="text-[10px] font-bold bg-muted">
-                {chat?.title?.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col truncate min-w-0">
-              <span className="text-sm font-semibold truncate">
-                {chat?.title}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <div
-                  className={cn(
-                    "h-1.5 w-1.5 rounded-full",
-                    onlineStatus === "online"
-                      ? "bg-emerald-500"
-                      : "bg-muted-foreground/40",
-                  )}
-                />
-                <span className="text-[10px] text-muted-foreground uppercase font-mono">
-                  {onlineStatus}
+    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
+      <header className="flex h-14 items-center justify-between px-4 border-b shrink-0 bg-background/95 backdrop-blur z-20">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate({ to: "/" })}
+            className="h-8 w-8 md:hidden"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          {chatLoading ? (
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 overflow-hidden">
+              <Avatar className="h-8 w-8 border">
+                <AvatarImage src={chat?.photoUrl || ""} />
+                <AvatarFallback className="text-xs font-bold bg-muted">
+                  {chat?.title?.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col truncate min-w-0">
+                <span className="text-sm font-semibold truncate">
+                  {chat?.title}
                 </span>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        <ThemeToggle />
       </header>
 
       <div className="flex-1 min-h-0 relative overflow-hidden">
@@ -154,7 +132,7 @@ export function ChatPage() {
                           >
                             {msg.text}
                           </div>
-                          <span className="text-[9px] text-muted-foreground mt-1 px-1">
+                          <span className="text-xs text-muted-foreground mt-1 px-1">
                             {new Date(msg.sentAt).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -174,9 +152,7 @@ export function ChatPage() {
           className="flex gap-2 max-w-4xl mx-auto"
           onSubmit={(e) => {
             e.preventDefault();
-            if (input.trim() && !isSending) {
-              sendMessage(input, { onSuccess: () => resetInput() });
-            }
+            handleSend();
           }}
         >
           <Input
@@ -199,3 +175,7 @@ export function ChatPage() {
     </div>
   );
 }
+
+export const Route = createFileRoute("/(protected)/chat/$chatId")({
+  component: ChatPage,
+});
