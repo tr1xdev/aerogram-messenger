@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -153,7 +154,11 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 	verificationID := uuid.NewString()
 	err = s.authRepo.StoreAndSendCode(ctx, verificationID, user.ID, user.Email, user.FirstName)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to send verification code")
+		if os.Getenv("APP_ENV") != "development" {
+			return nil, status.Error(codes.Internal, "failed to send verification code")
+		} else {
+			fmt.Printf("=== [DEV MODE] Failed to send verification code email\n")
+		}
 	}
 
 	return &authpb.LoginResponse{
