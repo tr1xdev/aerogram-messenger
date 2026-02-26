@@ -1,26 +1,5 @@
 import { gql } from "@apollo/client";
 
-export const GET_MY_CHATS = gql`
-  query GetMyChats {
-    myChats {
-      id
-      type
-      title
-      unreadCount
-      lastMessage {
-        id
-        text
-        sentAt
-        sender {
-          id
-          first_name
-          last_name
-        }
-      }
-    }
-  }
-`;
-
 export const SEARCH_USERS = gql`
   query SearchUsers($username: String!) {
     searchUsers(username: $username) {
@@ -41,24 +20,6 @@ export const CREATE_DIRECT_CHAT = gql`
   }
 `;
 
-export const GET_MESSAGE_HISTORY = gql`
-  query GetMessageHistory($chatId: ID!, $limit: Int!, $offset: Int!) {
-    messageHistory(chatId: $chatId, limit: $limit, offset: $offset) {
-      id
-      chatId
-      text
-      sentAt
-      isRead
-      sender {
-        id
-        first_name
-        last_name
-        username
-      }
-    }
-  }
-`;
-
 export const SEND_MESSAGE = gql`
   mutation SendMessage($chatId: ID!, $text: String!, $replyToId: ID) {
     sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {
@@ -66,19 +27,16 @@ export const SEND_MESSAGE = gql`
       chatId
       text
       sentAt
+      isRead
+      isEdited
       sender {
         id
         first_name
         last_name
         username
+        status
       }
     }
-  }
-`;
-
-export const MARK_AS_READ = gql`
-  mutation MarkAsRead($chatID: String!, $lastMessageID: String!) {
-    markAsRead(chatID: $chatID, lastMessageID: $lastMessageID)
   }
 `;
 
@@ -102,15 +60,6 @@ export const MESSAGE_SUBSCRIPTION = gql`
   }
 `;
 
-export const USER_PRESENCE_SUBSCRIPTION = gql`
-  subscription OnUserStatusChanged($chatId: ID!) {
-    userStatusChanged(chatId: $chatId) {
-      userId
-      status
-    }
-  }
-`;
-
 export const GET_ME = gql`
   query GetMe {
     me {
@@ -129,6 +78,71 @@ export const GET_CHAT_BY_ID = gql`
       title
       type
       photoUrl
+    }
+  }
+`;
+
+export const GET_MY_CHATS = gql`
+  query GetMyChats {
+    myChats {
+      id
+      type
+      title
+      unreadCount
+      lastMessage {
+        id
+        text
+        sentAt
+        isRead
+        sender {
+          id
+          first_name
+          last_name
+        }
+      }
+    }
+  }
+`;
+
+export const GET_MESSAGE_HISTORY = gql`
+  query GetMessageHistory($chatId: ID!, $limit: Int!, $offset: Int!) {
+    messageHistory(chatId: $chatId, limit: $limit, offset: $offset) {
+      id
+      chatId
+      text
+      sentAt
+      isRead
+      sender {
+        id
+        first_name
+        last_name
+        username
+      }
+    }
+  }
+`;
+
+export const MARK_AS_READ = gql`
+  mutation MarkAsRead($chatID: String!, $lastMessageID: String!) {
+    markAsRead(chatID: $chatID, lastMessageID: $lastMessageID)
+  }
+`;
+
+export const MESSAGE_READ_SUBSCRIPTION = gql`
+  subscription OnMessageRead($chatID: String!) {
+    messageRead(chatID: $chatID) {
+      chatID
+      userID
+      lastMessageID
+    }
+  }
+`;
+
+export const USER_PRESENCE_SUBSCRIPTION = gql`
+  subscription OnUserStatusChanged($chatId: ID!) {
+    userStatusChanged(chatId: $chatId) {
+      userId
+      status
     }
   }
 `;
