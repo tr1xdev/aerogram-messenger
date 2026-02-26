@@ -3,6 +3,7 @@ import { setContext } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
+import type { Reference } from "@apollo/client";
 
 const httpLink = new HttpLink({
   uri: "http://localhost:8080/query",
@@ -22,7 +23,7 @@ const wsLink = new GraphQLWsLink(
   createClient({
     url: "ws://localhost:8080/query",
     connectionParams: () => ({
-      access_token: localStorage.getItem("access_token"),
+      Authorization: `Bearer ${localStorage.getItem("access_token")}`,
     }),
   }),
 );
@@ -42,28 +43,25 @@ export const client = new ApolloClient({
   link: splitLink,
   cache: new InMemoryCache({
     typePolicies: {
-      Message: {
-        keyFields: ["id"],
-      },
       Query: {
         fields: {
           messageHistory: {
             keyArgs: ["chatId"],
-            merge(existing = [], incoming = [], { readField }) {
-              const merged = existing ? existing.slice(0) : [];
-              const seen = new Set<string>();
+            merge(
+              existing: Reference[] = [],
+              incoming: Reference[],
+              { readField },
+            ) {
+              const merged = [...existing];
+              const existingIds = new Set(
+                merged.map((ref) => readField("id", ref)),
+              );
 
-              for (const item of merged) {
-                const id = readField<string>("id", item);
-                if (id) seen.add(id);
-              }
-
-              for (const item of incoming) {
-                const id = readField<string>("id", item);
-                if (!id || seen.has(id)) continue;
-                seen.add(id);
-                merged.push(item);
-              }
+              incoming.forEach((ref) => {
+                if (!existingIds.has(readField("id", ref))) {
+                  merged.push(ref);
+                }
+              });
 
               return merged;
             },
