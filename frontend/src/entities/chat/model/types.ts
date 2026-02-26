@@ -26,4 +26,6 @@ export interface Chat {
   title: string;
   photoUrl?: string;
   members?: User[];
+  lastMessage?: Message;
+  unreadCount: number;
 }
