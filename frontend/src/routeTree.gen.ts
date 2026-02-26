@@ -9,122 +9,144 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './app/routes/__root'
-import { Route as SignupRouteImport } from './app/routes/signup'
-import { Route as OtpRouteImport } from './app/routes/otp'
-import { Route as LoginRouteImport } from './app/routes/login'
-import { Route as IndexRouteImport } from './app/routes/index'
-import { Route as ChatChatIdRouteImport } from './app/routes/chat/$chatId'
+import { Route as protectedIndexRouteImport } from './app/routes/(protected)/index'
+import { Route as publicSignupRouteImport } from './app/routes/(public)/signup'
+import { Route as publicOtpRouteImport } from './app/routes/(public)/otp'
+import { Route as publicLoginRouteImport } from './app/routes/(public)/login'
+import { Route as protectedLayoutRouteImport } from './app/routes/(protected)/_layout'
+import { Route as protectedChatChatIdRouteImport } from './app/routes/(protected)/chat.$chatId'
 
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OtpRoute = OtpRouteImport.update({
-  id: '/otp',
-  path: '/otp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
+const protectedIndexRoute = protectedIndexRouteImport.update({
+  id: '/(protected)/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ChatChatIdRoute = ChatChatIdRouteImport.update({
-  id: '/chat/$chatId',
+const publicSignupRoute = publicSignupRouteImport.update({
+  id: '/(public)/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicOtpRoute = publicOtpRouteImport.update({
+  id: '/(public)/otp',
+  path: '/otp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicLoginRoute = publicLoginRouteImport.update({
+  id: '/(public)/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const protectedLayoutRoute = protectedLayoutRouteImport.update({
+  id: '/(protected)/_layout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const protectedChatChatIdRoute = protectedChatChatIdRouteImport.update({
+  id: '/(protected)/chat/$chatId',
   path: '/chat/$chatId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/login': typeof LoginRoute
-  '/otp': typeof OtpRoute
-  '/signup': typeof SignupRoute
-  '/chat/$chatId': typeof ChatChatIdRoute
+  '/login': typeof publicLoginRoute
+  '/otp': typeof publicOtpRoute
+  '/signup': typeof publicSignupRoute
+  '/': typeof protectedIndexRoute
+  '/chat/$chatId': typeof protectedChatChatIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/login': typeof LoginRoute
-  '/otp': typeof OtpRoute
-  '/signup': typeof SignupRoute
-  '/chat/$chatId': typeof ChatChatIdRoute
+  '/login': typeof publicLoginRoute
+  '/otp': typeof publicOtpRoute
+  '/signup': typeof publicSignupRoute
+  '/': typeof protectedIndexRoute
+  '/chat/$chatId': typeof protectedChatChatIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/login': typeof LoginRoute
-  '/otp': typeof OtpRoute
-  '/signup': typeof SignupRoute
-  '/chat/$chatId': typeof ChatChatIdRoute
+  '/(protected)/_layout': typeof protectedLayoutRoute
+  '/(public)/login': typeof publicLoginRoute
+  '/(public)/otp': typeof publicOtpRoute
+  '/(public)/signup': typeof publicSignupRoute
+  '/(protected)/': typeof protectedIndexRoute
+  '/(protected)/chat/$chatId': typeof protectedChatChatIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/otp' | '/signup' | '/chat/$chatId'
+  fullPaths: '/login' | '/otp' | '/signup' | '/' | '/chat/$chatId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/otp' | '/signup' | '/chat/$chatId'
-  id: '__root__' | '/' | '/login' | '/otp' | '/signup' | '/chat/$chatId'
+  to: '/login' | '/otp' | '/signup' | '/' | '/chat/$chatId'
+  id:
+    | '__root__'
+    | '/(protected)/_layout'
+    | '/(public)/login'
+    | '/(public)/otp'
+    | '/(public)/signup'
+    | '/(protected)/'
+    | '/(protected)/chat/$chatId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  LoginRoute: typeof LoginRoute
-  OtpRoute: typeof OtpRoute
-  SignupRoute: typeof SignupRoute
-  ChatChatIdRoute: typeof ChatChatIdRoute
+  protectedLayoutRoute: typeof protectedLayoutRoute
+  publicLoginRoute: typeof publicLoginRoute
+  publicOtpRoute: typeof publicOtpRoute
+  publicSignupRoute: typeof publicSignupRoute
+  protectedIndexRoute: typeof protectedIndexRoute
+  protectedChatChatIdRoute: typeof protectedChatChatIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/otp': {
-      id: '/otp'
-      path: '/otp'
-      fullPath: '/otp'
-      preLoaderRoute: typeof OtpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
+    '/(protected)/': {
+      id: '/(protected)/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof protectedIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/chat/$chatId': {
-      id: '/chat/$chatId'
+    '/(public)/signup': {
+      id: '/(public)/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof publicSignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/otp': {
+      id: '/(public)/otp'
+      path: '/otp'
+      fullPath: '/otp'
+      preLoaderRoute: typeof publicOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/login': {
+      id: '/(public)/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof publicLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(protected)/_layout': {
+      id: '/(protected)/_layout'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof protectedLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(protected)/chat/$chatId': {
+      id: '/(protected)/chat/$chatId'
       path: '/chat/$chatId'
       fullPath: '/chat/$chatId'
-      preLoaderRoute: typeof ChatChatIdRouteImport
+      preLoaderRoute: typeof protectedChatChatIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  LoginRoute: LoginRoute,
-  OtpRoute: OtpRoute,
-  SignupRoute: SignupRoute,
-  ChatChatIdRoute: ChatChatIdRoute,
+  protectedLayoutRoute: protectedLayoutRoute,
+  publicLoginRoute: publicLoginRoute,
+  publicOtpRoute: publicOtpRoute,
+  publicSignupRoute: publicSignupRoute,
+  protectedIndexRoute: protectedIndexRoute,
+  protectedChatChatIdRoute: protectedChatChatIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
