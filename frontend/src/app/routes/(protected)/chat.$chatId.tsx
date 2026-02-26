@@ -1,4 +1,4 @@
-import { useRef, useLayoutEffect, useMemo, useState } from "react";
+import { useRef, useLayoutEffect, useMemo, useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, Send, ArrowDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -39,22 +39,35 @@ function ChatPage() {
     );
   }, [messages]);
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
-    const el = scrollRef.current?.querySelector(
+  const getViewport = () =>
+    scrollRef.current?.querySelector<HTMLDivElement>(
       "[data-radix-scroll-area-viewport]",
     );
-    if (el) {
-      el.scrollTo({ top: el.scrollHeight, behavior });
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const viewport = getViewport();
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior });
     }
   };
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    const offset = 100;
-    const isBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + offset;
-    isAtBottom.current = isBottom;
-    setShowScrollButton(!isBottom);
-  };
+  useEffect(() => {
+    const viewport = getViewport();
+    if (!viewport) return;
+
+    const handleScroll = () => {
+      const threshold = 150;
+      const bottomReached =
+        viewport.scrollHeight - viewport.scrollTop <=
+        viewport.clientHeight + threshold;
+
+      isAtBottom.current = bottomReached;
+      setShowScrollButton(!bottomReached);
+    };
+
+    viewport.addEventListener("scroll", handleScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", handleScroll);
+  }, [msgsLoading]);
 
   useLayoutEffect(() => {
     if (isAtBottom.current) {
@@ -68,7 +81,7 @@ function ChatPage() {
       onSuccess: () => {
         resetInput();
         isAtBottom.current = true;
-        setTimeout(() => scrollToBottom("smooth"), 100);
+        setTimeout(() => scrollToBottom("smooth"), 50);
       },
     });
   };
@@ -109,13 +122,9 @@ function ChatPage() {
         <ThemeToggle />
       </header>
 
-      <div className="flex-1 min-h-0 relative overflow-hidden">
-        <ScrollArea
-          ref={scrollRef}
-          className="h-full w-full"
-          onScroll={handleScroll}
-        >
-          <div className="p-4 pb-24 space-y-4">
+      <div className="flex-1 min-h-0 relative">
+        <ScrollArea ref={scrollRef} className="h-full w-full">
+          <div className="p-4 pb-12 space-y-4">
             {msgsLoading
               ? Array(5)
                   .fill(0)
@@ -179,16 +188,15 @@ function ChatPage() {
 
         {showScrollButton && (
           <Button
-            size="sm"
+            size="icon"
             variant="secondary"
-            className="absolute bottom-20 left-1/2 -translate-x-1/2 shadow-lg rounded-full gap-2 z-30 animate-in fade-in zoom-in duration-200"
+            className="absolute bottom-6 right-6 h-10 w-10 rounded-full shadow-lg border z-50 animate-in fade-in zoom-in duration-200"
             onClick={() => {
               isAtBottom.current = true;
-              scrollToBottom();
+              scrollToBottom("smooth");
             }}
           >
-            <ArrowDown className="h-4 w-4" />
-            New Messages
+            <ArrowDown className="h-5 w-5" />
           </Button>
         )}
       </div>
