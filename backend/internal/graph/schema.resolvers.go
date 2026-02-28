@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/aerogram-org/aerogram-api/internal/graph/model"
@@ -17,6 +18,8 @@ import (
 	messagespb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1"
 	"github.com/aerogram-org/aerogram-api/internal/middleware"
 	"github.com/aerogram-org/aerogram-api/internal/models"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // ChatID is the resolver for the chatId field.
@@ -61,28 +64,12 @@ func (r *messageResolver) SentAt(ctx context.Context, obj *models.Message) (stri
 	return obj.CreatedAt.Format(time.RFC3339), nil
 }
 
-// IsRead is the resolver for the isRead field.
-func (r *messageResolver) IsRead(ctx context.Context, obj *models.Message) (bool, error) {
-	authID := middleware.GetUserID(ctx)
-
-	if obj.AuthorID == authID {
-		var otherMember models.DialogMember
-		err := r.db.Where("dialog_id = ? AND user_id != ?", obj.DialogID, authID).First(&otherMember).Error
-		if err == nil {
-			if !obj.CreatedAt.After(otherMember.LastReadAt) {
-				return true, nil
-			}
-		}
-		return obj.ViewsCount > 0, nil
+// Sequence is the resolver for the sequence field.
+func (r *messageResolver) Sequence(ctx context.Context, obj *models.Message) (int64, error) {
+	if obj == nil {
+		return 0, nil
 	}
-
-	var myMember models.DialogMember
-	err := r.db.Where("dialog_id = ? AND user_id = ?", obj.DialogID, authID).First(&myMember).Error
-	if err != nil {
-		return false, nil
-	}
-
-	return !obj.CreatedAt.After(myMember.LastReadAt), nil
+	return obj.Sequence, nil
 }
 
 // ReplyTo is the resolver for the replyTo field.
@@ -216,31 +203,36 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 // SendMessage is the resolver for the sendMessage field.
 func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text string, replyToID *string) (*models.Message, error) {
 	authID := middleware.GetUserID(ctx)
-	resp, err := r.messagesClient.SendMessage(ctx, &messagespb.SendMessageRequest{
-		ChatId:    chatID,
-		SenderId:  authID,
-		Text:      text,
-		ReplyToId: replyToID,
-	})
-	if err != nil {
-		return nil, mapGRPCError(err)
-	}
-
-	user, _ := r.userRepo.GetByID(authID)
-	sentAt, _ := time.Parse(time.RFC3339, resp.Message.SentAt)
 
 	msg := &models.Message{
-		ID:        resp.Message.Id,
-		DialogID:  resp.Message.ChatId,
-		AuthorID:  resp.Message.SenderId,
-		Content:   resp.Message.Text,
-		CreatedAt: sentAt,
-		ReplyToID: resp.Message.ReplyToId,
-		Sender:    user,
+		ID:        uuid.NewString(),
+		DialogID:  chatID,
+		AuthorID:  authID,
+		Content:   text,
+		ReplyToID: replyToID,
+		CreatedAt: time.Now(),
+	}
+
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(msg).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.Dialog{}).
+			Where("id = ?", chatID).
+			Updates(map[string]interface{}{
+				"last_message_id": msg.ID,
+				"last_message_at": msg.CreatedAt,
+			}).Error
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	payload, _ := json.Marshal(msg)
-	r.redisClient.Publish(ctx, "chat_updates:"+chatID, payload)
+	log.Printf("Publishing message to Redis channel chat:%s -> %s", chatID, string(payload))
+	if err := r.redisClient.Publish(ctx, "chat:"+chatID, payload).Err(); err != nil {
+		log.Printf("Redis publish error: %v", err)
+	}
 
 	return msg, nil
 }
@@ -347,6 +339,32 @@ func (r *mutationResolver) MarkAsRead(ctx context.Context, chatID string, lastMe
 		"lastMessageID": lastMessageID,
 	})
 	r.redisClient.Publish(ctx, "read:"+chatID, payload)
+
+	return true, nil
+}
+
+// MarkDialogAsRead is the resolver for the markDialogAsRead field.
+func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error) {
+	userID := middleware.GetUserID(ctx)
+	if userID == "" {
+		return false, errors.New("unauthorized access")
+	}
+
+	err := r.db.Model(&models.DialogMember{}).
+		Where("dialog_id = ? AND user_id = ?", chatID, userID).
+		Update("last_read_sequence", lastSequence).Error
+	if err != nil {
+		return false, err
+	}
+
+	payload := model.ReadPayload{
+		ChatID:       chatID,
+		UserID:       userID,
+		LastSequence: lastSequence,
+	}
+
+	data, _ := json.Marshal(payload)
+	r.redisClient.Publish(ctx, "dialog_read:"+chatID, data)
 
 	return true, nil
 }
@@ -484,6 +502,26 @@ func (r *queryResolver) SearchUsers(ctx context.Context, username string) ([]*mo
 	return r.userRepo.SearchByUsername(username)
 }
 
+// DialogRead is the resolver for the dialogRead field.
+func (r *queryResolver) DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error) {
+	userID := middleware.GetUserID(ctx)
+	if userID == "" {
+		return nil, errors.New("unauthorized access")
+	}
+
+	var member models.DialogMember
+	err := r.db.Where("dialog_id = ? AND user_id = ?", chatID, userID).First(&member).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.ReadPayload{
+		ChatID:       chatID,
+		UserID:       userID,
+		LastSequence: member.LastReadSequence,
+	}, nil
+}
+
 // CreatedAt is the resolver for the createdAt field.
 func (r *sessionResolver) CreatedAt(ctx context.Context, obj *models.Session) (string, error) {
 	return obj.CreatedAt.Format(time.RFC3339), nil
@@ -492,26 +530,44 @@ func (r *sessionResolver) CreatedAt(ctx context.Context, obj *models.Session) (s
 // MessageAdded is the resolver for the messageAdded field.
 func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) (<-chan *models.Message, error) {
 	msgChan := make(chan *models.Message, 1)
-	pubsub := r.redisClient.Subscribe(ctx, "chat_updates:"+chatID)
+	pubsub := r.redisClient.Subscribe(ctx, "chat:"+chatID)
+
 	go func() {
 		defer pubsub.Close()
 		defer close(msgChan)
+
 		ch := pubsub.Channel()
+		log.Printf("Subscription started for chat: %s", chatID)
+
 		for {
 			select {
 			case <-ctx.Done():
+				log.Printf("Subscription closed for chat: %s", chatID)
 				return
 			case msg, ok := <-ch:
 				if !ok {
+					log.Printf("Redis channel closed for chat: %s", chatID)
 					return
 				}
+
+				log.Printf("Received message from Redis for chat %s: %s", chatID, msg.Payload)
 				var m models.Message
-				if err := json.Unmarshal([]byte(msg.Payload), &m); err == nil {
-					msgChan <- &m
+				if err := json.Unmarshal([]byte(msg.Payload), &m); err != nil {
+					log.Printf("Failed to unmarshal message: %v", err)
+					continue
+				}
+
+				select {
+				case msgChan <- &m:
+					log.Printf("Message sent to subscription channel for chat %s: %s", chatID, m.ID)
+				case <-ctx.Done():
+					log.Printf("Context canceled while sending message for chat %s", chatID)
+					return
 				}
 			}
 		}
 	}()
+
 	return msgChan, nil
 }
 
@@ -565,6 +621,38 @@ func (r *subscriptionResolver) MessageRead(ctx context.Context, chatID string) (
 	return readChan, nil
 }
 
+// DialogRead is the resolver for the dialogRead field.
+func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error) {
+	readChan := make(chan *model.ReadPayload, 1)
+	pubsub := r.redisClient.Subscribe(ctx, "dialog_read:"+chatID)
+	authID := middleware.GetUserID(ctx)
+
+	go func() {
+		defer pubsub.Close()
+		defer close(readChan)
+
+		ch := pubsub.Channel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-ch:
+				if !ok {
+					return
+				}
+				var payload model.ReadPayload
+				if err := json.Unmarshal([]byte(msg.Payload), &payload); err == nil {
+					if payload.UserID != authID {
+						readChan <- &payload
+					}
+				}
+			}
+		}
+	}()
+
+	return readChan, nil
+}
+
 // Message returns MessageResolver implementation.
 func (r *Resolver) Message() MessageResolver { return &messageResolver{r} }
 
@@ -585,17 +673,3 @@ type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type sessionResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *userResolver) Status(ctx context.Context, obj *models.User) (string, error) {
-	return r.presenceRepo.GetStatus(ctx, obj.ID)
-}
-func (r *Resolver) User() UserResolver { return &userResolver{r} }
-type userResolver struct{ *Resolver }
-*/
