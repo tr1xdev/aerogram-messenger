@@ -30,14 +30,16 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth";
-import { useMyChats } from "@/features/chat/lib/use-chats";
+import { useMyChats } from "@/features/chat/lib/use-messages";
 import type { Chat } from "@/entities/chat/model/types";
 
 export default function RootLayout() {
   const navigate = useNavigate();
   const isAuth = useAuthStore((s) => s.isAuth);
   const pathname = useRouterState().location.pathname;
-  const { data: chats, isLoading } = useMyChats();
+  const { data, loading: isLoading } = useMyChats();
+
+  const chats = data?.myChats;
 
   if (!isAuth && !["/login", "/signup", "/otp"].includes(pathname)) {
     return (
@@ -105,7 +107,7 @@ export default function RootLayout() {
                     </div>
                   </SidebarMenuItem>
                 ) : (
-                  (chats as Chat[]).map((chat) => (
+                  chats.map((chat: Chat) => (
                     <SidebarMenuItem key={chat.id}>
                       <SidebarMenuButton
                         asChild
