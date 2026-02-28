@@ -56,17 +56,23 @@ type ComplexityRoot struct {
 	}
 
 	Chat struct {
-		ID           func(childComplexity int) int
-		IsPinned     func(childComplexity int) int
-		LastMessage  func(childComplexity int) int
-		Members      func(childComplexity int) int
-		MembersCount func(childComplexity int) int
-		Messages     func(childComplexity int) int
-		PhotoURL     func(childComplexity int) int
-		Slug         func(childComplexity int) int
-		Title        func(childComplexity int) int
-		Type         func(childComplexity int) int
-		UnreadCount  func(childComplexity int) int
+		ID               func(childComplexity int) int
+		IsPinned         func(childComplexity int) int
+		LastMessage      func(childComplexity int) int
+		LastReadSequence func(childComplexity int) int
+		Members          func(childComplexity int) int
+		MembersCount     func(childComplexity int) int
+		Messages         func(childComplexity int) int
+		PhotoURL         func(childComplexity int) int
+		Slug             func(childComplexity int) int
+		Title            func(childComplexity int) int
+		Type             func(childComplexity int) int
+		UnreadCount      func(childComplexity int) int
+	}
+
+	ChatMember struct {
+		LastReadSequence func(childComplexity int) int
+		User             func(childComplexity int) int
 	}
 
 	Message struct {
@@ -74,10 +80,10 @@ type ComplexityRoot struct {
 		ForwardedFrom func(childComplexity int) int
 		ID            func(childComplexity int) int
 		IsEdited      func(childComplexity int) int
-		IsRead        func(childComplexity int) int
 		ReplyTo       func(childComplexity int) int
 		Sender        func(childComplexity int) int
 		SentAt        func(childComplexity int) int
+		Sequence      func(childComplexity int) int
 		Text          func(childComplexity int) int
 	}
 
@@ -88,6 +94,7 @@ type ComplexityRoot struct {
 		Login            func(childComplexity int, input model.LoginInput) int
 		Logout           func(childComplexity int) int
 		MarkAsRead       func(childComplexity int, chatID string, lastMessageID string) int
+		MarkDialogAsRead func(childComplexity int, chatID string, lastSequence int64) int
 		PinChat          func(childComplexity int, id string, pinned bool) int
 		RefreshToken     func(childComplexity int, token string) int
 		SendMessage      func(childComplexity int, chatID string, text string, replyToID *string) int
@@ -101,6 +108,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		Chat           func(childComplexity int, id *string, slug *string) int
+		DialogRead     func(childComplexity int, chatID string) int
 		Me             func(childComplexity int) int
 		MessageHistory func(childComplexity int, chatID string, limit int, offset int) int
 		MyChats        func(childComplexity int) int
@@ -109,9 +117,9 @@ type ComplexityRoot struct {
 	}
 
 	ReadPayload struct {
-		ChatID        func(childComplexity int) int
-		LastMessageID func(childComplexity int) int
-		UserID        func(childComplexity int) int
+		ChatID       func(childComplexity int) int
+		LastSequence func(childComplexity int) int
+		UserID       func(childComplexity int) int
 	}
 
 	Session struct {
@@ -123,6 +131,7 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
+		DialogRead        func(childComplexity int, chatID string) int
 		MessageAdded      func(childComplexity int, chatID string) int
 		MessageRead       func(childComplexity int, chatID string) int
 		UserStatusChanged func(childComplexity int, chatID string) int
@@ -153,7 +162,7 @@ type MessageResolver interface {
 	Sender(ctx context.Context, obj *models.Message) (*models.User, error)
 	Text(ctx context.Context, obj *models.Message) (string, error)
 	SentAt(ctx context.Context, obj *models.Message) (string, error)
-	IsRead(ctx context.Context, obj *models.Message) (bool, error)
+	Sequence(ctx context.Context, obj *models.Message) (int64, error)
 
 	ReplyTo(ctx context.Context, obj *models.Message) (*models.Message, error)
 	ForwardedFrom(ctx context.Context, obj *models.Message) (*models.Message, error)
@@ -172,6 +181,7 @@ type MutationResolver interface {
 	CreateDirectChat(ctx context.Context, userID string) (*model.Chat, error)
 	SendTypingEvent(ctx context.Context, chatID string) (bool, error)
 	MarkAsRead(ctx context.Context, chatID string, lastMessageID string) (bool, error)
+	MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error)
 	TerminateSession(ctx context.Context, id string) (bool, error)
 	Logout(ctx context.Context) (bool, error)
 }
@@ -182,6 +192,7 @@ type QueryResolver interface {
 	Chat(ctx context.Context, id *string, slug *string) (*model.Chat, error)
 	MessageHistory(ctx context.Context, chatID string, limit int, offset int) ([]*models.Message, error)
 	SearchUsers(ctx context.Context, username string) ([]*models.User, error)
+	DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error)
 }
 type SessionResolver interface {
 	CreatedAt(ctx context.Context, obj *models.Session) (string, error)
@@ -190,6 +201,7 @@ type SubscriptionResolver interface {
 	MessageAdded(ctx context.Context, chatID string) (<-chan *models.Message, error)
 	UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error)
 	MessageRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
+	DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
 }
 
 type executableSchema struct {
@@ -236,6 +248,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Chat.LastMessage(childComplexity), true
+	case "Chat.lastReadSequence":
+		if e.complexity.Chat.LastReadSequence == nil {
+			break
+		}
+
+		return e.complexity.Chat.LastReadSequence(childComplexity), true
 	case "Chat.members":
 		if e.complexity.Chat.Members == nil {
 			break
@@ -285,6 +303,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Chat.UnreadCount(childComplexity), true
 
+	case "ChatMember.lastReadSequence":
+		if e.complexity.ChatMember.LastReadSequence == nil {
+			break
+		}
+
+		return e.complexity.ChatMember.LastReadSequence(childComplexity), true
+	case "ChatMember.user":
+		if e.complexity.ChatMember.User == nil {
+			break
+		}
+
+		return e.complexity.ChatMember.User(childComplexity), true
+
 	case "Message.chatId":
 		if e.complexity.Message.ChatID == nil {
 			break
@@ -309,12 +340,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Message.IsEdited(childComplexity), true
-	case "Message.isRead":
-		if e.complexity.Message.IsRead == nil {
-			break
-		}
-
-		return e.complexity.Message.IsRead(childComplexity), true
 	case "Message.replyTo":
 		if e.complexity.Message.ReplyTo == nil {
 			break
@@ -333,6 +358,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Message.SentAt(childComplexity), true
+	case "Message.sequence":
+		if e.complexity.Message.Sequence == nil {
+			break
+		}
+
+		return e.complexity.Message.Sequence(childComplexity), true
 	case "Message.text":
 		if e.complexity.Message.Text == nil {
 			break
@@ -401,6 +432,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.MarkAsRead(childComplexity, args["chatID"].(string), args["lastMessageID"].(string)), true
+	case "Mutation.markDialogAsRead":
+		if e.complexity.Mutation.MarkDialogAsRead == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_markDialogAsRead_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.MarkDialogAsRead(childComplexity, args["chatID"].(string), args["lastSequence"].(int64)), true
 	case "Mutation.pinChat":
 		if e.complexity.Mutation.PinChat == nil {
 			break
@@ -512,6 +554,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Chat(childComplexity, args["id"].(*string), args["slug"].(*string)), true
+	case "Query.dialogRead":
+		if e.complexity.Query.DialogRead == nil {
+			break
+		}
+
+		args, err := ec.field_Query_dialogRead_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.DialogRead(childComplexity, args["chatID"].(string)), true
 	case "Query.me":
 		if e.complexity.Query.Me == nil {
 			break
@@ -564,12 +617,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ReadPayload.ChatID(childComplexity), true
-	case "ReadPayload.lastMessageID":
-		if e.complexity.ReadPayload.LastMessageID == nil {
+	case "ReadPayload.lastSequence":
+		if e.complexity.ReadPayload.LastSequence == nil {
 			break
 		}
 
-		return e.complexity.ReadPayload.LastMessageID(childComplexity), true
+		return e.complexity.ReadPayload.LastSequence(childComplexity), true
 	case "ReadPayload.userID":
 		if e.complexity.ReadPayload.UserID == nil {
 			break
@@ -608,6 +661,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Session.IsActive(childComplexity), true
 
+	case "Subscription.dialogRead":
+		if e.complexity.Subscription.DialogRead == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_dialogRead_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.DialogRead(childComplexity, args["chatID"].(string)), true
 	case "Subscription.messageAdded":
 		if e.complexity.Subscription.MessageAdded == nil {
 			break
@@ -925,6 +989,22 @@ func (ec *executionContext) field_Mutation_markAsRead_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_markDialogAsRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatID", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["chatID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "lastSequence", ec.unmarshalNLong2int64)
+	if err != nil {
+		return nil, err
+	}
+	args["lastSequence"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_pinChat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1071,6 +1151,17 @@ func (ec *executionContext) field_Query_chat_args(ctx context.Context, rawArgs m
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_dialogRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatID", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["chatID"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_messageHistory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1111,6 +1202,17 @@ func (ec *executionContext) field_Query_sessions_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["userId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_dialogRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatID", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["chatID"] = arg0
 	return args, nil
 }
 
@@ -1494,8 +1596,8 @@ func (ec *executionContext) fieldContext_Chat_lastMessage(_ context.Context, fie
 				return ec.fieldContext_Message_text(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "isRead":
-				return ec.fieldContext_Message_isRead(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
 			case "replyTo":
@@ -1504,6 +1606,35 @@ func (ec *executionContext) fieldContext_Chat_lastMessage(_ context.Context, fie
 				return ec.fieldContext_Message_forwardedFrom(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Message", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Chat_lastReadSequence(ctx context.Context, field graphql.CollectedField, obj *model.Chat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Chat_lastReadSequence,
+		func(ctx context.Context) (any, error) {
+			return obj.LastReadSequence, nil
+		},
+		nil,
+		ec.marshalNLong2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Chat_lastReadSequence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Chat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Long does not have child fields")
 		},
 	}
 	return fc, nil
@@ -1519,7 +1650,7 @@ func (ec *executionContext) _Chat_members(ctx context.Context, field graphql.Col
 			return obj.Members, nil
 		},
 		nil,
-		ec.marshalOUser2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUserᚄ,
+		ec.marshalOChatMember2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatMemberᚄ,
 		true,
 		false,
 	)
@@ -1533,20 +1664,12 @@ func (ec *executionContext) fieldContext_Chat_members(_ context.Context, field g
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "first_name":
-				return ec.fieldContext_User_first_name(ctx, field)
-			case "last_name":
-				return ec.fieldContext_User_last_name(ctx, field)
-			case "username":
-				return ec.fieldContext_User_username(ctx, field)
-			case "status":
-				return ec.fieldContext_User_status(ctx, field)
+			case "user":
+				return ec.fieldContext_ChatMember_user(ctx, field)
+			case "lastReadSequence":
+				return ec.fieldContext_ChatMember_lastReadSequence(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type ChatMember", field.Name)
 		},
 	}
 	return fc, nil
@@ -1586,8 +1709,8 @@ func (ec *executionContext) fieldContext_Chat_messages(_ context.Context, field 
 				return ec.fieldContext_Message_text(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "isRead":
-				return ec.fieldContext_Message_isRead(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
 			case "replyTo":
@@ -1596,6 +1719,78 @@ func (ec *executionContext) fieldContext_Chat_messages(_ context.Context, field 
 				return ec.fieldContext_Message_forwardedFrom(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Message", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChatMember_user(ctx context.Context, field graphql.CollectedField, obj *model.ChatMember) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChatMember_user,
+		func(ctx context.Context) (any, error) {
+			return obj.User, nil
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChatMember_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChatMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "first_name":
+				return ec.fieldContext_User_first_name(ctx, field)
+			case "last_name":
+				return ec.fieldContext_User_last_name(ctx, field)
+			case "username":
+				return ec.fieldContext_User_username(ctx, field)
+			case "status":
+				return ec.fieldContext_User_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChatMember_lastReadSequence(ctx context.Context, field graphql.CollectedField, obj *model.ChatMember) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChatMember_lastReadSequence,
+		func(ctx context.Context) (any, error) {
+			return obj.LastReadSequence, nil
+		},
+		nil,
+		ec.marshalNLong2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChatMember_lastReadSequence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChatMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Long does not have child fields")
 		},
 	}
 	return fc, nil
@@ -1760,30 +1955,30 @@ func (ec *executionContext) fieldContext_Message_sentAt(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Message_isRead(ctx context.Context, field graphql.CollectedField, obj *models.Message) (ret graphql.Marshaler) {
+func (ec *executionContext) _Message_sequence(ctx context.Context, field graphql.CollectedField, obj *models.Message) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Message_isRead,
+		ec.fieldContext_Message_sequence,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Message().IsRead(ctx, obj)
+			return ec.resolvers.Message().Sequence(ctx, obj)
 		},
 		nil,
-		ec.marshalNBoolean2bool,
+		ec.marshalNLong2int64,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_Message_isRead(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Message_sequence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Message",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
+			return nil, errors.New("field of type Long does not have child fields")
 		},
 	}
 	return fc, nil
@@ -1852,8 +2047,8 @@ func (ec *executionContext) fieldContext_Message_replyTo(_ context.Context, fiel
 				return ec.fieldContext_Message_text(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "isRead":
-				return ec.fieldContext_Message_isRead(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
 			case "replyTo":
@@ -1901,8 +2096,8 @@ func (ec *executionContext) fieldContext_Message_forwardedFrom(_ context.Context
 				return ec.fieldContext_Message_text(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "isRead":
-				return ec.fieldContext_Message_isRead(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
 			case "replyTo":
@@ -2198,6 +2393,8 @@ func (ec *executionContext) fieldContext_Mutation_createChat(ctx context.Context
 				return ec.fieldContext_Chat_isPinned(ctx, field)
 			case "lastMessage":
 				return ec.fieldContext_Chat_lastMessage(ctx, field)
+			case "lastReadSequence":
+				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
 			case "members":
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
@@ -2255,8 +2452,8 @@ func (ec *executionContext) fieldContext_Mutation_sendMessage(ctx context.Contex
 				return ec.fieldContext_Message_text(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "isRead":
-				return ec.fieldContext_Message_isRead(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
 			case "replyTo":
@@ -2316,8 +2513,8 @@ func (ec *executionContext) fieldContext_Mutation_updateMessage(ctx context.Cont
 				return ec.fieldContext_Message_text(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "isRead":
-				return ec.fieldContext_Message_isRead(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
 			case "replyTo":
@@ -2467,6 +2664,8 @@ func (ec *executionContext) fieldContext_Mutation_createDirectChat(ctx context.C
 				return ec.fieldContext_Chat_isPinned(ctx, field)
 			case "lastMessage":
 				return ec.fieldContext_Chat_lastMessage(ctx, field)
+			case "lastReadSequence":
+				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
 			case "members":
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
@@ -2565,6 +2764,47 @@ func (ec *executionContext) fieldContext_Mutation_markAsRead(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_markAsRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_markDialogAsRead(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_markDialogAsRead,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().MarkDialogAsRead(ctx, fc.Args["chatID"].(string), fc.Args["lastSequence"].(int64))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_markDialogAsRead(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_markDialogAsRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2779,6 +3019,8 @@ func (ec *executionContext) fieldContext_Query_myChats(_ context.Context, field 
 				return ec.fieldContext_Chat_isPinned(ctx, field)
 			case "lastMessage":
 				return ec.fieldContext_Chat_lastMessage(ctx, field)
+			case "lastReadSequence":
+				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
 			case "members":
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
@@ -2833,6 +3075,8 @@ func (ec *executionContext) fieldContext_Query_chat(ctx context.Context, field g
 				return ec.fieldContext_Chat_isPinned(ctx, field)
 			case "lastMessage":
 				return ec.fieldContext_Chat_lastMessage(ctx, field)
+			case "lastReadSequence":
+				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
 			case "members":
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
@@ -2890,8 +3134,8 @@ func (ec *executionContext) fieldContext_Query_messageHistory(ctx context.Contex
 				return ec.fieldContext_Message_text(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "isRead":
-				return ec.fieldContext_Message_isRead(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
 			case "replyTo":
@@ -2965,6 +3209,55 @@ func (ec *executionContext) fieldContext_Query_searchUsers(ctx context.Context, 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_searchUsers_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_dialogRead(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_dialogRead,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().DialogRead(ctx, fc.Args["chatID"].(string))
+		},
+		nil,
+		ec.marshalNReadPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐReadPayload,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_dialogRead(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "chatID":
+				return ec.fieldContext_ReadPayload_chatID(ctx, field)
+			case "userID":
+				return ec.fieldContext_ReadPayload_userID(ctx, field)
+			case "lastSequence":
+				return ec.fieldContext_ReadPayload_lastSequence(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReadPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_dialogRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3137,30 +3430,30 @@ func (ec *executionContext) fieldContext_ReadPayload_userID(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _ReadPayload_lastMessageID(ctx context.Context, field graphql.CollectedField, obj *model.ReadPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _ReadPayload_lastSequence(ctx context.Context, field graphql.CollectedField, obj *model.ReadPayload) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_ReadPayload_lastMessageID,
+		ec.fieldContext_ReadPayload_lastSequence,
 		func(ctx context.Context) (any, error) {
-			return obj.LastMessageID, nil
+			return obj.LastSequence, nil
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalNLong2int64,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_ReadPayload_lastMessageID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ReadPayload_lastSequence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ReadPayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type Long does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3346,8 +3639,8 @@ func (ec *executionContext) fieldContext_Subscription_messageAdded(ctx context.C
 				return ec.fieldContext_Message_text(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "isRead":
-				return ec.fieldContext_Message_isRead(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
 			case "replyTo":
@@ -3448,8 +3741,8 @@ func (ec *executionContext) fieldContext_Subscription_messageRead(ctx context.Co
 				return ec.fieldContext_ReadPayload_chatID(ctx, field)
 			case "userID":
 				return ec.fieldContext_ReadPayload_userID(ctx, field)
-			case "lastMessageID":
-				return ec.fieldContext_ReadPayload_lastMessageID(ctx, field)
+			case "lastSequence":
+				return ec.fieldContext_ReadPayload_lastSequence(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ReadPayload", field.Name)
 		},
@@ -3462,6 +3755,55 @@ func (ec *executionContext) fieldContext_Subscription_messageRead(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Subscription_messageRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_dialogRead(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_dialogRead,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().DialogRead(ctx, fc.Args["chatID"].(string))
+		},
+		nil,
+		ec.marshalNReadPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐReadPayload,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_dialogRead(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "chatID":
+				return ec.fieldContext_ReadPayload_chatID(ctx, field)
+			case "userID":
+				return ec.fieldContext_ReadPayload_userID(ctx, field)
+			case "lastSequence":
+				return ec.fieldContext_ReadPayload_lastSequence(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReadPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_dialogRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -5459,10 +5801,59 @@ func (ec *executionContext) _Chat(ctx context.Context, sel ast.SelectionSet, obj
 			}
 		case "lastMessage":
 			out.Values[i] = ec._Chat_lastMessage(ctx, field, obj)
+		case "lastReadSequence":
+			out.Values[i] = ec._Chat_lastReadSequence(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "members":
 			out.Values[i] = ec._Chat_members(ctx, field, obj)
 		case "messages":
 			out.Values[i] = ec._Chat_messages(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var chatMemberImplementors = []string{"ChatMember"}
+
+func (ec *executionContext) _ChatMember(ctx context.Context, sel ast.SelectionSet, obj *model.ChatMember) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chatMemberImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChatMember")
+		case "user":
+			out.Values[i] = ec._ChatMember_user(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastReadSequence":
+			out.Values[i] = ec._ChatMember_lastReadSequence(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -5649,7 +6040,7 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "isRead":
+		case "sequence":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -5658,7 +6049,7 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Message_isRead(ctx, field, obj)
+				res = ec._Message_sequence(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -5889,6 +6280,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "markDialogAsRead":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_markDialogAsRead(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "terminateSession":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_terminateSession(ctx, field)
@@ -6077,6 +6475,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "dialogRead":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_dialogRead(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -6129,8 +6549,8 @@ func (ec *executionContext) _ReadPayload(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "lastMessageID":
-			out.Values[i] = ec._ReadPayload_lastMessageID(ctx, field, obj)
+		case "lastSequence":
+			out.Values[i] = ec._ReadPayload_lastSequence(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -6257,6 +6677,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_userStatusChanged(ctx, fields[0])
 	case "messageRead":
 		return ec._Subscription_messageRead(ctx, fields[0])
+	case "dialogRead":
+		return ec._Subscription_dialogRead(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -6831,6 +7253,16 @@ func (ec *executionContext) marshalNChat2ᚖgithubᚗcomᚋaerogramᚑorgᚋaero
 	return ec._Chat(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNChatMember2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatMember(ctx context.Context, sel ast.SelectionSet, v *model.ChatMember) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ChatMember(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNChatType2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatType(ctx context.Context, v any) (model.ChatType, error) {
 	var res model.ChatType
 	err := res.UnmarshalGQL(v)
@@ -6876,6 +7308,22 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐLoginInput(ctx context.Context, v any) (model.LoginInput, error) {
 	res, err := ec.unmarshalInputLoginInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNLong2int64(ctx context.Context, v any) (int64, error) {
+	res, err := graphql.UnmarshalInt64(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNLong2int64(ctx context.Context, sel ast.SelectionSet, v int64) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalInt64(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) marshalNMessage2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage(ctx context.Context, sel ast.SelectionSet, v models.Message) graphql.Marshaler {
@@ -7404,6 +7852,53 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
+func (ec *executionContext) marshalOChatMember2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatMemberᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ChatMember) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChatMember2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatMember(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalOID2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
 	if v == nil {
 		return nil, nil
@@ -7493,53 +7988,6 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalString(*v)
 	return res
-}
-
-func (ec *executionContext) marshalOUser2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUserᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.User) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {
