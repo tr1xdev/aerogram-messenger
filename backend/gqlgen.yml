@@ -25,3 +25,7 @@ models:
       fields:
          sender:
             resolver: true
+         sequence:
+            resolver: true
+   Long:
+      model: github.com/99designs/gqlgen/graphql.Int64
