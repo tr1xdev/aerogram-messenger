@@ -24,14 +24,35 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 
 	var userIDs []string
 	var isPinned bool
+	var partnerReadSeq int64
+	var myReadSeq int64
+
 	for _, m := range dbMembers {
 		userIDs = append(userIDs, m.UserID)
 		if m.UserID == authID {
 			isPinned = m.IsPinned
+			myReadSeq = m.LastReadSequence
+		} else if chatType == model.ChatTypePrivate {
+			partnerReadSeq = m.LastReadSequence
 		}
 	}
 
 	users, _ := r.userRepo.GetByIDs(userIDs)
+
+	var gqlMembers []*model.ChatMember
+	for _, u := range users {
+		var lastSeq int64
+		for _, m := range dbMembers {
+			if m.UserID == u.ID {
+				lastSeq = m.LastReadSequence
+				break
+			}
+		}
+		gqlMembers = append(gqlMembers, &model.ChatMember{
+			User:             u,
+			LastReadSequence: lastSeq,
+		})
+	}
 
 	displayTitle := pbChat.Title
 	if chatType == model.ChatTypePrivate {
@@ -55,14 +76,12 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		var msg models.Message
 		if err := r.db.WithContext(ctx).First(&msg, "id = ?", pbChat.LastMessageId).Error; err == nil {
 			lastMsg = &msg
-
 			for _, u := range users {
 				if u.ID == msg.AuthorID {
 					lastMsg.Sender = u
 					break
 				}
 			}
-
 			if lastMsg.Sender == nil {
 				author, err := r.userRepo.GetByID(msg.AuthorID)
 				if err == nil {
@@ -74,20 +93,21 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 
 	var unreadCount int64
 	r.db.WithContext(ctx).Model(&models.Message{}).
-		Where("dialog_id = ? AND author_id != ? AND created_at > (SELECT last_read_at FROM dialog_members WHERE dialog_id = ? AND user_id = ?)",
-			pbChat.Id, authID, pbChat.Id, authID).
+		Where("dialog_id = ? AND author_id != ? AND sequence > ?",
+			pbChat.Id, authID, myReadSeq).
 		Count(&unreadCount)
 
 	return &model.Chat{
-		ID:           pbChat.Id,
-		Type:         chatType,
-		Title:        displayTitle,
-		Slug:         &pbChat.Slug,
-		MembersCount: int(pbChat.MembersCount),
-		Members:      users,
-		LastMessage:  lastMsg,
-		UnreadCount:  int(unreadCount),
-		IsPinned:     isPinned,
+		ID:               pbChat.Id,
+		Type:             chatType,
+		Title:            displayTitle,
+		Slug:             &pbChat.Slug,
+		MembersCount:     int(pbChat.MembersCount),
+		Members:          gqlMembers,
+		LastMessage:      lastMsg,
+		UnreadCount:      int(unreadCount),
+		IsPinned:         isPinned,
+		LastReadSequence: partnerReadSeq,
 	}, nil
 }
 
