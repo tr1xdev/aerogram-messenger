@@ -1,7 +1,14 @@
+scalar Long
+
 enum ChatType {
    PRIVATE
    GROUP
    CHANNEL
+}
+
+type ChatMember {
+   user: User!
+   lastReadSequence: Long!
 }
 
 type Chat {
@@ -14,7 +21,8 @@ type Chat {
    unreadCount: Int!
    isPinned: Boolean!
    lastMessage: Message
-   members: [User!]
+   lastReadSequence: Long!
+   members: [ChatMember!]
    messages: [Message!]!
 }
 
@@ -24,7 +32,7 @@ type Message {
    sender: User!
    text: String!
    sentAt: String!
-   isRead: Boolean!
+   sequence: Long!
    isEdited: Boolean!
    replyTo: Message
    forwardedFrom: Message
@@ -75,7 +83,7 @@ type VerifyEmailPayload {
 type ReadPayload {
    chatID: String!
    userID: String!
-   lastMessageID: String!
+   lastSequence: Long!
 }
 
 type Session {
@@ -93,6 +101,7 @@ type Query {
    chat(id: ID, slug: String): Chat!
    messageHistory(chatId: ID!, limit: Int!, offset: Int!): [Message!]!
    searchUsers(username: String!): [User!]!
+   dialogRead(chatID: String!): ReadPayload!
 }
 
 type Mutation {
@@ -113,7 +122,8 @@ type Mutation {
    pinChat(id: ID!, pinned: Boolean!): Boolean!
    createDirectChat(userID: String!): Chat!
    sendTypingEvent(chatID: String!): Boolean!
-   markAsRead(chatID: String!, lastMessageID: String!): Boolean!
+   markAsRead(chatID: String!, lastMessageID: String!): Boolean! # (deprecated)
+   markDialogAsRead(chatID: String!, lastSequence: Long!): Boolean!
    terminateSession(id: ID!): Boolean!
    logout: Boolean!
 }
@@ -121,7 +131,8 @@ type Mutation {
 type Subscription {
    messageAdded(chatId: ID!): Message!
    userStatusChanged(chatId: ID!): UserStatusPayload!
-   messageRead(chatID: String!): ReadPayload!
+   messageRead(chatID: String!): ReadPayload! # (deprecated)
+   dialogRead(chatID: String!): ReadPayload!
 }
 
 type UserStatusPayload {
