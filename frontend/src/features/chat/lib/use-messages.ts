@@ -5,15 +5,22 @@ import {
 } from "@apollo/client/react";
 import {
   SEND_MESSAGE,
-  MARK_AS_READ,
+  MARK_DIALOG_AS_READ,
   GET_MESSAGE_HISTORY,
   GET_ME,
   GET_CHAT_BY_ID,
+  GET_MY_CHATS,
+  SEARCH_USERS,
+  CREATE_DIRECT_CHAT,
 } from "../api/chat.gql";
 import type { Message, User, Chat } from "@/entities/chat/model/types";
 
 export function useMe() {
   return useQuery<{ me: User }>(GET_ME);
+}
+
+export function useMyChats() {
+  return useQuery<{ myChats: Chat[] }>(GET_MY_CHATS);
 }
 
 export function useChatDetails(id: string) {
@@ -26,35 +33,39 @@ export function useChatDetails(id: string) {
 export function useChatHistory(chatId: string) {
   const { data, loading, ...rest } = useQuery<{ messageHistory: Message[] }>(
     GET_MESSAGE_HISTORY,
-    {
-      variables: { chatId, limit: 50, offset: 0 },
-      skip: !chatId,
-    },
+    { variables: { chatId, limit: 50, offset: 0 }, skip: !chatId },
   );
   return { data: data?.messageHistory ?? [], isLoading: loading, ...rest };
+}
+
+export function useSearchUsers(username: string) {
+  return useQuery<{ searchUsers: User[] }>(SEARCH_USERS, {
+    variables: { username },
+    skip: username.length < 2,
+  });
 }
 
 export function useChatActions(chatId: string) {
   const [send, { loading }] = useMutation<{ sendMessage: Message }>(
     SEND_MESSAGE,
   );
-  const [read] = useMutation<{ markAsRead: boolean }>(MARK_AS_READ);
+  const [read] = useMutation<{ markDialogAsRead: boolean }>(
+    MARK_DIALOG_AS_READ,
+  );
+  const [createDirect] = useMutation<{ createDirectChat: Chat }>(
+    CREATE_DIRECT_CHAT,
+  );
 
   const sendMessage = (
     text: string,
     options?: MutationHookOptions<{ sendMessage: Message }>,
-  ) => {
-    return send({
-      variables: { chatId, text },
-      ...options,
-    });
-  };
+  ) => send({ variables: { chatId, text }, ...options });
 
-  const markAsRead = (lastMessageId: string) => {
-    return read({
-      variables: { chatID: chatId, lastMessageID: lastMessageId },
-    });
-  };
+  const markAsRead = (lastSequence: number) =>
+    read({ variables: { chatID: chatId, lastSequence } });
 
-  return { sendMessage, isSending: loading, markAsRead };
+  const createChat = (userID: string) =>
+    createDirect({ variables: { userID } });
+
+  return { sendMessage, isSending: loading, markAsRead, createChat };
 }

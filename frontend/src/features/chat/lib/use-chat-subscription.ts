@@ -1,24 +1,24 @@
 import { useSubscription, useApolloClient } from "@apollo/client/react";
-import type { Message, Chat } from "@/entities/chat/model/types";
 import {
   MESSAGE_SUBSCRIPTION,
   USER_PRESENCE_SUBSCRIPTION,
+  DIALOG_READ_SUBSCRIPTION,
   GET_MESSAGE_HISTORY,
   GET_MY_CHATS,
 } from "../api/chat.gql";
+import type { Message, Chat } from "@/entities/chat/model/types";
 
 interface MessageAddedData {
   messageAdded: Message;
 }
-
-interface StatusPayload {
-  userStatusChanged: {
-    userId: string;
-    status: string;
-  };
+interface StatusChanged {
+  userStatusChanged: { userId: string; status: string };
+}
+interface DialogReadData {
+  dialogRead: { chatID: string; userID: string; lastSequence: number };
 }
 
-export function useChatSubscription(chatId: string) {
+export function useGlobalSubscriptions(chatId: string, myId?: string) {
   const client = useApolloClient();
 
   useSubscription<MessageAddedData>(MESSAGE_SUBSCRIPTION, {
@@ -28,20 +28,24 @@ export function useChatSubscription(chatId: string) {
       if (!newMessage) return;
 
       const historyVars = { chatId, limit: 50, offset: 0 };
-      const existingHistory = client.readQuery<{ messageHistory: Message[] }>({
+
+      const existing = client.readQuery<{ messageHistory: Message[] }>({
         query: GET_MESSAGE_HISTORY,
         variables: historyVars,
       });
 
-      if (
-        existingHistory &&
-        !existingHistory.messageHistory.some((m) => m.id === newMessage.id)
-      ) {
+      if (!existing?.messageHistory.some((m) => m.id === newMessage.id)) {
         client.writeQuery({
           query: GET_MESSAGE_HISTORY,
           variables: historyVars,
           data: {
-            messageHistory: [...existingHistory.messageHistory, newMessage],
+            messageHistory: [
+              ...(existing?.messageHistory || []),
+              newMessage,
+            ].sort(
+              (a, b) =>
+                new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
+            ),
           },
         });
       }
@@ -49,47 +53,68 @@ export function useChatSubscription(chatId: string) {
       const chatsData = client.readQuery<{ myChats: Chat[] }>({
         query: GET_MY_CHATS,
       });
-      if (!chatsData) return;
-
-      const updatedChats = chatsData.myChats.map((c) =>
-        c.id === chatId
-          ? { ...c, lastMessage: newMessage, unreadCount: c.unreadCount + 1 }
-          : c,
-      );
-
-      client.writeQuery({
-        query: GET_MY_CHATS,
-        data: { myChats: updatedChats },
-      });
+      if (chatsData) {
+        const isFromMe = myId && newMessage.sender.id === myId;
+        const updated = chatsData.myChats.map((c) =>
+          c.id === chatId
+            ? {
+                ...c,
+                lastMessage: newMessage,
+                unreadCount: isFromMe ? 0 : c.unreadCount + 1,
+              }
+            : c,
+        );
+        client.writeQuery({ query: GET_MY_CHATS, data: { myChats: updated } });
+      }
     },
   });
 
-  useSubscription<StatusPayload>(USER_PRESENCE_SUBSCRIPTION, {
+  useSubscription<DialogReadData>(DIALOG_READ_SUBSCRIPTION, {
+    variables: { chatID: chatId },
+    onData({ data }) {
+      const payload = data.data?.dialogRead;
+      if (!payload) return;
+
+      const isMe = myId && payload.userID === myId;
+
+      client.cache.modify({
+        id: client.cache.identify({ __typename: "Chat", id: payload.chatID }),
+        fields: {
+          lastReadSequence: (prev) => Math.max(prev || 0, payload.lastSequence),
+          unreadCount: (prev) => (isMe ? 0 : prev),
+        },
+      });
+
+      const sidebar = client.readQuery<{ myChats: Chat[] }>({
+        query: GET_MY_CHATS,
+      });
+      if (sidebar) {
+        const updated = sidebar.myChats.map((c) =>
+          c.id === payload.chatID
+            ? {
+                ...c,
+                lastReadSequence: Math.max(
+                  c.lastReadSequence || 0,
+                  payload.lastSequence,
+                ),
+                unreadCount: isMe ? 0 : c.unreadCount,
+              }
+            : c,
+        );
+        client.writeQuery({ query: GET_MY_CHATS, data: { myChats: updated } });
+      }
+    },
+  });
+
+  useSubscription<StatusChanged>(USER_PRESENCE_SUBSCRIPTION, {
     variables: { chatId },
     onData({ data }) {
       const payload = data.data?.userStatusChanged;
       if (!payload) return;
 
-      const chatsData = client.readQuery<{ myChats: Chat[] }>({
-        query: GET_MY_CHATS,
-      });
-      if (!chatsData) return;
-
-      const updatedChats = chatsData.myChats.map((c) =>
-        c.lastMessage?.sender.id === payload.userId
-          ? {
-              ...c,
-              lastMessage: {
-                ...c.lastMessage,
-                sender: { ...c.lastMessage.sender, status: payload.status },
-              },
-            }
-          : c,
-      );
-
-      client.writeQuery({
-        query: GET_MY_CHATS,
-        data: { myChats: updatedChats },
+      client.cache.modify({
+        id: client.cache.identify({ __typename: "User", id: payload.userId }),
+        fields: { status: () => payload.status },
       });
     },
   });

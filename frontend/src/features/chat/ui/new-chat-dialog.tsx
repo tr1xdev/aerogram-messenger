@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useCreateChat, useSearchUsers } from "../lib/use-chats";
+import {
+  useSearchUsers,
+  useChatActions,
+} from "@/features/chat/lib/use-messages";
 import {
   Dialog,
   DialogContent,
@@ -11,24 +14,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Plus, Loader2 } from "lucide-react";
+import type { User } from "@/entities/chat/model/types";
 
 export function NewChatDialog() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const { data: users, isLoading: isSearching } = useSearchUsers(search);
-  const createChat = useCreateChat();
+  const { data, loading: isSearching } = useSearchUsers(search);
+  const { createChat } = useChatActions("");
+
+  const users = data?.searchUsers || [];
 
   const handleCreate = async (userID: string) => {
     try {
-      await createChat.mutateAsync(userID);
+      await createChat(userID);
       setOpen(false);
       setSearch("");
     } catch (error: unknown) {
-      if (error instanceof Error && error.message.includes("unauthorized")) {
-        alert("Session expired. Please log in again.");
-      } else {
-        console.error(error);
-      }
+      console.error(error);
     }
   };
 
@@ -68,12 +70,11 @@ export function NewChatDialog() {
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : users?.length ? (
-            users.map((user) => (
+          ) : users.length ? (
+            users.map((user: User) => (
               <button
                 key={user.id}
                 onClick={() => handleCreate(user.id)}
-                disabled={createChat.isPending}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/70 transition text-left disabled:opacity-50"
               >
                 <Avatar className="h-9 w-9">
