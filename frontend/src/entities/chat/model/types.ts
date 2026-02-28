@@ -1,9 +1,11 @@
 export interface User {
   id: string;
   first_name: string;
-  last_name?: string;
+  last_name: string;
   username?: string;
+  photoUrl?: string;
   status: string;
+  lastSeen?: string;
 }
 
 export interface Message {
@@ -11,6 +13,7 @@ export interface Message {
   chatId: string;
   text: string;
   sentAt: string;
+  sequence?: number;
   isRead: boolean;
   isEdited: boolean;
   sender: User;
@@ -25,7 +28,8 @@ export interface Chat {
   type: ChatType;
   title: string;
   photoUrl?: string;
-  members?: User[];
+  members: User[];
   lastMessage?: Message;
   unreadCount: number;
+  lastReadSequence: number;
 }
