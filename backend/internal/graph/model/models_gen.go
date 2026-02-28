@@ -16,17 +16,23 @@ type AuthPayload struct {
 }
 
 type Chat struct {
-	ID           string            `json:"id"`
-	Type         ChatType          `json:"type"`
-	Slug         *string           `json:"slug,omitempty"`
-	Title        string            `json:"title"`
-	PhotoURL     *string           `json:"photoUrl,omitempty"`
-	MembersCount int               `json:"membersCount"`
-	UnreadCount  int               `json:"unreadCount"`
-	IsPinned     bool              `json:"isPinned"`
-	LastMessage  *models.Message   `json:"lastMessage,omitempty"`
-	Members      []*models.User    `json:"members,omitempty"`
-	Messages     []*models.Message `json:"messages"`
+	ID               string            `json:"id"`
+	Type             ChatType          `json:"type"`
+	Slug             *string           `json:"slug,omitempty"`
+	Title            string            `json:"title"`
+	PhotoURL         *string           `json:"photoUrl,omitempty"`
+	MembersCount     int               `json:"membersCount"`
+	UnreadCount      int               `json:"unreadCount"`
+	IsPinned         bool              `json:"isPinned"`
+	LastMessage      *models.Message   `json:"lastMessage,omitempty"`
+	LastReadSequence int64             `json:"lastReadSequence"`
+	Members          []*ChatMember     `json:"members,omitempty"`
+	Messages         []*models.Message `json:"messages"`
+}
+
+type ChatMember struct {
+	User             *models.User `json:"user"`
+	LastReadSequence int64        `json:"lastReadSequence"`
 }
 
 type LoginInput struct {
@@ -41,9 +47,9 @@ type Query struct {
 }
 
 type ReadPayload struct {
-	ChatID        string `json:"chatID"`
-	UserID        string `json:"userID"`
-	LastMessageID string `json:"lastMessageID"`
+	ChatID       string `json:"chatID"`
+	UserID       string `json:"userID"`
+	LastSequence int64  `json:"lastSequence"`
 }
 
 type SignUpInput struct {
