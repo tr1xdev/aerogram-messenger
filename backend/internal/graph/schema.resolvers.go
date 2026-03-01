@@ -289,15 +289,15 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 // SendTypingEvent is the resolver for the sendTypingEvent field.
 func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string) (bool, error) {
 	authID := middleware.GetUserID(ctx)
-	user, err := r.userRepo.GetByID(authID)
-	if err != nil {
-		return false, err
+
+	payload := map[string]interface{}{
+		"userId": authID,
+		"status": "typing",
 	}
-	payload, _ := json.Marshal(map[string]string{
-		"userID":   authID,
-		"username": user.Username,
-	})
-	r.redisClient.Publish(ctx, "typing:"+chatID, payload)
+
+	data, _ := json.Marshal(payload)
+	r.redisClient.Publish(ctx, "presence:updates", data)
+
 	return true, nil
 }
 
