@@ -24,8 +24,8 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 
 	var userIDs []string
 	var isPinned bool
-	var partnerReadSeq int64
 	var myReadSeq int64
+	var partnerReadSeq int64
 
 	for _, m := range dbMembers {
 		userIDs = append(userIDs, m.UserID)
@@ -37,21 +37,33 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		}
 	}
 
+	var lastMsg *models.Message
+	if pbChat.LastMessageId != "" {
+		var msg models.Message
+		if err := r.db.WithContext(ctx).First(&msg, "id = ?", pbChat.LastMessageId).Error; err == nil {
+			lastMsg = &msg
+			userIDs = append(userIDs, msg.AuthorID)
+		}
+	}
+
 	users, _ := r.userRepo.GetByIDs(userIDs)
+	userMap := make(map[string]*models.User)
+	for _, u := range users {
+		userMap[u.ID] = u
+	}
 
 	var gqlMembers []*model.ChatMember
-	for _, u := range users {
-		var lastSeq int64
-		for _, m := range dbMembers {
-			if m.UserID == u.ID {
-				lastSeq = m.LastReadSequence
-				break
-			}
+	for _, m := range dbMembers {
+		if u, ok := userMap[m.UserID]; ok {
+			gqlMembers = append(gqlMembers, &model.ChatMember{
+				User:             u,
+				LastReadSequence: m.LastReadSequence,
+			})
 		}
-		gqlMembers = append(gqlMembers, &model.ChatMember{
-			User:             u,
-			LastReadSequence: lastSeq,
-		})
+	}
+
+	if lastMsg != nil {
+		lastMsg.Sender = userMap[lastMsg.AuthorID]
 	}
 
 	displayTitle := pbChat.Title
@@ -71,30 +83,9 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		displayTitle = "Saved Messages"
 	}
 
-	var lastMsg *models.Message
-	if pbChat.LastMessageId != "" {
-		var msg models.Message
-		if err := r.db.WithContext(ctx).First(&msg, "id = ?", pbChat.LastMessageId).Error; err == nil {
-			lastMsg = &msg
-			for _, u := range users {
-				if u.ID == msg.AuthorID {
-					lastMsg.Sender = u
-					break
-				}
-			}
-			if lastMsg.Sender == nil {
-				author, err := r.userRepo.GetByID(msg.AuthorID)
-				if err == nil {
-					lastMsg.Sender = author
-				}
-			}
-		}
-	}
-
 	var unreadCount int64
 	r.db.WithContext(ctx).Model(&models.Message{}).
-		Where("dialog_id = ? AND author_id != ? AND sequence > ?",
-			pbChat.Id, authID, myReadSeq).
+		Where("dialog_id = ? AND author_id != ? AND sequence > ?", pbChat.Id, authID, myReadSeq).
 		Count(&unreadCount)
 
 	return &model.Chat{
