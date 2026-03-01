@@ -164,7 +164,7 @@ function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden">
+    <div className="flex flex-col h-full bg-background overflow-hidden w-full max-w-full">
       <header className="flex h-14 items-center justify-between px-4 border-b shrink-0 bg-background/95 backdrop-blur z-20">
         <div className="flex items-center gap-3">
           <Button
@@ -204,9 +204,9 @@ function ChatPage() {
         <ThemeToggle />
       </header>
 
-      <div className="flex-1 min-h-0 relative">
-        <ScrollArea ref={scrollRef} className="h-full">
-          <div className="p-4 space-y-4">
+      <div className="flex-1 min-h-0 relative w-full overflow-hidden">
+        <ScrollArea ref={scrollRef} className="h-full w-full">
+          <div className="p-4 space-y-4 w-full max-w-full flex flex-col overflow-hidden">
             {allMessages.map((msg) => (
               <MessageBubble
                 key={msg.id}
