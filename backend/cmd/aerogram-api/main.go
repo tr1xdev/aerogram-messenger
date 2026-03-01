@@ -57,9 +57,7 @@ func main() {
 	userRepo := repositories.NewUserRepository(db)
 	presenceRepo := repositories.NewPresenceRepository(rdb)
 
-	if err := db.AutoMigrate(&models.User{}, &models.Message{}, &models.Session{}); err != nil {
-		log.Fatal(err)
-	}
+	db.AutoMigrate(&models.User{}, &models.Message{}, &models.Session{}, &models.Dialog{}, &models.DialogMember{})
 
 	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.GRPC.Host, cfg.Server.GRPC.Port)
 	grpcLis, err := net.Listen("tcp", grpcAddr)
@@ -72,7 +70,7 @@ func main() {
 
 	go func() {
 		if err := grpcServer.Serve(grpcLis); err != nil && err != grpc.ErrServerStopped {
-			log.Fatalf("gRPC server error: %v", err)
+			log.Fatalf("gRPC error: %v", err)
 		}
 	}()
 
@@ -80,14 +78,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
 
 	srv := initGraphQL(db, userRepo, rdb, presenceRepo, conn)
-
 	router := chi.NewRouter()
 
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://127.0.0.1:5173", "*"},
+		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight"},
 		AllowCredentials: true,
@@ -97,9 +93,8 @@ func main() {
 	router.Get("/ws/presence", handlers.HandlePresence(presenceRepo))
 	api.SetupRoutes(router, srv)
 
-	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 	httpServer := &http.Server{
-		Addr:    httpAddr,
+		Addr:    fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port),
 		Handler: router,
 	}
 
@@ -107,28 +102,36 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("HTTP server on %s", httpAddr)
+		log.Printf("HTTP server on %s", httpServer.Addr)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server error: %v", err)
+			log.Fatalf("HTTP error: %v", err)
 		}
 	}()
 
 	<-stop
+	log.Println("Shutting down servers...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	grpcServer.GracefulStop()
-
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		log.Printf("HTTP shutdown error: %v", err)
 	}
+	log.Println("HTTP server stopped")
+
+	grpcServer.GracefulStop()
+	log.Println("gRPC server stopped")
+
+	conn.Close()
 
 	sqlDB, _ := db.DB()
 	if sqlDB != nil {
 		sqlDB.Close()
+		log.Println("Database connection closed")
 	}
+
 	rdb.Close()
+	log.Println("Redis connection closed")
 }
 
 func initGRPC(s *grpc.Server, db *gorm.DB, rdb *redis.Client, cfg *config.Config, pRepo *repositories.PresenceRepository) {
