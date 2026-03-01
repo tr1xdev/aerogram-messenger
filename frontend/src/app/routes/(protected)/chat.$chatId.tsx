@@ -1,16 +1,8 @@
-import {
-  useRef,
-  useLayoutEffect,
-  useMemo,
-  useState,
-  useEffect,
-  useCallback,
-} from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Send, ArrowDown, Clock } from "lucide-react";
+import { ChevronLeft, ArrowDown } from "lucide-react";
 import { useApolloClient, useMutation } from "@apollo/client/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,20 +22,17 @@ import {
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/entities/chat/model/types";
+import { useChatScroll } from "@/features/chat/lib/use-chat-scroll";
+import { MessageBubble } from "@/features/chat/ui/message-bubble";
+import { MessageComposer } from "@/features/chat/ui/message-composer";
 
 function ChatPage() {
   const { chatId } = Route.useParams();
   const navigate = useNavigate();
   const client = useApolloClient();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isAtBottom = useRef(true);
   const lastMarkedSeqRef = useRef<number | null>(null);
-  const prevMsgsLengthRef = useRef(0);
 
-  const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
-
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
   const { data: meData, loading: meLoading } = useMe();
   const { data: chatData, loading: chatLoading } = useChatDetails(chatId);
@@ -69,39 +58,15 @@ function ChatPage() {
     );
   }, [messages, optimisticMsgs]);
 
-  const getViewport = useCallback(
-    () =>
-      scrollRef.current?.querySelector<HTMLDivElement>(
-        "[data-radix-scroll-area-viewport]",
-      ),
-    [],
-  );
-
-  const scrollToBottom = useCallback(
-    (behavior: ScrollBehavior = "smooth") => {
-      const v = getViewport();
-      if (v) {
-        v.scrollTo({ top: v.scrollHeight, behavior });
-        isAtBottom.current = true;
-        setShowScrollBtn(false);
-        setUnreadCount(0);
-      }
-    },
-    [getViewport],
-  );
-
   const checkAndMarkRead = useCallback(() => {
-    if (!me || !chatId || !allMessages.length || !isAtBottom.current) return;
-
+    if (!me || !chatId || !allMessages.length) return;
     const partnerMsgs = allMessages.filter(
       (m) =>
         m.sender.id !== me.id &&
         !m.id.startsWith("temp-") &&
         typeof m.sequence === "number",
     );
-
     if (!partnerMsgs.length) return;
-
     const lastMsg = partnerMsgs[partnerMsgs.length - 1];
     const seq = lastMsg.sequence as number;
 
@@ -132,44 +97,23 @@ function ChatPage() {
     });
   }, [allMessages, me, chatId, markDialog, client, lastReadSequence]);
 
-  useLayoutEffect(() => {
-    const v = getViewport();
-    if (!v) return;
-
-    if (allMessages.length > prevMsgsLengthRef.current) {
-      if (isAtBottom.current) {
-        v.scrollTo({ top: v.scrollHeight, behavior: "instant" });
-      } else {
-        const lastMsg = allMessages[allMessages.length - 1];
-        if (lastMsg?.sender.id !== me?.id && !lastMsg?.id.startsWith("temp-")) {
-          setTimeout(() => setUnreadCount((p) => p + 1), 0);
-        }
-      }
-    }
-    prevMsgsLengthRef.current = allMessages.length;
-  }, [allMessages.length, getViewport, me?.id]);
+  const {
+    scrollRef,
+    showScrollBtn,
+    unreadCount,
+    scrollToBottom,
+    isAtBottomRef,
+  } = useChatScroll({
+    messages: allMessages,
+    myId: me?.id,
+    onMarkRead: checkAndMarkRead,
+  });
 
   useEffect(() => {
-    if (allMessages.length > 0) {
+    if (allMessages.length > 0 && isAtBottomRef.current) {
       checkAndMarkRead();
     }
-  }, [allMessages.length, checkAndMarkRead]);
-
-  useEffect(() => {
-    const v = getViewport();
-    if (!v) return;
-    const onScroll = () => {
-      const isBottom = v.scrollHeight - v.scrollTop <= v.clientHeight + 100;
-      isAtBottom.current = isBottom;
-      setShowScrollBtn(!isBottom);
-      if (isBottom) {
-        setUnreadCount(0);
-        checkAndMarkRead();
-      }
-    };
-    v.addEventListener("scroll", onScroll);
-    return () => v.removeEventListener("scroll", onScroll);
-  }, [getViewport, checkAndMarkRead]);
+  }, [allMessages.length, checkAndMarkRead, isAtBottomRef]);
 
   useEffect(() => {
     if (chatId) {
@@ -191,14 +135,11 @@ function ChatPage() {
       isEdited: false,
       sender: me,
     };
-
     setOptimisticMsgs((prev) => [...prev, newMsg]);
     const currentInput = input;
     resetInput();
-
-    isAtBottom.current = true;
+    isAtBottomRef.current = true;
     setTimeout(() => scrollToBottom("smooth"), 10);
-
     sendMessage(currentInput, {
       onCompleted: () =>
         setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId)),
@@ -214,12 +155,13 @@ function ChatPage() {
     [chat?.members, me?.id],
   );
 
-  if (meLoading || (!chat && chatLoading))
+  if (meLoading || (!chat && chatLoading)) {
     return (
       <div className="flex h-full items-center justify-center">
         <Skeleton className="h-12 w-12 rounded-full" />
       </div>
     );
+  }
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
@@ -265,68 +207,20 @@ function ChatPage() {
       <div className="flex-1 min-h-0 relative">
         <ScrollArea ref={scrollRef} className="h-full">
           <div className="p-4 space-y-4">
-            {allMessages.map((msg) => {
-              const isMe = msg.sender.id === me?.id;
-              const isRead =
-                isMe &&
-                !msg.id.startsWith("temp-") &&
-                typeof msg.sequence === "number" &&
-                lastReadSequence !== undefined
-                  ? lastReadSequence >= (msg.sequence as number)
-                  : false;
-              return (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex w-full",
-                    isMe ? "justify-end" : "justify-start",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex flex-col max-w-[75%]",
-                      isMe ? "items-end" : "items-start",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "px-3 py-1.5 text-sm rounded-2xl",
-                        isMe
-                          ? "bg-primary text-primary-foreground rounded-tr-none"
-                          : "bg-muted rounded-tl-none",
-                        msg.id.startsWith("temp-") && "opacity-70",
-                      )}
-                    >
-                      {msg.text}
-                    </div>
-                    <div className="flex items-center gap-1 mt-1 px-1">
-                      <span className="text-[10px] text-muted-foreground">
-                        {new Date(msg.sentAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      {isMe && (
-                        <span
-                          className={cn(
-                            "text-[10px] font-medium",
-                            isRead ? "text-primary" : "text-muted-foreground",
-                          )}
-                        >
-                          {msg.id.startsWith("temp-") ? (
-                            <Clock className="h-2 w-2 inline mr-1" />
-                          ) : isRead ? (
-                            "Read"
-                          ) : (
-                            "Sent"
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {allMessages.map((msg) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                isMe={msg.sender.id === me?.id}
+                isRead={
+                  msg.sender.id === me?.id &&
+                  !msg.id.startsWith("temp-") &&
+                  typeof msg.sequence === "number" &&
+                  lastReadSequence !== undefined &&
+                  lastReadSequence >= (msg.sequence as number)
+                }
+              />
+            ))}
           </div>
         </ScrollArea>
         {(showScrollBtn || unreadCount > 0) && (
@@ -348,29 +242,12 @@ function ChatPage() {
         )}
       </div>
 
-      <footer className="p-4 border-t bg-background">
-        <form
-          className="flex gap-2 max-w-4xl mx-auto"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-        >
-          <Input
-            placeholder="Message"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="flex-1"
-          />
-          <Button
-            type="submit"
-            disabled={isSending || !input.trim()}
-            size="icon"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </footer>
+      <MessageComposer
+        input={input}
+        setInput={setInput}
+        onSend={handleSend}
+        disabled={isSending}
+      />
     </div>
   );
 }
