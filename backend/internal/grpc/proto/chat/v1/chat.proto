@@ -35,6 +35,7 @@ message Chat {
   string slug = 4;
   int32 members_count = 5;
   string last_message_id = 6;
+  int64 last_read_sequence = 7;
 }
 
 message CreateChatRequest {

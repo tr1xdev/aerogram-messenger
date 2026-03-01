@@ -28,7 +28,7 @@ type Message struct {
 	SenderId        string                 `protobuf:"bytes,3,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
 	Text            string                 `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`
 	SentAt          string                 `protobuf:"bytes,5,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
-	IsRead          bool                   `protobuf:"varint,6,opt,name=is_read,json=isRead,proto3" json:"is_read,omitempty"`
+	Sequence        int64                  `protobuf:"varint,6,opt,name=sequence,proto3" json:"sequence,omitempty"`
 	IsEdited        bool                   `protobuf:"varint,7,opt,name=is_edited,json=isEdited,proto3" json:"is_edited,omitempty"`
 	ReplyToId       *string                `protobuf:"bytes,8,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
 	ForwardedFromId *string                `protobuf:"bytes,9,opt,name=forwarded_from_id,json=forwardedFromId,proto3,oneof" json:"forwarded_from_id,omitempty"`
@@ -101,11 +101,11 @@ func (x *Message) GetSentAt() string {
 	return ""
 }
 
-func (x *Message) GetIsRead() bool {
+func (x *Message) GetSequence() int64 {
 	if x != nil {
-		return x.IsRead
+		return x.Sequence
 	}
-	return false
+	return 0
 }
 
 func (x *Message) GetIsEdited() bool {
@@ -653,14 +653,14 @@ var File_messages_v1_messages_proto protoreflect.FileDescriptor
 
 const file_messages_v1_messages_proto_rawDesc = "" +
 	"\n" +
-	"\x1amessages/v1/messages.proto\x12\vmessages.v1\"\xae\x02\n" +
+	"\x1amessages/v1/messages.proto\x12\vmessages.v1\"\xb1\x02\n" +
 	"\aMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\achat_id\x18\x02 \x01(\tR\x06chatId\x12\x1b\n" +
 	"\tsender_id\x18\x03 \x01(\tR\bsenderId\x12\x12\n" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x12\x17\n" +
-	"\asent_at\x18\x05 \x01(\tR\x06sentAt\x12\x17\n" +
-	"\ais_read\x18\x06 \x01(\bR\x06isRead\x12\x1b\n" +
+	"\asent_at\x18\x05 \x01(\tR\x06sentAt\x12\x1a\n" +
+	"\bsequence\x18\x06 \x01(\x03R\bsequence\x12\x1b\n" +
 	"\tis_edited\x18\a \x01(\bR\bisEdited\x12#\n" +
 	"\vreply_to_id\x18\b \x01(\tH\x00R\treplyToId\x88\x01\x01\x12/\n" +
 	"\x11forwarded_from_id\x18\t \x01(\tH\x01R\x0fforwardedFromId\x88\x01\x01B\x0e\n" +

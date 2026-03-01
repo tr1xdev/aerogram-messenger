@@ -178,15 +178,16 @@ func (x *GetChatResponse) GetChat() *Chat {
 }
 
 type Chat struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Type          ChatType               `protobuf:"varint,2,opt,name=type,proto3,enum=chat.v1.ChatType" json:"type,omitempty"`
-	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	Slug          string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	MembersCount  int32                  `protobuf:"varint,5,opt,name=members_count,json=membersCount,proto3" json:"members_count,omitempty"`
-	LastMessageId string                 `protobuf:"bytes,6,opt,name=last_message_id,json=lastMessageId,proto3" json:"last_message_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type             ChatType               `protobuf:"varint,2,opt,name=type,proto3,enum=chat.v1.ChatType" json:"type,omitempty"`
+	Title            string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Slug             string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	MembersCount     int32                  `protobuf:"varint,5,opt,name=members_count,json=membersCount,proto3" json:"members_count,omitempty"`
+	LastMessageId    string                 `protobuf:"bytes,6,opt,name=last_message_id,json=lastMessageId,proto3" json:"last_message_id,omitempty"`
+	LastReadSequence int64                  `protobuf:"varint,7,opt,name=last_read_sequence,json=lastReadSequence,proto3" json:"last_read_sequence,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Chat) Reset() {
@@ -259,6 +260,13 @@ func (x *Chat) GetLastMessageId() string {
 		return x.LastMessageId
 	}
 	return ""
+}
+
+func (x *Chat) GetLastReadSequence() int64 {
+	if x != nil {
+		return x.LastReadSequence
+	}
+	return 0
 }
 
 type CreateChatRequest struct {
@@ -586,14 +594,15 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\b_chat_idB\a\n" +
 	"\x05_slug\"4\n" +
 	"\x0fGetChatResponse\x12!\n" +
-	"\x04chat\x18\x01 \x01(\v2\r.chat.v1.ChatR\x04chat\"\xb4\x01\n" +
+	"\x04chat\x18\x01 \x01(\v2\r.chat.v1.ChatR\x04chat\"\xe2\x01\n" +
 	"\x04Chat\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x11.chat.v1.ChatTypeR\x04type\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n" +
 	"\x04slug\x18\x04 \x01(\tR\x04slug\x12#\n" +
 	"\rmembers_count\x18\x05 \x01(\x05R\fmembersCount\x12&\n" +
-	"\x0flast_message_id\x18\x06 \x01(\tR\rlastMessageId\"\xc9\x01\n" +
+	"\x0flast_message_id\x18\x06 \x01(\tR\rlastMessageId\x12,\n" +
+	"\x12last_read_sequence\x18\a \x01(\x03R\x10lastReadSequence\"\xc9\x01\n" +
 	"\x11CreateChatRequest\x12%\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x11.chat.v1.ChatTypeR\x04type\x12'\n" +
 	"\x0fparticipant_ids\x18\x02 \x03(\tR\x0eparticipantIds\x12\x19\n" +

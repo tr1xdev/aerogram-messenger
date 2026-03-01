@@ -9,6 +9,15 @@ option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user
 
 service UserService {
   rpc UserInfo(UserInfoRequest) returns (UserInfoResponse);
+  rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
+}
+
+message GetUsersRequest {
+  repeated string ids = 1;
+}
+
+message GetUsersResponse {
+  repeated User users = 1;
 }
 
 message User {
