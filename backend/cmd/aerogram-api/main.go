@@ -27,6 +27,7 @@ import (
 	"github.com/aerogram-org/aerogram-api/internal/services/chat_svc"
 	"github.com/aerogram-org/aerogram-api/internal/services/messages_svc"
 	"github.com/aerogram-org/aerogram-api/internal/services/presence_svc"
+	"github.com/aerogram-org/aerogram-api/internal/services/user_svc"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/gorilla/websocket"
@@ -40,6 +41,7 @@ import (
 	chatpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1"
 	messagespb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1"
 	presencepb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/presence/v1"
+	userpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1"
 )
 
 func main() {
@@ -79,6 +81,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	userClient := userpb.NewUserServiceClient(conn)
+
 	srv := initGraphQL(db, userRepo, rdb, presenceRepo, conn)
 	router := chi.NewRouter()
 
@@ -89,6 +93,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
+	router.Use(graph.LoaderMiddleware(userClient))
 	router.Use(middleware.AuthMiddleware(cfg))
 	router.Get("/ws/presence", handlers.HandlePresence(presenceRepo))
 	api.SetupRoutes(router, srv)
@@ -139,14 +144,16 @@ func initGRPC(s *grpc.Server, db *gorm.DB, rdb *redis.Client, cfg *config.Config
 	chatpb.RegisterChatServiceServer(s, chat_svc.NewServer(db))
 	messagespb.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
 	presencepb.RegisterPresenceServiceServer(s, presence_svc.NewServer(pRepo))
+	userpb.RegisterUserServiceServer(s, user_svc.NewServer(db))
 }
 
 func initGraphQL(db *gorm.DB, uRepo *repositories.UserRepository, rdb *redis.Client, pRepo *repositories.PresenceRepository, conn *grpc.ClientConn) *handler.Server {
 	authClient := authpb.NewAuthServiceClient(conn)
 	chatClient := chatpb.NewChatServiceClient(conn)
 	msgClient := messagespb.NewMessagesServiceClient(conn)
+	userClient := userpb.NewUserServiceClient(conn)
 
-	resolver := graph.NewResolver(db, uRepo, authClient, chatClient, msgClient, rdb, pRepo)
+	resolver := graph.NewResolver(db, uRepo, authClient, chatClient, msgClient, userClient, rdb, pRepo)
 	schema := graph.NewExecutableSchema(graph.Config{Resolvers: resolver})
 	srv := handler.New(schema)
 

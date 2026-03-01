@@ -60,7 +60,6 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	}
 
 	pb := mapModelToProto(msg)
-
 	data, _ := json.Marshal(pb)
 	s.rdb.Publish(ctx, "chat:"+req.ChatId, data)
 
@@ -72,7 +71,7 @@ func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryReque
 
 	err := s.db.
 		Where("dialog_id = ? AND is_deleted = false", req.ChatId).
-		Order("created_at DESC").
+		Order("sequence DESC").
 		Limit(int(req.Limit)).
 		Offset(int(req.Offset)).
 		Find(&msgs).Error
@@ -126,9 +125,14 @@ func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessag
 }
 
 func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadRequest) (*messagespb.MarkAsReadResponse, error) {
+	var lastMsg models.Message
+	if err := s.db.First(&lastMsg, "id = ?", req.LastMessageId).Error; err != nil {
+		return nil, err
+	}
+
 	err := s.db.Model(&models.DialogMember{}).
 		Where("dialog_id = ? AND user_id = ?", req.ChatId, req.UserId).
-		Update("last_read_at", time.Now()).Error
+		Update("last_read_sequence", lastMsg.Sequence).Error
 
 	if err != nil {
 		return nil, err
@@ -146,5 +150,6 @@ func mapModelToProto(m *models.Message) *messagespb.Message {
 		SentAt:    m.CreatedAt.Format(time.RFC3339),
 		IsEdited:  m.IsEdited,
 		ReplyToId: m.ReplyToID,
+		Sequence:  m.Sequence,
 	}
 }

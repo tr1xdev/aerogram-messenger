@@ -65,3 +65,23 @@ func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*us
 		},
 	}, nil
 }
+
+func (s *Server) GetUsers(ctx context.Context, req *userpb.GetUsersRequest) (*userpb.GetUsersResponse, error) {
+	var users []models.User
+	if err := s.db.WithContext(ctx).Where("id IN ?", req.Ids).Find(&users).Error; err != nil {
+		return nil, status.Error(codes.Internal, "failed to batch fetch users")
+	}
+
+	pbUsers := make([]*userpb.User, len(users))
+	for i, u := range users {
+		pbUsers[i] = &userpb.User{
+			Id:        u.ID,
+			FirstName: u.FirstName,
+			LastName:  &u.LastName,
+			Email:     &u.Email,
+			Username:  &u.Username,
+		}
+	}
+
+	return &userpb.GetUsersResponse{Users: pbUsers}, nil
+}

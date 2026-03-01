@@ -32,7 +32,7 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		if m.UserID == authID {
 			isPinned = m.IsPinned
 			myReadSeq = m.LastReadSequence
-		} else if chatType == model.ChatTypePrivate {
+		} else {
 			partnerReadSeq = m.LastReadSequence
 		}
 	}

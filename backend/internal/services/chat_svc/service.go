@@ -85,9 +85,10 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 			}
 
 			member := models.DialogMember{
-				DialogID: dialog.ID,
-				UserID:   userID,
-				Role:     role,
+				DialogID:         dialog.ID,
+				UserID:           userID,
+				Role:             role,
+				LastReadSequence: 0,
 			}
 
 			if err := tx.Create(&member).Error; err != nil {
