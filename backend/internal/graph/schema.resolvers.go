@@ -217,13 +217,16 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	}
 
 	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT 1 FROM dialogs WHERE id = ? FOR UPDATE", chatID).Error; err != nil {
+			return err
+		}
+
 		var lastSeq int64
-		if err := tx.Raw("SELECT COALESCE(MAX(sequence), 0) FROM messages WHERE dialog_id = ? FOR UPDATE", chatID).Scan(&lastSeq).Error; err != nil {
+		if err := tx.Model(&models.Message{}).Where("dialog_id = ?", chatID).Select("COALESCE(MAX(sequence), 0)").Scan(&lastSeq).Error; err != nil {
 			return err
 		}
 
 		msg.Sequence = lastSeq + 1
-
 		if err := tx.Create(msg).Error; err != nil {
 			return err
 		}
@@ -240,7 +243,6 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 
 	payload, _ := json.Marshal(msg)
 	r.redisClient.Publish(ctx, "chat:"+chatID, payload)
-
 	return msg, nil
 }
 
