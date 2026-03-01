@@ -8,7 +8,7 @@ import {
 } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, Send, ArrowDown, Clock } from "lucide-react";
-import { useApolloClient, useMutation } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,7 @@ import {
   useChatDetails,
 } from "@/features/chat/lib/use-messages";
 import { useGlobalSubscriptions } from "@/features/chat/lib/use-global-subscription";
-import {
-  GET_MESSAGE_HISTORY,
-  MARK_DIALOG_AS_READ,
-} from "@/features/chat/api/chat.gql";
+import { MARK_DIALOG_AS_READ } from "@/features/chat/api/chat.gql";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/entities/chat/model/types";
@@ -34,9 +31,8 @@ import type { Message } from "@/entities/chat/model/types";
 function ChatPage() {
   const { chatId } = Route.useParams();
   const navigate = useNavigate();
-  const client = useApolloClient();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isAtBottom = useRef(true);
+  const isAtBottomRef = useRef(true);
   const lastMarkedSeqRef = useRef<number | null>(null);
 
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -50,9 +46,10 @@ function ChatPage() {
   const { sendMessage, isSending } = useChatActions(chatId);
 
   const me = meData?.me;
+  const myId = me?.id;
   const chat = chatData?.chat;
 
-  useGlobalSubscriptions(chatId, me?.id);
+  useGlobalSubscriptions(chatId, myId);
   const [markDialog] = useMutation(MARK_DIALOG_AS_READ);
 
   const allMessages = useMemo(() => {
@@ -64,8 +61,6 @@ function ChatPage() {
     );
   }, [messages, optimisticMsgs]);
 
-  const prevMsgsLengthRef = useRef(allMessages.length);
-
   const getViewport = useCallback(
     () =>
       scrollRef.current?.querySelector<HTMLDivElement>(
@@ -74,93 +69,80 @@ function ChatPage() {
     [],
   );
 
+  const performMarkRead = useCallback(
+    (force = false) => {
+      if (!myId || !chatId || !allMessages.length) return;
+      if (!force && !isAtBottomRef.current) return;
+
+      const partnerMsgs = allMessages.filter(
+        (m) => m.sender.id !== myId && typeof m.sequence === "number",
+      );
+
+      if (!partnerMsgs.length) return;
+
+      const maxSeq = Math.max(...partnerMsgs.map((m) => m.sequence as number));
+      if (lastMarkedSeqRef.current === maxSeq) return;
+
+      lastMarkedSeqRef.current = maxSeq;
+      markDialog({
+        variables: { chatID: chatId, lastSequence: maxSeq },
+      });
+    },
+    [allMessages, myId, chatId, markDialog],
+  );
+
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = "smooth") => {
       const v = getViewport();
-      if (v) v.scrollTo({ top: v.scrollHeight, behavior });
+      if (!v) return;
+      v.scrollTo({ top: v.scrollHeight, behavior });
+      isAtBottomRef.current = true;
+
+      requestAnimationFrame(() => {
+        setShowScrollBtn(false);
+        setUnreadCount(0);
+      });
     },
     [getViewport],
   );
 
-  const checkAndMarkRead = useCallback(() => {
-    if (!me || !chatId || !allMessages.length || !isAtBottom.current) return;
-
-    const unread = allMessages
-      .filter(
-        (m) =>
-          m.sender.id !== me.id &&
-          !m.id.startsWith("temp-") &&
-          typeof m.sequence === "number",
-      )
-      .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
-
-    if (!unread.length) return;
-
-    const lastMsg = unread[unread.length - 1];
-    const seq = lastMsg.sequence!;
-
-    if (chat?.lastReadSequence !== undefined && seq <= chat.lastReadSequence)
-      return;
-    if (lastMarkedSeqRef.current === seq) return;
-
-    lastMarkedSeqRef.current = seq;
-    markDialog({
-      variables: { chatID: chatId, lastSequence: seq },
-      onCompleted: () => {
-        const vars = { chatId, limit: 50, offset: 0 };
-        const history = client.readQuery<{ messageHistory: Message[] }>({
-          query: GET_MESSAGE_HISTORY,
-          variables: vars,
-        });
-        if (history) {
-          client.writeQuery({
-            query: GET_MESSAGE_HISTORY,
-            variables: vars,
-            data: {
-              messageHistory: history.messageHistory.map((m) =>
-                m.sender.id !== me.id ? { ...m, isRead: true } : m,
-              ),
-            },
-          });
-        }
-      },
-    });
-  }, [allMessages, me, chatId, markDialog, client, chat]);
+  useEffect(() => {
+    lastMarkedSeqRef.current = null;
+    if (!chatLoading && allMessages.length > 0) {
+      scrollToBottom("instant");
+      performMarkRead(true);
+    }
+  }, [
+    chatId,
+    chatLoading,
+    allMessages.length,
+    scrollToBottom,
+    performMarkRead,
+  ]);
 
   useLayoutEffect(() => {
-    if (isAtBottom.current && allMessages.length > prevMsgsLengthRef.current) {
-      scrollToBottom("instant");
+    if (isAtBottomRef.current) {
+      const v = getViewport();
+      if (v) v.scrollTo({ top: v.scrollHeight, behavior: "instant" });
+      performMarkRead(true);
     }
-  }, [allMessages.length, scrollToBottom]);
-
-  useEffect(() => {
-    if (allMessages.length > prevMsgsLengthRef.current) {
-      const lastMsg = allMessages[allMessages.length - 1];
-      if (!isAtBottom.current && lastMsg?.sender.id !== me?.id) {
-        setTimeout(() => setUnreadCount((p) => p + 1), 0);
-      }
-      prevMsgsLengthRef.current = allMessages.length;
-      checkAndMarkRead();
-    }
-  }, [allMessages, me?.id, checkAndMarkRead]);
+  }, [allMessages.length, getViewport, performMarkRead]);
 
   useEffect(() => {
     const v = getViewport();
     if (!v) return;
     const onScroll = () => {
       const isBottom = v.scrollHeight - v.scrollTop <= v.clientHeight + 100;
-      if (isAtBottom.current !== isBottom) {
-        isAtBottom.current = isBottom;
-        setShowScrollBtn(!isBottom);
-        if (isBottom) {
-          setUnreadCount(0);
-          checkAndMarkRead();
-        }
+      isAtBottomRef.current = isBottom;
+      setShowScrollBtn(!isBottom);
+      if (isBottom) {
+        setUnreadCount(0);
+        performMarkRead(true);
       }
     };
     v.addEventListener("scroll", onScroll);
     return () => v.removeEventListener("scroll", onScroll);
-  }, [getViewport, checkAndMarkRead]);
+  }, [getViewport, performMarkRead]);
 
   useEffect(() => {
     if (chatId) setActiveChatId(chatId);
@@ -170,28 +152,28 @@ function ChatPage() {
   const handleSend = () => {
     if (!input.trim() || isSending || !me) return;
     const tempId = `temp-${Date.now()}`;
-    setOptimisticMsgs((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        chatId,
-        text: input,
-        sentAt: new Date().toISOString(),
-        isRead: false,
-        isEdited: false,
-        sender: me,
-      },
-    ]);
+    const newMsg: Message = {
+      id: tempId,
+      chatId,
+      text: input,
+      sentAt: new Date().toISOString(),
+      isRead: false,
+      isEdited: false,
+      sender: me,
+    };
+
+    setOptimisticMsgs((prev) => [...prev, newMsg]);
     const currentInput = input;
     resetInput();
-    isAtBottom.current = true;
-    setTimeout(() => {
-      scrollToBottom("smooth");
-      setUnreadCount(0);
-    }, 10);
+
+    isAtBottomRef.current = true;
+    setTimeout(() => scrollToBottom("smooth"), 10);
+
     sendMessage(currentInput, {
-      onCompleted: () =>
-        setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId)),
+      onCompleted: () => {
+        setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
+        performMarkRead(true);
+      },
       onError: () => {
         setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
         setInput(currentInput);
@@ -200,8 +182,8 @@ function ChatPage() {
   };
 
   const otherUser = useMemo(
-    () => chat?.members?.find((m) => m.id !== me?.id),
-    [chat?.members, me?.id],
+    () => chat?.members?.find((m) => m.id !== myId),
+    [chat?.members, myId],
   );
 
   if (meLoading || (!chat && chatLoading))
@@ -256,13 +238,13 @@ function ChatPage() {
         <ScrollArea ref={scrollRef} className="h-full">
           <div className="p-4 space-y-4">
             {allMessages.map((msg) => {
-              const isMe = msg.sender.id === me?.id;
+              const isMe = msg.sender.id === myId;
               const isRead =
                 isMe &&
                 !msg.id.startsWith("temp-") &&
                 typeof msg.sequence === "number" &&
                 chat
-                  ? chat.lastReadSequence >= msg.sequence
+                  ? (chat.lastReadSequence ?? 0) >= msg.sequence
                   : false;
               return (
                 <div
