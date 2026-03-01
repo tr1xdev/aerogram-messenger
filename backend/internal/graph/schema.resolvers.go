@@ -203,6 +203,9 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 // SendMessage is the resolver for the sendMessage field.
 func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text string, replyToID *string) (*models.Message, error) {
 	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, errors.New("unauthorized")
+	}
 
 	msg := &models.Message{
 		ID:        uuid.NewString(),
@@ -214,25 +217,29 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	}
 
 	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var lastSeq int64
+		if err := tx.Raw("SELECT COALESCE(MAX(sequence), 0) FROM messages WHERE dialog_id = ? FOR UPDATE", chatID).Scan(&lastSeq).Error; err != nil {
+			return err
+		}
+
+		msg.Sequence = lastSeq + 1
+
 		if err := tx.Create(msg).Error; err != nil {
 			return err
 		}
-		return tx.Model(&models.Dialog{}).
-			Where("id = ?", chatID).
-			Updates(map[string]interface{}{
-				"last_message_id": msg.ID,
-				"last_message_at": msg.CreatedAt,
-			}).Error
+
+		return tx.Model(&models.Dialog{}).Where("id = ?", chatID).Updates(map[string]interface{}{
+			"last_message_id": msg.ID,
+			"last_message_at": msg.CreatedAt,
+		}).Error
 	})
+
 	if err != nil {
 		return nil, err
 	}
 
 	payload, _ := json.Marshal(msg)
-	log.Printf("Publishing message to Redis channel chat:%s -> %s", chatID, string(payload))
-	if err := r.redisClient.Publish(ctx, "chat:"+chatID, payload).Err(); err != nil {
-		log.Printf("Redis publish error: %v", err)
-	}
+	r.redisClient.Publish(ctx, "chat:"+chatID, payload)
 
 	return msg, nil
 }
@@ -347,24 +354,26 @@ func (r *mutationResolver) MarkAsRead(ctx context.Context, chatID string, lastMe
 func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error) {
 	userID := middleware.GetUserID(ctx)
 	if userID == "" {
-		return false, errors.New("unauthorized access")
+		return false, errors.New("unauthorized")
 	}
 
-	err := r.db.Model(&models.DialogMember{}).
-		Where("dialog_id = ? AND user_id = ?", chatID, userID).
-		Update("last_read_sequence", lastSequence).Error
-	if err != nil {
-		return false, err
+	res := r.db.Model(&models.DialogMember{}).
+		Where("dialog_id = ? AND user_id = ? AND last_read_sequence < ?", chatID, userID, lastSequence).
+		Update("last_read_sequence", lastSequence)
+
+	if res.Error != nil {
+		return false, res.Error
 	}
 
-	payload := model.ReadPayload{
-		ChatID:       chatID,
-		UserID:       userID,
-		LastSequence: lastSequence,
+	if res.RowsAffected > 0 {
+		payload := model.ReadPayload{
+			ChatID:       chatID,
+			UserID:       userID,
+			LastSequence: lastSequence,
+		}
+		data, _ := json.Marshal(payload)
+		r.redisClient.Publish(ctx, "dialog_read:"+chatID, data)
 	}
-
-	data, _ := json.Marshal(payload)
-	r.redisClient.Publish(ctx, "dialog_read:"+chatID, data)
 
 	return true, nil
 }
