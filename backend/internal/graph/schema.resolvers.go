@@ -194,32 +194,31 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	}
 
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec("SELECT 1 FROM dialogs WHERE id = ? FOR UPDATE", chatID).Error; err != nil {
-			return err
-		}
-
-		var lastSeq int64
-		if err := tx.Model(&models.Message{}).Where("dialog_id = ?", chatID).Select("COALESCE(MAX(sequence), 0)").Scan(&lastSeq).Error; err != nil {
-			return err
-		}
-
-		msg.Sequence = lastSeq + 1
 		if err := tx.Create(msg).Error; err != nil {
 			return err
 		}
 
-		return tx.Model(&models.Dialog{}).Where("id = ?", chatID).Updates(map[string]interface{}{
-			"last_message_id": msg.ID,
-			"last_message_at": msg.CreatedAt,
-		}).Error
+		result := tx.Model(&models.Dialog{}).
+			Where("id = ?", chatID).
+			Updates(map[string]interface{}{
+				"last_message_id": msg.ID,
+				"last_message_at": msg.CreatedAt,
+			})
+
+		if result.Error != nil {
+			return result.Error
+		}
+
+		return nil
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.New("server_error_message_not_saved")
 	}
 
 	payload, _ := json.Marshal(msg)
 	r.redisClient.Publish(ctx, "chat:"+chatID, payload)
+
 	return msg, nil
 }
 
@@ -299,33 +298,6 @@ func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string) (
 		"username": user.Username,
 	})
 	r.redisClient.Publish(ctx, "typing:"+chatID, payload)
-	return true, nil
-}
-
-// MarkAsRead is the resolver for the markAsRead field.
-func (r *mutationResolver) MarkAsRead(ctx context.Context, chatID string, lastMessageID string) (bool, error) {
-	authID := middleware.GetUserID(ctx)
-	now := time.Now()
-
-	err := r.db.Model(&models.DialogMember{}).
-		Where("dialog_id = ? AND user_id = ?", chatID, authID).
-		Update("last_read_at", now).Error
-	if err != nil {
-		return false, err
-	}
-
-	r.db.Model(&models.Message{}).
-		Where("dialog_id = ? AND author_id != ? AND views_count = 0 AND created_at <= (SELECT created_at FROM messages WHERE id = ?)",
-			chatID, authID, lastMessageID).
-		Update("views_count", 1)
-
-	payload, _ := json.Marshal(map[string]string{
-		"chatID":        chatID,
-		"userID":        authID,
-		"lastMessageID": lastMessageID,
-	})
-	r.redisClient.Publish(ctx, "read:"+chatID, payload)
-
 	return true, nil
 }
 
@@ -585,39 +557,6 @@ func (r *subscriptionResolver) UserStatusChanged(ctx context.Context, chatID str
 	}()
 
 	return statusChan, nil
-}
-
-// MessageRead is the resolver for the messageRead field.
-func (r *subscriptionResolver) MessageRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error) {
-	readChan := make(chan *model.ReadPayload, 1)
-	pubsub := r.redisClient.Subscribe(ctx, "read:"+chatID)
-	authID := middleware.GetUserID(ctx)
-	go func() {
-		defer pubsub.Close()
-		defer close(readChan)
-		ch := pubsub.Channel()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-ch:
-				if !ok || msg == nil {
-					return
-				}
-				var p model.ReadPayload
-				if err := json.Unmarshal([]byte(msg.Payload), &p); err == nil {
-					if p.UserID != authID {
-						select {
-						case readChan <- &p:
-						case <-ctx.Done():
-							return
-						}
-					}
-				}
-			}
-		}
-	}()
-	return readChan, nil
 }
 
 // DialogRead is the resolver for the dialogRead field.
