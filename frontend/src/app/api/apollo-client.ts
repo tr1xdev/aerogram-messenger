@@ -3,20 +3,104 @@ import {
   InMemoryCache,
   HttpLink,
   split,
-  type Reference,
+  from,
+  Observable,
+} from "@apollo/client";
+import type {
+  Reference,
+  FetchResult,
+  Operation,
+  ApolloLink,
 } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
+import { onError } from "@apollo/client/link/error";
 import { createClient } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
+import type { GraphQLError } from "graphql";
+import { REFRESH_TOKEN_MUTATION } from "@/features/auth/api/auth.gql";
+
+interface RefreshTokenResponse {
+  refreshToken: {
+    accessToken: string;
+    refreshToken: string;
+  };
+}
+
+interface ApolloErrorResponse {
+  graphQLErrors?: readonly GraphQLError[];
+  networkError?: Error | null;
+  operation: Operation;
+  forward: (op: Operation) => Observable<FetchResult>;
+}
 
 const httpLink = new HttpLink({ uri: "http://localhost:8080/query" });
 
 const authLink = setContext((_, { headers }) => {
   const token = localStorage.getItem("access_token");
   return {
-    headers: { ...headers, authorization: token ? `Bearer ${token}` : "" },
+    headers: {
+      ...headers,
+      authorization: token ? `Bearer ${token}` : "",
+    },
   };
+});
+
+const errorLink = onError((errorArgs) => {
+  const { graphQLErrors, operation, forward } =
+    errorArgs as unknown as ApolloErrorResponse;
+
+  if (graphQLErrors) {
+    for (const err of graphQLErrors) {
+      if (err.extensions?.code === "UNAUTHENTICATED") {
+        const refreshToken = localStorage.getItem("refresh_token");
+
+        if (!refreshToken) {
+          window.location.href = "/login";
+          return;
+        }
+
+        return new Observable<FetchResult>((observer) => {
+          client
+            .mutate<RefreshTokenResponse>({
+              mutation: REFRESH_TOKEN_MUTATION,
+              variables: { token: refreshToken },
+            })
+            .then(({ data }: FetchResult<RefreshTokenResponse>) => {
+              if (!data) {
+                throw new Error("No refresh data");
+              }
+
+              const { accessToken, refreshToken: newRefresh } =
+                data.refreshToken;
+              localStorage.setItem("access_token", accessToken);
+              localStorage.setItem("refresh_token", newRefresh);
+
+              operation.setContext(({ headers = {} }) => ({
+                headers: {
+                  ...headers,
+                  authorization: `Bearer ${accessToken}`,
+                },
+              }));
+
+              const subscriber = {
+                next: observer.next.bind(observer),
+                error: observer.error.bind(observer),
+                complete: observer.complete.bind(observer),
+              };
+
+              forward(operation).subscribe(subscriber);
+            })
+            .catch((error: Error) => {
+              localStorage.removeItem("access_token");
+              localStorage.removeItem("refresh_token");
+              window.location.href = "/login";
+              observer.error(error);
+            });
+        });
+      }
+    }
+  }
 });
 
 const wsLink = new GraphQLWsLink(
@@ -28,14 +112,13 @@ const wsLink = new GraphQLWsLink(
     },
     on: {
       connected: () => console.log("[WS] Connected"),
-      connecting: () => console.log("[WS] Connecting..."),
-      closed: (event) => console.log("[WS] Closed:", event),
-      error: (err) => console.error("[WS] Error:", err),
+      closed: (event: unknown) => console.log("[WS] Closed:", event),
+      error: (err: unknown) => console.error("[WS] Error:", err),
     },
   }),
 );
 
-const splitLink = split(
+const splitLink: ApolloLink = split(
   ({ query }) => {
     const def = getMainDefinition(query);
     return (
@@ -43,18 +126,27 @@ const splitLink = split(
     );
   },
   wsLink,
-  authLink.concat(httpLink),
+  from([errorLink, authLink, httpLink]),
 );
 
 export const client = new ApolloClient({
   link: splitLink,
   cache: new InMemoryCache({
     typePolicies: {
+      Message: {
+        fields: {
+          status: {
+            read(existing: string = "sent"): string {
+              return existing;
+            },
+          },
+        },
+      },
       User: {
         fields: {
-          first_name: { read: (v: string | undefined) => v || "" },
-          last_name: { read: (v: string | undefined) => v || "" },
-          username: { read: (v: string | undefined) => v || "" },
+          first_name: { read: (v: string | undefined): string => v || "" },
+          last_name: { read: (v: string | undefined): string => v || "" },
+          username: { read: (v: string | undefined): string => v || "" },
         },
       },
       Query: {
@@ -65,7 +157,7 @@ export const client = new ApolloClient({
               existing: Reference[] = [],
               incoming: Reference[],
               { readField },
-            ) {
+            ): Reference[] {
               const merged = [...existing];
               const existingIds = new Set(
                 merged.map((r) => readField("id", r)),
@@ -82,5 +174,3 @@ export const client = new ApolloClient({
     },
   }),
 });
-
-console.log("[ApolloClient] Initialized HTTP + WS");
