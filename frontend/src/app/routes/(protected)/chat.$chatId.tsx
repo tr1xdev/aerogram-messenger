@@ -27,15 +27,18 @@ import { MessageBubble } from "@/features/chat/ui/message-bubble";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
 import { DateDivider } from "@/features/chat/ui/date-divider";
 
+interface MessageGroup {
+  date: string;
+  items: Message[];
+}
+
 function ChatPage() {
   const { chatId } = Route.useParams();
   const navigate = useNavigate();
   const client = useApolloClient();
   const lastMarkedSeqRef = useRef<number | null>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
-  const [isScrolling, setIsScrolling] = useState(false);
 
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
   const { data: meData, loading: meLoading } = useMe();
@@ -59,11 +62,19 @@ function ChatPage() {
     );
   }, [messages, optimisticMsgs]);
 
-  const handleScrollState = useCallback(() => {
-    setIsScrolling(true);
-    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(() => setIsScrolling(false), 1500);
-  }, []);
+  const groupedMessages = useMemo(() => {
+    const groups: MessageGroup[] = [];
+    allMessages.forEach((msg) => {
+      const dateKey = new Date(msg.sentAt).toDateString();
+      const existingGroup = groups.find((g) => g.date === dateKey);
+      if (existingGroup) {
+        existingGroup.items.push(msg);
+      } else {
+        groups.push({ date: dateKey, items: [msg] });
+      }
+    });
+    return groups;
+  }, [allMessages]);
 
   const checkAndMarkRead = useCallback(() => {
     if (!me || !chatId || !allMessages.length) return;
@@ -117,19 +128,6 @@ function ChatPage() {
   });
 
   useEffect(() => {
-    const viewport = scrollRef.current?.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    );
-    if (viewport) {
-      viewport.addEventListener("scroll", handleScrollState);
-    }
-    return () => {
-      viewport?.removeEventListener("scroll", handleScrollState);
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    };
-  }, [handleScrollState, scrollRef]);
-
-  useEffect(() => {
     if (chatId) {
       setActiveChatId(chatId);
       setTimeout(() => scrollToBottom("instant"), 50);
@@ -179,31 +177,31 @@ function ChatPage() {
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden w-full max-w-full">
-      <header className="flex h-14 items-center justify-between px-4 border-b shrink-0 bg-background/95 backdrop-blur z-20">
-        <div className="flex items-center gap-3">
+      <header className="flex h-14 items-center justify-between px-4 border-b shrink-0 bg-background/95 backdrop-blur z-50">
+        <div className="flex items-center gap-3 overflow-hidden">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate({ to: "/" })}
-            className="md:hidden"
+            className="md:hidden shrink-0"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-3">
-            <Avatar className="h-8 w-8">
+          <div className="flex items-center gap-3 text-left overflow-hidden">
+            <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src={chat?.photoUrl || ""} />
               <AvatarFallback>
                 {chat?.title?.[0]?.toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold">
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-sm font-semibold text-foreground truncate max-w-[150px] md:max-w-[250px]">
                 {chat?.title || "Chat"}
               </span>
               {otherUser && (
                 <span
                   className={cn(
-                    "text-[10px]",
+                    "text-[10px] truncate",
                     otherUser.status === "online"
                       ? "text-primary font-medium"
                       : "text-muted-foreground",
@@ -220,47 +218,42 @@ function ChatPage() {
 
       <div className="flex-1 min-h-0 relative w-full overflow-hidden">
         <ScrollArea ref={scrollRef} className="h-full w-full">
-          <div className="p-4 space-y-2 w-full max-w-full flex flex-col overflow-hidden">
-            {allMessages.map((msg, index) => {
-              const prevMsg = allMessages[index - 1];
-              const currentDate = new Date(msg.sentAt).toDateString();
-              const prevDate = prevMsg
-                ? new Date(prevMsg.sentAt).toDateString()
-                : null;
-              const showDivider = currentDate !== prevDate;
-
-              return (
-                <div key={msg.id} className="w-full">
-                  {showDivider && (
-                    <DateDivider date={msg.sentAt} isScrolling={isScrolling} />
-                  )}
-                  <MessageBubble
-                    message={msg}
-                    isMe={msg.sender.id === me?.id}
-                    isRead={
-                      msg.sender.id === me?.id &&
-                      !msg.id.startsWith("temp-") &&
-                      typeof msg.sequence === "number" &&
-                      lastReadSequence !== undefined &&
-                      lastReadSequence >= (msg.sequence as number)
-                    }
-                  />
+          <div className="px-4 py-2 w-full max-w-full flex flex-col">
+            {groupedMessages.map((group) => (
+              <div key={group.date} className="flex flex-col w-full">
+                <DateDivider date={group.items[0].sentAt} />
+                <div className="flex flex-col space-y-1">
+                  {group.items.map((msg) => (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      isMe={msg.sender.id === me?.id}
+                      isRead={
+                        msg.sender.id === me?.id &&
+                        !msg.id.startsWith("temp-") &&
+                        typeof msg.sequence === "number" &&
+                        lastReadSequence !== undefined &&
+                        lastReadSequence >= (msg.sequence as number)
+                      }
+                    />
+                  ))}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </ScrollArea>
+
         {(showScrollBtn || unreadCount > 0) && (
-          <div className="absolute bottom-4 right-6 z-30">
+          <div className="absolute bottom-4 right-6 z-40">
             <Button
               size="icon"
               variant="secondary"
-              className="rounded-full shadow-lg h-12 w-12 relative bg-background/80 backdrop-blur"
+              className="rounded-full shadow-lg h-10 w-10 relative bg-background/80 backdrop-blur"
               onClick={() => scrollToBottom()}
             >
-              <ArrowDown className="h-6 w-6 text-foreground" />
+              <ArrowDown className="h-5 w-5 text-foreground" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold border-2 border-background shadow-sm">
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-primary text-[9px] text-primary-foreground font-bold border-2 border-background shadow-sm">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
