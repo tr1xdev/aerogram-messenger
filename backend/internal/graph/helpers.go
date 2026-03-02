@@ -12,9 +12,10 @@ import (
 
 func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb.Chat) (*model.Chat, error) {
 	chatType := model.ChatTypePrivate
-	if pbChat.Type == chatpb.ChatType_CHAT_TYPE_GROUP {
+	switch pbChat.Type {
+	case chatpb.ChatType_CHAT_TYPE_GROUP:
 		chatType = model.ChatTypeGroup
-	} else if pbChat.Type == chatpb.ChatType_CHAT_TYPE_CHANNEL {
+	case chatpb.ChatType_CHAT_TYPE_CHANNEL:
 		chatType = model.ChatTypeChannel
 	}
 
@@ -34,10 +35,8 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		} else {
 			if chatType == model.ChatTypePrivate {
 				pReadSeq = m.LastReadSequence
-			} else {
-				if m.LastReadSequence > pReadSeq {
-					pReadSeq = m.LastReadSequence
-				}
+			} else if m.LastReadSequence > pReadSeq {
+				pReadSeq = m.LastReadSequence
 			}
 		}
 	}

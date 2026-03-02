@@ -199,18 +199,24 @@ func (s *Server) mapProtoTypeToModel(t chatpb.ChatType) models.DialogType {
 }
 
 func (s *Server) mapDialogToProto(d *models.Dialog) *chatpb.Chat {
-	title := ""
-	slug := ""
 	lastMsgID := ""
+	if d.LastMessageID != nil {
+		lastMsgID = *d.LastMessageID
+	}
 
+	photoURL := ""
+	if d.PhotoURL != nil {
+		photoURL = *d.PhotoURL
+	}
+
+	title := ""
 	if d.Name != nil {
 		title = *d.Name
 	}
+
+	slug := ""
 	if d.Username != nil {
 		slug = *d.Username
-	}
-	if d.LastMessageID != nil {
-		lastMsgID = *d.LastMessageID
 	}
 
 	var t chatpb.ChatType
@@ -224,11 +230,16 @@ func (s *Server) mapDialogToProto(d *models.Dialog) *chatpb.Chat {
 	}
 
 	return &chatpb.Chat{
-		Id:            d.ID,
-		Type:          t,
-		Title:         title,
-		Slug:          slug,
-		MembersCount:  int32(d.MembersCount),
-		LastMessageId: lastMsgID,
+		Id:              d.ID,
+		Type:            t,
+		Title:           title,
+		Slug:            slug,
+		MembersCount:    int32(d.MembersCount),
+		LastMessageId:   lastMsgID,
+		PhotoUrl:        photoURL,
+		Bio:             d.Bio,
+		Description:     d.Description,
+		IsVerified:      d.IsVerified,
+		PinnedMessageId: d.PinnedMessageID,
 	}
 }

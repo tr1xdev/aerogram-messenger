@@ -34,12 +34,14 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	}
 
 	msg := &models.Message{
-		ID:        uuid.NewString(),
-		DialogID:  req.ChatId,
-		AuthorID:  req.SenderId,
-		Content:   req.Text,
-		ReplyToID: req.ReplyToId,
-		CreatedAt: time.Now(),
+		ID:           uuid.NewString(),
+		DialogID:     req.ChatId,
+		AuthorID:     req.SenderId,
+		Content:      req.Text,
+		IsEncrypted:  req.IsEncrypted,
+		EncryptionIV: req.EncryptionIv,
+		ReplyToID:    req.ReplyToId,
+		CreatedAt:    time.Now(),
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -142,14 +144,31 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 }
 
 func mapModelToProto(m *models.Message) *messagespb.Message {
-	return &messagespb.Message{
-		Id:        m.ID,
-		ChatId:    m.DialogID,
-		SenderId:  m.AuthorID,
-		Text:      m.Content,
-		SentAt:    m.CreatedAt.Format(time.RFC3339),
-		IsEdited:  m.IsEdited,
-		ReplyToId: m.ReplyToID,
-		Sequence:  m.Sequence,
+	pb := &messagespb.Message{
+		Id:           m.ID,
+		ChatId:       m.DialogID,
+		SenderId:     m.AuthorID,
+		Text:         m.Content,
+		SentAt:       m.CreatedAt.Format(time.RFC3339),
+		Sequence:     m.Sequence,
+		IsEdited:     m.IsEdited,
+		IsEncrypted:  m.IsEncrypted,
+		EncryptionIv: m.EncryptionIV,
+		IsSystem:     m.IsSystem,
+		ReplyToId:    m.ReplyToID,
 	}
+
+	if m.ForwardFromID != nil {
+		pb.ForwardedFromId = m.ForwardFromID
+	}
+
+	if m.MediaURL != nil {
+		pb.MediaUrl = m.MediaURL
+	}
+
+	if m.MediaType != nil {
+		pb.MediaType = m.MediaType
+	}
+
+	return pb
 }

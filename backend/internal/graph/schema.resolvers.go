@@ -12,8 +12,6 @@ import (
 	messagespb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1"
 	"github.com/aerogram-org/aerogram-api/internal/middleware"
 	"github.com/aerogram-org/aerogram-api/internal/models"
-	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 func (r *messageResolver) ChatID(ctx context.Context, obj *models.Message) (string, error) {
@@ -116,6 +114,9 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input model.UpdateUse
 	if input.Username != nil {
 		updates["username"] = *input.Username
 	}
+	if input.PublicKey != nil {
+		updates["public_key"] = *input.PublicKey
+	}
 	if len(updates) == 0 {
 		return r.userRepo.GetByID(authID)
 	}
@@ -152,32 +153,32 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 	return r.enrichChat(ctx, authID, resp.Chat)
 }
 
-func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text string, replyToID *string) (*models.Message, error) {
+func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) (*models.Message, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return nil, errors.New("unauthorized")
 	}
-	msg := &models.Message{
-		ID:        uuid.NewString(),
-		DialogID:  chatID,
-		AuthorID:  authID,
-		Content:   text,
-		ReplyToID: replyToID,
-		CreatedAt: time.Now(),
-	}
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(msg).Error; err != nil {
-			return err
-		}
-		return tx.Model(&models.Dialog{}).
-			Where("id = ?", chatID).
-			Updates(map[string]interface{}{
-				"last_message_id": msg.ID,
-				"last_message_at": msg.CreatedAt,
-			}).Error
+	resp, err := r.messagesClient.SendMessage(ctx, &messagespb.SendMessageRequest{
+		ChatId:       chatID,
+		SenderId:     authID,
+		Text:         text,
+		IsEncrypted:  isEncrypted,
+		EncryptionIv: encryptionIv,
+		ReplyToId:    replyToID,
 	})
 	if err != nil {
-		return nil, errors.New("server_error_message_not_saved")
+		return nil, mapGRPCError(err)
+	}
+	sentAt, _ := time.Parse(time.RFC3339, resp.Message.SentAt)
+	msg := &models.Message{
+		ID:           resp.Message.Id,
+		DialogID:     resp.Message.ChatId,
+		AuthorID:     resp.Message.SenderId,
+		Content:      resp.Message.Text,
+		CreatedAt:    sentAt,
+		Sequence:     resp.Message.Sequence,
+		IsEncrypted:  resp.Message.IsEncrypted,
+		EncryptionIV: resp.Message.EncryptionIv,
 	}
 	payload, _ := json.Marshal(msg)
 	r.redisClient.Publish(ctx, "chat:"+chatID, payload)
@@ -382,13 +383,15 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 	for _, m := range resp.Messages {
 		sentAt, _ := time.Parse(time.RFC3339, m.SentAt)
 		msgs = append(msgs, &models.Message{
-			ID:        m.Id,
-			DialogID:  m.ChatId,
-			AuthorID:  m.SenderId,
-			Content:   m.Text,
-			CreatedAt: sentAt,
-			Sequence:  m.Sequence,
-			IsEdited:  m.IsEdited,
+			ID:           m.Id,
+			DialogID:     m.ChatId,
+			AuthorID:     m.SenderId,
+			Content:      m.Text,
+			CreatedAt:    sentAt,
+			Sequence:     m.Sequence,
+			IsEdited:     m.IsEdited,
+			IsEncrypted:  m.IsEncrypted,
+			EncryptionIV: m.EncryptionIv,
 		})
 	}
 	return msgs, nil

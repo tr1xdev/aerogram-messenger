@@ -60,7 +60,18 @@ func main() {
 	userRepo := repositories.NewUserRepository(db)
 	presenceRepo := repositories.NewPresenceRepository(rdb)
 
-	db.AutoMigrate(&models.User{}, &models.Message{}, &models.Session{}, &models.Dialog{}, &models.DialogMember{})
+	db.Exec("CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";")
+
+	db.AutoMigrate(
+		&models.User{},
+		&models.Session{},
+		&models.Dialog{},
+		&models.DialogMember{},
+		&models.DialogSettings{},
+		&models.Message{},
+		&models.MessageRevision{},
+		&models.MessageAction{},
+	)
 
 	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.GRPC.Host, cfg.Server.GRPC.Port)
 	grpcLis, err := net.Listen("tcp", grpcAddr)

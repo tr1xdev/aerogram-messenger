@@ -31,6 +31,8 @@ type Message struct {
 	DialogID      string         `gorm:"type:uuid;not null;index:idx_dialog_seq"`
 	AuthorID      string         `gorm:"type:uuid;not null;index"`
 	Content       string         `gorm:"type:text;not null"`
+	IsEncrypted   bool           `gorm:"type:bool;default:false;not null"`
+	EncryptionIV  *string        `gorm:"type:text"`
 	Sequence      int64          `gorm:"autoIncrement;uniqueIndex;index:idx_dialog_seq"`
 	ReplyToID     *string        `gorm:"type:uuid;index"`
 	Sender        *User          `gorm:"-"`
@@ -103,6 +105,6 @@ type MessageAction struct {
 	ID         string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	MessageID  string    `gorm:"type:uuid;not null;index"`
 	UserID     string    `gorm:"type:uuid;not null;index"`
-	ActionType int16     `gorm:"not null;index"` // like, dislike, forward, save
+	ActionType int16     `gorm:"not null;index"`
 	CreatedAt  time.Time `gorm:"autoCreateTime"`
 }

@@ -61,6 +61,7 @@ func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*us
 				LastName:  &u.LastName,
 				Email:     &u.Email,
 				Username:  &u.Username,
+				PublicKey: u.PublicKey,
 			},
 		},
 	}, nil
@@ -80,8 +81,57 @@ func (s *Server) GetUsers(ctx context.Context, req *userpb.GetUsersRequest) (*us
 			LastName:  &u.LastName,
 			Email:     &u.Email,
 			Username:  &u.Username,
+			PublicKey: u.PublicKey,
 		}
 	}
 
 	return &userpb.GetUsersResponse{Users: pbUsers}, nil
+}
+
+func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) (*userpb.UpdateUserResponse, error) {
+	var u models.User
+	if err := s.db.First(&u, "id = ?", req.Id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &userpb.UpdateUserResponse{
+				Response: &userpb.UpdateUserResponse_Error{
+					Error: &errorspb.CommonError{
+						Code:    errorspb.ErrorCode_ERROR_CODE_NOT_FOUND.Enum(),
+						Message: "user not found",
+					},
+				},
+			}, nil
+		}
+		return nil, status.Error(codes.Internal, "database error")
+	}
+
+	updates := make(map[string]interface{})
+	if req.FirstName != nil {
+		updates["first_name"] = *req.FirstName
+	}
+	if req.LastName != nil {
+		updates["last_name"] = *req.LastName
+	}
+	if req.Username != nil {
+		updates["username"] = *req.Username
+	}
+	if req.PublicKey != nil {
+		updates["public_key"] = *req.PublicKey
+	}
+
+	if err := s.db.Model(&u).Updates(updates).Error; err != nil {
+		return nil, status.Error(codes.Internal, "failed to update user")
+	}
+
+	return &userpb.UpdateUserResponse{
+		Response: &userpb.UpdateUserResponse_User{
+			User: &userpb.User{
+				Id:        u.ID,
+				FirstName: u.FirstName,
+				LastName:  &u.LastName,
+				Email:     &u.Email,
+				Username:  &u.Username,
+				PublicKey: u.PublicKey,
+			},
+		},
+	}, nil
 }

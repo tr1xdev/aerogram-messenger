@@ -57,3 +57,9 @@ func (r *DialogRepository) GetMember(ctx context.Context, dialogID, userID strin
 		First(&member).Error
 	return &member, err
 }
+
+func (r *DialogRepository) GetMembers(ctx context.Context, dialogID string) ([]models.DialogMember, error) {
+	var members []models.DialogMember
+	err := r.db.WithContext(ctx).Where("dialog_id = ?", dialogID).Find(&members).Error
+	return members, err
+}
