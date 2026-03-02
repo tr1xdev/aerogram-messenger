@@ -38,6 +38,7 @@ function ChatPage() {
   const client = useApolloClient();
   const lastMarkedSeqRef = useRef<number | null>(null);
 
+  const [tick, setTick] = useState(0);
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
 
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
@@ -52,6 +53,11 @@ function ChatPage() {
 
   useGlobalSubscriptions(chatId, me?.id);
   const [markDialog] = useMutation(MARK_DIALOG_AS_READ);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const allMessages = useMemo(() => {
     const combined = [...messages, ...optimisticMsgs];
@@ -174,7 +180,7 @@ function ChatPage() {
 
   const otherMember = useMemo(
     () => chat?.members?.find((m) => m.user.id !== me?.id),
-    [chat?.members, me?.id],
+    [chat?.members, me?.id, tick],
   );
 
   if (meLoading || (!chat && chatLoading)) {
@@ -198,22 +204,23 @@ function ChatPage() {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-3 text-left overflow-hidden">
-            <Avatar className="h-8 w-8 shrink-0">
+            <Avatar className="h-9 w-9 shrink-0">
               <AvatarImage src={chat?.photoUrl || ""} />
-              <AvatarFallback>
+              <AvatarFallback className="text-xs">
                 {chat?.title?.[0]?.toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-semibold text-foreground truncate max-w-[150px] md:max-w-[250px]">
+            <div className="flex flex-col justify-center overflow-hidden py-0.5">
+              <span className="text-[14px] font-semibold text-foreground truncate leading-tight max-w-[150px] md:max-w-[250px]">
                 {chat?.title || "Chat"}
               </span>
               {chat?.type === "PRIVATE" && otherMember && (
                 <span
+                  key={`status-${tick}`}
                   className={cn(
-                    "text-[10px] truncate",
+                    "text-[11px] truncate leading-tight transition-colors duration-300 mt-0.5",
                     otherMember.user.status === "online"
-                      ? "text-primary font-medium"
+                      ? "text-sky-500 dark:text-sky-400 font-medium"
                       : "text-muted-foreground",
                   )}
                 >
@@ -221,7 +228,7 @@ function ChatPage() {
                 </span>
               )}
               {chat?.type !== "PRIVATE" && chat?.members && (
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-[11px] text-muted-foreground leading-tight mt-0.5">
                   {chat.members.length} members
                 </span>
               )}
