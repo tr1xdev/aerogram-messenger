@@ -1,9 +1,4 @@
-import { Outlet, useNavigate } from "@tanstack/react-router";
-import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Card,
   CardHeader,
@@ -13,14 +8,13 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth";
-import { AppSidebar } from "./app-sidebar";
-import { SubscriptionManager } from "@/features/chat/ui/subscription-manager";
 
 export default function RootLayout() {
   const navigate = useNavigate();
   const isAuth = useAuthStore((s) => s.isAuth);
+  const pathname = useRouterState().location.pathname;
 
-  if (!isAuth) {
+  if (!isAuth && !["/login", "/signup", "/otp"].includes(pathname)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6 md:p-10">
         <Card className="w-full max-w-sm">
@@ -48,18 +42,5 @@ export default function RootLayout() {
     );
   }
 
-  return (
-    <SidebarProvider>
-      <SubscriptionManager />
-      <AppSidebar />
-      <SidebarInset className="flex flex-col h-screen overflow-hidden">
-        <header className="flex h-14 items-center border-b px-4 shrink-0 md:hidden">
-          <SidebarTrigger />
-        </header>
-        <main className="flex-1 overflow-hidden relative">
-          <Outlet />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
-  );
+  return <Outlet />;
 }

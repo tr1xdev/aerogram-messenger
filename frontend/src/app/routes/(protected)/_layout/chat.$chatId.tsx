@@ -275,6 +275,6 @@ function ChatPage() {
   );
 }
 
-export const Route = createFileRoute("/(protected)/chat/$chatId")({
+export const Route = createFileRoute("/(protected)/_layout/chat/$chatId")({
   component: ChatPage,
 });

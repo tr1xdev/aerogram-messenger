@@ -9,18 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './app/routes/__root'
-import { Route as protectedIndexRouteImport } from './app/routes/(protected)/index'
 import { Route as publicSignupRouteImport } from './app/routes/(public)/signup'
 import { Route as publicOtpRouteImport } from './app/routes/(public)/otp'
 import { Route as publicLoginRouteImport } from './app/routes/(public)/login'
 import { Route as protectedLayoutRouteImport } from './app/routes/(protected)/_layout'
-import { Route as protectedChatChatIdRouteImport } from './app/routes/(protected)/chat.$chatId'
+import { Route as protectedLayoutIndexRouteImport } from './app/routes/(protected)/_layout/index'
+import { Route as protectedLayoutChatChatIdRouteImport } from './app/routes/(protected)/_layout/chat.$chatId'
 
-const protectedIndexRoute = protectedIndexRouteImport.update({
-  id: '/(protected)/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const publicSignupRoute = publicSignupRouteImport.update({
   id: '/(public)/signup',
   path: '/signup',
@@ -40,34 +35,40 @@ const protectedLayoutRoute = protectedLayoutRouteImport.update({
   id: '/(protected)/_layout',
   getParentRoute: () => rootRouteImport,
 } as any)
-const protectedChatChatIdRoute = protectedChatChatIdRouteImport.update({
-  id: '/(protected)/chat/$chatId',
-  path: '/chat/$chatId',
-  getParentRoute: () => rootRouteImport,
+const protectedLayoutIndexRoute = protectedLayoutIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => protectedLayoutRoute,
 } as any)
+const protectedLayoutChatChatIdRoute =
+  protectedLayoutChatChatIdRouteImport.update({
+    id: '/chat/$chatId',
+    path: '/chat/$chatId',
+    getParentRoute: () => protectedLayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/login': typeof publicLoginRoute
   '/otp': typeof publicOtpRoute
   '/signup': typeof publicSignupRoute
-  '/': typeof protectedIndexRoute
-  '/chat/$chatId': typeof protectedChatChatIdRoute
+  '/': typeof protectedLayoutIndexRoute
+  '/chat/$chatId': typeof protectedLayoutChatChatIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof publicLoginRoute
   '/otp': typeof publicOtpRoute
   '/signup': typeof publicSignupRoute
-  '/': typeof protectedIndexRoute
-  '/chat/$chatId': typeof protectedChatChatIdRoute
+  '/': typeof protectedLayoutIndexRoute
+  '/chat/$chatId': typeof protectedLayoutChatChatIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/(protected)/_layout': typeof protectedLayoutRoute
+  '/(protected)/_layout': typeof protectedLayoutRouteWithChildren
   '/(public)/login': typeof publicLoginRoute
   '/(public)/otp': typeof publicOtpRoute
   '/(public)/signup': typeof publicSignupRoute
-  '/(protected)/': typeof protectedIndexRoute
-  '/(protected)/chat/$chatId': typeof protectedChatChatIdRoute
+  '/(protected)/_layout/': typeof protectedLayoutIndexRoute
+  '/(protected)/_layout/chat/$chatId': typeof protectedLayoutChatChatIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -80,28 +81,19 @@ export interface FileRouteTypes {
     | '/(public)/login'
     | '/(public)/otp'
     | '/(public)/signup'
-    | '/(protected)/'
-    | '/(protected)/chat/$chatId'
+    | '/(protected)/_layout/'
+    | '/(protected)/_layout/chat/$chatId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  protectedLayoutRoute: typeof protectedLayoutRoute
+  protectedLayoutRoute: typeof protectedLayoutRouteWithChildren
   publicLoginRoute: typeof publicLoginRoute
   publicOtpRoute: typeof publicOtpRoute
   publicSignupRoute: typeof publicSignupRoute
-  protectedIndexRoute: typeof protectedIndexRoute
-  protectedChatChatIdRoute: typeof protectedChatChatIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/(protected)/': {
-      id: '/(protected)/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof protectedIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/(public)/signup': {
       id: '/(public)/signup'
       path: '/signup'
@@ -130,23 +122,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof protectedLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(protected)/chat/$chatId': {
-      id: '/(protected)/chat/$chatId'
+    '/(protected)/_layout/': {
+      id: '/(protected)/_layout/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof protectedLayoutIndexRouteImport
+      parentRoute: typeof protectedLayoutRoute
+    }
+    '/(protected)/_layout/chat/$chatId': {
+      id: '/(protected)/_layout/chat/$chatId'
       path: '/chat/$chatId'
       fullPath: '/chat/$chatId'
-      preLoaderRoute: typeof protectedChatChatIdRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof protectedLayoutChatChatIdRouteImport
+      parentRoute: typeof protectedLayoutRoute
     }
   }
 }
 
+interface protectedLayoutRouteChildren {
+  protectedLayoutIndexRoute: typeof protectedLayoutIndexRoute
+  protectedLayoutChatChatIdRoute: typeof protectedLayoutChatChatIdRoute
+}
+
+const protectedLayoutRouteChildren: protectedLayoutRouteChildren = {
+  protectedLayoutIndexRoute: protectedLayoutIndexRoute,
+  protectedLayoutChatChatIdRoute: protectedLayoutChatChatIdRoute,
+}
+
+const protectedLayoutRouteWithChildren = protectedLayoutRoute._addFileChildren(
+  protectedLayoutRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  protectedLayoutRoute: protectedLayoutRoute,
+  protectedLayoutRoute: protectedLayoutRouteWithChildren,
   publicLoginRoute: publicLoginRoute,
   publicOtpRoute: publicOtpRoute,
   publicSignupRoute: publicSignupRoute,
-  protectedIndexRoute: protectedIndexRoute,
-  protectedChatChatIdRoute: protectedChatChatIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
