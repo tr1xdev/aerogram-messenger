@@ -18,7 +18,7 @@ export function useMarkDialog(myId?: string) {
 
     const valid = messages.filter(
       (m): m is Message & { sequence: number } =>
-        typeof m.sequence === "number",
+        typeof m.sequence === "number" && m.sender.id !== myId,
     );
 
     if (!valid.length) return;
@@ -32,7 +32,6 @@ export function useMarkDialog(myId?: string) {
           id: client.cache.identify({ __typename: "Chat", id: chatId }),
           fields: {
             unreadCount: () => 0,
-            lastReadSequence: () => lastSequence,
           },
         });
 
@@ -41,9 +40,7 @@ export function useMarkDialog(myId?: string) {
         });
         if (sidebar) {
           const updated = sidebar.myChats.map((c) =>
-            c.id === chatId
-              ? { ...c, unreadCount: 0, lastReadSequence: lastSequence }
-              : c,
+            c.id === chatId ? { ...c, unreadCount: 0 } : c,
           );
           client.writeQuery({
             query: GET_MY_CHATS,

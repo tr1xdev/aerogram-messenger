@@ -28,24 +28,22 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       if (!newMessage) return;
 
       const historyVars = { chatId, limit: 50, offset: 0 };
-
-      const existing = client.readQuery<{ messageHistory: Message[] }>({
+      const existingHistory = client.readQuery<{ messageHistory: Message[] }>({
         query: GET_MESSAGE_HISTORY,
         variables: historyVars,
       });
 
-      if (!existing?.messageHistory.some((m) => m.id === newMessage.id)) {
+      if (existingHistory) {
         client.writeQuery({
           query: GET_MESSAGE_HISTORY,
           variables: historyVars,
           data: {
             messageHistory: [
-              ...(existing?.messageHistory || []),
+              ...existingHistory.messageHistory.filter(
+                (m) => m.id !== newMessage.id,
+              ),
               newMessage,
-            ].sort(
-              (a, b) =>
-                new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
-            ),
+            ].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0)),
           },
         });
       }
@@ -53,18 +51,31 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       const chatsData = client.readQuery<{ myChats: Chat[] }>({
         query: GET_MY_CHATS,
       });
+
       if (chatsData) {
         const isFromMe = myId && newMessage.sender.id === myId;
-        const updated = chatsData.myChats.map((c) =>
-          c.id === chatId
-            ? {
-                ...c,
-                lastMessage: newMessage,
-                unreadCount: isFromMe ? 0 : c.unreadCount + 1,
-              }
-            : c,
-        );
-        client.writeQuery({ query: GET_MY_CHATS, data: { myChats: updated } });
+
+        const updatedChats = chatsData.myChats.map((c) => {
+          if (c.id === chatId) {
+            return {
+              ...c,
+              lastMessage: newMessage,
+              unreadCount: isFromMe ? 0 : (c.unreadCount || 0) + 1,
+            };
+          }
+          return c;
+        });
+
+        const sortedChats = [...updatedChats].sort((a, b) => {
+          const timeA = new Date(a.lastMessage?.sentAt || 0).getTime();
+          const timeB = new Date(b.lastMessage?.sentAt || 0).getTime();
+          return timeB - timeA;
+        });
+
+        client.writeQuery({
+          query: GET_MY_CHATS,
+          data: { myChats: sortedChats },
+        });
       }
     },
   });
@@ -88,6 +99,7 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       const sidebar = client.readQuery<{ myChats: Chat[] }>({
         query: GET_MY_CHATS,
       });
+
       if (sidebar) {
         const updated = sidebar.myChats.map((c) =>
           c.id === payload.chatID

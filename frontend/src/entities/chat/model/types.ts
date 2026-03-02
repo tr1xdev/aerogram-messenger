@@ -24,13 +24,19 @@ export interface Message {
 
 export type ChatType = "PRIVATE" | "GROUP" | "CHANNEL";
 
+export interface ChatMember {
+  user: User;
+  lastReadSequence: number;
+}
+
 export interface Chat {
   id: string;
   type: ChatType;
   title: string;
   photoUrl?: string;
-  members: User[];
+  members: ChatMember[];
   lastMessage?: Message;
   unreadCount: number;
   lastReadSequence: number;
+  messages?: Message[];
 }
