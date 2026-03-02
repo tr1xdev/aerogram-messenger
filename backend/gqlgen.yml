@@ -21,6 +21,10 @@ autobind:
    - "github.com/aerogram-org/aerogram-api/internal/schemas"
 
 models:
+   User:
+      fields:
+         status:
+            resolver: true
    Message:
       fields:
          sender:

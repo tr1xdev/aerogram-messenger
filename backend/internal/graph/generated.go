@@ -45,6 +45,7 @@ type ResolverRoot interface {
 	Query() QueryResolver
 	Session() SessionResolver
 	Subscription() SubscriptionResolver
+	User() UserResolver
 }
 
 type DirectiveRoot struct {
@@ -198,6 +199,9 @@ type SubscriptionResolver interface {
 	MessageAdded(ctx context.Context, chatID string) (<-chan *models.Message, error)
 	UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error)
 	DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
+}
+type UserResolver interface {
+	Status(ctx context.Context, obj *models.User) (string, error)
 }
 
 type executableSchema struct {
@@ -3819,7 +3823,7 @@ func (ec *executionContext) _User_status(ctx context.Context, field graphql.Coll
 		field,
 		ec.fieldContext_User_status,
 		func(ctx context.Context) (any, error) {
-			return obj.Status, nil
+			return ec.resolvers.User().Status(ctx, obj)
 		},
 		nil,
 		ec.marshalNString2string,
@@ -3832,8 +3836,8 @@ func (ec *executionContext) fieldContext_User_status(_ context.Context, field gr
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -6546,27 +6550,58 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._User_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "email":
 			out.Values[i] = ec._User_email(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "first_name":
 			out.Values[i] = ec._User_first_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "last_name":
 			out.Values[i] = ec._User_last_name(ctx, field, obj)
 		case "username":
 			out.Values[i] = ec._User_username(ctx, field, obj)
 		case "status":
-			out.Values[i] = ec._User_status(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_status(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

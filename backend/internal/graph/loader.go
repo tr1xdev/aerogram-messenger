@@ -7,19 +7,24 @@ import (
 
 	userpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1"
 	"github.com/aerogram-org/aerogram-api/internal/models"
+	"github.com/aerogram-org/aerogram-api/internal/repositories"
 	"github.com/graph-gophers/dataloader/v7"
 )
 
-type contextKey string
+type loaderCtxKey string
 
-const loadersKey contextKey = "dataloaders"
+const loadersKey loaderCtxKey = "dataloaders"
 
-func LoaderMiddleware(client userpb.UserServiceClient) func(http.Handler) http.Handler {
+type Loaders struct {
+	UserLoader     *dataloader.Loader[string, *models.User]
+	PresenceLoader *dataloader.Loader[string, string]
+}
+
+func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.PresenceRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			batchFn := func(ctx context.Context, keys []string) []*dataloader.Result[*models.User] {
+			userBatchFn := func(ctx context.Context, keys []string) []*dataloader.Result[*models.User] {
 				res, err := client.GetUsers(ctx, &userpb.GetUsersRequest{Ids: keys})
-
 				output := make([]*dataloader.Result[*models.User], len(keys))
 				if err != nil {
 					for i := range output {
@@ -43,27 +48,54 @@ func LoaderMiddleware(client userpb.UserServiceClient) func(http.Handler) http.H
 					if u, ok := userMap[id]; ok {
 						output[i] = &dataloader.Result[*models.User]{Data: u}
 					} else {
-						output[i] = &dataloader.Result[*models.User]{
-							Error: fmt.Errorf("user %s not found", id),
-						}
+						output[i] = &dataloader.Result[*models.User]{Error: fmt.Errorf("user %s not found", id)}
 					}
 				}
 				return output
 			}
 
-			loader := dataloader.NewBatchedLoader(batchFn)
-			ctx := context.WithValue(r.Context(), loadersKey, loader)
+			presenceBatchFn := func(ctx context.Context, keys []string) []*dataloader.Result[string] {
+				res, err := pRepo.GetStatuses(ctx, keys)
+				output := make([]*dataloader.Result[string], len(keys))
+				if err != nil {
+					for i := range output {
+						output[i] = &dataloader.Result[string]{Error: err}
+					}
+					return output
+				}
+				for i, id := range keys {
+					status := "offline"
+					if s, ok := res[id]; ok {
+						status = s
+					}
+					output[i] = &dataloader.Result[string]{Data: status}
+				}
+				return output
+			}
+
+			loaders := &Loaders{
+				UserLoader:     dataloader.NewBatchedLoader(userBatchFn),
+				PresenceLoader: dataloader.NewBatchedLoader(presenceBatchFn),
+			}
+
+			ctx := context.WithValue(r.Context(), loadersKey, loaders)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
 func LoadUser(ctx context.Context, id string) (*models.User, error) {
-	val := ctx.Value(loadersKey)
-	if val == nil {
-		return nil, fmt.Errorf("dataloader not found in context")
+	loaders, ok := ctx.Value(loadersKey).(*Loaders)
+	if !ok {
+		return nil, fmt.Errorf("dataloaders not found")
 	}
+	return loaders.UserLoader.Load(ctx, id)()
+}
 
-	loader := val.(*dataloader.Loader[string, *models.User])
-	return loader.Load(ctx, id)()
+func LoadPresence(ctx context.Context, id string) (string, error) {
+	loaders, ok := ctx.Value(loadersKey).(*Loaders)
+	if !ok {
+		return "offline", nil
+	}
+	return loaders.PresenceLoader.Load(ctx, id)()
 }
