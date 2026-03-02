@@ -187,6 +187,10 @@ type Chat struct {
 	LastMessageId    string                 `protobuf:"bytes,6,opt,name=last_message_id,json=lastMessageId,proto3" json:"last_message_id,omitempty"`
 	LastReadSequence int64                  `protobuf:"varint,7,opt,name=last_read_sequence,json=lastReadSequence,proto3" json:"last_read_sequence,omitempty"`
 	PhotoUrl         string                 `protobuf:"bytes,8,opt,name=photo_url,json=photoUrl,proto3" json:"photo_url,omitempty"`
+	Bio              *string                `protobuf:"bytes,9,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	Description      *string                `protobuf:"bytes,10,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	IsVerified       bool                   `protobuf:"varint,11,opt,name=is_verified,json=isVerified,proto3" json:"is_verified,omitempty"`
+	PinnedMessageId  *string                `protobuf:"bytes,12,opt,name=pinned_message_id,json=pinnedMessageId,proto3,oneof" json:"pinned_message_id,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -273,6 +277,34 @@ func (x *Chat) GetLastReadSequence() int64 {
 func (x *Chat) GetPhotoUrl() string {
 	if x != nil {
 		return x.PhotoUrl
+	}
+	return ""
+}
+
+func (x *Chat) GetBio() string {
+	if x != nil && x.Bio != nil {
+		return *x.Bio
+	}
+	return ""
+}
+
+func (x *Chat) GetDescription() string {
+	if x != nil && x.Description != nil {
+		return *x.Description
+	}
+	return ""
+}
+
+func (x *Chat) GetIsVerified() bool {
+	if x != nil {
+		return x.IsVerified
+	}
+	return false
+}
+
+func (x *Chat) GetPinnedMessageId() string {
+	if x != nil && x.PinnedMessageId != nil {
+		return *x.PinnedMessageId
 	}
 	return ""
 }
@@ -602,7 +634,7 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\b_chat_idB\a\n" +
 	"\x05_slug\"4\n" +
 	"\x0fGetChatResponse\x12!\n" +
-	"\x04chat\x18\x01 \x01(\v2\r.chat.v1.ChatR\x04chat\"\xff\x01\n" +
+	"\x04chat\x18\x01 \x01(\v2\r.chat.v1.ChatR\x04chat\"\xbd\x03\n" +
 	"\x04Chat\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x11.chat.v1.ChatTypeR\x04type\x12\x14\n" +
@@ -611,7 +643,16 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\rmembers_count\x18\x05 \x01(\x05R\fmembersCount\x12&\n" +
 	"\x0flast_message_id\x18\x06 \x01(\tR\rlastMessageId\x12,\n" +
 	"\x12last_read_sequence\x18\a \x01(\x03R\x10lastReadSequence\x12\x1b\n" +
-	"\tphoto_url\x18\b \x01(\tR\bphotoUrl\"\xc9\x01\n" +
+	"\tphoto_url\x18\b \x01(\tR\bphotoUrl\x12\x15\n" +
+	"\x03bio\x18\t \x01(\tH\x00R\x03bio\x88\x01\x01\x12%\n" +
+	"\vdescription\x18\n" +
+	" \x01(\tH\x01R\vdescription\x88\x01\x01\x12\x1f\n" +
+	"\vis_verified\x18\v \x01(\bR\n" +
+	"isVerified\x12/\n" +
+	"\x11pinned_message_id\x18\f \x01(\tH\x02R\x0fpinnedMessageId\x88\x01\x01B\x06\n" +
+	"\x04_bioB\x0e\n" +
+	"\f_descriptionB\x14\n" +
+	"\x12_pinned_message_id\"\xc9\x01\n" +
 	"\x11CreateChatRequest\x12%\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x11.chat.v1.ChatTypeR\x04type\x12'\n" +
 	"\x0fparticipant_ids\x18\x02 \x03(\tR\x0eparticipantIds\x12\x19\n" +
@@ -699,6 +740,7 @@ func file_chat_v1_chat_proto_init() {
 		return
 	}
 	file_chat_v1_chat_proto_msgTypes[0].OneofWrappers = []any{}
+	file_chat_v1_chat_proto_msgTypes[2].OneofWrappers = []any{}
 	file_chat_v1_chat_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

@@ -121,6 +121,7 @@ type User struct {
 	Username      *string                `protobuf:"bytes,6,opt,name=username,proto3,oneof" json:"username,omitempty"`
 	IsPremium     *string                `protobuf:"bytes,7,opt,name=is_premium,json=isPremium,proto3,oneof" json:"is_premium,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3,oneof" json:"created_at,omitempty"`
+	PublicKey     *string                `protobuf:"bytes,9,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -209,6 +210,13 @@ func (x *User) GetCreatedAt() *timestamppb.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
+}
+
+func (x *User) GetPublicKey() string {
+	if x != nil && x.PublicKey != nil {
+		return *x.PublicKey
+	}
+	return ""
 }
 
 type UserInfoRequest struct {
@@ -375,6 +383,164 @@ func (*UserInfoResponse_Error) isUserInfoResponse_Response() {}
 
 func (*UserInfoResponse_User) isUserInfoResponse_Response() {}
 
+type UpdateUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FirstName     *string                `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3,oneof" json:"first_name,omitempty"`
+	LastName      *string                `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
+	Username      *string                `protobuf:"bytes,4,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	PublicKey     *string                `protobuf:"bytes,5,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserRequest) Reset() {
+	*x = UpdateUserRequest{}
+	mi := &file_user_v1_user_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserRequest) ProtoMessage() {}
+
+func (x *UpdateUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_user_v1_user_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserRequest.ProtoReflect.Descriptor instead.
+func (*UpdateUserRequest) Descriptor() ([]byte, []int) {
+	return file_user_v1_user_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *UpdateUserRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetFirstName() string {
+	if x != nil && x.FirstName != nil {
+		return *x.FirstName
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetLastName() string {
+	if x != nil && x.LastName != nil {
+		return *x.LastName
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetPublicKey() string {
+	if x != nil && x.PublicKey != nil {
+		return *x.PublicKey
+	}
+	return ""
+}
+
+type UpdateUserResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Response:
+	//
+	//	*UpdateUserResponse_Error
+	//	*UpdateUserResponse_User
+	Response      isUpdateUserResponse_Response `protobuf_oneof:"response"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserResponse) Reset() {
+	*x = UpdateUserResponse{}
+	mi := &file_user_v1_user_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserResponse) ProtoMessage() {}
+
+func (x *UpdateUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_user_v1_user_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserResponse.ProtoReflect.Descriptor instead.
+func (*UpdateUserResponse) Descriptor() ([]byte, []int) {
+	return file_user_v1_user_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *UpdateUserResponse) GetResponse() isUpdateUserResponse_Response {
+	if x != nil {
+		return x.Response
+	}
+	return nil
+}
+
+func (x *UpdateUserResponse) GetError() *v1.CommonError {
+	if x != nil {
+		if x, ok := x.Response.(*UpdateUserResponse_Error); ok {
+			return x.Error
+		}
+	}
+	return nil
+}
+
+func (x *UpdateUserResponse) GetUser() *User {
+	if x != nil {
+		if x, ok := x.Response.(*UpdateUserResponse_User); ok {
+			return x.User
+		}
+	}
+	return nil
+}
+
+type isUpdateUserResponse_Response interface {
+	isUpdateUserResponse_Response()
+}
+
+type UpdateUserResponse_Error struct {
+	Error *v1.CommonError `protobuf:"bytes,1,opt,name=error,proto3,oneof"`
+}
+
+type UpdateUserResponse_User struct {
+	User *User `protobuf:"bytes,2,opt,name=user,proto3,oneof"`
+}
+
+func (*UpdateUserResponse_Error) isUpdateUserResponse_Response() {}
+
+func (*UpdateUserResponse_User) isUpdateUserResponse_Response() {}
+
 var File_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_user_v1_user_proto_rawDesc = "" +
@@ -383,7 +549,7 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x0fGetUsersRequest\x12\x10\n" +
 	"\x03ids\x18\x01 \x03(\tR\x03ids\"7\n" +
 	"\x10GetUsersResponse\x12#\n" +
-	"\x05users\x18\x01 \x03(\v2\r.user.v1.UserR\x05users\"\xd9\x02\n" +
+	"\x05users\x18\x01 \x03(\v2\r.user.v1.UserR\x05users\"\x8c\x03\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -395,14 +561,17 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"is_premium\x18\a \x01(\tH\x04R\tisPremium\x88\x01\x01\x12>\n" +
 	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x05R\tcreatedAt\x88\x01\x01B\b\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x05R\tcreatedAt\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"public_key\x18\t \x01(\tH\x06R\tpublicKey\x88\x01\x01B\b\n" +
 	"\x06_emailB\f\n" +
 	"\n" +
 	"_last_nameB\x06\n" +
 	"\x04_bioB\v\n" +
 	"\t_usernameB\r\n" +
 	"\v_is_premiumB\r\n" +
-	"\v_created_at\"O\n" +
+	"\v_created_atB\r\n" +
+	"\v_public_key\"O\n" +
 	"\x0fUserInfoRequest\x12\x1c\n" +
 	"\busername\x18\x01 \x01(\tH\x00R\busername\x12\x10\n" +
 	"\x02id\x18\x02 \x01(\tH\x00R\x02idB\f\n" +
@@ -412,10 +581,30 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
 	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
 	"\n" +
-	"\bresponse2\x8f\x01\n" +
+	"\bresponse\"\xe7\x01\n" +
+	"\x11UpdateUserRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
+	"\n" +
+	"first_name\x18\x02 \x01(\tH\x00R\tfirstName\x88\x01\x01\x12 \n" +
+	"\tlast_name\x18\x03 \x01(\tH\x01R\blastName\x88\x01\x01\x12\x1f\n" +
+	"\busername\x18\x04 \x01(\tH\x02R\busername\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"public_key\x18\x05 \x01(\tH\x03R\tpublicKey\x88\x01\x01B\r\n" +
+	"\v_first_nameB\f\n" +
+	"\n" +
+	"_last_nameB\v\n" +
+	"\t_usernameB\r\n" +
+	"\v_public_key\"u\n" +
+	"\x12UpdateUserResponse\x12.\n" +
+	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
+	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
+	"\n" +
+	"\bresponse2\xd6\x01\n" +
 	"\vUserService\x12?\n" +
 	"\bUserInfo\x12\x18.user.v1.UserInfoRequest\x1a\x19.user.v1.UserInfoResponse\x12?\n" +
-	"\bGetUsers\x12\x18.user.v1.GetUsersRequest\x1a\x19.user.v1.GetUsersResponseB@Z>github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1b\x06proto3"
+	"\bGetUsers\x12\x18.user.v1.GetUsersRequest\x1a\x19.user.v1.GetUsersResponse\x12E\n" +
+	"\n" +
+	"UpdateUser\x12\x1a.user.v1.UpdateUserRequest\x1a\x1b.user.v1.UpdateUserResponseB@Z>github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1b\x06proto3"
 
 var (
 	file_user_v1_user_proto_rawDescOnce sync.Once
@@ -429,30 +618,36 @@ func file_user_v1_user_proto_rawDescGZIP() []byte {
 	return file_user_v1_user_proto_rawDescData
 }
 
-var file_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_user_v1_user_proto_goTypes = []any{
 	(*GetUsersRequest)(nil),       // 0: user.v1.GetUsersRequest
 	(*GetUsersResponse)(nil),      // 1: user.v1.GetUsersResponse
 	(*User)(nil),                  // 2: user.v1.User
 	(*UserInfoRequest)(nil),       // 3: user.v1.UserInfoRequest
 	(*UserInfoResponse)(nil),      // 4: user.v1.UserInfoResponse
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
-	(*v1.CommonError)(nil),        // 6: errors.v1.CommonError
+	(*UpdateUserRequest)(nil),     // 5: user.v1.UpdateUserRequest
+	(*UpdateUserResponse)(nil),    // 6: user.v1.UpdateUserResponse
+	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(*v1.CommonError)(nil),        // 8: errors.v1.CommonError
 }
 var file_user_v1_user_proto_depIdxs = []int32{
 	2, // 0: user.v1.GetUsersResponse.users:type_name -> user.v1.User
-	5, // 1: user.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	6, // 2: user.v1.UserInfoResponse.error:type_name -> errors.v1.CommonError
+	7, // 1: user.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	8, // 2: user.v1.UserInfoResponse.error:type_name -> errors.v1.CommonError
 	2, // 3: user.v1.UserInfoResponse.user:type_name -> user.v1.User
-	3, // 4: user.v1.UserService.UserInfo:input_type -> user.v1.UserInfoRequest
-	0, // 5: user.v1.UserService.GetUsers:input_type -> user.v1.GetUsersRequest
-	4, // 6: user.v1.UserService.UserInfo:output_type -> user.v1.UserInfoResponse
-	1, // 7: user.v1.UserService.GetUsers:output_type -> user.v1.GetUsersResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	8, // 4: user.v1.UpdateUserResponse.error:type_name -> errors.v1.CommonError
+	2, // 5: user.v1.UpdateUserResponse.user:type_name -> user.v1.User
+	3, // 6: user.v1.UserService.UserInfo:input_type -> user.v1.UserInfoRequest
+	0, // 7: user.v1.UserService.GetUsers:input_type -> user.v1.GetUsersRequest
+	5, // 8: user.v1.UserService.UpdateUser:input_type -> user.v1.UpdateUserRequest
+	4, // 9: user.v1.UserService.UserInfo:output_type -> user.v1.UserInfoResponse
+	1, // 10: user.v1.UserService.GetUsers:output_type -> user.v1.GetUsersResponse
+	6, // 11: user.v1.UserService.UpdateUser:output_type -> user.v1.UpdateUserResponse
+	9, // [9:12] is the sub-list for method output_type
+	6, // [6:9] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_user_v1_user_proto_init() }
@@ -469,13 +664,18 @@ func file_user_v1_user_proto_init() {
 		(*UserInfoResponse_Error)(nil),
 		(*UserInfoResponse_User)(nil),
 	}
+	file_user_v1_user_proto_msgTypes[5].OneofWrappers = []any{}
+	file_user_v1_user_proto_msgTypes[6].OneofWrappers = []any{
+		(*UpdateUserResponse_Error)(nil),
+		(*UpdateUserResponse_User)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_v1_user_proto_rawDesc), len(file_user_v1_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

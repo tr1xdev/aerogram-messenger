@@ -67,6 +67,7 @@ type UpdateUserInput struct {
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
 	Username  *string `json:"username,omitempty"`
+	PublicKey *string `json:"publicKey,omitempty"`
 }
 
 type UserStatusPayload struct {

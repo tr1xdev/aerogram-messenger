@@ -10,6 +10,7 @@ option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user
 service UserService {
   rpc UserInfo(UserInfoRequest) returns (UserInfoResponse);
   rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
 }
 
 message GetUsersRequest {
@@ -29,6 +30,7 @@ message User {
   optional string username = 6;
   optional string is_premium = 7;
   optional google.protobuf.Timestamp created_at = 8;
+  optional string public_key = 9;
 }
 
 message UserInfoRequest {
@@ -39,6 +41,21 @@ message UserInfoRequest {
 }
 
 message UserInfoResponse {
+  oneof response {
+    errors.v1.CommonError error = 1;
+    User user = 2;
+  }
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  optional string first_name = 2;
+  optional string last_name = 3;
+  optional string username = 4;
+  optional string public_key = 5;
+}
+
+message UpdateUserResponse {
   oneof response {
     errors.v1.CommonError error = 1;
     User user = 2;

@@ -37,6 +37,10 @@ message Chat {
   string last_message_id = 6;
   int64 last_read_sequence = 7;
   string photo_url = 8;
+  optional string bio = 9;
+  optional string description = 10;
+  bool is_verified = 11;
+  optional string pinned_message_id = 12;
 }
 
 message CreateChatRequest {

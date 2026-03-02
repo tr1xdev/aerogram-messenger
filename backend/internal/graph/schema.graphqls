@@ -34,6 +34,8 @@ type Message {
    sentAt: String!
    sequence: Long!
    isEdited: Boolean!
+   isEncrypted: Boolean!
+   encryptionIv: String
    replyTo: Message
    forwardedFrom: Message
 }
@@ -58,8 +60,9 @@ input VerifyEmailInput {
 
 input UpdateUserInput {
    firstName: String
-   lastName: String # TODO: Make it optional
+   lastName: String
    username: String
+   publicKey: String
 }
 
 type User {
@@ -69,6 +72,7 @@ type User {
    last_name: String
    username: String
    status: String!
+   publicKey: String
 }
 
 type AuthPayload {
@@ -116,7 +120,13 @@ type Mutation {
       slug: String
       title: String
    ): Chat!
-   sendMessage(chatId: ID!, text: String!, replyToId: ID): Message!
+   sendMessage(
+      chatId: ID!
+      text: String!
+      isEncrypted: Boolean!
+      encryptionIv: String
+      replyToId: ID
+   ): Message!
    updateMessage(id: ID!, text: String!): Message!
    deleteMessage(id: ID!): Boolean!
    pinChat(id: ID!, pinned: Boolean!): Boolean!

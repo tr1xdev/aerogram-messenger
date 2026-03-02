@@ -20,15 +20,24 @@ message Message {
   string sent_at = 5;
   int64 sequence = 6;
   bool is_edited = 7;
-  optional string reply_to_id = 8;
-  optional string forwarded_from_id = 9;
+  bool is_encrypted = 8;
+  optional string encryption_iv = 9;
+  optional string reply_to_id = 10;
+  optional string forwarded_from_id = 11;
+  optional string media_url = 12;
+  optional string media_type = 13;
+  bool is_system = 14;
 }
 
 message SendMessageRequest {
   string chat_id = 1;
   string sender_id = 2;
   string text = 3;
-  optional string reply_to_id = 4;
+  bool is_encrypted = 4;
+  optional string encryption_iv = 5;
+  optional string reply_to_id = 6;
+  optional string media_url = 7;
+  optional string media_type = 8;
 }
 
 message SendMessageResponse {
