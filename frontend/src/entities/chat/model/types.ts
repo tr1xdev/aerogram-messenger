@@ -6,6 +6,7 @@ export interface User {
   username?: string;
   photoUrl?: string;
   status: string;
+  publicKey?: string;
   lastSeen?: string;
 }
 
@@ -17,6 +18,8 @@ export interface Message {
   sequence?: number;
   isRead: boolean;
   isEdited: boolean;
+  isEncrypted: boolean;
+  encryptionIv?: string;
   sender: User;
   replyTo?: Message;
   forwardedFrom?: Message;
