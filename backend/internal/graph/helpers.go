@@ -34,7 +34,7 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		} else {
 			if chatType == model.ChatTypePrivate {
 				pReadSeq = m.LastReadSequence
-			} else if chatType == model.ChatTypeGroup {
+			} else {
 				if m.LastReadSequence > pReadSeq {
 					pReadSeq = m.LastReadSequence
 				}
@@ -102,7 +102,6 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		Type:             chatType,
 		Title:            displayTitle,
 		Slug:             &pbChat.Slug,
-		PhotoURL:         &pbChat.PhotoUrl,
 		MembersCount:     int(pbChat.MembersCount),
 		Members:          gqlMembers,
 		LastMessage:      lastMsg,
