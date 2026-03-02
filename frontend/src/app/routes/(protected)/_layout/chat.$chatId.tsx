@@ -13,6 +13,7 @@ import {
   useChatActions,
   useMe,
   useChatDetails,
+  useMyChats,
 } from "@/features/chat/lib/use-messages";
 import {
   GET_MESSAGE_HISTORY,
@@ -46,10 +47,18 @@ function ChatPage() {
   const { data: chatData, loading: chatLoading } = useChatDetails(chatId);
   const { data: messages = [] } = useChatHistory(chatId);
   const { sendMessage, isSending } = useChatActions(chatId);
+  const { data: chatsData } = useMyChats();
 
   const me = meData?.me;
   const chat = chatData?.chat;
   const lastReadSequence = chat?.lastReadSequence;
+
+  const totalUnread = useMemo(() => {
+    return (chatsData?.myChats ?? []).reduce((acc: number, c: Chat) => {
+      if (c.id === chatId) return acc;
+      return acc + (c.unreadCount ?? 0);
+    }, 0);
+  }, [chatsData?.myChats, chatId]);
 
   const [markDialog] = useMutation(MARK_DIALOG_AS_READ);
 
@@ -223,33 +232,40 @@ function ChatPage() {
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden w-full max-w-full">
       <header className="flex h-14 items-center justify-between px-4 border-b shrink-0 bg-background/95 backdrop-blur z-50">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate({ to: "/" })}
-            className="md:hidden shrink-0"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-3 text-left overflow-hidden">
+        <div className="flex items-center gap-1 overflow-hidden">
+          <div className="relative md:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate({ to: "/" })}
+              className="shrink-0 -ml-2"
+            >
+              <ChevronLeft className="h-6 w-6 text-primary" />
+            </Button>
+            {totalUnread > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground border-2 border-background pointer-events-none">
+                {totalUnread > 99 ? "99+" : totalUnread}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 text-left overflow-hidden ml-1">
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarImage src={chat?.photoUrl || ""} />
-              <AvatarFallback className="text-xs">
+              <AvatarFallback className="text-xs font-bold">
                 {chat?.title?.[0]?.toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col justify-center overflow-hidden py-0.5">
-              <span className="text-[14px] font-semibold text-foreground truncate leading-tight max-w-[150px] md:max-w-[250px]">
+              <span className="text-[15px] font-bold text-foreground truncate leading-tight max-w-[140px] md:max-w-[300px]">
                 {chat?.title || "Chat"}
               </span>
               {chat?.type === "PRIVATE" && otherMember && (
                 <span
-                  key={`status-${tick}`}
                   className={cn(
                     "text-[11px] truncate leading-tight transition-colors duration-300 mt-0.5",
                     otherMember.user.status === "online"
-                      ? "text-sky-500 dark:text-sky-400 font-medium"
+                      ? "text-primary font-semibold"
                       : "text-muted-foreground",
                   )}
                 >

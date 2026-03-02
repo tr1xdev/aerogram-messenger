@@ -1,11 +1,14 @@
-import { createFileRoute, redirect, Outlet } from "@tanstack/react-router";
-import { useAuthStore } from "@/store/auth";
 import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+  createFileRoute,
+  redirect,
+  Outlet,
+  useRouterState,
+} from "@tanstack/react-router";
+import { useAuthStore } from "@/store/auth";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app/layout/app-sidebar";
+import { MobileNav } from "@/features/navigation/ui/mobile-nav";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/(protected)/_layout")({
   beforeLoad: () => {
@@ -13,17 +16,38 @@ export const Route = createFileRoute("/(protected)/_layout")({
       throw redirect({ to: "/login" });
     }
   },
-  component: () => (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="flex flex-col h-screen">
-        <header className="flex h-14 items-center gap-2 px-3">
-          <SidebarTrigger className="md:hidden" />
-        </header>
-        <main className="flex-1 overflow-hidden">
-          <Outlet />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
-  ),
+  component: LayoutComponent,
 });
+
+function LayoutComponent() {
+  const pathname = useRouterState().location.pathname;
+  const isChatOpen = pathname.startsWith("/chat/");
+
+  return (
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
+        <div className="flex flex-1 overflow-hidden">
+          <aside
+            className={cn(
+              "flex-shrink-0 border-r transition-none",
+              isChatOpen ? "hidden md:flex md:w-80" : "flex w-full md:w-80",
+            )}
+          >
+            <AppSidebar />
+          </aside>
+
+          <main
+            className={cn(
+              "flex-1 min-w-0 h-full",
+              !isChatOpen ? "hidden md:block" : "block",
+            )}
+          >
+            <Outlet />
+          </main>
+        </div>
+
+        <MobileNav />
+      </div>
+    </SidebarProvider>
+  );
+}
