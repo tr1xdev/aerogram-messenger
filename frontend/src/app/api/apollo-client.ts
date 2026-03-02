@@ -19,6 +19,7 @@ import { createClient } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
 import type { GraphQLError } from "graphql";
 import { REFRESH_TOKEN_MUTATION } from "@/features/auth/api/auth.gql";
+import { useConnectionStore } from "@/store/connection";
 
 interface RefreshTokenResponse {
   refreshToken: {
@@ -67,9 +68,7 @@ const errorLink = onError((errorArgs) => {
               variables: { token: refreshToken },
             })
             .then(({ data }: FetchResult<RefreshTokenResponse>) => {
-              if (!data) {
-                throw new Error("No refresh data");
-              }
+              if (!data) throw new Error("No refresh data");
 
               const { accessToken, refreshToken: newRefresh } =
                 data.refreshToken;
@@ -111,9 +110,15 @@ const wsLink = new GraphQLWsLink(
       return { Authorization: token ? `Bearer ${token}` : "" };
     },
     on: {
-      connected: () => console.log("[WS] Connected"),
-      closed: (event: unknown) => console.log("[WS] Closed:", event),
-      error: (err: unknown) => console.error("[WS] Error:", err),
+      connected: () => {
+        useConnectionStore.getState().setIsWsConnected(true);
+      },
+      closed: () => {
+        useConnectionStore.getState().setIsWsConnected(false);
+      },
+      error: () => {
+        useConnectionStore.getState().setIsWsConnected(false);
+      },
     },
   }),
 );
