@@ -18,17 +18,23 @@ export function useChatScroll({
   const isInitialLoad = useRef(true);
   const prevChatId = useRef<string | null>(null);
 
-  const getViewport = () =>
-    scrollRef.current?.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    ) as HTMLElement | null;
+  const getViewport = useCallback(
+    (): HTMLElement | null =>
+      scrollRef.current?.querySelector(
+        "[data-radix-scroll-area-viewport]",
+      ) as HTMLElement | null,
+    [],
+  );
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    const viewport = getViewport();
-    if (viewport) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior });
-    }
-  }, []);
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "smooth") => {
+      const viewport = getViewport();
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+      }
+    },
+    [getViewport],
+  );
 
   useEffect(() => {
     const viewport = getViewport();
@@ -39,7 +45,9 @@ export function useChatScroll({
     if (prevChatId.current !== currentChatId) {
       isInitialLoad.current = true;
       prevChatId.current = currentChatId;
-      requestAnimationFrame(() => setUnreadCount(0));
+      requestAnimationFrame(() => {
+        setUnreadCount(0);
+      });
     }
 
     if (isInitialLoad.current) {
@@ -56,19 +64,23 @@ export function useChatScroll({
     if (isMe || isNearBottom) {
       scrollToBottom("smooth");
     } else {
-      requestAnimationFrame(() => setUnreadCount((prev) => prev + 1));
+      requestAnimationFrame(() => {
+        setUnreadCount((prev) => prev + 1);
+      });
     }
-  }, [messages, myId, scrollToBottom]);
+  }, [messages, myId, scrollToBottom, getViewport]);
 
   useEffect(() => {
     const viewport = getViewport();
     if (!viewport) return;
 
-    const handleScroll = () => {
+    const handleScroll = (): void => {
       const bottom =
         viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
         100;
+
       setShowScrollBtn(!bottom);
+
       if (bottom) {
         setUnreadCount(0);
         onMarkRead();
@@ -77,7 +89,7 @@ export function useChatScroll({
 
     viewport.addEventListener("scroll", handleScroll);
     return () => viewport.removeEventListener("scroll", handleScroll);
-  }, [onMarkRead]);
+  }, [onMarkRead, getViewport]);
 
   return { scrollRef, showScrollBtn, unreadCount, scrollToBottom };
 }

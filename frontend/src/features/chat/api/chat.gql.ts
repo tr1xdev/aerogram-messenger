@@ -1,5 +1,14 @@
 import { gql } from "@apollo/client";
 
+export const UPDATE_PROFILE = gql`
+  mutation UpdateUser($input: UpdateUserInput!) {
+    updateUser(input: $input) {
+      id
+      publicKey
+    }
+  }
+`;
+
 export const GET_ME = gql`
   query GetMe {
     me {
@@ -9,6 +18,7 @@ export const GET_ME = gql`
       last_name
       username
       status
+      publicKey
     }
   }
 `;
@@ -30,6 +40,7 @@ export const GET_MY_CHATS = gql`
           last_name
           username
           status
+          publicKey
         }
       }
       lastMessage {
@@ -37,10 +48,13 @@ export const GET_MY_CHATS = gql`
         text
         sentAt
         sequence
+        isEncrypted
+        encryptionIv
         sender {
           id
           first_name
           last_name
+          publicKey
         }
       }
     }
@@ -62,6 +76,7 @@ export const GET_CHAT_BY_ID = gql`
           last_name
           username
           status
+          publicKey
         }
       }
     }
@@ -77,6 +92,8 @@ export const GET_MESSAGE_HISTORY = gql`
       sentAt
       sequence
       isEdited
+      isEncrypted
+      encryptionIv
       sender {
         id
         email
@@ -84,23 +101,39 @@ export const GET_MESSAGE_HISTORY = gql`
         last_name
         username
         status
+        publicKey
       }
     }
   }
 `;
 
 export const SEND_MESSAGE = gql`
-  mutation SendMessage($chatId: ID!, $text: String!, $replyToId: ID) {
-    sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {
+  mutation SendMessage(
+    $chatId: ID!
+    $text: String!
+    $isEncrypted: Boolean!
+    $encryptionIv: String
+    $replyToId: ID
+  ) {
+    sendMessage(
+      chatId: $chatId
+      text: $text
+      isEncrypted: $isEncrypted
+      encryptionIv: $encryptionIv
+      replyToId: $replyToId
+    ) {
       id
       chatId
       text
       sentAt
       sequence
-      isEdited
+      isEncrypted
+      encryptionIv
       sender {
         id
-        status
+        first_name
+        last_name
+        publicKey
       }
     }
   }
@@ -121,6 +154,7 @@ export const SEARCH_USERS = gql`
       first_name
       last_name
       status
+      publicKey
     }
   }
 `;
@@ -133,6 +167,12 @@ export const CREATE_DIRECT_CHAT = gql`
       type
       lastReadSequence
       unreadCount
+      members {
+        user {
+          id
+          publicKey
+        }
+      }
     }
   }
 `;
@@ -146,11 +186,16 @@ export const MESSAGE_SUBSCRIPTION = gql`
       sentAt
       sequence
       isEdited
+      isEncrypted
+      encryptionIv
       sender {
         id
         email
         username
+        first_name
+        last_name
         status
+        publicKey
       }
     }
   }

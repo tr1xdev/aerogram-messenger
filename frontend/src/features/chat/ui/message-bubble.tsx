@@ -1,15 +1,68 @@
+import { useState, useEffect } from "react";
 import { Clock, Check, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { decryptText } from "@/shared/lib/crypto";
 import type { Message } from "@/entities/chat/model/types";
 
 interface MessageBubbleProps {
   message: Message;
   isMe: boolean;
   isRead: boolean;
+  myId: string;
+  peerPublicKey?: string;
 }
 
-export function MessageBubble({ message, isMe, isRead }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  isMe,
+  isRead,
+  myId,
+  peerPublicKey,
+}: MessageBubbleProps) {
+  const [decryptedText, setDecryptedText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const isTemp = message.id.startsWith("temp-");
+  const displayText = message.isEncrypted
+    ? (decryptedText ?? error ?? "...")
+    : message.text;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!message.isEncrypted) return;
+
+    const decrypt = async (): Promise<void> => {
+      try {
+        const privKey = localStorage.getItem(`e2ee_priv_${myId}`);
+        const senderPubKey = isMe ? peerPublicKey : message.sender.publicKey;
+
+        if (!privKey || !senderPubKey || !message.encryptionIv) {
+          if (isMounted) setError("Decryption error");
+          return;
+        }
+
+        const result = await decryptText(
+          message.text,
+          message.encryptionIv,
+          senderPubKey,
+          privKey,
+        );
+
+        if (isMounted) {
+          setDecryptedText(result);
+          setError(null);
+        }
+      } catch {
+        if (isMounted) setError("Decryption error");
+      }
+    };
+
+    decrypt();
+    return () => {
+      isMounted = false;
+    };
+  }, [message, myId, peerPublicKey, isMe]);
 
   return (
     <div
@@ -29,7 +82,7 @@ export function MessageBubble({ message, isMe, isRead }: MessageBubbleProps) {
             isTemp && "opacity-70",
           )}
         >
-          {message.text}
+          {displayText}
 
           <div
             className={cn(

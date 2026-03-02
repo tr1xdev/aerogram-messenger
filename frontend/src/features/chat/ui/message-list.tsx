@@ -5,11 +5,12 @@ import { ArrowDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageBubble } from "./message-bubble";
 import { DateDivider } from "./date-divider";
-import type { Message } from "@/entities/chat/model/types";
+import type { Message, ChatMember } from "@/entities/chat/model/types";
 import { useChatScroll } from "../lib/use-chat-scroll";
 
 interface MessageListProps {
   messages: Message[];
+  members?: ChatMember[];
   myId?: string;
   lastReadSequence?: number;
   onMarkRead: () => void;
@@ -17,6 +18,7 @@ interface MessageListProps {
 
 export function MessageList({
   messages,
+  members,
   myId,
   lastReadSequence,
   onMarkRead,
@@ -31,6 +33,10 @@ export function MessageList({
     });
     return groups;
   }, [messages]);
+
+  const peerPublicKey = useMemo(() => {
+    return members?.find((m) => m.user.id !== myId)?.user.publicKey;
+  }, [members, myId]);
 
   const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
     useChatScroll({
@@ -51,6 +57,8 @@ export function MessageList({
                   <MessageBubble
                     key={m.id}
                     message={m}
+                    myId={myId ?? ""}
+                    peerPublicKey={peerPublicKey}
                     isMe={m.sender.id === myId}
                     isRead={
                       m.sender.id === myId &&

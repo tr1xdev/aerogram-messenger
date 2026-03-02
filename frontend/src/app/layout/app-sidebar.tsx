@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Check, CheckCheck, Loader2 } from "lucide-react";
 import {
@@ -16,18 +17,94 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NewChatDialog } from "@/features/chat/ui/new-chat-dialog";
 import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
 import { useConnectionStore } from "@/store/connection";
-import type { Chat, ChatMember } from "@/entities/chat/model/types";
+import { decryptText } from "@/shared/lib/crypto";
+import type { Chat, ChatMember, Message } from "@/entities/chat/model/types";
 import { cn } from "@/lib/utils";
+
+function LastMessageContent({
+  message,
+  myId,
+  chat,
+}: {
+  message: Message;
+  myId: string;
+  chat: Chat;
+}) {
+  const [decryptedText, setDecryptedText] = useState<string>(
+    message.isEncrypted ? "Decrypting..." : message.text,
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!message.isEncrypted) {
+      return;
+    }
+
+    const performDecryption = async (): Promise<void> => {
+      try {
+        const isMe = message.sender.id === myId;
+        const otherMember = chat.members?.find(
+          (m: ChatMember) => m.user.id !== myId,
+        );
+
+        const targetPublicKey = isMe
+          ? otherMember?.user.publicKey
+          : message.sender.publicKey;
+
+        const myPrivKey = localStorage.getItem(`e2ee_priv_${myId}`);
+
+        if (!targetPublicKey || !myPrivKey || !message.encryptionIv) {
+          if (isMounted) setDecryptedText("Encrypted");
+          return;
+        }
+
+        const clearText = await decryptText(
+          message.text,
+          message.encryptionIv,
+          targetPublicKey,
+          myPrivKey,
+        );
+
+        if (isMounted) setDecryptedText(clearText);
+      } catch (err: unknown) {
+        console.error("[Crypto] Failed:", err);
+        if (isMounted) setDecryptedText("Decryption error");
+      }
+    };
+
+    performDecryption();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    message.id,
+    message.isEncrypted,
+    message.encryptionIv,
+    myId,
+    chat.members,
+  ]);
+
+  return (
+    <span className="flex items-center gap-1.5 truncate">
+      <span className="truncate">{decryptedText}</span>
+    </span>
+  );
+}
 
 export function AppSidebar() {
   const { data: userData } = useMe();
   const { data: chatsData, loading: isLoading } = useMyChats();
   const pathname = useRouterState().location.pathname;
-  const isWsConnected = useConnectionStore((state) => state.isWsConnected);
-  const chats = chatsData?.myChats ?? [];
+  const isWsConnected = useConnectionStore(
+    (state: { isWsConnected: boolean }) => state.isWsConnected,
+  );
+  const chats: Chat[] = chatsData?.myChats ?? [];
 
   const getUserInitial = (): string => {
-    const name = userData?.me.first_name || userData?.me.username || "?";
+    const name: string =
+      userData?.me.first_name || userData?.me.username || "?";
     return name[0].toUpperCase();
   };
 
@@ -64,7 +141,7 @@ export function AppSidebar() {
               {isLoading && !chatsData
                 ? Array(12)
                     .fill(0)
-                    .map((_, i) => (
+                    .map((_, i: number) => (
                       <div
                         key={i}
                         className="flex items-center gap-3 px-4 py-3"
@@ -132,10 +209,12 @@ function ChatMenuItem({
   isActive: boolean;
   myId?: string;
 }) {
-  const lastMsg = chat.lastMessage;
-  const isMe = lastMsg?.sender.id === myId;
-  const otherMember = chat.members?.find((m: ChatMember) => m.user.id !== myId);
-  const isRead =
+  const lastMsg: Message | undefined = chat.lastMessage;
+  const isMe: boolean = lastMsg?.sender.id === myId;
+  const otherMember: ChatMember | undefined = chat.members?.find(
+    (m: ChatMember) => m.user.id !== myId,
+  );
+  const isRead: boolean =
     isMe &&
     lastMsg?.sequence !== undefined &&
     chat.lastReadSequence >= lastMsg.sequence;
@@ -185,9 +264,9 @@ function ChatMenuItem({
               )}
             </div>
             <div className="flex items-center justify-between gap-2">
-              <p
+              <div
                 className={cn(
-                  "text-[13px] truncate",
+                  "text-[13px] truncate flex items-center gap-1",
                   chat.unreadCount > 0
                     ? "text-foreground font-medium"
                     : "text-muted-foreground",
@@ -195,17 +274,26 @@ function ChatMenuItem({
               >
                 {lastMsg ? (
                   <>
-                    <span className="opacity-70">
+                    <span className="opacity-70 shrink-0">
                       {isMe
                         ? "You: "
                         : `${lastMsg.sender.first_name || "User"}: `}
                     </span>
-                    {lastMsg.text}
+                    {myId ? (
+                      <LastMessageContent
+                        key={lastMsg.id}
+                        message={lastMsg}
+                        myId={myId}
+                        chat={chat}
+                      />
+                    ) : (
+                      <span className="truncate">{lastMsg.text}</span>
+                    )}
                   </>
                 ) : (
                   "No messages"
                 )}
-              </p>
+              </div>
               <div className="flex items-center gap-1 shrink-0">
                 {isMe && lastMsg && (
                   <div className="mr-0.5">
