@@ -157,12 +157,12 @@ function ChatMenuItem({
         >
           <div className="relative shrink-0">
             <Avatar className="h-12 w-12 border-none shadow-sm">
-              <AvatarFallback className="bg-muted text-foreground/60 font-bold">
+              <AvatarFallback className="bg-muted text-foreground/60 font-bold text-lg">
                 {chat.title.slice(0, 1).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             {otherMember?.user.status === "online" && (
-              <div className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+              <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-emerald-500 border-[3px] border-background shadow-sm z-10" />
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -210,7 +210,7 @@ function ChatMenuItem({
                 {isMe && lastMsg && (
                   <div className="mr-0.5">
                     {isRead ? (
-                      <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                      <CheckCheck className="h-3.5 w-3.5 text-emerald-500" />
                     ) : (
                       <Check className="h-3.5 w-3.5 opacity-40" />
                     )}
