@@ -210,7 +210,7 @@ function ChatMenuItem({
                 {isMe && lastMsg && (
                   <div className="mr-0.5">
                     {isRead ? (
-                      <CheckCheck className="h-3.5 w-3.5 text-emerald-500" />
+                      <CheckCheck className="h-3.5 w-3.5 text-sky-500" />
                     ) : (
                       <Check className="h-3.5 w-3.5 opacity-40" />
                     )}
