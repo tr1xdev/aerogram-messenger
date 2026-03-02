@@ -49,7 +49,7 @@ export function MessageBubble({ message, isMe, isRead }: MessageBubbleProps) {
                 {isTemp ? (
                   <Clock className="h-3 w-3 animate-pulse" />
                 ) : isRead ? (
-                  <CheckCheck className="h-3.5 w-3.5 text-white" />
+                  <CheckCheck className="h-3.5 w-3.5 text-primary-foreground" />
                 ) : (
                   <Check className="h-3.5 w-3.5" />
                 )}
