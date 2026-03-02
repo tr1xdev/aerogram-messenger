@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -38,7 +37,7 @@ func GetSessionID(ctx context.Context) string {
 func AuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+			secret := cfg.JWT.Secret
 			authHeader := r.Header.Get("Authorization")
 			tokenString := ""
 

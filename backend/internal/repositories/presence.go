@@ -18,28 +18,15 @@ func NewPresenceRepository(rdb *redis.Client) *PresenceRepository {
 }
 
 func (r *PresenceRepository) key(userID string) string {
-	return fmt.Sprintf("user:presence:%s", userID)
+	return fmt.Sprintf("presence:%s", userID)
 }
 
 func (r *PresenceRepository) SetOnline(ctx context.Context, userID string) error {
-	current, _ := r.GetStatus(ctx, userID)
-
-	err := r.redis.Set(ctx, r.key(userID), "online", 60*time.Second).Err()
+	err := r.redis.Set(ctx, r.key(userID), "online", 0).Err()
 	if err != nil {
 		return err
 	}
-
-	if current != "online" {
-		return r.publishStatus(ctx, userID, "online")
-	}
-	return nil
-}
-
-func (r *PresenceRepository) RefreshOnline(ctx context.Context, userID string) {
-	exists, _ := r.redis.Expire(ctx, r.key(userID), 60*time.Second).Result()
-	if !exists {
-		_ = r.SetOnline(ctx, userID)
-	}
+	return r.publishStatus(ctx, userID, "online")
 }
 
 func (r *PresenceRepository) SetOffline(ctx context.Context, userID string) error {
@@ -56,7 +43,37 @@ func (r *PresenceRepository) GetStatus(ctx context.Context, userID string) (stri
 	if err == redis.Nil {
 		return "offline", nil
 	}
+	if err != nil {
+		return "offline", err
+	}
 	return val, nil
+}
+
+func (r *PresenceRepository) GetStatuses(ctx context.Context, userIDs []string) (map[string]string, error) {
+	if len(userIDs) == 0 {
+		return make(map[string]string), nil
+	}
+
+	keys := make([]string, len(userIDs))
+	for i, id := range userIDs {
+		keys[i] = r.key(id)
+	}
+
+	values, err := r.redis.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]string)
+	for i, val := range values {
+		status := "offline"
+		if val != nil {
+			status = val.(string)
+		}
+		result[userIDs[i]] = status
+	}
+
+	return result, nil
 }
 
 func (r *PresenceRepository) publishStatus(ctx context.Context, userID, status string) error {

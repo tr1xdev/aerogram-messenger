@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/aerogram-org/aerogram-api/internal/config"
 	"github.com/aerogram-org/aerogram-api/internal/database"
 	"github.com/aerogram-org/aerogram-api/internal/graph"
-	"github.com/aerogram-org/aerogram-api/internal/handlers"
 	"github.com/aerogram-org/aerogram-api/internal/middleware"
 	"github.com/aerogram-org/aerogram-api/internal/models"
 	"github.com/aerogram-org/aerogram-api/internal/repositories"
@@ -30,6 +30,7 @@ import (
 	"github.com/aerogram-org/aerogram-api/internal/services/user_svc"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -80,10 +81,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer conn.Close()
 
 	userClient := userpb.NewUserServiceClient(conn)
 
-	srv := initGraphQL(db, userRepo, rdb, presenceRepo, conn)
+	srv := initGraphQL(db, userRepo, rdb, presenceRepo, conn, cfg)
 	router := chi.NewRouter()
 
 	router.Use(cors.Handler(cors.Options{
@@ -93,9 +95,8 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	router.Use(graph.LoaderMiddleware(userClient))
+	router.Use(graph.LoaderMiddleware(userClient, presenceRepo))
 	router.Use(middleware.AuthMiddleware(cfg))
-	router.Get("/ws/presence", handlers.HandlePresence(presenceRepo))
 	api.SetupRoutes(router, srv)
 
 	httpServer := &http.Server{
@@ -122,21 +123,14 @@ func main() {
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		log.Printf("HTTP shutdown error: %v", err)
 	}
-	log.Println("HTTP server stopped")
 
 	grpcServer.GracefulStop()
-	log.Println("gRPC server stopped")
-
-	conn.Close()
 
 	sqlDB, _ := db.DB()
 	if sqlDB != nil {
 		sqlDB.Close()
-		log.Println("Database connection closed")
 	}
-
 	rdb.Close()
-	log.Println("Redis connection closed")
 }
 
 func initGRPC(s *grpc.Server, db *gorm.DB, rdb *redis.Client, cfg *config.Config, pRepo *repositories.PresenceRepository) {
@@ -147,7 +141,7 @@ func initGRPC(s *grpc.Server, db *gorm.DB, rdb *redis.Client, cfg *config.Config
 	userpb.RegisterUserServiceServer(s, user_svc.NewServer(db))
 }
 
-func initGraphQL(db *gorm.DB, uRepo *repositories.UserRepository, rdb *redis.Client, pRepo *repositories.PresenceRepository, conn *grpc.ClientConn) *handler.Server {
+func initGraphQL(db *gorm.DB, uRepo *repositories.UserRepository, rdb *redis.Client, pRepo *repositories.PresenceRepository, conn *grpc.ClientConn, cfg *config.Config) *handler.Server {
 	authClient := authpb.NewAuthServiceClient(conn)
 	chatClient := chatpb.NewChatServiceClient(conn)
 	msgClient := messagespb.NewMessagesServiceClient(conn)
@@ -162,7 +156,47 @@ func initGraphQL(db *gorm.DB, uRepo *repositories.UserRepository, rdb *redis.Cli
 		Upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
+		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			auth, ok := initPayload["Authorization"].(string)
+			if !ok || auth == "" {
+				return ctx, nil, nil
+			}
+
+			tokenString := strings.TrimPrefix(auth, "Bearer ")
+			secret := cfg.JWT.Secret
+
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				return []byte(secret), nil
+			})
+
+			if err == nil && token.Valid {
+				if claims, ok := token.Claims.(jwt.MapClaims); ok {
+					userID, _ := claims["sub"].(string)
+					sessionID, _ := claims["sid"].(string)
+
+					if userID != "" {
+						newCtx := context.WithValue(ctx, middleware.AuthUserIDKey, userID)
+						newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sessionID)
+						newCtx = context.WithValue(newCtx, middleware.AuthTokenKey, tokenString)
+
+						_ = pRepo.SetOnline(newCtx, userID)
+
+						go func() {
+							<-newCtx.Done()
+							_ = pRepo.SetOffline(context.Background(), userID)
+						}()
+
+						return newCtx, nil, nil
+					}
+				}
+			}
+			return ctx, nil, nil
+		},
 	})
+
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
 	srv.AddTransport(transport.POST{})
