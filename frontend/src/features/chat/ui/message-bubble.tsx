@@ -47,7 +47,7 @@ export function MessageBubble({ message, isMe, isRead }: MessageBubbleProps) {
             {isMe && (
               <span className="flex items-center">
                 {isTemp ? (
-                  <Clock className="h-3 w-3" />
+                  <Clock className="h-3.5 w-3.5" />
                 ) : isRead ? (
                   <CheckCheck className="h-3.5 w-3.5 text-primary-foreground" />
                 ) : (
