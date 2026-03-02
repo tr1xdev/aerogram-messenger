@@ -131,12 +131,19 @@ function ChatPage() {
   });
 
   useEffect(() => {
+    lastMarkedSeqRef.current = null;
     if (chatId) {
       setActiveChatId(chatId);
       setTimeout(() => scrollToBottom("instant"), 50);
     }
     return () => setActiveChatId(null);
   }, [chatId, setActiveChatId, scrollToBottom]);
+
+  useEffect(() => {
+    if (allMessages.length > 0 && me) {
+      checkAndMarkRead();
+    }
+  }, [allMessages.length, me?.id, checkAndMarkRead]);
 
   const handleSend = () => {
     if (!input.trim() || isSending || !me) return;
