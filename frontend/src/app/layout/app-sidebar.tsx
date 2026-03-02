@@ -84,7 +84,7 @@ export function AppSidebar() {
 
       <SidebarFooter className="px-4 py-3 border-t">
         <div className="text-xs text-muted-foreground truncate">
-          {userData?.me.email ?? userData?.me.username ?? "Loading..."}
+          {userData?.me.first_name ?? userData?.me.username ?? "Loading..."}
         </div>
       </SidebarFooter>
     </Sidebar>
