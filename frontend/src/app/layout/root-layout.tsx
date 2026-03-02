@@ -8,10 +8,11 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth";
+import { SubscriptionManager } from "@/features/chat/ui/subscription-manager";
 
 export default function RootLayout() {
   const navigate = useNavigate();
-  const isAuth = useAuthStore((s) => s.isAuth);
+  const isAuth = useAuthStore((s: { isAuth: boolean }) => s.isAuth);
   const pathname = useRouterState().location.pathname;
 
   if (!isAuth && !["/login", "/signup", "/otp"].includes(pathname)) {
@@ -42,5 +43,10 @@ export default function RootLayout() {
     );
   }
 
-  return <Outlet />;
+  return (
+    <>
+      {isAuth && <SubscriptionManager />}
+      <Outlet />
+    </>
+  );
 }

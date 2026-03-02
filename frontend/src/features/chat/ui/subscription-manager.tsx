@@ -1,5 +1,5 @@
 import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
-import { useGlobalSubscriptions } from "@/features/chat/lib/use-global-subscription";
+import { useGlobalSubscriptions } from "@/features/chat/lib/use-chat-subscription";
 
 export function SubscriptionManager() {
   const { data: meData } = useMe();

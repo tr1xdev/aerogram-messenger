@@ -15,7 +15,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NewChatDialog } from "@/features/chat/ui/new-chat-dialog";
 import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
-import { useGlobalSubscriptions } from "@/features/chat/lib/use-global-subscription";
 import type { Chat } from "@/entities/chat/model/types";
 
 export function AppSidebar() {
@@ -26,7 +25,7 @@ export function AppSidebar() {
 
   const chats = chatsData?.myChats ?? [];
   const totalUnread = chats.reduce(
-    (acc, chat) => acc + (chat.unreadCount ?? 0),
+    (acc: number, chat: Chat) => acc + (chat.unreadCount ?? 0),
     0,
   );
 
@@ -102,8 +101,6 @@ function ChatMenuItem({
   myId?: string;
   onSelect: () => void;
 }) {
-  useGlobalSubscriptions(chat.id, myId);
-
   const isMe = chat.lastMessage?.sender.id === myId;
   const senderName = isMe ? "You" : chat.lastMessage?.sender.first_name;
 
