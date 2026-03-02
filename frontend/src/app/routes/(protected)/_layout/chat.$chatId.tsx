@@ -172,8 +172,8 @@ function ChatPage() {
     });
   };
 
-  const otherUser = useMemo(
-    () => chat?.members?.find((m) => m.id !== me?.id),
+  const otherMember = useMemo(
+    () => chat?.members?.find((m) => m.user.id !== me?.id),
     [chat?.members, me?.id],
   );
 
@@ -208,16 +208,21 @@ function ChatPage() {
               <span className="text-sm font-semibold text-foreground truncate max-w-[150px] md:max-w-[250px]">
                 {chat?.title || "Chat"}
               </span>
-              {otherUser && (
+              {chat?.type === "PRIVATE" && otherMember && (
                 <span
                   className={cn(
                     "text-[10px] truncate",
-                    otherUser.status === "online"
+                    otherMember.user.status === "online"
                       ? "text-primary font-medium"
                       : "text-muted-foreground",
                   )}
                 >
-                  {formatLastSeen(otherUser.status)}
+                  {formatLastSeen(otherMember.user.status)}
+                </span>
+              )}
+              {chat?.type !== "PRIVATE" && chat?.members && (
+                <span className="text-[10px] text-muted-foreground">
+                  {chat.members.length} members
                 </span>
               )}
             </div>
