@@ -198,18 +198,16 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 			return err
 		}
 
-		result := tx.Model(&models.Dialog{}).
+		if err := tx.First(msg, "id = ?", msg.ID).Error; err != nil {
+			return err
+		}
+
+		return tx.Model(&models.Dialog{}).
 			Where("id = ?", chatID).
 			Updates(map[string]interface{}{
 				"last_message_id": msg.ID,
 				"last_message_at": msg.CreatedAt,
-			})
-
-		if result.Error != nil {
-			return result.Error
-		}
-
-		return nil
+			}).Error
 	})
 
 	if err != nil {
@@ -233,7 +231,17 @@ func (r *mutationResolver) UpdateMessage(ctx context.Context, id string, text st
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
-	return &models.Message{ID: resp.Message.Id, Content: resp.Message.Text}, nil
+
+	sentAt, _ := time.Parse(time.RFC3339, resp.Message.SentAt)
+	return &models.Message{
+		ID:        resp.Message.Id,
+		Content:   resp.Message.Text,
+		AuthorID:  resp.Message.SenderId,
+		DialogID:  resp.Message.ChatId,
+		CreatedAt: sentAt,
+		Sequence:  resp.Message.Sequence,
+		IsEdited:  true,
+	}, nil
 }
 
 // DeleteMessage is the resolver for the deleteMessage field.

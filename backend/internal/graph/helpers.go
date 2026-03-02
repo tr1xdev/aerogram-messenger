@@ -12,28 +12,33 @@ import (
 
 func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb.Chat) (*model.Chat, error) {
 	chatType := model.ChatTypePrivate
-	switch pbChat.Type {
-	case chatpb.ChatType_CHAT_TYPE_GROUP:
+	if pbChat.Type == chatpb.ChatType_CHAT_TYPE_GROUP {
 		chatType = model.ChatTypeGroup
-	case chatpb.ChatType_CHAT_TYPE_CHANNEL:
+	} else if pbChat.Type == chatpb.ChatType_CHAT_TYPE_CHANNEL {
 		chatType = model.ChatTypeChannel
 	}
 
 	var dbMembers []models.DialogMember
 	r.db.WithContext(ctx).Where("dialog_id = ?", pbChat.Id).Find(&dbMembers)
 
-	var userIDs []string
+	idsMap := make(map[string]bool)
 	var isPinned bool
 	var myReadSeq int64
-	var partnerReadSeq int64
+	var pReadSeq int64
 
 	for _, m := range dbMembers {
-		userIDs = append(userIDs, m.UserID)
+		idsMap[m.UserID] = true
 		if m.UserID == authID {
 			isPinned = m.IsPinned
 			myReadSeq = m.LastReadSequence
 		} else {
-			partnerReadSeq = m.LastReadSequence
+			if chatType == model.ChatTypePrivate {
+				pReadSeq = m.LastReadSequence
+			} else if chatType == model.ChatTypeGroup {
+				if m.LastReadSequence > pReadSeq {
+					pReadSeq = m.LastReadSequence
+				}
+			}
 		}
 	}
 
@@ -42,8 +47,13 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		var msg models.Message
 		if err := r.db.WithContext(ctx).First(&msg, "id = ?", pbChat.LastMessageId).Error; err == nil {
 			lastMsg = &msg
-			userIDs = append(userIDs, msg.AuthorID)
+			idsMap[msg.AuthorID] = true
 		}
+	}
+
+	userIDs := make([]string, 0, len(idsMap))
+	for id := range idsMap {
+		userIDs = append(userIDs, id)
 	}
 
 	users, _ := r.userRepo.GetByIDs(userIDs)
@@ -78,9 +88,8 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 			}
 		}
 	}
-
 	if displayTitle == "" {
-		displayTitle = "Saved Messages"
+		displayTitle = "Chat"
 	}
 
 	var unreadCount int64
@@ -93,12 +102,14 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		Type:             chatType,
 		Title:            displayTitle,
 		Slug:             &pbChat.Slug,
+		PhotoURL:         &pbChat.PhotoUrl,
 		MembersCount:     int(pbChat.MembersCount),
 		Members:          gqlMembers,
 		LastMessage:      lastMsg,
 		UnreadCount:      int(unreadCount),
 		IsPinned:         isPinned,
-		LastReadSequence: partnerReadSeq,
+		LastReadSequence: pReadSeq,
+		Messages:         []*models.Message{},
 	}, nil
 }
 
