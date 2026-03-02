@@ -4,6 +4,7 @@ export const GET_ME = gql`
   query GetMe {
     me {
       id
+      email
       first_name
       last_name
       username
@@ -24,6 +25,7 @@ export const GET_MY_CHATS = gql`
       members {
         user {
           id
+          email
           first_name
           last_name
           username
@@ -55,6 +57,7 @@ export const GET_CHAT_BY_ID = gql`
       members {
         user {
           id
+          email
           first_name
           last_name
           username
@@ -76,6 +79,7 @@ export const GET_MESSAGE_HISTORY = gql`
       isEdited
       sender {
         id
+        email
         first_name
         last_name
         username
@@ -112,6 +116,7 @@ export const SEARCH_USERS = gql`
   query SearchUsers($username: String!) {
     searchUsers(username: $username) {
       id
+      email
       username
       first_name
       last_name
@@ -143,6 +148,7 @@ export const MESSAGE_SUBSCRIPTION = gql`
       isEdited
       sender {
         id
+        email
         username
         status
       }
