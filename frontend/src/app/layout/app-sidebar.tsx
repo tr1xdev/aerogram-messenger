@@ -104,6 +104,9 @@ function ChatMenuItem({
 }) {
   useGlobalSubscriptions(chat.id, myId);
 
+  const isMe = chat.lastMessage?.sender.id === myId;
+  const senderName = isMe ? "You" : chat.lastMessage?.sender.first_name;
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
@@ -137,7 +140,7 @@ function ChatMenuItem({
             <div className="flex items-center justify-between mt-1">
               <p className="truncate text-xs text-muted-foreground">
                 {chat.lastMessage
-                  ? `${chat.lastMessage.sender.first_name}: ${chat.lastMessage.text}`
+                  ? `${senderName}: ${chat.lastMessage.text}`
                   : "No messages yet"}
               </p>
               {chat.unreadCount > 0 && (
