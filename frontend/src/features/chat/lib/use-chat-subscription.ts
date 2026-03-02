@@ -60,7 +60,7 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
             return {
               ...c,
               lastMessage: newMessage,
-              unreadCount: isFromMe ? 0 : (c.unreadCount || 0) + 1,
+              unreadCount: isFromMe ? c.unreadCount : (c.unreadCount || 0) + 1,
             };
           }
           return c;
@@ -91,8 +91,9 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       client.cache.modify({
         id: client.cache.identify({ __typename: "Chat", id: payload.chatID }),
         fields: {
-          lastReadSequence: (prev) => Math.max(prev || 0, payload.lastSequence),
-          unreadCount: (prev) => (isMe ? 0 : prev),
+          lastReadSequence: (prev: number) =>
+            Math.max(prev || 0, payload.lastSequence),
+          unreadCount: (prev: number) => (isMe ? 0 : prev),
         },
       });
 

@@ -14,14 +14,14 @@ import {
   useMe,
   useChatDetails,
 } from "@/features/chat/lib/use-messages";
-import { useGlobalSubscriptions } from "@/features/chat/lib/use-global-subscription";
 import {
   GET_MESSAGE_HISTORY,
   MARK_DIALOG_AS_READ,
+  GET_MY_CHATS,
 } from "@/features/chat/api/chat.gql";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
-import type { Message } from "@/entities/chat/model/types";
+import type { Message, Chat } from "@/entities/chat/model/types";
 import { useChatScroll } from "@/features/chat/lib/use-chat-scroll";
 import { MessageBubble } from "@/features/chat/ui/message-bubble";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
@@ -51,7 +51,6 @@ function ChatPage() {
   const chat = chatData?.chat;
   const lastReadSequence = chat?.lastReadSequence;
 
-  useGlobalSubscriptions(chatId, me?.id);
   const [markDialog] = useMutation(MARK_DIALOG_AS_READ);
 
   useEffect(() => {
@@ -61,11 +60,7 @@ function ChatPage() {
 
   const allMessages = useMemo(() => {
     const map = new Map<string, Message>();
-
-    messages.forEach((m) => {
-      map.set(m.id, m);
-    });
-
+    messages.forEach((m) => map.set(m.id, m));
     optimisticMsgs.forEach((om) => {
       const isAlreadyInHistory = messages.some(
         (m) =>
@@ -74,12 +69,8 @@ function ChatPage() {
             new Date(m.sentAt).getTime() - new Date(om.sentAt).getTime(),
           ) < 5000,
       );
-
-      if (!isAlreadyInHistory) {
-        map.set(om.id, om);
-      }
+      if (!isAlreadyInHistory) map.set(om.id, om);
     });
-
     return Array.from(map.values()).sort(
       (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
     );
@@ -107,8 +98,7 @@ function ChatPage() {
       (m) =>
         m.sender.id !== me.id &&
         !m.id.startsWith("temp-") &&
-        m.sequence !== undefined &&
-        m.sequence !== null,
+        typeof m.sequence === "number",
     );
 
     if (!partnerMsgs.length) return;
@@ -122,6 +112,34 @@ function ChatPage() {
     markDialog({
       variables: { chatID: chatId, lastSequence: seq },
       onCompleted: () => {
+        client.cache.modify({
+          id: client.cache.identify({ __typename: "Chat", id: chatId }),
+          fields: {
+            unreadCount: () => 0,
+            lastReadSequence: (prev: number) => Math.max(prev || 0, seq),
+          },
+        });
+
+        const sidebar = client.readQuery<{ myChats: Chat[] }>({
+          query: GET_MY_CHATS,
+        });
+        if (sidebar) {
+          client.writeQuery({
+            query: GET_MY_CHATS,
+            data: {
+              myChats: sidebar.myChats.map((c) =>
+                c.id === chatId
+                  ? {
+                      ...c,
+                      unreadCount: 0,
+                      lastReadSequence: Math.max(c.lastReadSequence || 0, seq),
+                    }
+                  : c,
+              ),
+            },
+          });
+        }
+
         const vars = { chatId, limit: 50, offset: 0 };
         const history = client.readQuery<{ messageHistory: Message[] }>({
           query: GET_MESSAGE_HISTORY,
@@ -236,11 +254,6 @@ function ChatPage() {
                   )}
                 >
                   {formatLastSeen(otherMember.user.status)}
-                </span>
-              )}
-              {chat?.type !== "PRIVATE" && chat?.members && (
-                <span className="text-[11px] text-muted-foreground leading-tight mt-0.5">
-                  {chat.members.length} members
                 </span>
               )}
             </div>
