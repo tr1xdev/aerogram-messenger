@@ -186,6 +186,7 @@ type Chat struct {
 	MembersCount     int32                  `protobuf:"varint,5,opt,name=members_count,json=membersCount,proto3" json:"members_count,omitempty"`
 	LastMessageId    string                 `protobuf:"bytes,6,opt,name=last_message_id,json=lastMessageId,proto3" json:"last_message_id,omitempty"`
 	LastReadSequence int64                  `protobuf:"varint,7,opt,name=last_read_sequence,json=lastReadSequence,proto3" json:"last_read_sequence,omitempty"`
+	PhotoUrl         string                 `protobuf:"bytes,8,opt,name=photo_url,json=photoUrl,proto3" json:"photo_url,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -267,6 +268,13 @@ func (x *Chat) GetLastReadSequence() int64 {
 		return x.LastReadSequence
 	}
 	return 0
+}
+
+func (x *Chat) GetPhotoUrl() string {
+	if x != nil {
+		return x.PhotoUrl
+	}
+	return ""
 }
 
 type CreateChatRequest struct {
@@ -594,7 +602,7 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\b_chat_idB\a\n" +
 	"\x05_slug\"4\n" +
 	"\x0fGetChatResponse\x12!\n" +
-	"\x04chat\x18\x01 \x01(\v2\r.chat.v1.ChatR\x04chat\"\xe2\x01\n" +
+	"\x04chat\x18\x01 \x01(\v2\r.chat.v1.ChatR\x04chat\"\xff\x01\n" +
 	"\x04Chat\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x11.chat.v1.ChatTypeR\x04type\x12\x14\n" +
@@ -602,7 +610,8 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\x04slug\x18\x04 \x01(\tR\x04slug\x12#\n" +
 	"\rmembers_count\x18\x05 \x01(\x05R\fmembersCount\x12&\n" +
 	"\x0flast_message_id\x18\x06 \x01(\tR\rlastMessageId\x12,\n" +
-	"\x12last_read_sequence\x18\a \x01(\x03R\x10lastReadSequence\"\xc9\x01\n" +
+	"\x12last_read_sequence\x18\a \x01(\x03R\x10lastReadSequence\x12\x1b\n" +
+	"\tphoto_url\x18\b \x01(\tR\bphotoUrl\"\xc9\x01\n" +
 	"\x11CreateChatRequest\x12%\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x11.chat.v1.ChatTypeR\x04type\x12'\n" +
 	"\x0fparticipant_ids\x18\x02 \x03(\tR\x0eparticipantIds\x12\x19\n" +

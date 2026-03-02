@@ -36,6 +36,7 @@ message Chat {
   int32 members_count = 5;
   string last_message_id = 6;
   int64 last_read_sequence = 7;
+  string photo_url = 8;
 }
 
 message CreateChatRequest {
