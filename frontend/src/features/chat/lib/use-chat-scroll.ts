@@ -49,24 +49,30 @@ export function useChatScroll({
     const v = getViewport();
     if (!v) return;
 
-    if (messages.length > prevMsgsLengthRef.current) {
-      if (isAtBottomRef.current) {
-        v.scrollTo({ top: v.scrollHeight, behavior: "instant" });
-      } else {
-        const lastMsg = messages[messages.length - 1];
-        if (lastMsg?.sender.id !== myId && !lastMsg?.id.startsWith("temp-")) {
-          setTimeout(() => setUnreadCount((p) => p + 1), 0);
-        }
+    const currentLen = messages.length;
+    if (currentLen > prevMsgsLengthRef.current) {
+      const lastMsg = messages[currentLen - 1];
+      const isMyMsg = lastMsg?.sender.id === myId;
+
+      if (isAtBottomRef.current || isMyMsg) {
+        const behavior = isMyMsg ? "smooth" : "instant";
+        requestAnimationFrame(() => {
+          v.scrollTo({ top: v.scrollHeight, behavior });
+        });
+      } else if (lastMsg && !lastMsg.id.startsWith("temp-")) {
+        requestAnimationFrame(() => {
+          setUnreadCount((p) => p + 1);
+        });
       }
     }
-    prevMsgsLengthRef.current = messages.length;
-  }, [messages.length, getViewport, myId]);
+    prevMsgsLengthRef.current = currentLen;
+  }, [messages, getViewport, myId]);
 
   useEffect(() => {
     const v = getViewport();
     if (!v) return;
     const onScroll = () => {
-      const isBottom = v.scrollHeight - v.scrollTop <= v.clientHeight + 100;
+      const isBottom = v.scrollHeight - v.scrollTop <= v.clientHeight + 150;
       isAtBottomRef.current = isBottom;
       setShowScrollBtn(!isBottom);
       if (isBottom) {

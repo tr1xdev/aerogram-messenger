@@ -21,7 +21,7 @@ export function MessageBubble({ message, isMe, isRead }: MessageBubbleProps) {
       <div className={cn("flex flex-col max-w-[85%] sm:max-w-[70%] min-w-0")}>
         <div
           className={cn(
-            "relative px-3 py-1.5 text-sm rounded-2xl shadow-sm transition-all",
+            "relative px-3 py-1.5 text-sm rounded-2xl shadow-sm transition-all duration-200",
             "whitespace-pre-wrap break-all [word-break:break-word] [overflow-wrap:anywhere]",
             isMe
               ? "bg-primary text-primary-foreground rounded-tr-none"
@@ -33,7 +33,7 @@ export function MessageBubble({ message, isMe, isRead }: MessageBubbleProps) {
 
           <div
             className={cn(
-              "float-right mt-2 ml-2 -mr-1 flex items-center gap-1 select-none pointer-events-none",
+              "float-right mt-2 ml-2 -mr-1 flex items-center gap-1 select-none pointer-events-none h-3",
               isMe ? "text-primary-foreground/70" : "text-muted-foreground/70",
             )}
           >
@@ -45,11 +45,11 @@ export function MessageBubble({ message, isMe, isRead }: MessageBubbleProps) {
             </span>
 
             {isMe && (
-              <span className="flex items-center">
+              <span className="flex items-center justify-center w-3.5 h-3.5">
                 {isTemp ? (
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className="h-3 w-3 animate-pulse" />
                 ) : isRead ? (
-                  <CheckCheck className="h-3.5 w-3.5 text-primary-foreground" />
+                  <CheckCheck className="h-3.5 w-3.5 text-white" />
                 ) : (
                   <Check className="h-3.5 w-3.5" />
                 )}

@@ -60,9 +60,26 @@ function ChatPage() {
   }, []);
 
   const allMessages = useMemo(() => {
-    const combined = [...messages, ...optimisticMsgs];
     const map = new Map<string, Message>();
-    combined.forEach((m) => map.set(m.id, m));
+
+    messages.forEach((m) => {
+      map.set(m.id, m);
+    });
+
+    optimisticMsgs.forEach((om) => {
+      const isAlreadyInHistory = messages.some(
+        (m) =>
+          m.text === om.text &&
+          Math.abs(
+            new Date(m.sentAt).getTime() - new Date(om.sentAt).getTime(),
+          ) < 5000,
+      );
+
+      if (!isAlreadyInHistory) {
+        map.set(om.id, om);
+      }
+    });
+
     return Array.from(map.values()).sort(
       (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
     );
@@ -90,7 +107,8 @@ function ChatPage() {
       (m) =>
         m.sender.id !== me.id &&
         !m.id.startsWith("temp-") &&
-        typeof m.sequence === "number",
+        m.sequence !== undefined &&
+        m.sequence !== null,
     );
 
     if (!partnerMsgs.length) return;
@@ -124,17 +142,12 @@ function ChatPage() {
     });
   }, [allMessages, me, chatId, markDialog, client, lastReadSequence]);
 
-  const {
-    scrollRef,
-    showScrollBtn,
-    unreadCount,
-    scrollToBottom,
-    isAtBottomRef,
-  } = useChatScroll({
-    messages: allMessages,
-    myId: me?.id,
-    onMarkRead: checkAndMarkRead,
-  });
+  const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
+    useChatScroll({
+      messages: allMessages,
+      myId: me?.id,
+      onMarkRead: checkAndMarkRead,
+    });
 
   useEffect(() => {
     lastMarkedSeqRef.current = null;
@@ -166,8 +179,6 @@ function ChatPage() {
     setOptimisticMsgs((prev) => [...prev, newMsg]);
     const currentInput = input;
     resetInput();
-    isAtBottomRef.current = true;
-    setTimeout(() => scrollToBottom("smooth"), 10);
     sendMessage(currentInput, {
       onCompleted: () =>
         setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId)),
