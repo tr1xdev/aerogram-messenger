@@ -1,4 +1,5 @@
 import { useSubscription, useApolloClient } from "@apollo/client/react";
+import { gql } from "@apollo/client";
 import {
   MESSAGE_SUBSCRIPTION,
   USER_PRESENCE_SUBSCRIPTION,
@@ -28,7 +29,6 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       if (!newMessage) return;
 
       const historyVars = { chatId, limit: 50, offset: 0 };
-
       const existing = client.readQuery<{ messageHistory: Message[] }>({
         query: GET_MESSAGE_HISTORY,
         variables: historyVars,
@@ -73,7 +73,6 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
     onData({ data }) {
       const payload = data.data?.dialogRead;
       if (!payload) return;
-
       const isMe = myId && payload.userID === myId;
 
       client.cache.modify({
@@ -111,9 +110,17 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       const payload = data.data?.userStatusChanged;
       if (!payload) return;
 
-      client.cache.modify({
+      client.writeFragment({
         id: client.cache.identify({ __typename: "User", id: payload.userId }),
-        fields: { status: () => payload.status },
+        fragment: gql`
+          fragment UserStatusUpdate on User {
+            status
+          }
+        `,
+        data: {
+          status: payload.status,
+        },
+        broadcast: true,
       });
     },
   });
