@@ -77,13 +77,16 @@ function ChatPage() {
   }, [allMessages]);
 
   const checkAndMarkRead = useCallback(() => {
+    if (document.visibilityState !== "visible") return;
     if (!me || !chatId || !allMessages.length) return;
+
     const partnerMsgs = allMessages.filter(
       (m) =>
         m.sender.id !== me.id &&
         !m.id.startsWith("temp-") &&
         typeof m.sequence === "number",
     );
+
     if (!partnerMsgs.length) return;
     const lastMsg = partnerMsgs[partnerMsgs.length - 1];
     const seq = lastMsg.sequence as number;
