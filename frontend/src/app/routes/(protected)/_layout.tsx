@@ -2,7 +2,7 @@ import {
   createFileRoute,
   redirect,
   Outlet,
-  useRouterState,
+  useLocation,
 } from "@tanstack/react-router";
 import { useAuthStore } from "@/store/auth";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -20,17 +20,19 @@ export const Route = createFileRoute("/(protected)/_layout")({
 });
 
 function LayoutComponent() {
-  const pathname = useRouterState().location.pathname;
-  const isChatOpen = pathname.startsWith("/chat/");
+  const { pathname } = useLocation();
+  const isChatOpen = pathname.includes("/chat/");
 
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
           <aside
             className={cn(
-              "flex-shrink-0 border-r transition-none",
-              isChatOpen ? "hidden md:flex md:w-80" : "flex w-full md:w-80",
+              "flex-shrink-0 border-r bg-background z-20",
+              "transition-[width] duration-200 ease-in-out",
+              "w-full md:w-80 lg:w-96",
+              isChatOpen ? "hidden md:flex" : "flex",
             )}
           >
             <AppSidebar />
@@ -38,7 +40,7 @@ function LayoutComponent() {
 
           <main
             className={cn(
-              "flex-1 min-w-0 h-full",
+              "flex-1 min-w-0 h-full bg-background relative",
               !isChatOpen ? "hidden md:block" : "block",
             )}
           >
@@ -46,7 +48,7 @@ function LayoutComponent() {
           </main>
         </div>
 
-        <MobileNav />
+        {!isChatOpen && <MobileNav />}
       </div>
     </SidebarProvider>
   );
