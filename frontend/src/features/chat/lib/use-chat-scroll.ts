@@ -1,10 +1,4 @@
-import {
-  useRef,
-  useState,
-  useCallback,
-  useLayoutEffect,
-  useEffect,
-} from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { Message } from "@/entities/chat/model/types";
 
 interface UseChatScrollProps {
@@ -19,76 +13,71 @@ export function useChatScroll({
   onMarkRead,
 }: UseChatScrollProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isAtBottomRef = useRef(true);
-  const prevMsgsLengthRef = useRef(0);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const isInitialLoad = useRef(true);
+  const prevChatId = useRef<string | null>(null);
 
-  const getViewport = useCallback(
-    () =>
-      scrollRef.current?.querySelector<HTMLDivElement>(
-        "[data-radix-scroll-area-viewport]",
-      ),
-    [],
-  );
+  const getViewport = () =>
+    scrollRef.current?.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement | null;
 
-  const scrollToBottom = useCallback(
-    (behavior: ScrollBehavior = "smooth") => {
-      const v = getViewport();
-      if (v) {
-        v.scrollTo({ top: v.scrollHeight, behavior });
-        isAtBottomRef.current = true;
-        setShowScrollBtn(false);
-        setUnreadCount(0);
-      }
-    },
-    [getViewport],
-  );
-
-  useLayoutEffect(() => {
-    const v = getViewport();
-    if (!v) return;
-
-    const currentLen = messages.length;
-    if (currentLen > prevMsgsLengthRef.current) {
-      const lastMsg = messages[currentLen - 1];
-      const isMyMsg = lastMsg?.sender.id === myId;
-
-      if (isAtBottomRef.current || isMyMsg) {
-        const behavior = isMyMsg ? "smooth" : "instant";
-        requestAnimationFrame(() => {
-          v.scrollTo({ top: v.scrollHeight, behavior });
-        });
-      } else if (lastMsg && !lastMsg.id.startsWith("temp-")) {
-        requestAnimationFrame(() => {
-          setUnreadCount((p) => p + 1);
-        });
-      }
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const viewport = getViewport();
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior });
     }
-    prevMsgsLengthRef.current = currentLen;
-  }, [messages, getViewport, myId]);
+  }, []);
 
   useEffect(() => {
-    const v = getViewport();
-    if (!v) return;
-    const onScroll = () => {
-      const isBottom = v.scrollHeight - v.scrollTop <= v.clientHeight + 150;
-      isAtBottomRef.current = isBottom;
-      setShowScrollBtn(!isBottom);
-      if (isBottom) {
+    const viewport = getViewport();
+    if (!viewport || messages.length === 0) return;
+
+    const currentChatId = messages[0].chatId;
+
+    if (prevChatId.current !== currentChatId) {
+      isInitialLoad.current = true;
+      prevChatId.current = currentChatId;
+      requestAnimationFrame(() => setUnreadCount(0));
+    }
+
+    if (isInitialLoad.current) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "instant" });
+      isInitialLoad.current = false;
+      return;
+    }
+
+    const lastMsg = messages[messages.length - 1];
+    const isMe = lastMsg.sender.id === myId;
+    const isNearBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150;
+
+    if (isMe || isNearBottom) {
+      scrollToBottom("smooth");
+    } else {
+      requestAnimationFrame(() => setUnreadCount((prev) => prev + 1));
+    }
+  }, [messages, myId, scrollToBottom]);
+
+  useEffect(() => {
+    const viewport = getViewport();
+    if (!viewport) return;
+
+    const handleScroll = () => {
+      const bottom =
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
+        100;
+      setShowScrollBtn(!bottom);
+      if (bottom) {
         setUnreadCount(0);
         onMarkRead();
       }
     };
-    v.addEventListener("scroll", onScroll);
-    return () => v.removeEventListener("scroll", onScroll);
-  }, [getViewport, onMarkRead]);
 
-  return {
-    scrollRef,
-    showScrollBtn,
-    unreadCount,
-    scrollToBottom,
-    isAtBottomRef,
-  };
+    viewport.addEventListener("scroll", handleScroll);
+    return () => viewport.removeEventListener("scroll", handleScroll);
+  }, [onMarkRead]);
+
+  return { scrollRef, showScrollBtn, unreadCount, scrollToBottom };
 }

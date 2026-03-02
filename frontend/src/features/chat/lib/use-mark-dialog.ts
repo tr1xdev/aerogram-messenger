@@ -1,5 +1,6 @@
 import { useApolloClient, useMutation } from "@apollo/client/react";
 import { gql } from "@apollo/client";
+import { useCallback, useRef } from "react";
 import type { Chat, Message } from "@/entities/chat/model/types";
 import { GET_MY_CHATS } from "../api/chat.gql";
 
@@ -9,29 +10,53 @@ const MARK_DIALOG_AS_READ = gql`
   }
 `;
 
-export function useMarkDialog(myId?: string) {
+export function useMarkDialog(
+  chatId: string,
+  messages: Message[],
+  me?: { id: string },
+  lastReadSequence?: number,
+) {
   const client = useApolloClient();
+  const lastMarkedSeqRef = useRef<number | null>(null);
   const [markDialog] = useMutation(MARK_DIALOG_AS_READ);
 
-  function markChatAsRead(chatId: string, messages: Message[]) {
-    if (!myId || !messages.length) return;
+  const checkAndMarkRead = useCallback(() => {
+    if (
+      document.visibilityState !== "visible" ||
+      !me ||
+      !chatId ||
+      !messages.length
+    )
+      return;
 
-    const valid = messages.filter(
+    const incoming = messages.filter(
       (m): m is Message & { sequence: number } =>
-        typeof m.sequence === "number" && m.sender.id !== myId,
+        typeof m.sequence === "number" &&
+        m.sender.id !== me.id &&
+        !m.id.startsWith("temp-"),
     );
 
-    if (!valid.length) return;
+    if (!incoming.length) return;
 
-    const lastSequence = Math.max(...valid.map((m) => m.sequence));
+    const last = incoming[incoming.length - 1];
+    const seq = last.sequence;
+
+    if (
+      (lastReadSequence !== undefined && seq <= lastReadSequence) ||
+      lastMarkedSeqRef.current === seq
+    )
+      return;
+
+    lastMarkedSeqRef.current = seq;
 
     markDialog({
-      variables: { chatID: chatId, lastSequence },
+      variables: { chatID: chatId, lastSequence: seq },
       onCompleted: () => {
         client.cache.modify({
           id: client.cache.identify({ __typename: "Chat", id: chatId }),
           fields: {
             unreadCount: () => 0,
+            lastReadSequence: (prev: number) => Math.max(prev || 0, seq),
           },
         });
 
@@ -40,7 +65,13 @@ export function useMarkDialog(myId?: string) {
         });
         if (sidebar) {
           const updated = sidebar.myChats.map((c) =>
-            c.id === chatId ? { ...c, unreadCount: 0 } : c,
+            c.id === chatId
+              ? {
+                  ...c,
+                  unreadCount: 0,
+                  lastReadSequence: Math.max(c.lastReadSequence || 0, seq),
+                }
+              : c,
           );
           client.writeQuery({
             query: GET_MY_CHATS,
@@ -49,7 +80,7 @@ export function useMarkDialog(myId?: string) {
         }
       },
     });
-  }
+  }, [chatId, messages, me, lastReadSequence, markDialog, client]);
 
-  return { markChatAsRead };
+  return { checkAndMarkRead };
 }
