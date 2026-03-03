@@ -9,11 +9,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth";
 import { SubscriptionManager } from "@/features/chat/ui/subscription-manager";
+import { useMe } from "@/features/chat/lib/use-messages";
+import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
 
 export default function RootLayout() {
   const navigate = useNavigate();
   const isAuth = useAuthStore((s: { isAuth: boolean }) => s.isAuth);
   const pathname = useRouterState().location.pathname;
+
+  const { data: meData } = useMe();
+  useE2EEInit(meData?.me);
 
   if (!isAuth && !["/login", "/signup", "/otp"].includes(pathname)) {
     return (
