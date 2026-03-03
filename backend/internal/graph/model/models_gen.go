@@ -64,10 +64,12 @@ type Subscription struct {
 }
 
 type UpdateUserInput struct {
-	FirstName *string `json:"firstName,omitempty"`
-	LastName  *string `json:"lastName,omitempty"`
-	Username  *string `json:"username,omitempty"`
-	PublicKey *string `json:"publicKey,omitempty"`
+	FirstName        *string `json:"firstName,omitempty"`
+	LastName         *string `json:"lastName,omitempty"`
+	Username         *string `json:"username,omitempty"`
+	PublicKey        *string `json:"publicKey,omitempty"`
+	EncryptedPrivKey *string `json:"encryptedPrivKey,omitempty"`
+	EncryptionIv     *string `json:"encryptionIv,omitempty"`
 }
 
 type UserStatusPayload struct {

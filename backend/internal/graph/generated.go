@@ -139,13 +139,15 @@ type ComplexityRoot struct {
 	}
 
 	User struct {
-		Email     func(childComplexity int) int
-		FirstName func(childComplexity int) int
-		ID        func(childComplexity int) int
-		LastName  func(childComplexity int) int
-		PublicKey func(childComplexity int) int
-		Status    func(childComplexity int) int
-		Username  func(childComplexity int) int
+		Email            func(childComplexity int) int
+		EncryptedPrivKey func(childComplexity int) int
+		EncryptionIv     func(childComplexity int) int
+		FirstName        func(childComplexity int) int
+		ID               func(childComplexity int) int
+		LastName         func(childComplexity int) int
+		PublicKey        func(childComplexity int) int
+		Status           func(childComplexity int) int
+		Username         func(childComplexity int) int
 	}
 
 	UserStatusPayload struct {
@@ -705,6 +707,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.Email(childComplexity), true
+	case "User.encryptedPrivKey":
+		if e.complexity.User.EncryptedPrivKey == nil {
+			break
+		}
+
+		return e.complexity.User.EncryptedPrivKey(childComplexity), true
+	case "User.encryptionIv":
+		if e.complexity.User.EncryptionIv == nil {
+			break
+		}
+
+		return e.complexity.User.EncryptionIv(childComplexity), true
 	case "User.first_name":
 		if e.complexity.User.FirstName == nil {
 			break
@@ -1752,6 +1766,10 @@ func (ec *executionContext) fieldContext_ChatMember_user(_ context.Context, fiel
 				return ec.fieldContext_User_status(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
+			case "encryptedPrivKey":
+				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
+			case "encryptionIv":
+				return ec.fieldContext_User_encryptionIv(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -1884,6 +1902,10 @@ func (ec *executionContext) fieldContext_Message_sender(_ context.Context, field
 				return ec.fieldContext_User_status(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
+			case "encryptedPrivKey":
+				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
+			case "encryptionIv":
+				return ec.fieldContext_User_encryptionIv(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -2347,6 +2369,10 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 				return ec.fieldContext_User_status(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
+			case "encryptedPrivKey":
+				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
+			case "encryptionIv":
+				return ec.fieldContext_User_encryptionIv(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -2948,6 +2974,10 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_status(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
+			case "encryptedPrivKey":
+				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
+			case "encryptionIv":
+				return ec.fieldContext_User_encryptionIv(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -3234,6 +3264,10 @@ func (ec *executionContext) fieldContext_Query_searchUsers(ctx context.Context, 
 				return ec.fieldContext_User_status(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
+			case "encryptedPrivKey":
+				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
+			case "encryptionIv":
+				return ec.fieldContext_User_encryptionIv(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -3993,6 +4027,64 @@ func (ec *executionContext) _User_publicKey(ctx context.Context, field graphql.C
 }
 
 func (ec *executionContext) fieldContext_User_publicKey(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_encryptedPrivKey(ctx context.Context, field graphql.CollectedField, obj *models.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_encryptedPrivKey,
+		func(ctx context.Context) (any, error) {
+			return obj.EncryptedPrivKey, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_encryptedPrivKey(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_encryptionIv(ctx context.Context, field graphql.CollectedField, obj *models.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_encryptionIv,
+		func(ctx context.Context) (any, error) {
+			return obj.EncryptionIv, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_encryptionIv(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
@@ -5663,7 +5755,7 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"firstName", "lastName", "username", "publicKey"}
+	fieldsInOrder := [...]string{"firstName", "lastName", "username", "publicKey", "encryptedPrivKey", "encryptionIv"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -5698,6 +5790,20 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.PublicKey = data
+		case "encryptedPrivKey":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("encryptedPrivKey"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EncryptedPrivKey = data
+		case "encryptionIv":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("encryptionIv"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EncryptionIv = data
 		}
 	}
 
@@ -6778,6 +6884,10 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "publicKey":
 			out.Values[i] = ec._User_publicKey(ctx, field, obj)
+		case "encryptedPrivKey":
+			out.Values[i] = ec._User_encryptedPrivKey(ctx, field, obj)
+		case "encryptionIv":
+			out.Values[i] = ec._User_encryptionIv(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

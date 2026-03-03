@@ -112,18 +112,20 @@ func (x *GetUsersResponse) GetUsers() []*User {
 }
 
 type User struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	FirstName     string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
-	Email         *string                `protobuf:"bytes,3,opt,name=email,proto3,oneof" json:"email,omitempty"`
-	LastName      *string                `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
-	Bio           *string                `protobuf:"bytes,5,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
-	Username      *string                `protobuf:"bytes,6,opt,name=username,proto3,oneof" json:"username,omitempty"`
-	IsPremium     *string                `protobuf:"bytes,7,opt,name=is_premium,json=isPremium,proto3,oneof" json:"is_premium,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3,oneof" json:"created_at,omitempty"`
-	PublicKey     *string                `protobuf:"bytes,9,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FirstName        string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	Email            *string                `protobuf:"bytes,3,opt,name=email,proto3,oneof" json:"email,omitempty"`
+	LastName         *string                `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
+	Bio              *string                `protobuf:"bytes,5,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	Username         *string                `protobuf:"bytes,6,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	IsPremium        *string                `protobuf:"bytes,7,opt,name=is_premium,json=isPremium,proto3,oneof" json:"is_premium,omitempty"`
+	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3,oneof" json:"created_at,omitempty"`
+	PublicKey        *string                `protobuf:"bytes,9,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
+	EncryptedPrivKey *string                `protobuf:"bytes,10,opt,name=encrypted_priv_key,json=encryptedPrivKey,proto3,oneof" json:"encrypted_priv_key,omitempty"`
+	EncryptionIv     *string                `protobuf:"bytes,11,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -215,6 +217,20 @@ func (x *User) GetCreatedAt() *timestamppb.Timestamp {
 func (x *User) GetPublicKey() string {
 	if x != nil && x.PublicKey != nil {
 		return *x.PublicKey
+	}
+	return ""
+}
+
+func (x *User) GetEncryptedPrivKey() string {
+	if x != nil && x.EncryptedPrivKey != nil {
+		return *x.EncryptedPrivKey
+	}
+	return ""
+}
+
+func (x *User) GetEncryptionIv() string {
+	if x != nil && x.EncryptionIv != nil {
+		return *x.EncryptionIv
 	}
 	return ""
 }
@@ -384,14 +400,16 @@ func (*UserInfoResponse_Error) isUserInfoResponse_Response() {}
 func (*UserInfoResponse_User) isUserInfoResponse_Response() {}
 
 type UpdateUserRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	FirstName     *string                `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3,oneof" json:"first_name,omitempty"`
-	LastName      *string                `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
-	Username      *string                `protobuf:"bytes,4,opt,name=username,proto3,oneof" json:"username,omitempty"`
-	PublicKey     *string                `protobuf:"bytes,5,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FirstName        *string                `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3,oneof" json:"first_name,omitempty"`
+	LastName         *string                `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
+	Username         *string                `protobuf:"bytes,4,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	PublicKey        *string                `protobuf:"bytes,5,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
+	EncryptedPrivKey *string                `protobuf:"bytes,6,opt,name=encrypted_priv_key,json=encryptedPrivKey,proto3,oneof" json:"encrypted_priv_key,omitempty"`
+	EncryptionIv     *string                `protobuf:"bytes,7,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *UpdateUserRequest) Reset() {
@@ -455,6 +473,20 @@ func (x *UpdateUserRequest) GetUsername() string {
 func (x *UpdateUserRequest) GetPublicKey() string {
 	if x != nil && x.PublicKey != nil {
 		return *x.PublicKey
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetEncryptedPrivKey() string {
+	if x != nil && x.EncryptedPrivKey != nil {
+		return *x.EncryptedPrivKey
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetEncryptionIv() string {
+	if x != nil && x.EncryptionIv != nil {
+		return *x.EncryptionIv
 	}
 	return ""
 }
@@ -549,7 +581,7 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x0fGetUsersRequest\x12\x10\n" +
 	"\x03ids\x18\x01 \x03(\tR\x03ids\"7\n" +
 	"\x10GetUsersResponse\x12#\n" +
-	"\x05users\x18\x01 \x03(\v2\r.user.v1.UserR\x05users\"\x8c\x03\n" +
+	"\x05users\x18\x01 \x03(\v2\r.user.v1.UserR\x05users\"\x92\x04\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -563,7 +595,10 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x05R\tcreatedAt\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"public_key\x18\t \x01(\tH\x06R\tpublicKey\x88\x01\x01B\b\n" +
+	"public_key\x18\t \x01(\tH\x06R\tpublicKey\x88\x01\x01\x121\n" +
+	"\x12encrypted_priv_key\x18\n" +
+	" \x01(\tH\aR\x10encryptedPrivKey\x88\x01\x01\x12(\n" +
+	"\rencryption_iv\x18\v \x01(\tH\bR\fencryptionIv\x88\x01\x01B\b\n" +
 	"\x06_emailB\f\n" +
 	"\n" +
 	"_last_nameB\x06\n" +
@@ -571,7 +606,9 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\t_usernameB\r\n" +
 	"\v_is_premiumB\r\n" +
 	"\v_created_atB\r\n" +
-	"\v_public_key\"O\n" +
+	"\v_public_keyB\x15\n" +
+	"\x13_encrypted_priv_keyB\x10\n" +
+	"\x0e_encryption_iv\"O\n" +
 	"\x0fUserInfoRequest\x12\x1c\n" +
 	"\busername\x18\x01 \x01(\tH\x00R\busername\x12\x10\n" +
 	"\x02id\x18\x02 \x01(\tH\x00R\x02idB\f\n" +
@@ -581,7 +618,7 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
 	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
 	"\n" +
-	"\bresponse\"\xe7\x01\n" +
+	"\bresponse\"\xed\x02\n" +
 	"\x11UpdateUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
 	"\n" +
@@ -589,12 +626,16 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\tlast_name\x18\x03 \x01(\tH\x01R\blastName\x88\x01\x01\x12\x1f\n" +
 	"\busername\x18\x04 \x01(\tH\x02R\busername\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"public_key\x18\x05 \x01(\tH\x03R\tpublicKey\x88\x01\x01B\r\n" +
+	"public_key\x18\x05 \x01(\tH\x03R\tpublicKey\x88\x01\x01\x121\n" +
+	"\x12encrypted_priv_key\x18\x06 \x01(\tH\x04R\x10encryptedPrivKey\x88\x01\x01\x12(\n" +
+	"\rencryption_iv\x18\a \x01(\tH\x05R\fencryptionIv\x88\x01\x01B\r\n" +
 	"\v_first_nameB\f\n" +
 	"\n" +
 	"_last_nameB\v\n" +
 	"\t_usernameB\r\n" +
-	"\v_public_key\"u\n" +
+	"\v_public_keyB\x15\n" +
+	"\x13_encrypted_priv_keyB\x10\n" +
+	"\x0e_encryption_iv\"u\n" +
 	"\x12UpdateUserResponse\x12.\n" +
 	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
 	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
