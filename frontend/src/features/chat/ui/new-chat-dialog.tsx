@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useApolloClient } from "@apollo/client/react";
 import {
   useSearchUsers,
   useChatActions,
@@ -14,21 +16,43 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Plus, Loader2 } from "lucide-react";
-import type { User } from "@/entities/chat/model/types";
+import { GET_MY_CHATS } from "../api/chat.gql";
+import type { User, Chat } from "@/entities/chat/model/types";
 
 export function NewChatDialog() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { data, loading: isSearching } = useSearchUsers(search);
   const { createChat } = useChatActions("");
+  const navigate = useNavigate();
+  const client = useApolloClient();
 
   const users = data?.searchUsers || [];
 
   const handleCreate = async (userID: string) => {
     try {
-      await createChat(userID);
-      setOpen(false);
-      setSearch("");
+      const newChat = await createChat(userID);
+      if (newChat) {
+        const existingData = client.readQuery<{ myChats: Chat[] }>({
+          query: GET_MY_CHATS,
+        });
+        if (existingData) {
+          const alreadyExists = existingData.myChats.some(
+            (c: Chat) => c.id === newChat.id,
+          );
+          if (!alreadyExists) {
+            client.writeQuery({
+              query: GET_MY_CHATS,
+              data: {
+                myChats: [newChat, ...existingData.myChats],
+              },
+            });
+          }
+        }
+        setOpen(false);
+        setSearch("");
+        navigate({ to: "/chat/$chatId", params: { chatId: newChat.id } });
+      }
     } catch (error: unknown) {
       console.error(error);
     }

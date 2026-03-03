@@ -75,14 +75,6 @@ export function useChatActions(chatId: string) {
 
     const isPrivate = chat?.type === "PRIVATE" || chat?.type === "DIRECT";
 
-    console.log("[E2EE DEBUG]", {
-      chatType: chat?.type,
-      isPrivate,
-      myId: me?.id,
-      peerId: peer?.id,
-      hasPeerPublicKey: !!peer?.publicKey,
-    });
-
     let finalVariables = {
       chatId,
       text,
@@ -95,7 +87,6 @@ export function useChatActions(chatId: string) {
         const myPrivKeyObj = await getPrivateKey(me.id);
 
         if (myPrivKeyObj) {
-          console.log("[E2EE] Encrypting message...");
           const encrypted = await encryptText(
             text,
             peer.publicKey,
@@ -107,17 +98,10 @@ export function useChatActions(chatId: string) {
             isEncrypted: true,
             encryptionIv: encrypted.iv,
           };
-        } else {
-          console.warn("[E2EE] Private key not found in local storage");
         }
       } catch (err: unknown) {
         console.error("[E2EE] Encryption failed", err);
       }
-    } else {
-      console.warn("[E2EE] Conditions not met", {
-        isPrivate,
-        hasPeerKey: !!peer?.publicKey,
-      });
     }
 
     await send({
@@ -130,8 +114,9 @@ export function useChatActions(chatId: string) {
     read({ variables: { chatID: chatId, lastSequence: Number(lastSequence) } });
   };
 
-  const createChat = (userID: string): void => {
-    createDirect({ variables: { userID } });
+  const createChat = async (userID: string): Promise<Chat | undefined> => {
+    const result = await createDirect({ variables: { userID } });
+    return result.data?.createDirectChat;
   };
 
   return { sendMessage, isSending: loading, markAsRead, createChat };

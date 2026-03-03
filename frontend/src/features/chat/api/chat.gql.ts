@@ -1,5 +1,24 @@
 import { gql } from "@apollo/client";
 
+export const GET_SESSIONS = gql`
+  query GetSessions($userId: ID!) {
+    sessions(userId: $userId) {
+      id
+      device
+      ipAddress
+      location
+      isActive
+      createdAt
+    }
+  }
+`;
+
+export const TERMINATE_ALL_OTHERS = gql`
+  mutation TerminateAllOtherSessions {
+    terminateAllOtherSessions
+  }
+`;
+
 export const UPDATE_PROFILE = gql`
   mutation UpdateUser($input: UpdateUserInput!) {
     updateUser(input: $input) {

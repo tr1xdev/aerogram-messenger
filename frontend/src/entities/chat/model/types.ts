@@ -45,3 +45,13 @@ export interface Chat {
   lastReadSequence: number;
   messages?: Message[];
 }
+
+export interface Session {
+  id: string;
+  device?: string | null;
+  ipAddress?: string | null;
+  location?: string | null;
+  isActive: boolean;
+  isCurrent: boolean;
+  createdAt: string;
+}

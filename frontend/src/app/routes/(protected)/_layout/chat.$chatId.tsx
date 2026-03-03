@@ -11,9 +11,11 @@ import {
   useMyChats,
 } from "@/features/chat/lib/use-messages";
 import { useMarkDialog } from "@/features/chat/lib/use-mark-dialog";
+import { useGlobalSubscriptions } from "@/features/chat/lib/use-global-subscription";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
+import { MessageSquare } from "lucide-react";
 import type { Message, Chat, User } from "@/entities/chat/model/types";
 
 interface SentCacheEntry {
@@ -58,6 +60,8 @@ function ChatPage({ chatId }: { chatId: string }) {
   const me: User | undefined = meData?.me;
   const chat: Chat | undefined = chatData?.chat;
   const isInitialLoading = !chat && chatLoading;
+
+  useGlobalSubscriptions(chatId, me?.id);
 
   useEffect(() => {
     setActiveChatId(chatId);
@@ -129,6 +133,21 @@ function ChatPage({ chatId }: { chatId: string }) {
     chat?.lastReadSequence,
   );
 
+  useEffect(() => {
+    checkAndMarkRead();
+  }, [allMessages, checkAndMarkRead]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAndMarkRead();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [checkAndMarkRead]);
+
   const handleSend = useCallback(async (): Promise<void> => {
     const currentInput = inputRef.current.trim();
     if (!currentInput || isSending || !me) return;
@@ -193,6 +212,12 @@ function ChatPage({ chatId }: { chatId: string }) {
               <Skeleton className="h-10 w-[50%] rounded-2xl rounded-tl-none" />
             </div>
           </motion.div>
+        ) : allMessages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
+            <p className="text-sm">No messages yet.</p>
+            <p className="text-xs">Type a message to start the conversation.</p>
+          </div>
         ) : (
           <div className="h-full w-full">
             <MessageList
