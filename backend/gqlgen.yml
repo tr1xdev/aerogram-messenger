@@ -21,6 +21,15 @@ autobind:
    - "github.com/aerogram-org/aerogram-api/internal/schemas"
 
 models:
+   Session:
+      model: github.com/aerogram-org/aerogram-api/internal/models.Session
+      fields:
+         device:
+            resolver: true
+         location:
+            resolver: true
+         isCurrent:
+            resolver: true
    User:
       fields:
          status:

@@ -6,6 +6,8 @@ import (
 	messagespb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1"
 	userpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1"
 	"github.com/aerogram-org/aerogram-api/internal/repositories"
+	"github.com/aerogram-org/aerogram-api/internal/services/geo_svc"
+	"github.com/aerogram-org/aerogram-api/internal/services/ua_svc"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -19,6 +21,8 @@ type Resolver struct {
 	messagesClient messagespb.MessagesServiceClient
 	userClient     userpb.UserServiceClient
 	redisClient    *redis.Client
+	geoService     *geo_svc.Service
+	uaService      *ua_svc.Service
 }
 
 func NewResolver(
@@ -30,6 +34,8 @@ func NewResolver(
 	userClient userpb.UserServiceClient,
 	redisClient *redis.Client,
 	presenceRepo *repositories.PresenceRepository,
+	geoService *geo_svc.Service,
+	uaService *ua_svc.Service,
 ) *Resolver {
 	return &Resolver{
 		db:             db,
@@ -40,5 +46,7 @@ func NewResolver(
 		userClient:     userClient,
 		redisClient:    redisClient,
 		presenceRepo:   presenceRepo,
+		geoService:     geoService,
+		uaService:      uaService,
 	}
 }

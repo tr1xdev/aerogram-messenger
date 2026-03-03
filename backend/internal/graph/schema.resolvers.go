@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/aerogram-org/aerogram-api/internal/graph/model"
@@ -69,6 +70,26 @@ func (r *messageResolver) ForwardedFrom(ctx context.Context, obj *models.Message
 		return nil, nil
 	}
 	return &msg, nil
+}
+
+// TerminateAllOtherSessions is the resolver for the terminateAllOtherSessions field.
+func (r *mutationResolver) TerminateAllOtherSessions(ctx context.Context) (bool, error) {
+	userID, ok := ctx.Value(middleware.AuthUserIDKey).(string)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+
+	currentSessionID, ok := ctx.Value(middleware.AuthSessionIDKey).(string)
+	if !ok {
+		return false, fmt.Errorf("session not found")
+	}
+
+	err := r.db.Where("user_id = ? AND id != ?", userID, currentSessionID).Delete(&models.Session{}).Error
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // SignUp is the resolver for the signUp field.
@@ -322,33 +343,32 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, 
 
 // TerminateSession is the resolver for the terminateSession field.
 func (r *mutationResolver) TerminateSession(ctx context.Context, id string) (bool, error) {
-	authID := middleware.GetUserID(ctx)
-	if authID == "" {
-		return false, errors.New("unauthorized access")
+	userID, ok := ctx.Value(middleware.AuthUserIDKey).(string)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
 	}
-	var session models.Session
-	if err := r.db.Where("id = ? AND user_id = ?", id, authID).First(&session).Error; err != nil {
-		return false, errors.New("session not found or access denied")
-	}
-	if err := r.userRepo.TerminateSession(id); err != nil {
+
+	err := r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Session{}).Error
+	if err != nil {
 		return false, err
 	}
+
 	return true, nil
 }
 
 // Logout is the resolver for the logout field.
 func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
 	authID := middleware.GetUserID(ctx)
-	if authID == "" {
-		return false, errors.New("unauthorized access")
-	}
 	sessionID := middleware.GetSessionID(ctx)
-	if sessionID == "" {
-		return false, errors.New("active session not found")
+
+	if authID == "" || sessionID == "" {
+		return false, errors.New("no active session found")
 	}
+
 	if err := r.userRepo.TerminateSession(sessionID); err != nil {
 		return false, err
 	}
+
 	return true, nil
 }
 
@@ -448,20 +468,32 @@ func (r *queryResolver) SearchUsers(ctx context.Context, username string) ([]*mo
 
 // DialogRead is the resolver for the dialogRead field.
 func (r *queryResolver) DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error) {
-	userID := middleware.GetUserID(ctx)
-	if userID == "" {
-		return nil, errors.New("unauthorized access")
+	panic(fmt.Errorf("not implemented: DialogRead - dialogRead"))
+}
+
+// Device is the resolver for the device field.
+func (r *sessionResolver) Device(ctx context.Context, obj *models.Session) (*string, error) {
+	if obj.Device == "" {
+		return StringPtr("Unknown Device"), nil
 	}
-	var member models.DialogMember
-	err := r.db.Where("dialog_id = ? AND user_id = ?", chatID, userID).First(&member).Error
-	if err != nil {
-		return nil, err
+
+	name := r.uaService.Parse(obj.Device)
+	return &name, nil
+}
+
+// Location is the resolver for the location field.
+func (r *sessionResolver) Location(ctx context.Context, obj *models.Session) (*string, error) {
+	if obj.IPAddress == "" || obj.IPAddress == "127.0.0.1" || obj.IPAddress == "::1" {
+		return StringPtr("Local Network"), nil
 	}
-	return &model.ReadPayload{
-		ChatID:       chatID,
-		UserID:       userID,
-		LastSequence: member.LastReadSequence,
-	}, nil
+
+	res := r.geoService.Lookup(obj.IPAddress)
+	return &res, nil
+}
+
+// IsCurrent is the resolver for the isCurrent field.
+func (r *sessionResolver) IsCurrent(ctx context.Context, obj *models.Session) (bool, error) {
+	return obj.ID == middleware.GetSessionID(ctx), nil
 }
 
 // CreatedAt is the resolver for the createdAt field.
@@ -535,9 +567,11 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 	readChan := make(chan *model.ReadPayload, 1)
 	pubsub := r.redisClient.Subscribe(ctx, "dialog_read:"+chatID)
 	authID := middleware.GetUserID(ctx)
+
 	go func() {
 		defer pubsub.Close()
 		defer close(readChan)
+
 		ch := pubsub.Channel()
 		for {
 			select {
@@ -547,19 +581,23 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 				if !ok || msg == nil {
 					return
 				}
+
 				var payload model.ReadPayload
-				if err := json.Unmarshal([]byte(msg.Payload), &payload); err == nil {
-					if payload.UserID != authID {
-						select {
-						case readChan <- &payload:
-						case <-ctx.Done():
-							return
-						}
+				if err := json.Unmarshal([]byte(msg.Payload), &payload); err != nil {
+					continue
+				}
+
+				if payload.UserID != authID {
+					select {
+					case readChan <- &payload:
+					case <-ctx.Done():
+						return
 					}
 				}
 			}
 		}
 	}()
+
 	return readChan, nil
 }
 

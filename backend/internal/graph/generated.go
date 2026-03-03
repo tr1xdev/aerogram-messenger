@@ -91,21 +91,22 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateChat       func(childComplexity int, typeArg model.ChatType, participantIds []string, slug *string, title *string) int
-		CreateDirectChat func(childComplexity int, userID string) int
-		DeleteMessage    func(childComplexity int, id string) int
-		Login            func(childComplexity int, input model.LoginInput) int
-		Logout           func(childComplexity int) int
-		MarkDialogAsRead func(childComplexity int, chatID string, lastSequence int64) int
-		PinChat          func(childComplexity int, id string, pinned bool) int
-		RefreshToken     func(childComplexity int, token string) int
-		SendMessage      func(childComplexity int, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) int
-		SendTypingEvent  func(childComplexity int, chatID string) int
-		SignUp           func(childComplexity int, input model.SignUpInput) int
-		TerminateSession func(childComplexity int, id string) int
-		UpdateMessage    func(childComplexity int, id string, text string) int
-		UpdateUser       func(childComplexity int, input model.UpdateUserInput) int
-		VerifyEmail      func(childComplexity int, input model.VerifyEmailInput) int
+		CreateChat                func(childComplexity int, typeArg model.ChatType, participantIds []string, slug *string, title *string) int
+		CreateDirectChat          func(childComplexity int, userID string) int
+		DeleteMessage             func(childComplexity int, id string) int
+		Login                     func(childComplexity int, input model.LoginInput) int
+		Logout                    func(childComplexity int) int
+		MarkDialogAsRead          func(childComplexity int, chatID string, lastSequence int64) int
+		PinChat                   func(childComplexity int, id string, pinned bool) int
+		RefreshToken              func(childComplexity int, token string) int
+		SendMessage               func(childComplexity int, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) int
+		SendTypingEvent           func(childComplexity int, chatID string) int
+		SignUp                    func(childComplexity int, input model.SignUpInput) int
+		TerminateAllOtherSessions func(childComplexity int) int
+		TerminateSession          func(childComplexity int, id string) int
+		UpdateMessage             func(childComplexity int, id string, text string) int
+		UpdateUser                func(childComplexity int, input model.UpdateUserInput) int
+		VerifyEmail               func(childComplexity int, input model.VerifyEmailInput) int
 	}
 
 	Query struct {
@@ -130,6 +131,8 @@ type ComplexityRoot struct {
 		ID        func(childComplexity int) int
 		IPAddress func(childComplexity int) int
 		IsActive  func(childComplexity int) int
+		IsCurrent func(childComplexity int) int
+		Location  func(childComplexity int) int
 	}
 
 	Subscription struct {
@@ -172,6 +175,7 @@ type MessageResolver interface {
 	ForwardedFrom(ctx context.Context, obj *models.Message) (*models.Message, error)
 }
 type MutationResolver interface {
+	TerminateAllOtherSessions(ctx context.Context) (bool, error)
 	SignUp(ctx context.Context, input model.SignUpInput) (*model.AuthPayload, error)
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
 	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (*model.VerifyEmailPayload, error)
@@ -198,6 +202,11 @@ type QueryResolver interface {
 	DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error)
 }
 type SessionResolver interface {
+	Device(ctx context.Context, obj *models.Session) (*string, error)
+
+	Location(ctx context.Context, obj *models.Session) (*string, error)
+
+	IsCurrent(ctx context.Context, obj *models.Session) (bool, error)
 	CreatedAt(ctx context.Context, obj *models.Session) (string, error)
 }
 type SubscriptionResolver interface {
@@ -504,6 +513,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.SignUp(childComplexity, args["input"].(model.SignUpInput)), true
+	case "Mutation.terminateAllOtherSessions":
+		if e.complexity.Mutation.TerminateAllOtherSessions == nil {
+			break
+		}
+
+		return e.complexity.Mutation.TerminateAllOtherSessions(childComplexity), true
 	case "Mutation.terminateSession":
 		if e.complexity.Mutation.TerminateSession == nil {
 			break
@@ -666,6 +681,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Session.IsActive(childComplexity), true
+	case "Session.isCurrent":
+		if e.complexity.Session.IsCurrent == nil {
+			break
+		}
+
+		return e.complexity.Session.IsCurrent(childComplexity), true
+	case "Session.location":
+		if e.complexity.Session.Location == nil {
+			break
+		}
+
+		return e.complexity.Session.Location(childComplexity), true
 
 	case "Subscription.dialogRead":
 		if e.complexity.Subscription.DialogRead == nil {
@@ -2193,6 +2220,35 @@ func (ec *executionContext) fieldContext_Message_forwardedFrom(_ context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_terminateAllOtherSessions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_terminateAllOtherSessions,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().TerminateAllOtherSessions(ctx)
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_terminateAllOtherSessions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_signUp(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3016,8 +3072,12 @@ func (ec *executionContext) fieldContext_Query_sessions(ctx context.Context, fie
 				return ec.fieldContext_Session_device(ctx, field)
 			case "ipAddress":
 				return ec.fieldContext_Session_ipAddress(ctx, field)
+			case "location":
+				return ec.fieldContext_Session_location(ctx, field)
 			case "isActive":
 				return ec.fieldContext_Session_isActive(ctx, field)
+			case "isCurrent":
+				return ec.fieldContext_Session_isCurrent(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Session_createdAt(ctx, field)
 			}
@@ -3566,10 +3626,10 @@ func (ec *executionContext) _Session_device(ctx context.Context, field graphql.C
 		field,
 		ec.fieldContext_Session_device,
 		func(ctx context.Context) (any, error) {
-			return obj.Device, nil
+			return ec.resolvers.Session().Device(ctx, obj)
 		},
 		nil,
-		ec.marshalOString2string,
+		ec.marshalOString2ᚖstring,
 		true,
 		false,
 	)
@@ -3579,8 +3639,8 @@ func (ec *executionContext) fieldContext_Session_device(_ context.Context, field
 	fc = &graphql.FieldContext{
 		Object:     "Session",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -3617,6 +3677,35 @@ func (ec *executionContext) fieldContext_Session_ipAddress(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Session_location(ctx context.Context, field graphql.CollectedField, obj *models.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_location,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Session().Location(ctx, obj)
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_location(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Session_isActive(ctx context.Context, field graphql.CollectedField, obj *models.Session) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3639,6 +3728,35 @@ func (ec *executionContext) fieldContext_Session_isActive(_ context.Context, fie
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_isCurrent(ctx context.Context, field graphql.CollectedField, obj *models.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_isCurrent,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Session().IsCurrent(ctx, obj)
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_isCurrent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -6330,6 +6448,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
+		case "terminateAllOtherSessions":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_terminateAllOtherSessions(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "signUp":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_signUp(ctx, field)
@@ -6728,11 +6853,111 @@ func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, 
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "device":
-			out.Values[i] = ec._Session_device(ctx, field, obj)
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Session_device(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "ipAddress":
 			out.Values[i] = ec._Session_ipAddress(ctx, field, obj)
+		case "location":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Session_location(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "isActive":
 			out.Values[i] = ec._Session_isActive(ctx, field, obj)
+		case "isCurrent":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Session_isCurrent(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "createdAt":
 			field := field
 

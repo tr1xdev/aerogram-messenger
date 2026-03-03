@@ -120,3 +120,7 @@ func mapGRPCError(err error) error {
 	}
 	return err
 }
+
+func StringPtr(s string) *string {
+	return &s
+}

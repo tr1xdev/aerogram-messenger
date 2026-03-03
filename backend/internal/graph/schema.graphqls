@@ -98,7 +98,9 @@ type Session {
    id: ID!
    device: String
    ipAddress: String
+   location: String
    isActive: Boolean
+   isCurrent: Boolean!
    createdAt: String!
 }
 
@@ -113,6 +115,7 @@ type Query {
 }
 
 type Mutation {
+   terminateAllOtherSessions: Boolean!
    signUp(input: SignUpInput!): AuthPayload!
    login(input: LoginInput!): AuthPayload!
    verifyEmail(input: VerifyEmailInput!): VerifyEmailPayload!
