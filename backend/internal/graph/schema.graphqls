@@ -63,6 +63,8 @@ input UpdateUserInput {
    lastName: String
    username: String
    publicKey: String
+   encryptedPrivKey: String
+   encryptionIv: String
 }
 
 type User {
@@ -73,6 +75,8 @@ type User {
    username: String
    status: String!
    publicKey: String
+   encryptedPrivKey: String
+   encryptionIv: String
 }
 
 type AuthPayload {

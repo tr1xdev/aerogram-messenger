@@ -31,6 +31,8 @@ message User {
   optional string is_premium = 7;
   optional google.protobuf.Timestamp created_at = 8;
   optional string public_key = 9;
+  optional string encrypted_priv_key = 10;
+  optional string encryption_iv = 11;
 }
 
 message UserInfoRequest {
@@ -53,6 +55,8 @@ message UpdateUserRequest {
   optional string last_name = 3;
   optional string username = 4;
   optional string public_key = 5;
+  optional string encrypted_priv_key = 6;
+  optional string encryption_iv = 7;
 }
 
 message UpdateUserResponse {
