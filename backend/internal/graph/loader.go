@@ -35,18 +35,15 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 
 				userMap := make(map[string]*models.User)
 				for _, u := range res.Users {
-					var pubKey *string
-					if u.PublicKey != nil {
-						pubKey = u.PublicKey
-					}
-
 					userMap[u.Id] = &models.User{
-						ID:        u.Id,
-						FirstName: u.FirstName,
-						LastName:  u.GetLastName(),
-						Username:  u.GetUsername(),
-						Email:     u.GetEmail(),
-						PublicKey: pubKey,
+						ID:               u.Id,
+						FirstName:        u.FirstName,
+						LastName:         u.GetLastName(),
+						Username:         u.GetUsername(),
+						Email:            u.GetEmail(),
+						PublicKey:        u.PublicKey,
+						EncryptedPrivKey: u.EncryptedPrivKey,
+						EncryptionIv:     u.EncryptionIv,
 					}
 				}
 
