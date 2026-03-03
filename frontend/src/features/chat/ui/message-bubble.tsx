@@ -34,7 +34,19 @@ export function MessageBubble({
         const privKeyObj = await getPrivateKey(myId);
         const senderPubKey = isMe ? peerPublicKey : message.sender.publicKey;
 
+        console.log("[Crypto Debug] Attempting decryption:", {
+          messageId: message.id,
+          isMe,
+          hasPrivKey: !!privKeyObj,
+          hasSenderPubKey: !!senderPubKey,
+          hasIv: !!message.encryptionIv,
+        });
+
         if (!privKeyObj || !senderPubKey || !message.encryptionIv) {
+          console.error("[Crypto Debug] Missing requirements for decryption", {
+            messageId: message.id,
+            sender: message.sender.username,
+          });
           if (isMounted) setError("Decryption error");
           return;
         }
@@ -46,11 +58,17 @@ export function MessageBubble({
           privKeyObj,
         );
 
+        console.log("[Crypto Debug] Success:", {
+          messageId: message.id,
+          preview: result.substring(0, 10) + "...",
+        });
+
         if (isMounted) {
           setDecryptedText(result);
           setError(null);
         }
-      } catch {
+      } catch (err: unknown) {
+        console.error("[Crypto Debug] Decryption failed catch:", err);
         if (isMounted) setError("Decryption error");
       }
     };
@@ -66,6 +84,8 @@ export function MessageBubble({
     myId,
     peerPublicKey,
     isMe,
+    message.sender.publicKey,
+    message.text,
   ]);
 
   return (
