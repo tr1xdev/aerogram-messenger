@@ -56,12 +56,14 @@ func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*us
 	return &userpb.UserInfoResponse{
 		Response: &userpb.UserInfoResponse_User{
 			User: &userpb.User{
-				Id:        u.ID,
-				FirstName: u.FirstName,
-				LastName:  &u.LastName,
-				Email:     &u.Email,
-				Username:  &u.Username,
-				PublicKey: u.PublicKey,
+				Id:               u.ID,
+				FirstName:        u.FirstName,
+				LastName:         &u.LastName,
+				Email:            &u.Email,
+				Username:         &u.Username,
+				PublicKey:        u.PublicKey,
+				EncryptedPrivKey: u.EncryptedPrivKey,
+				EncryptionIv:     u.EncryptionIv,
 			},
 		},
 	}, nil
@@ -76,12 +78,14 @@ func (s *Server) GetUsers(ctx context.Context, req *userpb.GetUsersRequest) (*us
 	pbUsers := make([]*userpb.User, len(users))
 	for i, u := range users {
 		pbUsers[i] = &userpb.User{
-			Id:        u.ID,
-			FirstName: u.FirstName,
-			LastName:  &u.LastName,
-			Email:     &u.Email,
-			Username:  &u.Username,
-			PublicKey: u.PublicKey,
+			Id:               u.ID,
+			FirstName:        u.FirstName,
+			LastName:         &u.LastName,
+			Email:            &u.Email,
+			Username:         &u.Username,
+			PublicKey:        u.PublicKey,
+			EncryptedPrivKey: u.EncryptedPrivKey,
+			EncryptionIv:     u.EncryptionIv,
 		}
 	}
 
@@ -117,6 +121,12 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 	if req.PublicKey != nil {
 		updates["public_key"] = *req.PublicKey
 	}
+	if req.EncryptedPrivKey != nil {
+		updates["encrypted_priv_key"] = *req.EncryptedPrivKey
+	}
+	if req.EncryptionIv != nil {
+		updates["encryption_iv"] = *req.EncryptionIv
+	}
 
 	if err := s.db.Model(&u).Updates(updates).Error; err != nil {
 		return nil, status.Error(codes.Internal, "failed to update user")
@@ -125,12 +135,14 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 	return &userpb.UpdateUserResponse{
 		Response: &userpb.UpdateUserResponse_User{
 			User: &userpb.User{
-				Id:        u.ID,
-				FirstName: u.FirstName,
-				LastName:  &u.LastName,
-				Email:     &u.Email,
-				Username:  &u.Username,
-				PublicKey: u.PublicKey,
+				Id:               u.ID,
+				FirstName:        u.FirstName,
+				LastName:         &u.LastName,
+				Email:            &u.Email,
+				Username:         &u.Username,
+				PublicKey:        u.PublicKey,
+				EncryptedPrivKey: u.EncryptedPrivKey,
+				EncryptionIv:     u.EncryptionIv,
 			},
 		},
 	}, nil
