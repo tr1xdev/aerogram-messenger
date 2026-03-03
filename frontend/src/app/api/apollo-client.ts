@@ -30,10 +30,17 @@ interface RefreshTokenResponse {
 
 interface InternalErrorLinkArgs {
   graphQLErrors?: readonly GraphQLError[];
-  networkError?: Error;
+  networkError?: { statusCode?: number; message?: string };
   operation: Operation;
   forward: (op: Operation) => Observable<FetchResult>;
 }
+
+export const logoutAll = async () => {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  await client.clearStore();
+  window.location.href = "/login";
+};
 
 const httpLink = new HttpLink({ uri: "http://localhost:8080/query" });
 
@@ -48,66 +55,57 @@ const authLink = setContext((_, { headers }) => {
 });
 
 const errorLink = onError((args) => {
-  const { graphQLErrors, operation, forward } =
+  const { graphQLErrors, networkError, operation, forward } =
     args as unknown as InternalErrorLinkArgs;
 
-  if (graphQLErrors) {
-    for (const err of graphQLErrors) {
-      if (err.extensions?.code === "UNAUTHENTICATED") {
-        if (operation.operationName === "RefreshToken") {
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
-          window.location.href = "/login";
-          return;
-        }
+  const isUnauthorized =
+    graphQLErrors?.some(
+      (err) =>
+        err.extensions?.code === "UNAUTHENTICATED" ||
+        err.message.includes("Session terminated"),
+    ) || networkError?.statusCode === 401;
 
-        const refreshToken = localStorage.getItem("refresh_token");
-
-        if (!refreshToken) {
-          window.location.href = "/login";
-          return;
-        }
-
-        return new Observable<FetchResult>((observer) => {
-          client
-            .mutate<RefreshTokenResponse>({
-              mutation: REFRESH_TOKEN_MUTATION,
-              variables: { token: refreshToken },
-            })
-            .then(({ data }: FetchResult<RefreshTokenResponse>) => {
-              if (!data) throw new Error("No refresh data");
-
-              const { accessToken, refreshToken: newRefresh } =
-                data.refreshToken;
-              localStorage.setItem("access_token", accessToken);
-              localStorage.setItem("refresh_token", newRefresh);
-
-              operation.setContext(
-                ({ headers = {} }: { headers?: Record<string, string> }) => ({
-                  headers: {
-                    ...headers,
-                    authorization: `Bearer ${accessToken}`,
-                  },
-                }),
-              );
-
-              const subscriber = {
-                next: observer.next.bind(observer),
-                error: observer.error.bind(observer),
-                complete: observer.complete.bind(observer),
-              };
-
-              forward(operation).subscribe(subscriber);
-            })
-            .catch((error: Error) => {
-              localStorage.removeItem("access_token");
-              localStorage.removeItem("refresh_token");
-              window.location.href = "/login";
-              observer.error(error);
-            });
-        });
-      }
+  if (isUnauthorized) {
+    if (operation.operationName === "RefreshToken") {
+      logoutAll();
+      return;
     }
+
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken) {
+      logoutAll();
+      return;
+    }
+
+    return new Observable<FetchResult>((observer) => {
+      client
+        .mutate<RefreshTokenResponse>({
+          mutation: REFRESH_TOKEN_MUTATION,
+          variables: { token: refreshToken },
+        })
+        .then(({ data }: FetchResult<RefreshTokenResponse>) => {
+          if (!data) throw new Error("No refresh data");
+          const { accessToken, refreshToken: newRefresh } = data.refreshToken;
+          localStorage.setItem("access_token", accessToken);
+          localStorage.setItem("refresh_token", newRefresh);
+
+          operation.setContext(
+            ({ headers = {} }: { headers?: Record<string, string> }) => ({
+              headers: { ...headers, authorization: `Bearer ${accessToken}` },
+            }),
+          );
+
+          const subscriber = {
+            next: (val: FetchResult) => observer.next(val),
+            error: (err: Error) => observer.error(err),
+            complete: () => observer.complete(),
+          };
+          forward(operation).subscribe(subscriber);
+        })
+        .catch(() => {
+          logoutAll();
+        });
+    });
   }
 });
 
@@ -119,15 +117,9 @@ const wsLink = new GraphQLWsLink(
       return { Authorization: token ? `Bearer ${token}` : "" };
     },
     on: {
-      connected: () => {
-        useConnectionStore.getState().setIsWsConnected(true);
-      },
-      closed: () => {
-        useConnectionStore.getState().setIsWsConnected(false);
-      },
-      error: () => {
-        useConnectionStore.getState().setIsWsConnected(false);
-      },
+      connected: () => useConnectionStore.getState().setIsWsConnected(true),
+      closed: () => useConnectionStore.getState().setIsWsConnected(false),
+      error: () => useConnectionStore.getState().setIsWsConnected(false),
     },
   }),
 );
