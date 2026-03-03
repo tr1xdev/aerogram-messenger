@@ -30,12 +30,12 @@ export function ChatHeader({
   return (
     <header className="flex h-16 items-center justify-between px-4 border-b shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-50">
       <div className="flex items-center gap-2 min-w-0 h-full">
-        <div className="relative flex items-center h-full pt-1">
+        <div className="relative flex items-center h-full pt-1 md:hidden">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate({ to: "/" })}
-            className="md:hidden shrink-0"
+            className="shrink-0"
           >
             <ChevronLeft className="h-6 w-6" />
           </Button>
@@ -46,7 +46,7 @@ export function ChatHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-3 overflow-hidden">
+        <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
           <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
             <AvatarImage src={photoUrl || ""} />
             <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">

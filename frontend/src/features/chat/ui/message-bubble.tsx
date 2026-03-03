@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Clock, Check, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { decryptText } from "@/shared/lib/crypto";
+import { decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type { Message } from "@/entities/chat/model/types";
 
 interface MessageBubbleProps {
@@ -22,7 +22,7 @@ export function MessageBubble({
   const [decryptedText, setDecryptedText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const isTemp = message.id.startsWith("temp-");
+  const isTemp = message.id.startsWith("temp-") || message.id.length < 10;
 
   useEffect(() => {
     let isMounted = true;
@@ -31,10 +31,10 @@ export function MessageBubble({
 
     const decrypt = async (): Promise<void> => {
       try {
-        const privKey = localStorage.getItem(`e2ee_priv_${myId}`);
+        const privKeyObj = await getPrivateKey(myId);
         const senderPubKey = isMe ? peerPublicKey : message.sender.publicKey;
 
-        if (!privKey || !senderPubKey || !message.encryptionIv) {
+        if (!privKeyObj || !senderPubKey || !message.encryptionIv) {
           if (isMounted) setError("Decryption error");
           return;
         }
@@ -43,7 +43,7 @@ export function MessageBubble({
           message.text,
           message.encryptionIv,
           senderPubKey,
-          privKey,
+          privKeyObj,
         );
 
         if (isMounted) {

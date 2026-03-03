@@ -9,8 +9,8 @@ import {
 import type {
   Reference,
   FetchResult,
-  Operation,
   ApolloLink,
+  Operation,
 } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
@@ -28,9 +28,9 @@ interface RefreshTokenResponse {
   };
 }
 
-interface ApolloErrorResponse {
+interface InternalErrorLinkArgs {
   graphQLErrors?: readonly GraphQLError[];
-  networkError?: Error | null;
+  networkError?: Error;
   operation: Operation;
   forward: (op: Operation) => Observable<FetchResult>;
 }
@@ -41,19 +41,26 @@ const authLink = setContext((_, { headers }) => {
   const token = localStorage.getItem("access_token");
   return {
     headers: {
-      ...headers,
+      ...(headers as Record<string, string>),
       authorization: token ? `Bearer ${token}` : "",
     },
   };
 });
 
-const errorLink = onError((errorArgs) => {
+const errorLink = onError((args) => {
   const { graphQLErrors, operation, forward } =
-    errorArgs as unknown as ApolloErrorResponse;
+    args as unknown as InternalErrorLinkArgs;
 
   if (graphQLErrors) {
     for (const err of graphQLErrors) {
       if (err.extensions?.code === "UNAUTHENTICATED") {
+        if (operation.operationName === "RefreshToken") {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          window.location.href = "/login";
+          return;
+        }
+
         const refreshToken = localStorage.getItem("refresh_token");
 
         if (!refreshToken) {
@@ -75,12 +82,14 @@ const errorLink = onError((errorArgs) => {
               localStorage.setItem("access_token", accessToken);
               localStorage.setItem("refresh_token", newRefresh);
 
-              operation.setContext(({ headers = {} }) => ({
-                headers: {
-                  ...headers,
-                  authorization: `Bearer ${accessToken}`,
-                },
-              }));
+              operation.setContext(
+                ({ headers = {} }: { headers?: Record<string, string> }) => ({
+                  headers: {
+                    ...headers,
+                    authorization: `Bearer ${accessToken}`,
+                  },
+                }),
+              );
 
               const subscriber = {
                 next: observer.next.bind(observer),
@@ -165,11 +174,11 @@ export const client = new ApolloClient({
             ): Reference[] {
               const merged = [...existing];
               const existingIds = new Set(
-                merged.map((r) => readField("id", r)),
+                merged.map((r) => readField<string>("id", r)),
               );
               incoming.forEach((r) => {
-                const id = readField("id", r);
-                if (!existingIds.has(id)) merged.push(r);
+                const id = readField<string>("id", r);
+                if (id && !existingIds.has(id)) merged.push(r);
               });
               return merged;
             },

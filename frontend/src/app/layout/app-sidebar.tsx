@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NewChatDialog } from "@/features/chat/ui/new-chat-dialog";
 import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
 import { useConnectionStore } from "@/store/connection";
-import { decryptText } from "@/shared/lib/crypto";
+import { decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type { Chat, ChatMember, Message } from "@/entities/chat/model/types";
 import { cn } from "@/lib/utils";
 
@@ -45,9 +45,10 @@ function LastMessageContent({
         const targetPublicKey = isMe
           ? otherMember?.user.publicKey
           : message.sender.publicKey;
-        const myPrivKey = localStorage.getItem(`e2ee_priv_${myId}`);
 
-        if (!targetPublicKey || !myPrivKey || !message.encryptionIv) {
+        const myPrivKeyObj = await getPrivateKey(myId);
+
+        if (!targetPublicKey || !myPrivKeyObj || !message.encryptionIv) {
           if (isMounted) setDecryptedText("Encrypted");
           return;
         }
@@ -56,7 +57,7 @@ function LastMessageContent({
           message.text,
           message.encryptionIv,
           targetPublicKey,
-          myPrivKey,
+          myPrivKeyObj,
         );
 
         if (isMounted) setDecryptedText(clearText);
@@ -182,8 +183,8 @@ export function AppSidebar() {
               <span className="text-sm font-semibold truncate leading-none mb-1">
                 {userData.me.first_name || userData.me.username || "User"}
               </span>
-              <span className="text-[10px] text-primary font-bold uppercase tracking-widest">
-                Active
+              <span className="text-xs text-primary tracking-widest uppercase font-bold">
+                Bio
               </span>
             </div>
           </div>

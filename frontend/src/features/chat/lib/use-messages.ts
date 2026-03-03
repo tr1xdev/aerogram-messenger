@@ -10,7 +10,7 @@ import {
   SEARCH_USERS,
   CREATE_DIRECT_CHAT,
 } from "../api/chat.gql";
-import { encryptText } from "@/shared/lib/crypto";
+import { encryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type { Message, User, Chat } from "@/entities/chat/model/types";
 
 export function useMe() {
@@ -64,7 +64,6 @@ export function useChatActions(chatId: string) {
     const me = meData?.me;
     const chat = chatData?.chat;
     const peer = chat?.members?.find((m) => m.user.id !== me?.id)?.user;
-    const myPrivKey = me ? localStorage.getItem(`e2ee_priv_${me.id}`) : null;
 
     let finalVariables = {
       chatId,
@@ -75,17 +74,25 @@ export function useChatActions(chatId: string) {
 
     const isPrivate = chat?.type === "PRIVATE";
 
-    if (isPrivate && peer?.publicKey && myPrivKey) {
+    if (isPrivate && peer?.publicKey && me) {
       try {
-        const encrypted = await encryptText(text, peer.publicKey, myPrivKey);
-        finalVariables = {
-          ...finalVariables,
-          text: encrypted.ciphertext,
-          isEncrypted: true,
-          encryptionIv: encrypted.iv,
-        };
-      } catch {
-        console.error("Encryption failed");
+        const myPrivKeyObj = await getPrivateKey(me.id);
+
+        if (myPrivKeyObj) {
+          const encrypted = await encryptText(
+            text,
+            peer.publicKey,
+            myPrivKeyObj,
+          );
+          finalVariables = {
+            ...finalVariables,
+            text: encrypted.ciphertext,
+            isEncrypted: true,
+            encryptionIv: encrypted.iv,
+          };
+        }
+      } catch (err: unknown) {
+        console.error("[Crypto] Encryption failed", err);
       }
     }
 

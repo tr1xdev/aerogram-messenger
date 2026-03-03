@@ -1,28 +1,74 @@
-export interface KeyPair {
-  publicKey: string;
-  privateKey: string;
-}
+const DB_NAME = "aerogram_crypto";
+const STORE_NAME = "keys";
 
-export const generateE2EEKeys = async (): Promise<KeyPair> => {
+const getDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
+        request.result.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const savePrivateKey = async (
+  userId: string,
+  key: CryptoKey,
+): Promise<void> => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const request = transaction
+      .objectStore(STORE_NAME)
+      .put(key, `priv_${userId}`);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getPrivateKey = async (
+  userId: string,
+): Promise<CryptoKey | null> => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readonly");
+    const request = transaction.objectStore(STORE_NAME).get(`priv_${userId}`);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const generateE2EEKeys = async (): Promise<{
+  publicKey: string;
+  privKeyObj: CryptoKey;
+}> => {
   const keys = await window.crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
-    true,
+    false,
     ["deriveKey"],
   );
 
-  const pub = await window.crypto.subtle.exportKey("spki", keys.publicKey);
-  const priv = await window.crypto.subtle.exportKey("pkcs8", keys.privateKey);
+  const pubExported = await window.crypto.subtle.exportKey(
+    "spki",
+    keys.publicKey,
+  );
+  const publicKeyB64 = btoa(
+    String.fromCharCode(...new Uint8Array(pubExported)),
+  );
 
   return {
-    publicKey: btoa(String.fromCharCode(...new Uint8Array(pub))),
-    privateKey: btoa(String.fromCharCode(...new Uint8Array(priv))),
+    publicKey: publicKeyB64,
+    privKeyObj: keys.privateKey,
   };
 };
 
 export const encryptText = async (
   text: string,
   recipientPublicKeyB64: string,
-  myPrivateKeyB64: string,
+  myPrivKey: CryptoKey,
 ): Promise<{ ciphertext: string; iv: string }> => {
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
@@ -34,14 +80,6 @@ export const encryptText = async (
     { name: "ECDH", namedCurve: "P-256" },
     false,
     [],
-  );
-
-  const myPrivKey = await window.crypto.subtle.importKey(
-    "pkcs8",
-    Uint8Array.from(atob(myPrivateKeyB64), (c) => c.charCodeAt(0)),
-    { name: "ECDH", namedCurve: "P-256" },
-    false,
-    ["deriveKey"],
   );
 
   const sharedSecret = await window.crypto.subtle.deriveKey(
@@ -68,7 +106,7 @@ export const decryptText = async (
   ciphertextB64: string,
   ivB64: string,
   senderPublicKeyB64: string,
-  myPrivateKeyB64: string,
+  myPrivKey: CryptoKey,
 ): Promise<string> => {
   const decoder = new TextDecoder();
   const ciphertext = Uint8Array.from(atob(ciphertextB64), (c) =>
@@ -82,14 +120,6 @@ export const decryptText = async (
     { name: "ECDH", namedCurve: "P-256" },
     false,
     [],
-  );
-
-  const myPrivKey = await window.crypto.subtle.importKey(
-    "pkcs8",
-    Uint8Array.from(atob(myPrivateKeyB64), (c) => c.charCodeAt(0)),
-    { name: "ECDH", namedCurve: "P-256" },
-    false,
-    ["deriveKey"],
   );
 
   const sharedSecret = await window.crypto.subtle.deriveKey(
@@ -107,24 +137,4 @@ export const decryptText = async (
   );
 
   return decoder.decode(decrypted);
-};
-
-export const decryptMessage = async (
-  text: string,
-  senderPublicKey: string,
-  myPrivateKey: string,
-): Promise<string> => {
-  try {
-    const [ivB64, ciphertextB64] = text.split(":");
-    if (!ivB64 || !ciphertextB64) return text;
-
-    return await decryptText(
-      ciphertextB64,
-      ivB64,
-      senderPublicKey,
-      myPrivateKey,
-    );
-  } catch {
-    return "Decryption Error";
-  }
 };

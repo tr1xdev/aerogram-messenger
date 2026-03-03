@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, type Variants } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,24 +14,40 @@ import { useMarkDialog } from "@/features/chat/lib/use-mark-dialog";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
-import type { Message, Chat } from "@/entities/chat/model/types";
+import type { Message, Chat, User } from "@/entities/chat/model/types";
 
-const pageVariants: Variants = {
+interface SentCacheEntry {
+  id: string;
+  time: number;
+  text: string;
+}
+
+const PAGE_VARIANTS: Variants = {
   initial: { opacity: 0 },
   animate: { opacity: 1, transition: { duration: 0.2 } },
 };
 
+const MATCH_THRESHOLD_MS = 5000;
+
 export const Route = createFileRoute("/(protected)/_layout/chat/$chatId")({
-  component: ChatPage,
+  component: ChatRoute,
 });
 
-function ChatPage() {
+function ChatRoute() {
   const { chatId } = Route.useParams();
+  return <ChatPage key={chatId} chatId={chatId} />;
+}
+
+function ChatPage({ chatId }: { chatId: string }) {
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
-  const [sentCache, setSentCache] = useState<
-    Array<{ time: number; text: string; claimed: boolean }>
-  >([]);
+  const [sentCache, setSentCache] = useState<SentCacheEntry[]>([]);
+
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
+  const inputRef = useRef<string>(input);
+
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
 
   const { data: meData } = useMe();
   const { data: chatData, loading: chatLoading } = useChatDetails(chatId);
@@ -39,28 +55,40 @@ function ChatPage() {
   const { sendMessage, isSending } = useChatActions(chatId);
   const { data: chatsData } = useMyChats();
 
-  const me = meData?.me;
-  const chat = chatData?.chat;
+  const me: User | undefined = meData?.me;
+  const chat: Chat | undefined = chatData?.chat;
   const isInitialLoading = !chat && chatLoading;
 
+  useEffect(() => {
+    setActiveChatId(chatId);
+    return () => setActiveChatId(null);
+  }, [chatId, setActiveChatId]);
+
   const totalUnread = useMemo((): number => {
-    return (chatsData?.myChats ?? []).reduce((acc: number, c: Chat) => {
+    const myChats: Chat[] = chatsData?.myChats ?? [];
+    return myChats.reduce((acc: number, c: Chat) => {
       return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
     }, 0);
   }, [chatsData?.myChats, chatId]);
 
   const allMessages = useMemo((): Message[] => {
-    const serverIds = new Set(messages.map((m: Message) => m.id));
-    const localCache = sentCache.map((c) => ({ ...c }));
+    if (!me) return messages;
+
+    const serverIds = new Set<string>(messages.map((m) => m.id));
+    const usedCacheIds = new Set<string>();
 
     const patchedServerMessages = messages.map((m: Message): Message => {
-      if (m.sender.id === me?.id && m.isEncrypted) {
+      if (m.sender.id === me.id && m.isEncrypted) {
         const msgTime = new Date(m.sentAt).getTime();
-        const match = localCache.find(
-          (c) => !c.claimed && Math.abs(c.time - msgTime) < 15000,
+
+        const match = sentCache.find(
+          (c) =>
+            !usedCacheIds.has(c.id) &&
+            Math.abs(c.time - msgTime) < MATCH_THRESHOLD_MS,
         );
+
         if (match) {
-          match.claimed = true;
+          usedCacheIds.add(match.id);
           return { ...m, isEncrypted: false, text: match.text };
         }
       }
@@ -69,25 +97,30 @@ function ChatPage() {
 
     const filteredOptimistic = optimisticMsgs.filter((om: Message): boolean => {
       if (serverIds.has(om.id)) return false;
+
       const omTime = new Date(om.sentAt).getTime();
-      return !messages.some(
-        (m: Message) =>
-          m.sender.id === me?.id &&
-          Math.abs(new Date(m.sentAt).getTime() - omTime) < 15000,
+      const hasArrivedOnServer = messages.some(
+        (m) =>
+          m.sender.id === me.id &&
+          Math.abs(new Date(m.sentAt).getTime() - omTime) < 2000,
       );
+
+      return !hasArrivedOnServer;
     });
 
     return [...patchedServerMessages, ...filteredOptimistic].sort(
       (a: Message, b: Message) => {
         const timeA = new Date(a.sentAt).getTime();
         const timeB = new Date(b.sentAt).getTime();
-        if (Math.abs(timeA - timeB) > 1000) {
-          return timeA - timeB;
+
+        if (Math.abs(timeA - timeB) > 2000) return timeA - timeB;
+        if (a.sequence !== undefined && b.sequence !== undefined) {
+          return a.sequence - b.sequence;
         }
-        return (a.sequence ?? 0) - (b.sequence ?? 0);
+        return timeA - timeB;
       },
     );
-  }, [messages, optimisticMsgs, me?.id, sentCache]);
+  }, [messages, optimisticMsgs, me, sentCache]);
 
   const { checkAndMarkRead } = useMarkDialog(
     chatId,
@@ -96,20 +129,16 @@ function ChatPage() {
     chat?.lastReadSequence,
   );
 
-  useEffect(() => {
-    setActiveChatId(chatId);
-    return () => setActiveChatId(null);
-  }, [chatId, setActiveChatId]);
-
   const handleSend = useCallback(async (): Promise<void> => {
-    if (!input.trim() || isSending || !me) return;
+    const currentInput = inputRef.current.trim();
+    if (!currentInput || isSending || !me) return;
 
-    const val = input;
+    const val = currentInput;
     const nowTime = Date.now();
-    const tempId = `temp-${nowTime}`;
+    const tempId = crypto.randomUUID();
 
     setSentCache((prev) => {
-      const next = [...prev, { time: nowTime, text: val, claimed: false }];
+      const next = [...prev, { id: tempId, time: nowTime, text: val }];
       return next.length > 50 ? next.slice(-50) : next;
     });
 
@@ -129,14 +158,14 @@ function ChatPage() {
 
     try {
       await sendMessage(val);
-      setTimeout(() => {
-        setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
-      }, 2000);
-    } catch {
-      setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
+    } catch (error: unknown) {
       setInput(val);
+      setSentCache((prev) => prev.filter((c) => c.id !== tempId));
+      console.error("[ChatPage] Send failed", error);
+    } finally {
+      setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
     }
-  }, [input, isSending, me, chatId, sendMessage, resetInput, setInput]);
+  }, [chatId, isSending, me, resetInput, sendMessage, setInput]);
 
   return (
     <div className="flex flex-col h-full bg-background w-full fixed inset-0 z-[60] md:relative md:z-auto overflow-hidden">
@@ -152,7 +181,7 @@ function ChatPage() {
         {isInitialLoading ? (
           <motion.div
             key="skeleton"
-            variants={pageVariants}
+            variants={PAGE_VARIANTS}
             initial="initial"
             animate="animate"
             className="absolute inset-0 p-6 flex flex-col gap-6"
@@ -162,9 +191,6 @@ function ChatPage() {
             </div>
             <div className="flex flex-col items-start gap-2">
               <Skeleton className="h-10 w-[50%] rounded-2xl rounded-tl-none" />
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <Skeleton className="h-12 w-[40%] rounded-2xl rounded-tr-none" />
             </div>
           </motion.div>
         ) : (
@@ -180,7 +206,7 @@ function ChatPage() {
         )}
       </main>
 
-      <footer className="shrink-0">
+      <footer className="shrink-0 border-t">
         <MessageComposer
           input={input}
           setInput={setInput}
