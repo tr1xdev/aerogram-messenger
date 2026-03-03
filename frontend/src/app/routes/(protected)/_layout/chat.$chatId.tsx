@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChatStore } from "@/store/chat";
 import {
@@ -17,27 +17,20 @@ import { MessageComposer } from "@/features/chat/ui/message-composer";
 import type { Message, Chat } from "@/entities/chat/model/types";
 
 const pageVariants: Variants = {
-  initial: {
-    opacity: 0,
-  },
-  animate: {
-    opacity: 1,
-    transition: {
-      duration: 0.2,
-      ease: [0.4, 0, 0.2, 1],
-    },
-  },
-  exit: {
-    opacity: 0,
-    transition: {
-      duration: 0.15,
-    },
-  },
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.2 } },
 };
+
+export const Route = createFileRoute("/(protected)/_layout/chat/$chatId")({
+  component: ChatPage,
+});
 
 function ChatPage() {
   const { chatId } = Route.useParams();
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
+  const [sentCache, setSentCache] = useState<
+    Array<{ time: number; text: string; claimed: boolean }>
+  >([]);
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
 
   const { data: meData } = useMe();
@@ -48,32 +41,53 @@ function ChatPage() {
 
   const me = meData?.me;
   const chat = chatData?.chat;
-
   const isInitialLoading = !chat && chatLoading;
 
-  const totalUnread = useMemo(() => {
+  const totalUnread = useMemo((): number => {
     return (chatsData?.myChats ?? []).reduce((acc: number, c: Chat) => {
       return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
     }, 0);
   }, [chatsData?.myChats, chatId]);
 
-  const allMessages = useMemo(() => {
-    const map = new Map<string, Message>();
-    messages.forEach((m) => map.set(m.id, m));
-    optimisticMsgs.forEach((om) => {
-      const exists = messages.some(
-        (m) =>
-          m.text === om.text &&
-          Math.abs(
-            new Date(m.sentAt).getTime() - new Date(om.sentAt).getTime(),
-          ) < 2000,
-      );
-      if (!exists) map.set(om.id, om);
+  const allMessages = useMemo((): Message[] => {
+    const serverIds = new Set(messages.map((m: Message) => m.id));
+    const localCache = sentCache.map((c) => ({ ...c }));
+
+    const patchedServerMessages = messages.map((m: Message): Message => {
+      if (m.sender.id === me?.id && m.isEncrypted) {
+        const msgTime = new Date(m.sentAt).getTime();
+        const match = localCache.find(
+          (c) => !c.claimed && Math.abs(c.time - msgTime) < 15000,
+        );
+        if (match) {
+          match.claimed = true;
+          return { ...m, isEncrypted: false, text: match.text };
+        }
+      }
+      return m;
     });
-    return Array.from(map.values()).sort(
-      (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
+
+    const filteredOptimistic = optimisticMsgs.filter((om: Message): boolean => {
+      if (serverIds.has(om.id)) return false;
+      const omTime = new Date(om.sentAt).getTime();
+      return !messages.some(
+        (m: Message) =>
+          m.sender.id === me?.id &&
+          Math.abs(new Date(m.sentAt).getTime() - omTime) < 15000,
+      );
+    });
+
+    return [...patchedServerMessages, ...filteredOptimistic].sort(
+      (a: Message, b: Message) => {
+        const timeA = new Date(a.sentAt).getTime();
+        const timeB = new Date(b.sentAt).getTime();
+        if (Math.abs(timeA - timeB) > 1000) {
+          return timeA - timeB;
+        }
+        return (a.sequence ?? 0) - (b.sequence ?? 0);
+      },
     );
-  }, [messages, optimisticMsgs]);
+  }, [messages, optimisticMsgs, me?.id, sentCache]);
 
   const { checkAndMarkRead } = useMarkDialog(
     chatId,
@@ -87,30 +101,42 @@ function ChatPage() {
     return () => setActiveChatId(null);
   }, [chatId, setActiveChatId]);
 
-  const handleSend = () => {
+  const handleSend = useCallback(async (): Promise<void> => {
     if (!input.trim() || isSending || !me) return;
-    const tempId = `temp-${Date.now()}`;
+
+    const val = input;
+    const nowTime = Date.now();
+    const tempId = `temp-${nowTime}`;
+
+    setSentCache((prev) => {
+      const next = [...prev, { time: nowTime, text: val, claimed: false }];
+      return next.length > 50 ? next.slice(-50) : next;
+    });
+
     const newMsg: Message = {
       id: tempId,
       chatId,
-      text: input,
-      sentAt: new Date().toISOString(),
+      text: val,
+      sentAt: new Date(nowTime).toISOString(),
       isRead: false,
       isEdited: false,
+      isEncrypted: false,
       sender: me,
     };
+
     setOptimisticMsgs((prev) => [...prev, newMsg]);
-    const val = input;
     resetInput();
-    sendMessage(val, {
-      onCompleted: () =>
-        setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId)),
-      onError: () => {
+
+    try {
+      await sendMessage(val);
+      setTimeout(() => {
         setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
-        setInput(val);
-      },
-    });
-  };
+      }, 2000);
+    } catch {
+      setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
+      setInput(val);
+    }
+  }, [input, isSending, me, chatId, sendMessage, resetInput, setInput]);
 
   return (
     <div className="flex flex-col h-full bg-background w-full fixed inset-0 z-[60] md:relative md:z-auto overflow-hidden">
@@ -123,44 +149,35 @@ function ChatPage() {
       />
 
       <main className="flex-1 relative overflow-hidden bg-background">
-        <AnimatePresence mode="popLayout" initial={false}>
-          {isInitialLoading ? (
-            <motion.div
-              key="skeleton"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="absolute inset-0 p-6 flex flex-col gap-6"
-            >
-              <div className="flex flex-col items-end gap-2">
-                <Skeleton className="h-10 w-[60%] rounded-2xl rounded-tr-none" />
-                <Skeleton className="h-8 w-[40%] rounded-2xl rounded-tr-none opacity-60" />
-              </div>
-              <div className="flex flex-col items-start gap-2">
-                <Skeleton className="h-10 w-[55%] rounded-2xl rounded-tl-none opacity-40" />
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <Skeleton className="h-12 w-[30%] rounded-2xl rounded-tr-none opacity-20" />
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="messages"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              className="h-full w-full"
-            >
-              <MessageList
-                messages={allMessages}
-                myId={me?.id}
-                lastReadSequence={chat?.lastReadSequence}
-                onMarkRead={checkAndMarkRead}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {isInitialLoading ? (
+          <motion.div
+            key="skeleton"
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            className="absolute inset-0 p-6 flex flex-col gap-6"
+          >
+            <div className="flex flex-col items-end gap-2">
+              <Skeleton className="h-10 w-[60%] rounded-2xl rounded-tr-none" />
+            </div>
+            <div className="flex flex-col items-start gap-2">
+              <Skeleton className="h-10 w-[50%] rounded-2xl rounded-tl-none" />
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <Skeleton className="h-12 w-[40%] rounded-2xl rounded-tr-none" />
+            </div>
+          </motion.div>
+        ) : (
+          <div className="h-full w-full">
+            <MessageList
+              messages={allMessages}
+              members={chat?.members}
+              myId={me?.id}
+              lastReadSequence={chat?.lastReadSequence}
+              onMarkRead={checkAndMarkRead}
+            />
+          </div>
+        )}
       </main>
 
       <footer className="shrink-0">
@@ -174,7 +191,3 @@ function ChatPage() {
     </div>
   );
 }
-
-export const Route = createFileRoute("/(protected)/_layout/chat/$chatId")({
-  component: ChatPage,
-});
