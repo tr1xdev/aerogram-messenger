@@ -3,13 +3,16 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/aerogram-org/aerogram-api/internal/config"
+	"github.com/aerogram-org/aerogram-api/internal/models"
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc/metadata"
+	"gorm.io/gorm"
 )
 
 type contextKey string
@@ -18,6 +21,8 @@ const (
 	AuthUserIDKey    contextKey = "auth_user_id"
 	AuthSessionIDKey contextKey = "auth_session_id"
 	AuthTokenKey     contextKey = "auth_token"
+	UserAgentKey     contextKey = "user_agent"
+	IPAddressKey     contextKey = "ip_address"
 )
 
 func GetUserID(ctx context.Context) string {
@@ -34,7 +39,21 @@ func GetSessionID(ctx context.Context) string {
 	return ""
 }
 
-func AuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
+func GetIPAddress(ctx context.Context) string {
+	if ip, ok := ctx.Value(IPAddressKey).(string); ok {
+		return ip
+	}
+	return ""
+}
+
+func GetUserAgent(ctx context.Context) string {
+	if ua, ok := ctx.Value(UserAgentKey).(string); ok {
+		return ua
+	}
+	return ""
+}
+
+func AuthMiddleware(cfg *config.Config, db *gorm.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			secret := cfg.JWT.Secret
@@ -45,7 +64,14 @@ func AuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 				tokenString = strings.TrimPrefix(authHeader, "Bearer ")
 			}
 
+			ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+				ip = strings.Split(xff, ",")[0]
+			}
+
 			ctx := r.Context()
+			ctx = context.WithValue(ctx, IPAddressKey, ip)
+			ctx = context.WithValue(ctx, UserAgentKey, r.Header.Get("User-Agent"))
 
 			if tokenString != "" {
 				token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -60,12 +86,27 @@ func AuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 						userID, _ := claims["sub"].(string)
 						sessionID, _ := claims["sid"].(string)
 
-						if userID != "" {
+						if userID != "" && sessionID != "" {
+							var session models.Session
+							err := db.Select("id").Where("id = ? AND user_id = ? AND is_active = ?", sessionID, userID, true).First(&session).Error
+
+							if err != nil {
+								w.Header().Set("Content-Type", "application/json")
+								w.WriteHeader(http.StatusUnauthorized)
+								fmt.Fprint(w, `{"errors": [{"message": "Session terminated", "extensions": {"code": "UNAUTHENTICATED"}}]}`)
+								return
+							}
+
 							ctx = context.WithValue(ctx, AuthUserIDKey, userID)
 							ctx = context.WithValue(ctx, AuthSessionIDKey, sessionID)
 							ctx = context.WithValue(ctx, AuthTokenKey, tokenString)
 
-							md := metadata.Pairs("user-id", userID, "session-id", sessionID)
+							md := metadata.Pairs(
+								"user-id", userID,
+								"session-id", sessionID,
+								"ip-address", ip,
+								"user-agent", r.Header.Get("User-Agent"),
+							)
 							ctx = metadata.NewOutgoingContext(ctx, md)
 						}
 					}

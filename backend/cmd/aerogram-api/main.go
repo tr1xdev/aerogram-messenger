@@ -25,8 +25,10 @@ import (
 	"github.com/aerogram-org/aerogram-api/internal/repositories"
 	"github.com/aerogram-org/aerogram-api/internal/services/auth_svc"
 	"github.com/aerogram-org/aerogram-api/internal/services/chat_svc"
+	"github.com/aerogram-org/aerogram-api/internal/services/geo_svc"
 	"github.com/aerogram-org/aerogram-api/internal/services/messages_svc"
 	"github.com/aerogram-org/aerogram-api/internal/services/presence_svc"
+	"github.com/aerogram-org/aerogram-api/internal/services/ua_svc"
 	"github.com/aerogram-org/aerogram-api/internal/services/user_svc"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -59,6 +61,11 @@ func main() {
 	rdb := database.NewRedis(cfg.RedisAddr(), cfg.RedisPassword(), 0)
 	userRepo := repositories.NewUserRepository(db)
 	presenceRepo := repositories.NewPresenceRepository(rdb)
+
+	geoService := geo_svc.New("assets/GeoLite2-City.mmdb")
+	defer geoService.Close()
+
+	uaService := ua_svc.New()
 
 	db.Exec("CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";")
 
@@ -96,7 +103,7 @@ func main() {
 
 	userClient := userpb.NewUserServiceClient(conn)
 
-	srv := initGraphQL(db, userRepo, rdb, presenceRepo, conn, cfg)
+	srv := initGraphQL(db, userRepo, rdb, presenceRepo, conn, cfg, geoService, uaService)
 	router := chi.NewRouter()
 
 	router.Use(cors.Handler(cors.Options{
@@ -107,7 +114,7 @@ func main() {
 	}))
 
 	router.Use(graph.LoaderMiddleware(userClient, presenceRepo))
-	router.Use(middleware.AuthMiddleware(cfg))
+	router.Use(middleware.AuthMiddleware(cfg, db))
 	api.SetupRoutes(router, srv)
 
 	httpServer := &http.Server{
@@ -152,13 +159,34 @@ func initGRPC(s *grpc.Server, db *gorm.DB, rdb *redis.Client, cfg *config.Config
 	userpb.RegisterUserServiceServer(s, user_svc.NewServer(db))
 }
 
-func initGraphQL(db *gorm.DB, uRepo *repositories.UserRepository, rdb *redis.Client, pRepo *repositories.PresenceRepository, conn *grpc.ClientConn, cfg *config.Config) *handler.Server {
+func initGraphQL(
+	db *gorm.DB,
+	uRepo *repositories.UserRepository,
+	rdb *redis.Client,
+	pRepo *repositories.PresenceRepository,
+	conn *grpc.ClientConn,
+	cfg *config.Config,
+	geoSvc *geo_svc.Service,
+	uaSvc *ua_svc.Service,
+) *handler.Server {
 	authClient := authpb.NewAuthServiceClient(conn)
 	chatClient := chatpb.NewChatServiceClient(conn)
 	msgClient := messagespb.NewMessagesServiceClient(conn)
 	userClient := userpb.NewUserServiceClient(conn)
 
-	resolver := graph.NewResolver(db, uRepo, authClient, chatClient, msgClient, userClient, rdb, pRepo)
+	resolver := graph.NewResolver(
+		db,
+		uRepo,
+		authClient,
+		chatClient,
+		msgClient,
+		userClient,
+		rdb,
+		pRepo,
+		geoSvc,
+		uaSvc,
+	)
+
 	schema := graph.NewExecutableSchema(graph.Config{Resolvers: resolver})
 	srv := handler.New(schema)
 
