@@ -30,28 +30,21 @@ function LastMessageContent({
   myId: string;
   chat: Chat;
 }) {
-  const [decryptedText, setDecryptedText] = useState<string>(
-    message.isEncrypted ? "Decrypting..." : message.text,
+  const [decryptedText, setDecryptedText] = useState<string | null>(
+    message.isEncrypted ? null : message.text,
   );
 
   useEffect(() => {
     let isMounted = true;
-
-    if (!message.isEncrypted) {
-      return;
-    }
+    if (!message.isEncrypted) return;
 
     const performDecryption = async (): Promise<void> => {
       try {
         const isMe = message.sender.id === myId;
-        const otherMember = chat.members?.find(
-          (m: ChatMember) => m.user.id !== myId,
-        );
-
+        const otherMember = chat.members?.find((m) => m.user.id !== myId);
         const targetPublicKey = isMe
           ? otherMember?.user.publicKey
           : message.sender.publicKey;
-
         const myPrivKey = localStorage.getItem(`e2ee_priv_${myId}`);
 
         if (!targetPublicKey || !myPrivKey || !message.encryptionIv) {
@@ -67,14 +60,12 @@ function LastMessageContent({
         );
 
         if (isMounted) setDecryptedText(clearText);
-      } catch (err: unknown) {
-        console.error("[Crypto] Failed:", err);
+      } catch {
         if (isMounted) setDecryptedText("Decryption error");
       }
     };
 
     performDecryption();
-
     return () => {
       isMounted = false;
     };
@@ -86,9 +77,13 @@ function LastMessageContent({
     chat.members,
   ]);
 
+  if (decryptedText === null) {
+    return <Skeleton className="h-3 w-24 mt-1" />;
+  }
+
   return (
-    <span className="flex items-center gap-1.5 truncate">
-      <span className="truncate">{decryptedText}</span>
+    <span className="truncate animate-in fade-in duration-300">
+      {decryptedText}
     </span>
   );
 }
@@ -97,9 +92,7 @@ export function AppSidebar() {
   const { data: userData } = useMe();
   const { data: chatsData, loading: isLoading } = useMyChats();
   const pathname = useRouterState().location.pathname;
-  const isWsConnected = useConnectionStore(
-    (state: { isWsConnected: boolean }) => state.isWsConnected,
-  );
+  const isWsConnected = useConnectionStore((state) => state.isWsConnected);
   const chats: Chat[] = chatsData?.myChats ?? [];
 
   const getUserInitial = (): string => {
@@ -141,7 +134,7 @@ export function AppSidebar() {
               {isLoading && !chatsData
                 ? Array(12)
                     .fill(0)
-                    .map((_, i: number) => (
+                    .map((_, i) => (
                       <div
                         key={i}
                         className="flex items-center gap-3 px-4 py-3"
@@ -156,7 +149,7 @@ export function AppSidebar() {
                         </div>
                       </div>
                     ))
-                : chats.map((chat: Chat) => (
+                : chats.map((chat) => (
                     <ChatMenuItem
                       key={chat.id}
                       chat={chat}
@@ -212,7 +205,7 @@ function ChatMenuItem({
   const lastMsg: Message | undefined = chat.lastMessage;
   const isMe: boolean = lastMsg?.sender.id === myId;
   const otherMember: ChatMember | undefined = chat.members?.find(
-    (m: ChatMember) => m.user.id !== myId,
+    (m) => m.user.id !== myId,
   );
   const isRead: boolean =
     isMe &&
@@ -225,7 +218,7 @@ function ChatMenuItem({
         asChild
         isActive={isActive}
         className={cn(
-          "h-auto py-3 px-4 rounded-none border-l-2 border-transparent transition-colors",
+          "h-auto py-3 px-4 rounded-none border-l-2 border-transparent transition-all duration-200",
           isActive ? "bg-primary/5 border-l-primary" : "hover:bg-muted/40",
         )}
       >
@@ -266,7 +259,7 @@ function ChatMenuItem({
             <div className="flex items-center justify-between gap-2">
               <div
                 className={cn(
-                  "text-[13px] truncate flex items-center gap-1",
+                  "text-[13px] truncate flex items-center gap-1 min-h-[1.25rem]",
                   chat.unreadCount > 0
                     ? "text-foreground font-medium"
                     : "text-muted-foreground",
@@ -296,7 +289,7 @@ function ChatMenuItem({
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {isMe && lastMsg && (
-                  <div className="mr-0.5">
+                  <div className="mr-0.5 animate-in fade-in duration-300">
                     {isRead ? (
                       <CheckCheck className="h-3.5 w-3.5 text-sky-500" />
                     ) : (
