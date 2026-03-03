@@ -23,9 +23,6 @@ export function MessageBubble({
   const [error, setError] = useState<string | null>(null);
 
   const isTemp = message.id.startsWith("temp-");
-  const displayText = message.isEncrypted
-    ? (decryptedText ?? error ?? "...")
-    : message.text;
 
   useEffect(() => {
     let isMounted = true;
@@ -62,7 +59,14 @@ export function MessageBubble({
     return () => {
       isMounted = false;
     };
-  }, [message, myId, peerPublicKey, isMe]);
+  }, [
+    message.id,
+    message.isEncrypted,
+    message.encryptionIv,
+    myId,
+    peerPublicKey,
+    isMe,
+  ]);
 
   return (
     <div
@@ -74,7 +78,7 @@ export function MessageBubble({
       <div className={cn("flex flex-col max-w-[85%] sm:max-w-[70%] min-w-0")}>
         <div
           className={cn(
-            "relative px-3 py-1.5 text-sm rounded-2xl shadow-sm transition-all duration-200",
+            "relative px-3 py-1.5 text-sm rounded-2xl shadow-sm",
             "whitespace-pre-wrap break-all [word-break:break-word] [overflow-wrap:anywhere]",
             isMe
               ? "bg-primary text-primary-foreground rounded-tr-none"
@@ -82,7 +86,11 @@ export function MessageBubble({
             isTemp && "opacity-70",
           )}
         >
-          {displayText}
+          <span>
+            {message.isEncrypted
+              ? (decryptedText ?? error ?? "...")
+              : message.text}
+          </span>
 
           <div
             className={cn(
