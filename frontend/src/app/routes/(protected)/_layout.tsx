@@ -9,6 +9,8 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app/layout/app-sidebar";
 import { MobileNav } from "@/features/navigation/ui/mobile-nav";
 import { cn } from "@/lib/utils";
+import { useMe } from "@/features/chat/lib/use-messages";
+import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
 
 export const Route = createFileRoute("/(protected)/_layout")({
   beforeLoad: () => {
@@ -22,6 +24,10 @@ export const Route = createFileRoute("/(protected)/_layout")({
 function LayoutComponent() {
   const { pathname } = useLocation();
   const isChatOpen = pathname.includes("/chat/");
+
+  const { data: meData } = useMe();
+
+  useE2EEInit(meData?.me);
 
   return (
     <SidebarProvider defaultOpen={true}>

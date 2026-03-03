@@ -7,6 +7,8 @@ export interface User {
   photoUrl?: string;
   status: string;
   publicKey?: string;
+  encryptedPrivKey?: string;
+  encryptionIv?: string;
   lastSeen?: string;
 }
 
@@ -25,7 +27,7 @@ export interface Message {
   forwardedFrom?: Message;
 }
 
-export type ChatType = "PRIVATE" | "GROUP" | "CHANNEL";
+export type ChatType = "PRIVATE" | "GROUP" | "CHANNEL" | "DIRECT";
 
 export interface ChatMember {
   user: User;

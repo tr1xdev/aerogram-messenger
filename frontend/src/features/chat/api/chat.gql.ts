@@ -5,6 +5,8 @@ export const UPDATE_PROFILE = gql`
     updateUser(input: $input) {
       id
       publicKey
+      encryptedPrivKey
+      encryptionIv
     }
   }
 `;
@@ -19,6 +21,8 @@ export const GET_ME = gql`
       username
       status
       publicKey
+      encryptedPrivKey
+      encryptionIv
     }
   }
 `;

@@ -1,140 +1,204 @@
-const DB_NAME = "aerogram_crypto";
+const DB_NAME = "chat-e2ee";
 const STORE_NAME = "keys";
 
-const getDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME);
+async function openDB(): Promise<IDBDatabase> {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(STORE_NAME)) {
+        req.result.createObjectStore(STORE_NAME);
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
   });
-};
+}
 
-export const savePrivateKey = async (
-  userId: string,
-  key: CryptoKey,
-): Promise<void> => {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const request = transaction
-      .objectStore(STORE_NAME)
-      .put(key, `priv_${userId}`);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-};
-
-export const getPrivateKey = async (
-  userId: string,
-): Promise<CryptoKey | null> => {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readonly");
-    const request = transaction.objectStore(STORE_NAME).get(`priv_${userId}`);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-export const generateE2EEKeys = async (): Promise<{
-  publicKey: string;
-  privKeyObj: CryptoKey;
-}> => {
-  const keys = await window.crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "P-256" },
+export async function getMasterKey(
+  password: string,
+  salt: string,
+): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    "PBKDF2",
     false,
     ["deriveKey"],
   );
-
-  const pubExported = await window.crypto.subtle.exportKey(
-    "spki",
-    keys.publicKey,
-  );
-  const publicKeyB64 = btoa(
-    String.fromCharCode(...new Uint8Array(pubExported)),
-  );
-
-  return {
-    publicKey: publicKeyB64,
-    privKeyObj: keys.privateKey,
-  };
-};
-
-export const encryptText = async (
-  text: string,
-  recipientPublicKeyB64: string,
-  myPrivKey: CryptoKey,
-): Promise<{ ciphertext: string; iv: string }> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-
-  const recipientPubKey = await window.crypto.subtle.importKey(
-    "spki",
-    Uint8Array.from(atob(recipientPublicKeyB64), (c) => c.charCodeAt(0)),
-    { name: "ECDH", namedCurve: "P-256" },
-    false,
-    [],
-  );
-
-  const sharedSecret = await window.crypto.subtle.deriveKey(
-    { name: "ECDH", public: recipientPubKey },
-    myPrivKey,
+  return window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: enc.encode(salt),
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,
-    ["encrypt"],
+    ["encrypt", "decrypt"],
+  );
+}
+
+export async function generateE2EEKeys(): Promise<{
+  publicKey: string;
+  privateKey: CryptoKey;
+}> {
+  const pair = await window.crypto.subtle.generateKey(
+    {
+      name: "ECDH",
+      namedCurve: "P-256",
+    },
+    true,
+    ["deriveKey", "deriveBits"],
   );
 
+  const pubExport = await window.crypto.subtle.exportKey(
+    "spki",
+    pair.publicKey,
+  );
+  return {
+    publicKey: btoa(String.fromCharCode(...new Uint8Array(pubExport))),
+    privateKey: pair.privateKey,
+  };
+}
+
+export async function exportAndEncryptPrivateKey(
+  privKey: CryptoKey,
+  masterKey: CryptoKey,
+): Promise<{ ciphertext: string; iv: string }> {
+  const exported = await window.crypto.subtle.exportKey("pkcs8", privKey);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await window.crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
-    sharedSecret,
-    data,
+    masterKey,
+    exported,
   );
 
   return {
     ciphertext: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
-    iv: btoa(String.fromCharCode(...iv)),
+    iv: btoa(String.fromCharCode(...new Uint8Array(iv))),
   };
-};
+}
 
-export const decryptText = async (
+export async function decryptAndImportPrivateKey(
   ciphertextB64: string,
   ivB64: string,
-  senderPublicKeyB64: string,
-  myPrivKey: CryptoKey,
-): Promise<string> => {
-  const decoder = new TextDecoder();
+  masterKey: CryptoKey,
+): Promise<CryptoKey> {
   const ciphertext = Uint8Array.from(atob(ciphertextB64), (c) =>
     c.charCodeAt(0),
   );
   const iv = Uint8Array.from(atob(ivB64), (c) => c.charCodeAt(0));
 
-  const senderPubKey = await window.crypto.subtle.importKey(
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    masterKey,
+    ciphertext,
+  );
+
+  return window.crypto.subtle.importKey(
+    "pkcs8",
+    decrypted,
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveKey", "deriveBits"],
+  );
+}
+
+export async function savePrivateKey(
+  userId: string,
+  privKey: CryptoKey,
+): Promise<void> {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).put(privKey, userId);
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+export async function getPrivateKey(userId: string): Promise<CryptoKey | null> {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const req = tx.objectStore(STORE_NAME).get(userId);
+    req.onsuccess = () => res(req.result || null);
+    req.onerror = () => rej(tx.error);
+  });
+}
+
+export async function encryptText(
+  text: string,
+  peerPubKeyB64: string,
+  myPrivKey: CryptoKey,
+): Promise<{ ciphertext: string; iv: string }> {
+  const peerKeyBuf = Uint8Array.from(atob(peerPubKeyB64), (c) =>
+    c.charCodeAt(0),
+  );
+  const peerPubKey = await window.crypto.subtle.importKey(
     "spki",
-    Uint8Array.from(atob(senderPublicKeyB64), (c) => c.charCodeAt(0)),
+    peerKeyBuf,
     { name: "ECDH", namedCurve: "P-256" },
     false,
     [],
   );
 
-  const sharedSecret = await window.crypto.subtle.deriveKey(
-    { name: "ECDH", public: senderPubKey },
+  const sharedKey = await window.crypto.subtle.deriveKey(
+    { name: "ECDH", public: peerPubKey },
     myPrivKey,
     { name: "AES-GCM", length: 256 },
     false,
-    ["decrypt"],
+    ["encrypt", "decrypt"],
+  );
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    sharedKey,
+    new TextEncoder().encode(text),
+  );
+
+  return {
+    ciphertext: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
+    iv: btoa(String.fromCharCode(...new Uint8Array(iv))),
+  };
+}
+
+export async function decryptText(
+  ciphertext: string,
+  ivB64: string,
+  peerPubKeyB64: string,
+  myPrivKey: CryptoKey,
+): Promise<string> {
+  const peerKeyBuf = Uint8Array.from(atob(peerPubKeyB64), (c) =>
+    c.charCodeAt(0),
+  );
+  const peerPubKey = await window.crypto.subtle.importKey(
+    "spki",
+    peerKeyBuf,
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    [],
+  );
+
+  const sharedKey = await window.crypto.subtle.deriveKey(
+    { name: "ECDH", public: peerPubKey },
+    myPrivKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
   );
 
   const decrypted = await window.crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
-    sharedSecret,
-    ciphertext,
+    {
+      name: "AES-GCM",
+      iv: Uint8Array.from(atob(ivB64), (c) => c.charCodeAt(0)),
+    },
+    sharedKey,
+    Uint8Array.from(atob(ciphertext), (c) => c.charCodeAt(0)),
   );
 
-  return decoder.decode(decrypted);
-};
+  return new TextDecoder().decode(decrypted);
+}

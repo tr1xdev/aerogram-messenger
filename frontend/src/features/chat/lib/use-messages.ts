@@ -1,5 +1,5 @@
-import { useQuery, useMutation } from "@apollo/client/react";
-import { type MutationOptions } from "@apollo/client";
+import { useQuery, useMutation } from "@apollo/client/react/index.js";
+import { type MutationOptions } from "@apollo/client/index.js";
 import {
   SEND_MESSAGE,
   MARK_DIALOG_AS_READ,
@@ -11,7 +11,12 @@ import {
   CREATE_DIRECT_CHAT,
 } from "../api/chat.gql";
 import { encryptText, getPrivateKey } from "@/shared/lib/crypto";
-import type { Message, User, Chat } from "@/entities/chat/model/types";
+import type {
+  Message,
+  User,
+  Chat,
+  ChatMember,
+} from "@/entities/chat/model/types";
 
 export function useMe() {
   return useQuery<{ me: User }>(GET_ME);
@@ -63,7 +68,20 @@ export function useChatActions(chatId: string) {
   ): Promise<void> => {
     const me = meData?.me;
     const chat = chatData?.chat;
-    const peer = chat?.members?.find((m) => m.user.id !== me?.id)?.user;
+    const peerMember = chat?.members?.find(
+      (m: ChatMember): boolean => m.user.id !== me?.id,
+    );
+    const peer = peerMember?.user;
+
+    const isPrivate = chat?.type === "PRIVATE" || chat?.type === "DIRECT";
+
+    console.log("[E2EE DEBUG]", {
+      chatType: chat?.type,
+      isPrivate,
+      myId: me?.id,
+      peerId: peer?.id,
+      hasPeerPublicKey: !!peer?.publicKey,
+    });
 
     let finalVariables = {
       chatId,
@@ -72,13 +90,12 @@ export function useChatActions(chatId: string) {
       encryptionIv: undefined as string | undefined,
     };
 
-    const isPrivate = chat?.type === "PRIVATE";
-
     if (isPrivate && peer?.publicKey && me) {
       try {
         const myPrivKeyObj = await getPrivateKey(me.id);
 
         if (myPrivKeyObj) {
+          console.log("[E2EE] Encrypting message...");
           const encrypted = await encryptText(
             text,
             peer.publicKey,
@@ -90,10 +107,17 @@ export function useChatActions(chatId: string) {
             isEncrypted: true,
             encryptionIv: encrypted.iv,
           };
+        } else {
+          console.warn("[E2EE] Private key not found in local storage");
         }
       } catch (err: unknown) {
-        console.error("[Crypto] Encryption failed", err);
+        console.error("[E2EE] Encryption failed", err);
       }
+    } else {
+      console.warn("[E2EE] Conditions not met", {
+        isPrivate,
+        hasPeerKey: !!peer?.publicKey,
+      });
     }
 
     await send({
@@ -102,11 +126,13 @@ export function useChatActions(chatId: string) {
     });
   };
 
-  const markAsRead = (lastSequence: number) =>
-    read({ variables: { chatID: chatId, lastSequence } });
+  const markAsRead = (lastSequence: number): void => {
+    read({ variables: { chatID: chatId, lastSequence: Number(lastSequence) } });
+  };
 
-  const createChat = (userID: string) =>
+  const createChat = (userID: string): void => {
     createDirect({ variables: { userID } });
+  };
 
   return { sendMessage, isSending: loading, markAsRead, createChat };
 }

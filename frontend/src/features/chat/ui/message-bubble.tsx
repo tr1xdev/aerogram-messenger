@@ -31,23 +31,23 @@ export function MessageBubble({
 
     const decrypt = async (): Promise<void> => {
       try {
+        if (!myId) return;
+
         const privKeyObj = await getPrivateKey(myId);
-        const senderPubKey = isMe ? peerPublicKey : message.sender.publicKey;
+        const senderPubKey = isMe ? peerPublicKey : message.sender?.publicKey;
 
-        console.log("[Crypto Debug] Attempting decryption:", {
-          messageId: message.id,
-          isMe,
-          hasPrivKey: !!privKeyObj,
-          hasSenderPubKey: !!senderPubKey,
-          hasIv: !!message.encryptionIv,
-        });
+        if (!privKeyObj) {
+          if (isMounted) setError("[No PrivKey]");
+          return;
+        }
 
-        if (!privKeyObj || !senderPubKey || !message.encryptionIv) {
-          console.error("[Crypto Debug] Missing requirements for decryption", {
-            messageId: message.id,
-            sender: message.sender.username,
-          });
-          if (isMounted) setError("Decryption error");
+        if (!senderPubKey) {
+          if (isMounted) setError("[No PeerKey]");
+          return;
+        }
+
+        if (!message.encryptionIv) {
+          if (isMounted) setError("[No IV]");
           return;
         }
 
@@ -58,18 +58,15 @@ export function MessageBubble({
           privKeyObj,
         );
 
-        console.log("[Crypto Debug] Success:", {
-          messageId: message.id,
-          preview: result.substring(0, 10) + "...",
-        });
-
         if (isMounted) {
           setDecryptedText(result);
           setError(null);
         }
       } catch (err: unknown) {
-        console.error("[Crypto Debug] Decryption failed catch:", err);
-        if (isMounted) setError("Decryption error");
+        if (isMounted) {
+          console.error("[E2EE] Decrypt fail:", err);
+          setError("Decryption error");
+        }
       }
     };
 
@@ -81,12 +78,16 @@ export function MessageBubble({
     message.id,
     message.isEncrypted,
     message.encryptionIv,
-    myId,
-    peerPublicKey,
-    isMe,
-    message.sender.publicKey,
     message.text,
+    message.sender?.publicKey,
+    myId,
+    isMe,
+    peerPublicKey,
   ]);
+
+  const displayText = message.isEncrypted
+    ? (decryptedText ?? (error ? error : "..."))
+    : message.text;
 
   return (
     <div
@@ -95,7 +96,7 @@ export function MessageBubble({
         isMe ? "justify-end" : "justify-start",
       )}
     >
-      <div className={cn("flex flex-col max-w-[85%] sm:max-w-[70%] min-w-0")}>
+      <div className="flex flex-col max-w-[85%] sm:max-w-[70%] min-w-0">
         <div
           className={cn(
             "relative px-3 py-1.5 text-sm rounded-2xl shadow-sm",
@@ -106,12 +107,7 @@ export function MessageBubble({
             isTemp && "opacity-70",
           )}
         >
-          <span>
-            {message.isEncrypted
-              ? (decryptedText ?? error ?? "...")
-              : message.text}
-          </span>
-
+          <span className="block">{displayText}</span>
           <div
             className={cn(
               "float-right mt-2 ml-2 -mr-1 flex items-center gap-1 select-none pointer-events-none h-3",
@@ -124,13 +120,12 @@ export function MessageBubble({
                 minute: "2-digit",
               })}
             </span>
-
             {isMe && (
               <span className="flex items-center justify-center w-3.5 h-3.5">
                 {isTemp ? (
                   <Clock className="h-3 w-3 animate-pulse" />
                 ) : isRead ? (
-                  <CheckCheck className="h-3.5 w-3.5 text-primary-foreground" />
+                  <CheckCheck className="h-3.5 w-3.5" />
                 ) : (
                   <Check className="h-3.5 w-3.5" />
                 )}
