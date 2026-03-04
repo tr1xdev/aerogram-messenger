@@ -51,3 +51,6 @@ config.yaml
 
 # Zed editor
 .zed/
+
+# Other
+backend/assets/*.mmdb
