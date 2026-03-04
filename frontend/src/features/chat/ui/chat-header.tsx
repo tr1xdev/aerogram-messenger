@@ -6,11 +6,11 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import type { ChatMember } from "@/entities/chat/model/types";
+import { ChatUserPopover } from "./chat-user-popover";
 
 interface ChatHeaderProps {
   title?: string;
   photoUrl?: string;
-  status?: string;
   totalUnread: number;
   members?: ChatMember[];
   meId?: string;
@@ -46,27 +46,31 @@ export function ChatHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
-          <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
-            <AvatarImage src={photoUrl || ""} />
-            <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
-              {title?.[0].toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col min-w-0">
-            <span className="text-[15px] font-bold truncate leading-none">
-              {title}
-            </span>
-            <span
-              className={cn(
-                "text-[11px] mt-1 font-medium",
-                status === "online" ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              {status ? formatLastSeen(status) : "Offline"}
-            </span>
+        <ChatUserPopover userId={other?.user.id || ""}>
+          <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 p-1.5 px-2 rounded-lg transition-colors duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted">
+            <Avatar className="h-10 w-10 border border-border/50 shrink-0">
+              <AvatarImage src={photoUrl || ""} />
+              <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
+                {title?.[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[15px] font-bold truncate leading-tight">
+                {title}
+              </span>
+              <span
+                className={cn(
+                  "text-[11px] font-medium leading-tight",
+                  status === "online"
+                    ? "text-primary"
+                    : "text-muted-foreground",
+                )}
+              >
+                {status ? formatLastSeen(status) : "Offline"}
+              </span>
+            </div>
           </div>
-        </div>
+        </ChatUserPopover>
       </div>
 
       <div className="flex items-center gap-1">
