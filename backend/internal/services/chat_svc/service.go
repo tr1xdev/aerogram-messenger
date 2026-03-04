@@ -3,9 +3,9 @@ package chat_svc
 import (
 	"context"
 
+	"github.com/google/uuid"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -43,15 +43,15 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	if req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
 		var existingID string
 		s.db.Raw(`
-			SELECT dm.dialog_id
-			FROM dialog_members dm
-			JOIN dialogs d ON d.id = dm.dialog_id
-			WHERE dm.user_id IN (?)
-			  AND d.type = 'private'
-			  AND d.deleted_at IS NULL
-			GROUP BY dm.dialog_id
-			HAVING COUNT(DISTINCT dm.user_id) = 2
-		`, req.ParticipantIds).Scan(&existingID)
+            SELECT dm.dialog_id
+            FROM dialog_members dm
+            JOIN dialogs d ON d.id = dm.dialog_id
+            WHERE dm.user_id IN (?)
+              AND d.type = 'private'
+              AND d.deleted_at IS NULL
+            GROUP BY dm.dialog_id
+            HAVING COUNT(DISTINCT dm.user_id) = 2
+        `, req.ParticipantIds).Scan(&existingID)
 
 		if existingID != "" {
 			var dialog models.Dialog

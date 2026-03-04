@@ -80,8 +80,8 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		for _, u := range users {
 			if u.ID != authID {
 				displayTitle = u.FirstName
-				if u.LastName != "" {
-					displayTitle += " " + u.LastName
+				if u.LastName != nil && *u.LastName != "" {
+					displayTitle += " " + *u.LastName
 				}
 				break
 			}

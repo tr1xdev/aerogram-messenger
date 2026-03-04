@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/graph-gophers/dataloader/v7"
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
-	"github.com/graph-gophers/dataloader/v7"
 )
 
 type loaderCtxKey string
@@ -38,8 +38,8 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 					userMap[u.Id] = &models.User{
 						ID:               u.Id,
 						FirstName:        u.FirstName,
-						LastName:         u.GetLastName(),
-						Username:         u.GetUsername(),
+						LastName:         u.LastName,
+						Username:         u.Username,
 						Email:            u.GetEmail(),
 						PublicKey:        u.PublicKey,
 						EncryptedPrivKey: u.EncryptedPrivKey,
