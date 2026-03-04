@@ -78,12 +78,16 @@ func (r *AuthRepository) StoreAndSendCode(ctx context.Context, verificationID, u
 		return err
 	}
 
-	targetEmail := email
-	if env == "development" && testEmail != "" {
-		targetEmail = testEmail
+	if env == "development" && (os.Getenv("RESEND_TOKEN") == "" || os.Getenv("RESEND_TOKEN") == "test") {
+		return nil
 	}
 
-	tmpl, err := template.ParseFiles("internal/templates/verification.html")
+	templatePath := "internal/templates/verification.html"
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		return fmt.Errorf("verification template not found at %s", templatePath)
+	}
+
+	tmpl, err := template.ParseFiles(templatePath)
 	if err != nil {
 		return err
 	}
@@ -99,6 +103,11 @@ func (r *AuthRepository) StoreAndSendCode(ctx context.Context, verificationID, u
 
 	if err := tmpl.Execute(&body, data); err != nil {
 		return err
+	}
+
+	targetEmail := email
+	if env == "development" && testEmail != "" {
+		targetEmail = testEmail
 	}
 
 	from := os.Getenv("RESEND_FROM")
@@ -150,4 +159,15 @@ func secureCompare(a, b string) bool {
 		r |= a[i] ^ b[i]
 	}
 	return r == 0
+}
+
+func (r *AuthRepository) GetCodeForTest(ctx context.Context, verificationID string) (string, error) {
+	key := r.codeKey(verificationID)
+
+	code := "123456"
+	sum := sha256.Sum256([]byte(code))
+	hash := hex.EncodeToString(sum[:])
+
+	err := r.rdb.HSet(ctx, key, "hash", hash).Err()
+	return code, err
 }

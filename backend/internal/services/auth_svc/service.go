@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -105,17 +105,12 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 		ID:              uuid.NewString(),
 		Email:           req.Email,
 		FirstName:       req.FirstName,
+		LastName:        req.LastName,
+		Username:        req.Username,
 		Password:        string(pwHash),
 		IsPremium:       false,
 		IsEmailVerified: false,
 		CreatedAt:       time.Now(),
-	}
-
-	if req.LastName != nil {
-		user.LastName = *req.LastName
-	}
-	if req.Username != nil {
-		user.Username = *req.Username
 	}
 
 	if err := s.db.Create(user).Error; err != nil {
@@ -125,7 +120,10 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 	verificationID := uuid.NewString()
 	err = s.authRepo.StoreAndSendCode(ctx, verificationID, user.ID, user.Email, user.FirstName)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to send verification code")
+		if os.Getenv("APP_ENV") != "development" {
+			return nil, status.Error(codes.Internal, "failed to send verification code")
+		}
+		fmt.Printf("=== [DEV MODE] Ignoring email error in SignUp: %v\n", err)
 	}
 
 	return &authpb.SignUpResponse{
@@ -156,9 +154,8 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 	if err != nil {
 		if os.Getenv("APP_ENV") != "development" {
 			return nil, status.Error(codes.Internal, "failed to send verification code")
-		} else {
-			fmt.Printf("=== [DEV MODE] Failed to send verification code email\n")
 		}
+		fmt.Printf("=== [DEV MODE] Ignoring email error in Login: %v\n", err)
 	}
 
 	return &authpb.LoginResponse{
@@ -320,19 +317,12 @@ func (s *Server) GetUser(ctx context.Context, req *authpb.GetUserRequest) (*auth
 		return nil, status.Error(codes.Internal, "database error")
 	}
 
-	res := &authpb.GetUserResponse{
+	return &authpb.GetUserResponse{
 		Id:        user.ID,
 		Email:     user.Email,
 		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Username:  user.Username,
 		Status:    user.Status,
-	}
-
-	if user.LastName != "" {
-		res.LastName = &user.LastName
-	}
-	if user.Username != "" {
-		res.Username = &user.Username
-	}
-
-	return res, nil
+	}, nil
 }
