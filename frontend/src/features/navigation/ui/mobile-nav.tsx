@@ -1,57 +1,89 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { MessageSquare, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMyChats } from "@/features/chat/lib/use-messages";
+import type { Chat } from "@/entities/chat/model/types";
 
 export function MobileNav() {
   const pathname = useRouterState().location.pathname;
   const isChatOpen = pathname.startsWith("/chat/");
+  const { data: chatsData } = useMyChats();
 
   if (isChatOpen) return null;
 
+  const totalUnread =
+    chatsData?.myChats?.reduce(
+      (acc: number, chat: Chat) => acc + (chat.unreadCount || 0),
+      0,
+    ) || 0;
+
   const navItems = [
-    { label: "Chats", icon: MessageSquare, to: "/" },
-    { label: "Settings", icon: Settings, to: "/settings" },
+    {
+      id: "chats",
+      label: "Chats",
+      icon: MessageSquare,
+      to: "/" as const,
+      badge: totalUnread > 0 ? totalUnread : null,
+    },
+    {
+      id: "settings",
+      label: "Settings",
+      icon: Settings,
+      to: "/settings" as const,
+      badge: null,
+    },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-[68px] items-center justify-center gap-12 border-t border-border/40 bg-background/60 backdrop-blur-2xl pb-safe md:hidden">
-      {navItems.map((item) => {
-        const isActive =
-          pathname === item.to || (item.to === "/" && pathname === "/");
-        return (
-          <Link
-            key={item.label}
-            to={item.to}
-            className="group flex flex-col items-center justify-center transition-all duration-300"
-          >
-            <div
-              className={cn(
-                "flex h-8 w-14 items-center justify-center rounded-full transition-all duration-300",
-                isActive
-                  ? "bg-primary/20 text-primary shadow-sm"
-                  : "bg-transparent text-muted-foreground/50 group-hover:text-muted-foreground/80",
-              )}
-            >
-              <item.icon
+    <nav className="fixed bottom-0 left-0 right-0 z-[1000] flex flex-col md:hidden isolate bg-background">
+      <div className="relative flex h-[64px] w-full items-stretch justify-center bg-background">
+        <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-border/50" />
+
+        <div className="flex items-stretch justify-center gap-14 px-6">
+          {navItems.map((item) => {
+            const isActive = pathname === item.to;
+
+            return (
+              <Link
+                key={item.id}
+                to={item.to}
                 className={cn(
-                  "h-[22px] w-[22px] transition-all duration-300",
-                  isActive
-                    ? "scale-100 stroke-[2.4px]"
-                    : "scale-95 stroke-[1.8px]",
+                  "relative flex w-16 flex-col items-center justify-center outline-none transition-colors duration-75",
+                  isActive ? "text-primary" : "text-muted-foreground/45",
                 )}
-              />
-            </div>
-            <span
-              className={cn(
-                "mt-1 text-[10px] font-bold tracking-tight uppercase transition-colors duration-300",
-                isActive ? "text-primary" : "text-muted-foreground/60",
-              )}
-            >
-              {item.label}
-            </span>
-          </Link>
-        );
-      })}
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <div className="relative h-6 w-6 flex items-center justify-center active:scale-90 transition-transform duration-75">
+                    <item.icon
+                      className={cn(
+                        "h-[22px] w-[22px]",
+                        isActive ? "stroke-[2.2px]" : "stroke-[1.8px]",
+                      )}
+                    />
+
+                    {item.badge !== null ? (
+                      <span className="absolute -top-1.5 -right-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground shadow-sm animate-in fade-in zoom-in duration-200">
+                        {item.badge > 99 ? "99+" : item.badge}
+                      </span>
+                    ) : (
+                      isActive && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+                        </span>
+                      )
+                    )}
+                  </div>
+
+                  <span className="text-[11px] font-semibold tracking-tight">
+                    {item.label}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+      <div className="h-[env(safe-area-inset-bottom)] w-full bg-background" />
     </nav>
   );
 }
