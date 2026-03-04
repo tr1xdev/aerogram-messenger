@@ -13,17 +13,16 @@ import (
 	"gorm.io/gorm"
 )
 
+func ptr[T any](v T) *T {
+	return &v
+}
+
 func setupTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 
-	m := db.Migrator()
-
-	if m.HasTable(&models.User{}) {
-		m.DropTable(&models.User{})
-	}
-
-	db.Exec("CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT, first_name TEXT, last_name TEXT, email TEXT, password TEXT, status TEXT, is_premium INTEGER, is_email_verified INTEGER, verification_token TEXT, verification_expiry DATETIME, public_key TEXT, encrypted_priv_key TEXT, encryption_iv TEXT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME)")
+	err = db.AutoMigrate(&models.User{})
+	require.NoError(t, err)
 
 	return db
 }
@@ -36,7 +35,7 @@ func TestUserInfo(t *testing.T) {
 	testUser := models.User{
 		ID:        "user_1",
 		FirstName: "Alice",
-		Username:  "alice_hub",
+		Username:  ptr("alice_hub"),
 		Email:     "alice@test.com",
 	}
 	db.Create(&testUser)
@@ -50,6 +49,7 @@ func TestUserInfo(t *testing.T) {
 		assert.NoError(t, err)
 		require.NotNil(t, resp.GetUser())
 		assert.Equal(t, "Alice", resp.GetUser().FirstName)
+		assert.Equal(t, "alice_hub", *resp.GetUser().Username)
 	})
 
 	t.Run("not_found", func(t *testing.T) {
