@@ -216,13 +216,18 @@ func initGraphQL(
 					userID, _ := claims["sub"].(string)
 					sessionID, _ := claims["sid"].(string)
 
-					if userID != "" {
+					if userID != "" && sessionID != "" {
+						var session models.Session
+						err := db.Select("id").Where("id = ? AND user_id = ? AND is_active = ?", sessionID, userID, true).First(&session).Error
+						if err != nil {
+							return nil, nil, fmt.Errorf("session terminated")
+						}
+
 						newCtx := context.WithValue(ctx, middleware.AuthUserIDKey, userID)
 						newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sessionID)
 						newCtx = context.WithValue(newCtx, middleware.AuthTokenKey, tokenString)
 
 						_ = pRepo.SetOnline(newCtx, userID)
-
 						go func() {
 							<-newCtx.Done()
 							_ = pRepo.SetOffline(context.Background(), userID)

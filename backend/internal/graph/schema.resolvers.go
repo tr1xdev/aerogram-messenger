@@ -74,19 +74,26 @@ func (r *messageResolver) ForwardedFrom(ctx context.Context, obj *models.Message
 
 // TerminateAllOtherSessions is the resolver for the terminateAllOtherSessions field.
 func (r *mutationResolver) TerminateAllOtherSessions(ctx context.Context) (bool, error) {
-	userID, ok := ctx.Value(middleware.AuthUserIDKey).(string)
-	if !ok {
+	userID := middleware.GetUserID(ctx)
+	currentSessionID := middleware.GetSessionID(ctx)
+	if userID == "" {
 		return false, fmt.Errorf("unauthorized")
 	}
 
-	currentSessionID, ok := ctx.Value(middleware.AuthSessionIDKey).(string)
-	if !ok {
-		return false, fmt.Errorf("session not found")
-	}
+	var sessionIDs []string
+	r.db.Model(&models.Session{}).
+		Where("user_id = ? AND id != ? AND is_active = ?", userID, currentSessionID, true).
+		Pluck("id", &sessionIDs)
 
-	err := r.db.Where("user_id = ? AND id != ?", userID, currentSessionID).Delete(&models.Session{}).Error
+	err := r.db.Model(&models.Session{}).
+		Where("user_id = ? AND id != ?", userID, currentSessionID).
+		Update("is_active", false).Error
 	if err != nil {
 		return false, err
+	}
+
+	for _, sid := range sessionIDs {
+		r.redisClient.Publish(ctx, "kill:session:"+sid, "terminated")
 	}
 
 	return true, nil
@@ -369,6 +376,8 @@ func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
+	r.redisClient.Publish(ctx, "kill:session:"+sessionID, "terminated")
+
 	return true, nil
 }
 
@@ -503,17 +512,41 @@ func (r *sessionResolver) CreatedAt(ctx context.Context, obj *models.Session) (s
 
 // MessageAdded is the resolver for the messageAdded field.
 func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) (<-chan *models.Message, error) {
+	authID := middleware.GetUserID(ctx)
+	sessionID := middleware.GetSessionID(ctx)
+	if authID == "" || sessionID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	var count int64
+	err := r.db.Model(&models.DialogMember{}).
+		Where("dialog_id = ? AND user_id = ?", chatID, authID).
+		Count(&count).Error
+
+	if err != nil || count == 0 {
+		return nil, errors.New("forbidden")
+	}
+
 	msgChan := make(chan *models.Message, 1)
-	pubsub := r.redisClient.Subscribe(ctx, "chat:"+chatID)
+
+	chatPubSub := r.redisClient.Subscribe(ctx, "chat:"+chatID)
+	killPubSub := r.redisClient.Subscribe(ctx, "kill:session:"+sessionID)
+
 	go func() {
-		defer pubsub.Close()
+		defer chatPubSub.Close()
+		defer killPubSub.Close()
 		defer close(msgChan)
-		ch := pubsub.Channel()
+
+		chatCh := chatPubSub.Channel()
+		killCh := killPubSub.Channel()
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case msg, ok := <-ch:
+			case <-killCh:
+				return
+			case msg, ok := <-chatCh:
 				if !ok {
 					return
 				}
@@ -529,6 +562,7 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 			}
 		}
 	}()
+
 	return msgChan, nil
 }
 

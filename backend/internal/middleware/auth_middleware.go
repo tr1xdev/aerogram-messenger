@@ -87,10 +87,13 @@ func AuthMiddleware(cfg *config.Config, db *gorm.DB) func(http.Handler) http.Han
 						sessionID, _ := claims["sid"].(string)
 
 						if userID != "" && sessionID != "" {
-							var session models.Session
-							err := db.Select("id").Where("id = ? AND user_id = ? AND is_active = ?", sessionID, userID, true).First(&session).Error
+							var exists bool
+							err := db.Model(&models.Session{}).
+								Select("count(*) > 0").
+								Where("id = ? AND user_id = ? AND is_active = ?", sessionID, userID, true).
+								Find(&exists).Error
 
-							if err != nil {
+							if err != nil || !exists {
 								w.Header().Set("Content-Type", "application/json")
 								w.WriteHeader(http.StatusUnauthorized)
 								fmt.Fprint(w, `{"errors": [{"message": "Session terminated", "extensions": {"code": "UNAUTHENTICATED"}}]}`)
