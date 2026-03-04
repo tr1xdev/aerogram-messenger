@@ -29,7 +29,6 @@ export function LastMessageContent({
         const targetPublicKey = isMe
           ? otherMember?.user.publicKey
           : message.sender.publicKey;
-
         const myPrivKeyObj = await getPrivateKey(myId);
 
         if (!targetPublicKey || !myPrivKeyObj || !message.encryptionIv) {
@@ -58,17 +57,15 @@ export function LastMessageContent({
     message.id,
     message.isEncrypted,
     message.encryptionIv,
+    message.text,
+    message.sender,
     myId,
     chat.members,
   ]);
 
   if (decryptedText === null) {
-    return <Skeleton className="h-3 w-24 mt-1" />;
+    return <Skeleton className="h-3 w-24" />;
   }
 
-  return (
-    <span className="truncate animate-in fade-in duration-300">
-      {decryptedText}
-    </span>
-  );
+  return <span>{decryptedText}</span>;
 }
