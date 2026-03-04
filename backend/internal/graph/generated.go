@@ -4051,7 +4051,7 @@ func (ec *executionContext) _User_last_name(ctx context.Context, field graphql.C
 			return obj.LastName, nil
 		},
 		nil,
-		ec.marshalOString2string,
+		ec.marshalOString2ᚖstring,
 		true,
 		false,
 	)
@@ -4080,7 +4080,7 @@ func (ec *executionContext) _User_username(ctx context.Context, field graphql.Co
 			return obj.Username, nil
 		},
 		nil,
-		ec.marshalOString2string,
+		ec.marshalOString2ᚖstring,
 		true,
 		false,
 	)
