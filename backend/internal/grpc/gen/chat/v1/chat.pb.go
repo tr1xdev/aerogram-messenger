@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: chat/v1/chat.proto
 
-package chatpb
+package chatv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -685,7 +685,7 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\n" +
 	"GetMyChats\x12\x1a.chat.v1.GetMyChatsRequest\x1a\x1b.chat.v1.GetMyChatsResponse\x12<\n" +
 	"\aPinChat\x12\x17.chat.v1.PinChatRequest\x1a\x18.chat.v1.PinChatResponse\x12<\n" +
-	"\aGetChat\x12\x17.chat.v1.GetChatRequest\x1a\x18.chat.v1.GetChatResponseBGZEgithub.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1;chatpbb\x06proto3"
+	"\aGetChat\x12\x17.chat.v1.GetChatRequest\x1a\x18.chat.v1.GetChatResponseBHZFgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1;chatv1b\x06proto3"
 
 var (
 	file_chat_v1_chat_proto_rawDescOnce sync.Once

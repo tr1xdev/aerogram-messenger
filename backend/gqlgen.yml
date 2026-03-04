@@ -17,12 +17,12 @@ resolver:
    filename_template: "{name}.resolvers.go"
 
 autobind:
-   - "github.com/aerogram-org/aerogram-api/internal/models"
-   - "github.com/aerogram-org/aerogram-api/internal/schemas"
+   - "github.com/tr1xdev/aerogram-messenger/internal/models"
+   - "github.com/tr1xdev/aerogram-messenger/internal/schemas"
 
 models:
    Session:
-      model: github.com/aerogram-org/aerogram-api/internal/models.Session
+      model: github.com/tr1xdev/aerogram-messenger/internal/models.Session
       fields:
          device:
             resolver: true

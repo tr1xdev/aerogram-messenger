@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/aerogram-org/aerogram-api/internal/graph/model"
-	chatpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1"
-	"github.com/aerogram-org/aerogram-api/internal/models"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
+	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"google.golang.org/grpc/status"
 )
 

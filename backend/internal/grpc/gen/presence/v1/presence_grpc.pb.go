@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: presence/v1/presence.proto
 
-package v1
+package presencev1
 
 import (
 	context "context"

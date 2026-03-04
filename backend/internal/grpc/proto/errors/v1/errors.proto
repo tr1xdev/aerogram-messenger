@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package errors.v1;
 
-option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/errors/v1";
+option go_package = "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/errors/v1;errorsv1";
 
 enum ErrorCode {
   ERROR_CODE_UNSPECIFIED = 0;

@@ -14,8 +14,8 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	"github.com/aerogram-org/aerogram-api/internal/graph/model"
-	"github.com/aerogram-org/aerogram-api/internal/models"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -957,7 +957,7 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 func (ec *executionContext) field_Mutation_createChat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "type", ec.unmarshalNChatType2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatType)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "type", ec.unmarshalNChatType2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatType)
 	if err != nil {
 		return nil, err
 	}
@@ -1005,7 +1005,7 @@ func (ec *executionContext) field_Mutation_deleteMessage_args(ctx context.Contex
 func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNLoginInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐLoginInput)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNLoginInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐLoginInput)
 	if err != nil {
 		return nil, err
 	}
@@ -1101,7 +1101,7 @@ func (ec *executionContext) field_Mutation_sendTypingEvent_args(ctx context.Cont
 func (ec *executionContext) field_Mutation_signUp_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNSignUpInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐSignUpInput)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNSignUpInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐSignUpInput)
 	if err != nil {
 		return nil, err
 	}
@@ -1139,7 +1139,7 @@ func (ec *executionContext) field_Mutation_updateMessage_args(ctx context.Contex
 func (ec *executionContext) field_Mutation_updateUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateUserInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐUpdateUserInput)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateUserInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐUpdateUserInput)
 	if err != nil {
 		return nil, err
 	}
@@ -1150,7 +1150,7 @@ func (ec *executionContext) field_Mutation_updateUser_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNVerifyEmailInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐVerifyEmailInput)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNVerifyEmailInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailInput)
 	if err != nil {
 		return nil, err
 	}
@@ -1392,7 +1392,7 @@ func (ec *executionContext) _Chat_type(ctx context.Context, field graphql.Collec
 			return obj.Type, nil
 		},
 		nil,
-		ec.marshalNChatType2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatType,
+		ec.marshalNChatType2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatType,
 		true,
 		true,
 	)
@@ -1595,7 +1595,7 @@ func (ec *executionContext) _Chat_lastMessage(ctx context.Context, field graphql
 			return obj.LastMessage, nil
 		},
 		nil,
-		ec.marshalOMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage,
+		ec.marshalOMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage,
 		true,
 		false,
 	)
@@ -1677,7 +1677,7 @@ func (ec *executionContext) _Chat_members(ctx context.Context, field graphql.Col
 			return obj.Members, nil
 		},
 		nil,
-		ec.marshalOChatMember2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatMemberᚄ,
+		ec.marshalOChatMember2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatMemberᚄ,
 		true,
 		false,
 	)
@@ -1712,7 +1712,7 @@ func (ec *executionContext) _Chat_messages(ctx context.Context, field graphql.Co
 			return obj.Messages, nil
 		},
 		nil,
-		ec.marshalNMessage2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessageᚄ,
+		ec.marshalNMessage2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessageᚄ,
 		true,
 		true,
 	)
@@ -1765,7 +1765,7 @@ func (ec *executionContext) _ChatMember_user(ctx context.Context, field graphql.
 			return obj.User, nil
 		},
 		nil,
-		ec.marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser,
+		ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUser,
 		true,
 		true,
 	)
@@ -1901,7 +1901,7 @@ func (ec *executionContext) _Message_sender(ctx context.Context, field graphql.C
 			return ec.resolvers.Message().Sender(ctx, obj)
 		},
 		nil,
-		ec.marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser,
+		ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUser,
 		true,
 		true,
 	)
@@ -2124,7 +2124,7 @@ func (ec *executionContext) _Message_replyTo(ctx context.Context, field graphql.
 			return ec.resolvers.Message().ReplyTo(ctx, obj)
 		},
 		nil,
-		ec.marshalOMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage,
+		ec.marshalOMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage,
 		true,
 		false,
 	)
@@ -2177,7 +2177,7 @@ func (ec *executionContext) _Message_forwardedFrom(ctx context.Context, field gr
 			return ec.resolvers.Message().ForwardedFrom(ctx, obj)
 		},
 		nil,
-		ec.marshalOMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage,
+		ec.marshalOMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage,
 		true,
 		false,
 	)
@@ -2260,7 +2260,7 @@ func (ec *executionContext) _Mutation_signUp(ctx context.Context, field graphql.
 			return ec.resolvers.Mutation().SignUp(ctx, fc.Args["input"].(model.SignUpInput))
 		},
 		nil,
-		ec.marshalNAuthPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐAuthPayload,
+		ec.marshalNAuthPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAuthPayload,
 		true,
 		true,
 	)
@@ -2305,7 +2305,7 @@ func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.C
 			return ec.resolvers.Mutation().Login(ctx, fc.Args["input"].(model.LoginInput))
 		},
 		nil,
-		ec.marshalNAuthPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐAuthPayload,
+		ec.marshalNAuthPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAuthPayload,
 		true,
 		true,
 	)
@@ -2350,7 +2350,7 @@ func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field gra
 			return ec.resolvers.Mutation().VerifyEmail(ctx, fc.Args["input"].(model.VerifyEmailInput))
 		},
 		nil,
-		ec.marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload,
+		ec.marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload,
 		true,
 		true,
 	)
@@ -2397,7 +2397,7 @@ func (ec *executionContext) _Mutation_updateUser(ctx context.Context, field grap
 			return ec.resolvers.Mutation().UpdateUser(ctx, fc.Args["input"].(model.UpdateUserInput))
 		},
 		nil,
-		ec.marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser,
+		ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUser,
 		true,
 		true,
 	)
@@ -2458,7 +2458,7 @@ func (ec *executionContext) _Mutation_refreshToken(ctx context.Context, field gr
 			return ec.resolvers.Mutation().RefreshToken(ctx, fc.Args["token"].(string))
 		},
 		nil,
-		ec.marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload,
+		ec.marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload,
 		true,
 		true,
 	)
@@ -2505,7 +2505,7 @@ func (ec *executionContext) _Mutation_createChat(ctx context.Context, field grap
 			return ec.resolvers.Mutation().CreateChat(ctx, fc.Args["type"].(model.ChatType), fc.Args["participantIds"].([]string), fc.Args["slug"].(*string), fc.Args["title"].(*string))
 		},
 		nil,
-		ec.marshalNChat2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChat,
+		ec.marshalNChat2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChat,
 		true,
 		true,
 	)
@@ -2572,7 +2572,7 @@ func (ec *executionContext) _Mutation_sendMessage(ctx context.Context, field gra
 			return ec.resolvers.Mutation().SendMessage(ctx, fc.Args["chatId"].(string), fc.Args["text"].(string), fc.Args["isEncrypted"].(bool), fc.Args["encryptionIv"].(*string), fc.Args["replyToId"].(*string))
 		},
 		nil,
-		ec.marshalNMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage,
+		ec.marshalNMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage,
 		true,
 		true,
 	)
@@ -2637,7 +2637,7 @@ func (ec *executionContext) _Mutation_updateMessage(ctx context.Context, field g
 			return ec.resolvers.Mutation().UpdateMessage(ctx, fc.Args["id"].(string), fc.Args["text"].(string))
 		},
 		nil,
-		ec.marshalNMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage,
+		ec.marshalNMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage,
 		true,
 		true,
 	)
@@ -2784,7 +2784,7 @@ func (ec *executionContext) _Mutation_createDirectChat(ctx context.Context, fiel
 			return ec.resolvers.Mutation().CreateDirectChat(ctx, fc.Args["userID"].(string))
 		},
 		nil,
-		ec.marshalNChat2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChat,
+		ec.marshalNChat2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChat,
 		true,
 		true,
 	)
@@ -3002,7 +3002,7 @@ func (ec *executionContext) _Query_me(ctx context.Context, field graphql.Collect
 			return ec.resolvers.Query().Me(ctx)
 		},
 		nil,
-		ec.marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser,
+		ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUser,
 		true,
 		true,
 	)
@@ -3052,7 +3052,7 @@ func (ec *executionContext) _Query_sessions(ctx context.Context, field graphql.C
 			return ec.resolvers.Query().Sessions(ctx, fc.Args["userId"].(string))
 		},
 		nil,
-		ec.marshalNSession2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐSessionᚄ,
+		ec.marshalNSession2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐSessionᚄ,
 		true,
 		true,
 	)
@@ -3108,7 +3108,7 @@ func (ec *executionContext) _Query_myChats(ctx context.Context, field graphql.Co
 			return ec.resolvers.Query().MyChats(ctx)
 		},
 		nil,
-		ec.marshalNChat2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatᚄ,
+		ec.marshalNChat2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatᚄ,
 		true,
 		true,
 	)
@@ -3164,7 +3164,7 @@ func (ec *executionContext) _Query_chat(ctx context.Context, field graphql.Colle
 			return ec.resolvers.Query().Chat(ctx, fc.Args["id"].(*string), fc.Args["slug"].(*string))
 		},
 		nil,
-		ec.marshalNChat2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChat,
+		ec.marshalNChat2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChat,
 		true,
 		true,
 	)
@@ -3231,7 +3231,7 @@ func (ec *executionContext) _Query_messageHistory(ctx context.Context, field gra
 			return ec.resolvers.Query().MessageHistory(ctx, fc.Args["chatId"].(string), fc.Args["limit"].(int), fc.Args["offset"].(int))
 		},
 		nil,
-		ec.marshalNMessage2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessageᚄ,
+		ec.marshalNMessage2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessageᚄ,
 		true,
 		true,
 	)
@@ -3296,7 +3296,7 @@ func (ec *executionContext) _Query_searchUsers(ctx context.Context, field graphq
 			return ec.resolvers.Query().SearchUsers(ctx, fc.Args["username"].(string))
 		},
 		nil,
-		ec.marshalNUser2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUserᚄ,
+		ec.marshalNUser2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUserᚄ,
 		true,
 		true,
 	)
@@ -3357,7 +3357,7 @@ func (ec *executionContext) _Query_dialogRead(ctx context.Context, field graphql
 			return ec.resolvers.Query().DialogRead(ctx, fc.Args["chatID"].(string))
 		},
 		nil,
-		ec.marshalNReadPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐReadPayload,
+		ec.marshalNReadPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐReadPayload,
 		true,
 		true,
 	)
@@ -3804,7 +3804,7 @@ func (ec *executionContext) _Subscription_messageAdded(ctx context.Context, fiel
 			return ec.resolvers.Subscription().MessageAdded(ctx, fc.Args["chatId"].(string))
 		},
 		nil,
-		ec.marshalNMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage,
+		ec.marshalNMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage,
 		true,
 		true,
 	)
@@ -3869,7 +3869,7 @@ func (ec *executionContext) _Subscription_userStatusChanged(ctx context.Context,
 			return ec.resolvers.Subscription().UserStatusChanged(ctx, fc.Args["chatId"].(string))
 		},
 		nil,
-		ec.marshalNUserStatusPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐUserStatusPayload,
+		ec.marshalNUserStatusPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐUserStatusPayload,
 		true,
 		true,
 	)
@@ -3916,7 +3916,7 @@ func (ec *executionContext) _Subscription_dialogRead(ctx context.Context, field 
 			return ec.resolvers.Subscription().DialogRead(ctx, fc.Args["chatID"].(string))
 		},
 		nil,
-		ec.marshalNReadPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐReadPayload,
+		ec.marshalNReadPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐReadPayload,
 		true,
 		true,
 	)
@@ -7559,11 +7559,11 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
-func (ec *executionContext) marshalNAuthPayload2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v model.AuthPayload) graphql.Marshaler {
+func (ec *executionContext) marshalNAuthPayload2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v model.AuthPayload) graphql.Marshaler {
 	return ec._AuthPayload(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNAuthPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v *model.AuthPayload) graphql.Marshaler {
+func (ec *executionContext) marshalNAuthPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v *model.AuthPayload) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -7589,11 +7589,11 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalNChat2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChat(ctx context.Context, sel ast.SelectionSet, v model.Chat) graphql.Marshaler {
+func (ec *executionContext) marshalNChat2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChat(ctx context.Context, sel ast.SelectionSet, v model.Chat) graphql.Marshaler {
 	return ec._Chat(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNChat2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Chat) graphql.Marshaler {
+func (ec *executionContext) marshalNChat2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Chat) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -7617,7 +7617,7 @@ func (ec *executionContext) marshalNChat2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋa
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNChat2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChat(ctx, sel, v[i])
+			ret[i] = ec.marshalNChat2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChat(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -7637,7 +7637,7 @@ func (ec *executionContext) marshalNChat2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋa
 	return ret
 }
 
-func (ec *executionContext) marshalNChat2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChat(ctx context.Context, sel ast.SelectionSet, v *model.Chat) graphql.Marshaler {
+func (ec *executionContext) marshalNChat2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChat(ctx context.Context, sel ast.SelectionSet, v *model.Chat) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -7647,7 +7647,7 @@ func (ec *executionContext) marshalNChat2ᚖgithubᚗcomᚋaerogramᚑorgᚋaero
 	return ec._Chat(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNChatMember2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatMember(ctx context.Context, sel ast.SelectionSet, v *model.ChatMember) graphql.Marshaler {
+func (ec *executionContext) marshalNChatMember2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatMember(ctx context.Context, sel ast.SelectionSet, v *model.ChatMember) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -7657,13 +7657,13 @@ func (ec *executionContext) marshalNChatMember2ᚖgithubᚗcomᚋaerogramᚑorg�
 	return ec._ChatMember(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNChatType2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatType(ctx context.Context, v any) (model.ChatType, error) {
+func (ec *executionContext) unmarshalNChatType2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatType(ctx context.Context, v any) (model.ChatType, error) {
 	var res model.ChatType
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNChatType2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatType(ctx context.Context, sel ast.SelectionSet, v model.ChatType) graphql.Marshaler {
+func (ec *executionContext) marshalNChatType2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatType(ctx context.Context, sel ast.SelectionSet, v model.ChatType) graphql.Marshaler {
 	return v
 }
 
@@ -7699,7 +7699,7 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
-func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐLoginInput(ctx context.Context, v any) (model.LoginInput, error) {
+func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐLoginInput(ctx context.Context, v any) (model.LoginInput, error) {
 	res, err := ec.unmarshalInputLoginInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
@@ -7720,11 +7720,11 @@ func (ec *executionContext) marshalNLong2int64(ctx context.Context, sel ast.Sele
 	return res
 }
 
-func (ec *executionContext) marshalNMessage2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage(ctx context.Context, sel ast.SelectionSet, v models.Message) graphql.Marshaler {
+func (ec *executionContext) marshalNMessage2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage(ctx context.Context, sel ast.SelectionSet, v models.Message) graphql.Marshaler {
 	return ec._Message(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Message) graphql.Marshaler {
+func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Message) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -7748,7 +7748,7 @@ func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋaerogramᚑorg�
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage(ctx, sel, v[i])
+			ret[i] = ec.marshalNMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -7768,7 +7768,7 @@ func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋaerogramᚑorg�
 	return ret
 }
 
-func (ec *executionContext) marshalNMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage(ctx context.Context, sel ast.SelectionSet, v *models.Message) graphql.Marshaler {
+func (ec *executionContext) marshalNMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage(ctx context.Context, sel ast.SelectionSet, v *models.Message) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -7778,11 +7778,11 @@ func (ec *executionContext) marshalNMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋa
 	return ec._Message(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNReadPayload2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐReadPayload(ctx context.Context, sel ast.SelectionSet, v model.ReadPayload) graphql.Marshaler {
+func (ec *executionContext) marshalNReadPayload2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐReadPayload(ctx context.Context, sel ast.SelectionSet, v model.ReadPayload) graphql.Marshaler {
 	return ec._ReadPayload(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNReadPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐReadPayload(ctx context.Context, sel ast.SelectionSet, v *model.ReadPayload) graphql.Marshaler {
+func (ec *executionContext) marshalNReadPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐReadPayload(ctx context.Context, sel ast.SelectionSet, v *model.ReadPayload) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -7792,7 +7792,7 @@ func (ec *executionContext) marshalNReadPayload2ᚖgithubᚗcomᚋaerogramᚑorg
 	return ec._ReadPayload(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNSession2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐSessionᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Session) graphql.Marshaler {
+func (ec *executionContext) marshalNSession2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐSessionᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Session) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -7816,7 +7816,7 @@ func (ec *executionContext) marshalNSession2ᚕᚖgithubᚗcomᚋaerogramᚑorg�
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNSession2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐSession(ctx, sel, v[i])
+			ret[i] = ec.marshalNSession2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐSession(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -7836,7 +7836,7 @@ func (ec *executionContext) marshalNSession2ᚕᚖgithubᚗcomᚋaerogramᚑorg�
 	return ret
 }
 
-func (ec *executionContext) marshalNSession2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐSession(ctx context.Context, sel ast.SelectionSet, v *models.Session) graphql.Marshaler {
+func (ec *executionContext) marshalNSession2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐSession(ctx context.Context, sel ast.SelectionSet, v *models.Session) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -7846,7 +7846,7 @@ func (ec *executionContext) marshalNSession2ᚖgithubᚗcomᚋaerogramᚑorgᚋa
 	return ec._Session(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNSignUpInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐSignUpInput(ctx context.Context, v any) (model.SignUpInput, error) {
+func (ec *executionContext) unmarshalNSignUpInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐSignUpInput(ctx context.Context, v any) (model.SignUpInput, error) {
 	res, err := ec.unmarshalInputSignUpInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
@@ -7867,16 +7867,16 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 	return res
 }
 
-func (ec *executionContext) unmarshalNUpdateUserInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐUpdateUserInput(ctx context.Context, v any) (model.UpdateUserInput, error) {
+func (ec *executionContext) unmarshalNUpdateUserInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐUpdateUserInput(ctx context.Context, v any) (model.UpdateUserInput, error) {
 	res, err := ec.unmarshalInputUpdateUserInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNUser2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser(ctx context.Context, sel ast.SelectionSet, v models.User) graphql.Marshaler {
+func (ec *executionContext) marshalNUser2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUser(ctx context.Context, sel ast.SelectionSet, v models.User) graphql.Marshaler {
 	return ec._User(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNUser2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUserᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.User) graphql.Marshaler {
+func (ec *executionContext) marshalNUser2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUserᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.User) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -7900,7 +7900,7 @@ func (ec *executionContext) marshalNUser2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋa
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser(ctx, sel, v[i])
+			ret[i] = ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUser(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -7920,7 +7920,7 @@ func (ec *executionContext) marshalNUser2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋa
 	return ret
 }
 
-func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐUser(ctx context.Context, sel ast.SelectionSet, v *models.User) graphql.Marshaler {
+func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐUser(ctx context.Context, sel ast.SelectionSet, v *models.User) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -7930,11 +7930,11 @@ func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋaerogramᚑorgᚋaero
 	return ec._User(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNUserStatusPayload2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐUserStatusPayload(ctx context.Context, sel ast.SelectionSet, v model.UserStatusPayload) graphql.Marshaler {
+func (ec *executionContext) marshalNUserStatusPayload2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐUserStatusPayload(ctx context.Context, sel ast.SelectionSet, v model.UserStatusPayload) graphql.Marshaler {
 	return ec._UserStatusPayload(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNUserStatusPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐUserStatusPayload(ctx context.Context, sel ast.SelectionSet, v *model.UserStatusPayload) graphql.Marshaler {
+func (ec *executionContext) marshalNUserStatusPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐUserStatusPayload(ctx context.Context, sel ast.SelectionSet, v *model.UserStatusPayload) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -7944,16 +7944,16 @@ func (ec *executionContext) marshalNUserStatusPayload2ᚖgithubᚗcomᚋaerogram
 	return ec._UserStatusPayload(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNVerifyEmailInput2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐVerifyEmailInput(ctx context.Context, v any) (model.VerifyEmailInput, error) {
+func (ec *executionContext) unmarshalNVerifyEmailInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailInput(ctx context.Context, v any) (model.VerifyEmailInput, error) {
 	res, err := ec.unmarshalInputVerifyEmailInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNVerifyEmailPayload2githubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, v model.VerifyEmailPayload) graphql.Marshaler {
+func (ec *executionContext) marshalNVerifyEmailPayload2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, v model.VerifyEmailPayload) graphql.Marshaler {
 	return ec._VerifyEmailPayload(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, v *model.VerifyEmailPayload) graphql.Marshaler {
+func (ec *executionContext) marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, v *model.VerifyEmailPayload) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -8246,7 +8246,7 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) marshalOChatMember2ᚕᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatMemberᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ChatMember) graphql.Marshaler {
+func (ec *executionContext) marshalOChatMember2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatMemberᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ChatMember) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -8273,7 +8273,7 @@ func (ec *executionContext) marshalOChatMember2ᚕᚖgithubᚗcomᚋaerogramᚑo
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNChatMember2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋgraphᚋmodelᚐChatMember(ctx, sel, v[i])
+			ret[i] = ec.marshalNChatMember2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChatMember(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -8347,7 +8347,7 @@ func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalOMessage2ᚖgithubᚗcomᚋaerogramᚑorgᚋaerogramᚑapiᚋinternalᚋmodelsᚐMessage(ctx context.Context, sel ast.SelectionSet, v *models.Message) graphql.Marshaler {
+func (ec *executionContext) marshalOMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋmodelsᚐMessage(ctx context.Context, sel ast.SelectionSet, v *models.Message) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

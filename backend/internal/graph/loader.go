@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
-	userpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1"
-	"github.com/aerogram-org/aerogram-api/internal/models"
-	"github.com/aerogram-org/aerogram-api/internal/repositories"
+	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
+	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"github.com/graph-gophers/dataloader/v7"
 )
 

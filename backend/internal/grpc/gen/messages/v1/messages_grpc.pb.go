@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: messages/v1/messages.proto
 
-package messagespb
+package messagesv1
 
 import (
 	context "context"

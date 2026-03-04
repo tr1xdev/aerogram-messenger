@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package messages.v1;
 
-option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1;messagespb";
+option go_package = "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1;messagesv1";
 
 service MessagesService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);

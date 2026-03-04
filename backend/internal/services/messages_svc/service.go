@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	messagespb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1"
-	"github.com/aerogram-org/aerogram-api/internal/models"
+	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"

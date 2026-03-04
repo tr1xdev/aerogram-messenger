@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package presence.v1;
 
-option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/presence/v1";
+option go_package = "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1;presencev1";
 
 service PresenceService {
   rpc SetOnline(SetOnlineRequest) returns (SetOnlineResponse);

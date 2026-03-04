@@ -1,13 +1,13 @@
 package graph
 
 import (
-	authpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/auth/v1"
-	chatpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1"
-	messagespb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1"
-	userpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1"
-	"github.com/aerogram-org/aerogram-api/internal/repositories"
-	"github.com/aerogram-org/aerogram-api/internal/services/geo_svc"
-	"github.com/aerogram-org/aerogram-api/internal/services/ua_svc"
+	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
+	"github.com/tr1xdev/aerogram-messenger/internal/services/geo_svc"
+	"github.com/tr1xdev/aerogram-messenger/internal/services/ua_svc"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )

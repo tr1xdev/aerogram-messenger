@@ -3,7 +3,7 @@ package repositories
 import (
 	"errors"
 
-	"github.com/aerogram-org/aerogram-api/internal/models"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"gorm.io/gorm"
 )
 

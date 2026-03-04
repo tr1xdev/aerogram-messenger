@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: messages/v1/messages.proto
 
-package messagespb
+package messagesv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -796,7 +796,7 @@ const file_messages_v1_messages_proto_rawDesc = "" +
 	"\n" +
 	"GetHistory\x12\x1e.messages.v1.GetHistoryRequest\x1a\x1f.messages.v1.GetHistoryResponse\x12M\n" +
 	"\n" +
-	"MarkAsRead\x12\x1e.messages.v1.MarkAsReadRequest\x1a\x1f.messages.v1.MarkAsReadResponseBOZMgithub.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1;messagespbb\x06proto3"
+	"MarkAsRead\x12\x1e.messages.v1.MarkAsReadRequest\x1a\x1f.messages.v1.MarkAsReadResponseBPZNgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1;messagesv1b\x06proto3"
 
 var (
 	file_messages_v1_messages_proto_rawDescOnce sync.Once

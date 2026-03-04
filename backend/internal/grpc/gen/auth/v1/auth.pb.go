@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: auth/v1/auth.proto
 
-package v1
+package authv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -652,7 +652,7 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x16.auth.v1.LoginResponse\x12H\n" +
 	"\vVerifyEmail\x12\x1b.auth.v1.VerifyEmailRequest\x1a\x1c.auth.v1.VerifyEmailResponse\x12K\n" +
 	"\fRefreshToken\x12\x1c.auth.v1.RefreshTokenRequest\x1a\x1d.auth.v1.RefreshTokenResponse\x12<\n" +
-	"\aGetUser\x12\x17.auth.v1.GetUserRequest\x1a\x18.auth.v1.GetUserResponseB@Z>github.com/aerogram-org/aerogram-api/internal/grpc/gen/auth/v1b\x06proto3"
+	"\aGetUser\x12\x17.auth.v1.GetUserRequest\x1a\x18.auth.v1.GetUserResponseBHZFgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1;authv1b\x06proto3"
 
 var (
 	file_auth_v1_auth_proto_rawDescOnce sync.Once

@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: presence/v1/presence.proto
 
-package v1
+package presencev1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -402,7 +402,7 @@ const file_presence_v1_presence_proto_rawDesc = "" +
 	"\n" +
 	"SetOffline\x12\x1e.presence.v1.SetOfflineRequest\x1a\x1f.presence.v1.SetOfflineResponse\x12G\n" +
 	"\bIsOnline\x12\x1c.presence.v1.IsOnlineRequest\x1a\x1d.presence.v1.IsOnlineResponse\x12D\n" +
-	"\aGetBulk\x12\x1b.presence.v1.GetBulkRequest\x1a\x1c.presence.v1.GetBulkResponseBDZBgithub.com/aerogram-org/aerogram-api/internal/grpc/gen/presence/v1b\x06proto3"
+	"\aGetBulk\x12\x1b.presence.v1.GetBulkRequest\x1a\x1c.presence.v1.GetBulkResponseBPZNgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1;presencev1b\x06proto3"
 
 var (
 	file_presence_v1_presence_proto_rawDescOnce sync.Once

@@ -3,8 +3,8 @@ package presence_svc
 import (
 	"context"
 
-	presencepb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/presence/v1"
-	"github.com/aerogram-org/aerogram-api/internal/repositories"
+	presencepb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

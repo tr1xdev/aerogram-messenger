@@ -4,10 +4,10 @@
 // 	protoc        (unknown)
 // source: user/v1/user.proto
 
-package v1
+package userv1
 
 import (
-	v1 "github.com/aerogram-org/aerogram-api/internal/grpc/gen/errors/v1"
+	v1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/errors/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -645,7 +645,7 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\bUserInfo\x12\x18.user.v1.UserInfoRequest\x1a\x19.user.v1.UserInfoResponse\x12?\n" +
 	"\bGetUsers\x12\x18.user.v1.GetUsersRequest\x1a\x19.user.v1.GetUsersResponse\x12E\n" +
 	"\n" +
-	"UpdateUser\x12\x1a.user.v1.UpdateUserRequest\x1a\x1b.user.v1.UpdateUserResponseB@Z>github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1b\x06proto3"
+	"UpdateUser\x12\x1a.user.v1.UpdateUserRequest\x1a\x1b.user.v1.UpdateUserResponseBHZFgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1;userv1b\x06proto3"
 
 var (
 	file_user_v1_user_proto_rawDescOnce sync.Once

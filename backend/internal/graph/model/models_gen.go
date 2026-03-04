@@ -8,7 +8,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/aerogram-org/aerogram-api/internal/models"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
 )
 
 type AuthPayload struct {

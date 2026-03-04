@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aerogram-org/aerogram-api/internal/config"
-	"github.com/aerogram-org/aerogram-api/internal/models"
+	"github.com/tr1xdev/aerogram-messenger/internal/config"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc/metadata"
 	"gorm.io/gorm"

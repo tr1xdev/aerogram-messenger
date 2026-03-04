@@ -5,7 +5,7 @@ package user.v1;
 import "errors/v1/errors.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/user/v1";
+option go_package = "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1;userv1";
 
 service UserService {
   rpc UserInfo(UserInfoRequest) returns (UserInfoResponse);

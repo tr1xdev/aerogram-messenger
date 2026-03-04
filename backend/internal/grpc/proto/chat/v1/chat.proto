@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package chat.v1;
 
-option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1;chatpb";
+option go_package = "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1;chatv1";
 
 service ChatService {
   rpc CreateChat(CreateChatRequest) returns (CreateChatResponse);

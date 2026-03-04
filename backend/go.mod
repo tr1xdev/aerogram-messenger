@@ -1,4 +1,4 @@
-module github.com/aerogram-org/aerogram-api
+module github.com/tr1xdev/aerogram-messenger
 
 go 1.25.5
 

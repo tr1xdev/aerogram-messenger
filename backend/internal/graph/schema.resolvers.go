@@ -12,12 +12,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aerogram-org/aerogram-api/internal/graph/model"
-	authpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/auth/v1"
-	chatpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1"
-	messagespb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/messages/v1"
-	"github.com/aerogram-org/aerogram-api/internal/middleware"
-	"github.com/aerogram-org/aerogram-api/internal/models"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
+	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
 )
 
 // ChatID is the resolver for the chatId field.

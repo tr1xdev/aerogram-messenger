@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: chat/v1/chat.proto
 
-package chatpb
+package chatv1
 
 import (
 	context "context"

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package auth.v1;
 
-option go_package = "github.com/aerogram-org/aerogram-api/internal/grpc/gen/auth/v1";
+option go_package = "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1;authv1";
 
 service AuthService {
   rpc SignUp(SignUpRequest) returns (SignUpResponse);

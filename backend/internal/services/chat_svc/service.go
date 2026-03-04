@@ -3,8 +3,8 @@ package chat_svc
 import (
 	"context"
 
-	chatpb "github.com/aerogram-org/aerogram-api/internal/grpc/gen/chat/v1"
-	"github.com/aerogram-org/aerogram-api/internal/models"
+	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

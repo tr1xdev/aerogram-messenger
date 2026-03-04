@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: errors/v1/errors.proto
 
-package v1
+package errorsv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -134,7 +134,7 @@ const file_errors_v1_errors_proto_rawDesc = "" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ERROR_CODE_NOT_FOUND\x10\x01\x12\x1b\n" +
-	"\x17ERROR_CODE_UNAUTHORIZED\x10\x02BBZ@github.com/aerogram-org/aerogram-api/internal/grpc/gen/errors/v1b\x06proto3"
+	"\x17ERROR_CODE_UNAUTHORIZED\x10\x02BLZJgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/errors/v1;errorsv1b\x06proto3"
 
 var (
 	file_errors_v1_errors_proto_rawDescOnce sync.Once
