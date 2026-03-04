@@ -39,11 +39,6 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Go and Node.js workspace file
-go.work
-go.work.sum
-go.sum
-
 # Node.js frontend
 frontend/node_modules
 
