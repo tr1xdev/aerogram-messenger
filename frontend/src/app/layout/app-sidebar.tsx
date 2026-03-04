@@ -11,13 +11,13 @@ import {
   SidebarMenu,
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NewChatDialog } from "@/features/chat/ui/new-chat-dialog";
 import { ChatMenuItem } from "@/features/chat/ui/chat-menu-item";
 import { SettingsDialog } from "@/features/settings/ui/settings-dialog";
 import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
 import { useConnectionStore } from "@/store/connection";
 import type { Chat } from "@/entities/chat/model/types";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export function AppSidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -31,7 +31,10 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar collapsible="none" className="w-full border-r bg-background">
+      <Sidebar
+        collapsible="none"
+        className="w-full border-none bg-background shadow-none"
+      >
         <SidebarHeader className="px-4 pt-5 pb-2">
           <div className="flex items-center justify-between h-8 relative">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -43,7 +46,9 @@ export function AppSidebar() {
                   </span>
                 </div>
               ) : (
-                <h1 className="text-[17px] font-bold tracking-tight">Chats</h1>
+                <h1 className="text-[17px] font-bold tracking-tight text-foreground">
+                  Chats
+                </h1>
               )}
             </div>
             <div className="flex-1 flex justify-end z-10">
@@ -87,7 +92,7 @@ export function AppSidebar() {
 
         <SidebarFooter
           onClick={() => setSettingsOpen(true)}
-          className="p-4 border-t bg-muted/5 hover:bg-muted/20 transition-colors cursor-pointer"
+          className="p-4 border-t border-border/40 bg-muted/5 hover:bg-muted/10 transition-colors cursor-pointer"
         >
           {user ? (
             <div className="flex items-center gap-3">
