@@ -3,7 +3,7 @@ package models
 import "time"
 
 type RefreshToken struct {
-	ID        string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID        string    `gorm:"primaryKey;size:36" json:"id"`
 	UserID    string    `gorm:"type:uuid;not null" json:"user_id"`
 	Token     string    `gorm:"unique;not null" json:"token"`
 	Expiry    time.Time `gorm:"not null" json:"expiry"`

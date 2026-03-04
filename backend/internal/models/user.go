@@ -7,21 +7,21 @@ import (
 )
 
 type User struct {
-	ID                 string `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Username           string `gorm:"type:varchar(16);uniqueIndex"`
-	FirstName          string `gorm:"type:varchar(50);not null"`
-	LastName           string `gorm:"type:varchar(50)"`
-	Email              string `gorm:"type:varchar(255);uniqueIndex;not null"`
-	Password           string `gorm:"type:text;not null"`
-	Status             string `gorm:"type:varchar(20);default:'OFFLINE'"`
-	IsPremium          bool   `gorm:"type:bool;not null"`
-	IsEmailVerified    bool   `gorm:"type:bool;default:false"`
-	VerificationToken  string `gorm:"type:text"`
+	ID                 string  `gorm:"primaryKey;size:36"`
+	Username           *string `gorm:"size:16;uniqueIndex"`
+	FirstName          string  `gorm:"size:50;not null"`
+	LastName           *string `gorm:"size:50"`
+	Email              string  `gorm:"size:255;uniqueIndex;not null"`
+	Password           string  `gorm:"not null"`
+	Status             string  `gorm:"size:20;default:'OFFLINE'"`
+	IsPremium          bool    `gorm:"not null;default:false"`
+	IsEmailVerified    bool    `gorm:"default:false"`
+	VerificationToken  string
 	VerificationExpiry time.Time
-	PublicKey          *string        `gorm:"type:text"`
-	EncryptedPrivKey   *string        `gorm:"type:text"`
-	EncryptionIv       *string        `gorm:"type:text"`
-	CreatedAt          time.Time      `gorm:"autoCreateTime"`
-	UpdatedAt          time.Time      `gorm:"autoUpdateTime"`
+	PublicKey          *string
+	EncryptedPrivKey   *string
+	EncryptionIv       *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }

@@ -98,3 +98,13 @@ type MessageAction struct {
 	ActionType int16     `gorm:"not null;index"`
 	CreatedAt  time.Time `gorm:"autoCreateTime"`
 }
+
+type DialogSettings struct {
+	DialogID            string    `gorm:"type:uuid;primaryKey"`
+	Permissions         uint64    `gorm:"default:0"`
+	SlowModeDelay       int       `gorm:"default:0"`
+	IsHistoryHidden     bool      `gorm:"default:false"`
+	IsSignaturesEnabled bool      `gorm:"default:false"`
+	CreatedAt           time.Time `gorm:"autoCreateTime"`
+	UpdatedAt           time.Time `gorm:"autoUpdateTime"`
+}
