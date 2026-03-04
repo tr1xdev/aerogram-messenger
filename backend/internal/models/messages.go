@@ -27,7 +27,7 @@ const (
 )
 
 type Message struct {
-	ID            string         `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID            string         `gorm:"type:uuid;primaryKey"`
 	DialogID      string         `gorm:"type:uuid;not null;index:idx_dialog_seq"`
 	AuthorID      string         `gorm:"type:uuid;not null;index"`
 	Content       string         `gorm:"type:text;not null"`
@@ -48,7 +48,7 @@ type Message struct {
 }
 
 type Dialog struct {
-	ID              string         `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID              string         `gorm:"type:uuid;primaryKey"`
 	Type            DialogType     `gorm:"type:varchar(20);not null;index"`
 	Name            *string        `gorm:"type:varchar(255);index"`
 	Username        *string        `gorm:"type:varchar(32);uniqueIndex:,where:username IS NOT NULL"`
@@ -84,25 +84,15 @@ type DialogMember struct {
 }
 
 type MessageRevision struct {
-	ID        string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID        string    `gorm:"type:uuid;primaryKey"`
 	MessageID string    `gorm:"type:uuid;not null;index"`
 	OldText   string    `gorm:"type:text;not null"`
 	EditorID  string    `gorm:"type:uuid;not null;index"`
 	CreatedAt time.Time `gorm:"autoCreateTime;index"`
 }
 
-type DialogSettings struct {
-	DialogID            string    `gorm:"type:uuid;primaryKey"`
-	Permissions         uint64    `gorm:"default:0"`
-	SlowModeDelay       int       `gorm:"default:0"`
-	IsHistoryHidden     bool      `gorm:"default:false"`
-	IsSignaturesEnabled bool      `gorm:"default:false"`
-	CreatedAt           time.Time `gorm:"autoCreateTime"`
-	UpdatedAt           time.Time `gorm:"autoUpdateTime"`
-}
-
 type MessageAction struct {
-	ID         string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID         string    `gorm:"type:uuid;primaryKey"`
 	MessageID  string    `gorm:"type:uuid;not null;index"`
 	UserID     string    `gorm:"type:uuid;not null;index"`
 	ActionType int16     `gorm:"not null;index"`
