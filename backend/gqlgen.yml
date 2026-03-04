@@ -34,6 +34,10 @@ models:
       fields:
          status:
             resolver: true
+         encryptedPrivKey:
+            resolver: true
+         encryptionIv:
+            resolver: true
    Message:
       fields:
          sender:
