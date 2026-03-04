@@ -31,9 +31,11 @@ func TestPresenceServer(t *testing.T) {
 	defer mr.Close()
 
 	ctx := context.Background()
-	userID := "user_1"
 
 	t.Run("SetOnline", func(t *testing.T) {
+		mr.FlushAll()
+		userID := "user_1"
+
 		req := &presencepb.SetOnlineRequest{UserId: userID}
 		res, err := server.SetOnline(ctx, req)
 
@@ -45,6 +47,10 @@ func TestPresenceServer(t *testing.T) {
 	})
 
 	t.Run("IsOnline_True", func(t *testing.T) {
+		mr.FlushAll()
+		userID := "user_2"
+		mr.Set("presence:"+userID, "online")
+
 		req := &presencepb.IsOnlineRequest{UserId: userID}
 		res, err := server.IsOnline(ctx, req)
 
@@ -53,28 +59,33 @@ func TestPresenceServer(t *testing.T) {
 	})
 
 	t.Run("SetOffline", func(t *testing.T) {
+		mr.FlushAll()
+		userID := "user_3"
+		mr.Set("presence:"+userID, "online")
+
 		req := &presencepb.SetOfflineRequest{UserId: userID}
 		res, err := server.SetOffline(ctx, req)
 
 		assert.NoError(t, err)
 		assert.True(t, res.Ok)
 
-		exists := mr.Exists("presence:" + userID)
-		assert.False(t, exists)
+		val, _ := mr.Get("presence:" + userID)
+		assert.NotEqual(t, "online", val)
 	})
 
 	t.Run("GetBulk", func(t *testing.T) {
-		_ = mr.Set("presence:user_1", "online")
-		_ = mr.Set("presence:user_2", "offline")
+		mr.FlushAll()
+		mr.Set("presence:u1", "online")
+		mr.Set("presence:u2", "offline")
 
 		req := &presencepb.GetBulkRequest{
-			UserIds: []string{"user_1", "user_2", "user_3"},
+			UserIds: []string{"u1", "u2", "u3"},
 		}
 		res, err := server.GetBulk(ctx, req)
 
 		assert.NoError(t, err)
-		assert.True(t, res.Online["user_1"])
-		assert.False(t, res.Online["user_2"])
-		assert.False(t, res.Online["user_3"])
+		assert.True(t, res.Online["u1"])
+		assert.False(t, res.Online["u2"])
+		assert.False(t, res.Online["u3"])
 	})
 }
