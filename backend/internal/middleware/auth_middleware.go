@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tr1xdev/aerogram-messenger/internal/config"
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/tr1xdev/aerogram-messenger/internal/config"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"google.golang.org/grpc/metadata"
-	"gorm.io/gorm"
 )
 
 type contextKey string
@@ -39,21 +40,7 @@ func GetSessionID(ctx context.Context) string {
 	return ""
 }
 
-func GetIPAddress(ctx context.Context) string {
-	if ip, ok := ctx.Value(IPAddressKey).(string); ok {
-		return ip
-	}
-	return ""
-}
-
-func GetUserAgent(ctx context.Context) string {
-	if ua, ok := ctx.Value(UserAgentKey).(string); ok {
-		return ua
-	}
-	return ""
-}
-
-func AuthMiddleware(cfg *config.Config, db *gorm.DB) func(http.Handler) http.Handler {
+func AuthMiddleware(cfg *config.Config, db *database.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			secret := cfg.JWT.Secret
@@ -83,30 +70,32 @@ func AuthMiddleware(cfg *config.Config, db *gorm.DB) func(http.Handler) http.Han
 
 				if err == nil && token.Valid {
 					if claims, ok := token.Claims.(jwt.MapClaims); ok {
-						userID, _ := claims["sub"].(string)
-						sessionID, _ := claims["sid"].(string)
+						userIDStr, _ := claims["sub"].(string)
+						sessionIDStr, _ := claims["sid"].(string)
 
-						if userID != "" && sessionID != "" {
-							var exists bool
-							err := db.Model(&models.Session{}).
-								Select("count(*) > 0").
-								Where("id = ? AND user_id = ? AND is_active = ?", sessionID, userID, true).
-								Find(&exists).Error
+						if userIDStr != "" && sessionIDStr != "" {
+							uid, _ := uuid.Parse(userIDStr)
+							sid, _ := uuid.Parse(sessionIDStr)
 
-							if err != nil || !exists {
+							_, err := db.Queries.GetActiveSession(ctx, dbgen.GetActiveSessionParams{
+								ID:     sid,
+								UserID: uid,
+							})
+
+							if err != nil {
 								w.Header().Set("Content-Type", "application/json")
 								w.WriteHeader(http.StatusUnauthorized)
-								fmt.Fprint(w, `{"errors": [{"message": "Session terminated", "extensions": {"code": "UNAUTHENTICATED"}}]}`)
+								fmt.Fprint(w, `{"errors": [{"message": "Session terminated"}]}`)
 								return
 							}
 
-							ctx = context.WithValue(ctx, AuthUserIDKey, userID)
-							ctx = context.WithValue(ctx, AuthSessionIDKey, sessionID)
+							ctx = context.WithValue(ctx, AuthUserIDKey, userIDStr)
+							ctx = context.WithValue(ctx, AuthSessionIDKey, sessionIDStr)
 							ctx = context.WithValue(ctx, AuthTokenKey, tokenString)
 
 							md := metadata.Pairs(
-								"user-id", userID,
-								"session-id", sessionID,
+								"user-id", userIDStr,
+								"session-id", sessionIDStr,
 								"ip-address", ip,
 								"user-agent", r.Header.Get("User-Agent"),
 							)

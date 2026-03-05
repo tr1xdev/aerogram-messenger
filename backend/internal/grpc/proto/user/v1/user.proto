@@ -11,6 +11,7 @@ service UserService {
   rpc UserInfo(UserInfoRequest) returns (UserInfoResponse);
   rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
 }
 
 message GetUsersRequest {
@@ -18,6 +19,15 @@ message GetUsersRequest {
 }
 
 message GetUsersResponse {
+  repeated User users = 1;
+}
+
+message SearchUsersRequest {
+  string query = 1;
+  bool global = 2;
+}
+
+message SearchUsersResponse {
   repeated User users = 1;
 }
 

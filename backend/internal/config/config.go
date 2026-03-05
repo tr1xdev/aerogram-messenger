@@ -115,6 +115,7 @@ func Load() (*Config, error) {
 	cfg.Database.Postgres.Password = os.Getenv("POSTGRES_PASSWORD")
 	cfg.Database.Redis.Password = os.Getenv("REDIS_PASSWORD")
 	cfg.JWT.Secret = os.Getenv("JWT_SECRET")
+
 	cfg.Resend.Token = os.Getenv("RESEND_TOKEN")
 	cfg.Resend.From = viper.GetString("resend.from")
 
