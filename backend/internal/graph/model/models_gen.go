@@ -73,8 +73,9 @@ type UpdateUserInput struct {
 }
 
 type UserStatusPayload struct {
-	UserID string `json:"userId"`
-	Status string `json:"status"`
+	UserID   string  `json:"userId"`
+	Status   string  `json:"status"`
+	LastSeen *string `json:"lastSeen,omitempty"`
 }
 
 type VerifyEmailInput struct {

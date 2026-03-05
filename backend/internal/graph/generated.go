@@ -78,7 +78,7 @@ type ComplexityRoot struct {
 
 	Message struct {
 		ChatID        func(childComplexity int) int
-		EncryptionIV  func(childComplexity int) int
+		EncryptionIv  func(childComplexity int) int
 		ForwardedFrom func(childComplexity int) int
 		ID            func(childComplexity int) int
 		IsEdited      func(childComplexity int) int
@@ -154,8 +154,9 @@ type ComplexityRoot struct {
 	}
 
 	UserStatusPayload struct {
-		Status func(childComplexity int) int
-		UserID func(childComplexity int) int
+		LastSeen func(childComplexity int) int
+		Status   func(childComplexity int) int
+		UserID   func(childComplexity int) int
 	}
 
 	VerifyEmailPayload struct {
@@ -165,6 +166,7 @@ type ComplexityRoot struct {
 }
 
 type MessageResolver interface {
+	ID(ctx context.Context, obj *models.Message) (string, error)
 	ChatID(ctx context.Context, obj *models.Message) (string, error)
 	Sender(ctx context.Context, obj *models.Message) (*models.User, error)
 	Text(ctx context.Context, obj *models.Message) (string, error)
@@ -215,6 +217,8 @@ type SubscriptionResolver interface {
 	DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
 }
 type UserResolver interface {
+	ID(ctx context.Context, obj *models.User) (string, error)
+
 	Status(ctx context.Context, obj *models.User) (string, error)
 }
 
@@ -337,11 +341,11 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Message.ChatID(childComplexity), true
 	case "Message.encryptionIv":
-		if e.complexity.Message.EncryptionIV == nil {
+		if e.complexity.Message.EncryptionIv == nil {
 			break
 		}
 
-		return e.complexity.Message.EncryptionIV(childComplexity), true
+		return e.complexity.Message.EncryptionIv(childComplexity), true
 	case "Message.forwardedFrom":
 		if e.complexity.Message.ForwardedFrom == nil {
 			break
@@ -783,6 +787,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.User.Username(childComplexity), true
 
+	case "UserStatusPayload.lastSeen":
+		if e.complexity.UserStatusPayload.LastSeen == nil {
+			break
+		}
+
+		return e.complexity.UserStatusPayload.LastSeen(childComplexity), true
 	case "UserStatusPayload.status":
 		if e.complexity.UserStatusPayload.Status == nil {
 			break
@@ -1840,7 +1850,7 @@ func (ec *executionContext) _Message_id(ctx context.Context, field graphql.Colle
 		field,
 		ec.fieldContext_Message_id,
 		func(ctx context.Context) (any, error) {
-			return obj.ID, nil
+			return ec.resolvers.Message().ID(ctx, obj)
 		},
 		nil,
 		ec.marshalNID2string,
@@ -1853,8 +1863,8 @@ func (ec *executionContext) fieldContext_Message_id(_ context.Context, field gra
 	fc = &graphql.FieldContext{
 		Object:     "Message",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ID does not have child fields")
 		},
@@ -2092,7 +2102,7 @@ func (ec *executionContext) _Message_encryptionIv(ctx context.Context, field gra
 		field,
 		ec.fieldContext_Message_encryptionIv,
 		func(ctx context.Context) (any, error) {
-			return obj.EncryptionIV, nil
+			return obj.EncryptionIv, nil
 		},
 		nil,
 		ec.marshalOString2ᚖstring,
@@ -3887,6 +3897,8 @@ func (ec *executionContext) fieldContext_Subscription_userStatusChanged(ctx cont
 				return ec.fieldContext_UserStatusPayload_userId(ctx, field)
 			case "status":
 				return ec.fieldContext_UserStatusPayload_status(ctx, field)
+			case "lastSeen":
+				return ec.fieldContext_UserStatusPayload_lastSeen(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserStatusPayload", field.Name)
 		},
@@ -3961,7 +3973,7 @@ func (ec *executionContext) _User_id(ctx context.Context, field graphql.Collecte
 		field,
 		ec.fieldContext_User_id,
 		func(ctx context.Context) (any, error) {
-			return obj.ID, nil
+			return ec.resolvers.User().ID(ctx, obj)
 		},
 		nil,
 		ec.marshalNID2string,
@@ -3974,8 +3986,8 @@ func (ec *executionContext) fieldContext_User_id(_ context.Context, field graphq
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ID does not have child fields")
 		},
@@ -4261,6 +4273,35 @@ func (ec *executionContext) _UserStatusPayload_status(ctx context.Context, field
 }
 
 func (ec *executionContext) fieldContext_UserStatusPayload_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserStatusPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserStatusPayload_lastSeen(ctx context.Context, field graphql.CollectedField, obj *model.UserStatusPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserStatusPayload_lastSeen,
+		func(ctx context.Context) (any, error) {
+			return obj.LastSeen, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserStatusPayload_lastSeen(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "UserStatusPayload",
 		Field:      field,
@@ -6144,10 +6185,41 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Message")
 		case "id":
-			out.Values[i] = ec._Message_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "chatId":
 			field := field
 
@@ -7053,10 +7125,41 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("User")
 		case "id":
-			out.Values[i] = ec._User_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "email":
 			out.Values[i] = ec._User_email(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -7157,6 +7260,8 @@ func (ec *executionContext) _UserStatusPayload(ctx context.Context, sel ast.Sele
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "lastSeen":
+			out.Values[i] = ec._UserStatusPayload_lastSeen(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

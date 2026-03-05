@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"github.com/redis/go-redis/v9"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
@@ -8,12 +10,10 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/geo_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/ua_svc"
-	"github.com/redis/go-redis/v9"
-	"gorm.io/gorm"
 )
 
 type Resolver struct {
-	db             *gorm.DB
+	db             *database.DB
 	userRepo       *repositories.UserRepository
 	presenceRepo   *repositories.PresenceRepository
 	authClient     authpb.AuthServiceClient
@@ -26,7 +26,7 @@ type Resolver struct {
 }
 
 func NewResolver(
-	db *gorm.DB,
+	db *database.DB,
 	userRepo *repositories.UserRepository,
 	authClient authpb.AuthServiceClient,
 	chatClient chatpb.ChatServiceClient,

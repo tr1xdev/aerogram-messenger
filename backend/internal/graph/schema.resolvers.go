@@ -10,24 +10,34 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
-	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
-	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
-	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	authv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
+	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 )
+
+// ID is the resolver for the id field.
+func (r *messageResolver) ID(ctx context.Context, obj *models.Message) (string, error) {
+	return obj.ID.String(), nil
+}
 
 // ChatID is the resolver for the chatId field.
 func (r *messageResolver) ChatID(ctx context.Context, obj *models.Message) (string, error) {
-	return obj.DialogID, nil
+	return obj.DialogID.String(), nil
 }
 
 // Sender is the resolver for the sender field.
 func (r *messageResolver) Sender(ctx context.Context, obj *models.Message) (*models.User, error) {
-	return LoadUser(ctx, obj.AuthorID)
+	return LoadUser(ctx, obj.AuthorID.String())
 }
 
 // Text is the resolver for the text field.
@@ -50,50 +60,63 @@ func (r *messageResolver) Sequence(ctx context.Context, obj *models.Message) (in
 
 // ReplyTo is the resolver for the replyTo field.
 func (r *messageResolver) ReplyTo(ctx context.Context, obj *models.Message) (*models.Message, error) {
-	if obj.ReplyToID == nil || *obj.ReplyToID == "" {
+	if obj.ReplyToID == nil || *obj.ReplyToID == uuid.Nil {
 		return nil, nil
 	}
-	var msg models.Message
-	if err := r.db.First(&msg, "id = ?", *obj.ReplyToID).Error; err != nil {
+	m, err := r.db.Queries.GetMessageByID(ctx, *obj.ReplyToID)
+	if err != nil {
 		return nil, nil
 	}
-	return &msg, nil
+	return &models.Message{
+		ID:        m.ID,
+		DialogID:  m.DialogID,
+		AuthorID:  m.AuthorID,
+		Content:   m.Content,
+		CreatedAt: m.CreatedAt,
+		Sequence:  m.Sequence,
+	}, nil
 }
 
 // ForwardedFrom is the resolver for the forwardedFrom field.
 func (r *messageResolver) ForwardedFrom(ctx context.Context, obj *models.Message) (*models.Message, error) {
-	if obj.ForwardFromID == nil || *obj.ForwardFromID == "" {
+	if obj.ForwardFromID == nil || *obj.ForwardFromID == uuid.Nil {
 		return nil, nil
 	}
-	var msg models.Message
-	if err := r.db.First(&msg, "id = ?", *obj.ForwardFromID).Error; err != nil {
+	m, err := r.db.Queries.GetMessageByID(ctx, *obj.ForwardFromID)
+	if err != nil {
 		return nil, nil
 	}
-	return &msg, nil
+	return &models.Message{
+		ID:        m.ID,
+		DialogID:  m.DialogID,
+		AuthorID:  m.AuthorID,
+		Content:   m.Content,
+		CreatedAt: m.CreatedAt,
+		Sequence:  m.Sequence,
+	}, nil
 }
 
 // TerminateAllOtherSessions is the resolver for the terminateAllOtherSessions field.
 func (r *mutationResolver) TerminateAllOtherSessions(ctx context.Context) (bool, error) {
-	userID := middleware.GetUserID(ctx)
-	currentSessionID := middleware.GetSessionID(ctx)
-	if userID == "" {
+	userIDStr := middleware.GetUserID(ctx)
+	sessionIDStr := middleware.GetSessionID(ctx)
+	if userIDStr == "" {
 		return false, fmt.Errorf("unauthorized")
 	}
 
-	var sessionIDs []string
-	r.db.Model(&models.Session{}).
-		Where("user_id = ? AND id != ? AND is_active = ?", userID, currentSessionID, true).
-		Pluck("id", &sessionIDs)
+	uid, _ := uuid.Parse(userIDStr)
+	sid, _ := uuid.Parse(sessionIDStr)
 
-	err := r.db.Model(&models.Session{}).
-		Where("user_id = ? AND id != ?", userID, currentSessionID).
-		Update("is_active", false).Error
+	sessions, err := r.db.Queries.GetSessionsByUserID(ctx, uid)
 	if err != nil {
 		return false, err
 	}
 
-	for _, sid := range sessionIDs {
-		r.redisClient.Publish(ctx, "kill:session:"+sid, "terminated")
+	for _, s := range sessions {
+		if s.ID != sid {
+			r.db.Queries.DeactivateSession(ctx, s.ID)
+			r.redisClient.Publish(ctx, "kill:session:"+s.ID.String(), "terminated")
+		}
 	}
 
 	return true, nil
@@ -101,41 +124,49 @@ func (r *mutationResolver) TerminateAllOtherSessions(ctx context.Context) (bool,
 
 // SignUp is the resolver for the signUp field.
 func (r *mutationResolver) SignUp(ctx context.Context, input model.SignUpInput) (*model.AuthPayload, error) {
-	req := &authpb.SignUpRequest{
+	req := &authv1.SignUpRequest{
 		Email:     input.Email,
 		FirstName: input.FirstName,
 		Password:  input.Password,
 		LastName:  input.LastName,
 		Username:  input.Username,
 	}
+
 	resp, err := r.authClient.SignUp(ctx, req)
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
-	return &model.AuthPayload{UserID: &resp.UserId}, nil
+
+	return &model.AuthPayload{
+		UserID: &resp.UserId,
+	}, nil
 }
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error) {
-	resp, err := r.authClient.Login(ctx, &authpb.LoginRequest{
+	resp, err := r.authClient.Login(ctx, &authv1.LoginRequest{
 		Email:    input.Email,
 		Password: input.Password,
 	})
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
-	return &model.AuthPayload{UserID: &resp.UserId}, nil
+
+	return &model.AuthPayload{
+		UserID: &resp.UserId,
+	}, nil
 }
 
 // VerifyEmail is the resolver for the verifyEmail field.
 func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (*model.VerifyEmailPayload, error) {
-	resp, err := r.authClient.VerifyEmail(ctx, &authpb.VerifyEmailRequest{
+	resp, err := r.authClient.VerifyEmail(ctx, &authv1.VerifyEmailRequest{
 		UserId: input.UserID,
 		Code:   input.Code,
 	})
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
+
 	return &model.VerifyEmailPayload{
 		AccessToken:  resp.AccessToken,
 		RefreshToken: resp.RefreshToken,
@@ -148,40 +179,36 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input model.UpdateUse
 	if authID == "" {
 		return nil, errors.New("unauthorized access")
 	}
-
-	updates := make(map[string]interface{})
-	if input.FirstName != nil {
-		updates["first_name"] = *input.FirstName
-	}
-	if input.LastName != nil {
-		updates["last_name"] = *input.LastName
-	}
-	if input.Username != nil {
-		updates["username"] = *input.Username
-	}
-	if input.PublicKey != nil {
-		updates["public_key"] = *input.PublicKey
-	}
-	if input.EncryptedPrivKey != nil {
-		updates["encrypted_priv_key"] = *input.EncryptedPrivKey
-	}
-	if input.EncryptionIv != nil {
-		updates["encryption_iv"] = *input.EncryptionIv
+	uid, err := uuid.Parse(authID)
+	if err != nil {
+		return nil, errors.New("invalid user id")
 	}
 
-	if len(updates) == 0 {
-		return r.userRepo.GetByID(authID)
+	_, err = r.userRepo.Update(ctx, dbgen.UpdateUserParams{
+		ID:               uid,
+		FirstName:        database.ToNullString(input.FirstName),
+		LastName:         database.ToNullString(input.LastName),
+		Username:         database.ToNullString(input.Username),
+		PublicKey:        database.ToNullString(input.PublicKey),
+		EncryptedPrivKey: database.ToNullString(input.EncryptedPrivKey),
+		EncryptionIv:     database.ToNullString(input.EncryptionIv),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update profile: %w", err)
 	}
 
-	return r.userRepo.UpdateProfile(authID, updates)
+	return LoadUser(ctx, authID)
 }
 
 // RefreshToken is the resolver for the refreshToken field.
 func (r *mutationResolver) RefreshToken(ctx context.Context, token string) (*model.VerifyEmailPayload, error) {
-	resp, err := r.authClient.RefreshToken(ctx, &authpb.RefreshTokenRequest{RefreshToken: token})
+	resp, err := r.authClient.RefreshToken(ctx, &authv1.RefreshTokenRequest{
+		RefreshToken: token,
+	})
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
+
 	return &model.VerifyEmailPayload{
 		AccessToken:  resp.AccessToken,
 		RefreshToken: resp.RefreshToken,
@@ -194,17 +221,21 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 	if authID == "" {
 		return nil, errors.New("unauthorized access")
 	}
-	req := &chatpb.CreateChatRequest{
-		Type:           chatpb.ChatType(chatpb.ChatType_value["CHAT_TYPE_"+string(typeArg)]),
+
+	enumKey := "CHAT_TYPE_" + strings.ToUpper(string(typeArg))
+	req := &chatv1.CreateChatRequest{
+		Type:           chatv1.ChatType(chatv1.ChatType_value[enumKey]),
 		ParticipantIds: participantIds,
 		CreatorId:      authID,
 		Title:          title,
 		Slug:           slug,
 	}
+
 	resp, err := r.chatClient.CreateChat(ctx, req)
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
+
 	return r.enrichChat(ctx, authID, resp.Chat)
 }
 
@@ -214,7 +245,8 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	if authID == "" {
 		return nil, errors.New("unauthorized")
 	}
-	resp, err := r.messagesClient.SendMessage(ctx, &messagespb.SendMessageRequest{
+
+	resp, err := r.messagesClient.SendMessage(ctx, &messagesv1.SendMessageRequest{
 		ChatId:       chatID,
 		SenderId:     authID,
 		Text:         text,
@@ -225,26 +257,44 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
-	sentAt, _ := time.Parse(time.RFC3339, resp.Message.SentAt)
-	msg := &models.Message{
-		ID:           resp.Message.Id,
-		DialogID:     resp.Message.ChatId,
-		AuthorID:     resp.Message.SenderId,
-		Content:      resp.Message.Text,
-		CreatedAt:    sentAt,
-		Sequence:     resp.Message.Sequence,
-		IsEncrypted:  resp.Message.IsEncrypted,
-		EncryptionIV: resp.Message.EncryptionIv,
+
+	sentAt, err := time.Parse(time.RFC3339, resp.Message.SentAt)
+	if err != nil {
+		sentAt = time.Now()
 	}
+
+	msg := &models.Message{
+		ID:           uuid.MustParse(resp.Message.Id),
+		DialogID:     uuid.MustParse(resp.Message.ChatId),
+		AuthorID:     uuid.MustParse(resp.Message.SenderId),
+		Content:      resp.Message.Text,
+		IsEncrypted:  resp.Message.IsEncrypted,
+		EncryptionIv: resp.Message.EncryptionIv,
+		Sequence:     resp.Message.Sequence,
+		CreatedAt:    sentAt,
+		UpdatedAt:    sentAt,
+		IsEdited:     false,
+	}
+
+	if replyToID != nil {
+		parsed, _ := uuid.Parse(*replyToID)
+		msg.ReplyToID = &parsed
+	}
+
 	payload, _ := json.Marshal(msg)
 	r.redisClient.Publish(ctx, "chat:"+chatID, payload)
+
 	return msg, nil
 }
 
 // UpdateMessage is the resolver for the updateMessage field.
 func (r *mutationResolver) UpdateMessage(ctx context.Context, id string, text string) (*models.Message, error) {
 	authID := middleware.GetUserID(ctx)
-	resp, err := r.messagesClient.UpdateMessage(ctx, &messagespb.UpdateMessageRequest{
+	if authID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	resp, err := r.messagesClient.UpdateMessage(ctx, &messagesv1.UpdateMessageRequest{
 		Id:       id,
 		SenderId: authID,
 		Text:     text,
@@ -252,35 +302,52 @@ func (r *mutationResolver) UpdateMessage(ctx context.Context, id string, text st
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
+
 	sentAt, _ := time.Parse(time.RFC3339, resp.Message.SentAt)
-	return &models.Message{
-		ID:        resp.Message.Id,
+
+	msg := &models.Message{
+		ID:        uuid.MustParse(resp.Message.Id),
 		Content:   resp.Message.Text,
-		AuthorID:  resp.Message.SenderId,
-		DialogID:  resp.Message.ChatId,
+		AuthorID:  uuid.MustParse(resp.Message.SenderId),
+		DialogID:  uuid.MustParse(resp.Message.ChatId),
 		CreatedAt: sentAt,
+		UpdatedAt: time.Now(),
 		Sequence:  resp.Message.Sequence,
 		IsEdited:  true,
-	}, nil
+	}
+
+	payload, _ := json.Marshal(msg)
+	r.redisClient.Publish(ctx, "chat:"+resp.Message.ChatId, payload)
+
+	return msg, nil
 }
 
 // DeleteMessage is the resolver for the deleteMessage field.
 func (r *mutationResolver) DeleteMessage(ctx context.Context, id string) (bool, error) {
 	authID := middleware.GetUserID(ctx)
-	resp, err := r.messagesClient.DeleteMessage(ctx, &messagespb.DeleteMessageRequest{
+	if authID == "" {
+		return false, errors.New("unauthorized")
+	}
+
+	resp, err := r.messagesClient.DeleteMessage(ctx, &messagesv1.DeleteMessageRequest{
 		Id:       id,
 		SenderId: authID,
 	})
 	if err != nil {
 		return false, mapGRPCError(err)
 	}
+
 	return resp.Success, nil
 }
 
 // PinChat is the resolver for the pinChat field.
 func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) (bool, error) {
 	authID := middleware.GetUserID(ctx)
-	resp, err := r.chatClient.PinChat(ctx, &chatpb.PinChatRequest{
+	if authID == "" {
+		return false, errors.New("unauthorized")
+	}
+
+	resp, err := r.chatClient.PinChat(ctx, &chatv1.PinChatRequest{
 		ChatId: id,
 		UserId: authID,
 		Pinned: pinned,
@@ -288,6 +355,7 @@ func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) 
 	if err != nil {
 		return false, mapGRPCError(err)
 	}
+
 	return resp.Success, nil
 }
 
@@ -295,89 +363,108 @@ func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) 
 func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) (*model.Chat, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
-		return nil, errors.New("unauthorized access")
+		return nil, errors.New("unauthorized")
 	}
 	if authID == userID {
 		return nil, errors.New("cannot create chat with yourself")
 	}
-	req := &chatpb.CreateChatRequest{
-		Type:           chatpb.ChatType_CHAT_TYPE_PRIVATE,
+
+	req := &chatv1.CreateChatRequest{
+		Type:           chatv1.ChatType_CHAT_TYPE_PRIVATE,
 		ParticipantIds: []string{authID, userID},
 		CreatorId:      authID,
 	}
+
 	resp, err := r.chatClient.CreateChat(ctx, req)
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
+
 	return r.enrichChat(ctx, authID, resp.Chat)
 }
 
 // SendTypingEvent is the resolver for the sendTypingEvent field.
 func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string) (bool, error) {
 	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return false, nil
+	}
+
 	payload := map[string]interface{}{
 		"userId": authID,
 		"status": "typing",
+		"chatId": chatID,
 	}
 	data, _ := json.Marshal(payload)
 	r.redisClient.Publish(ctx, "presence:updates", data)
+
 	return true, nil
 }
 
 // MarkDialogAsRead is the resolver for the markDialogAsRead field.
 func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error) {
-	userID := middleware.GetUserID(ctx)
-	if userID == "" {
+	userIDStr := middleware.GetUserID(ctx)
+	if userIDStr == "" {
 		return false, errors.New("unauthorized")
 	}
-	res := r.db.Model(&models.DialogMember{}).
-		Where("dialog_id = ? AND user_id = ? AND last_read_sequence < ?", chatID, userID, lastSequence).
-		Update("last_read_sequence", lastSequence)
-	if res.Error != nil {
-		return false, res.Error
+
+	cid, errC := uuid.Parse(chatID)
+	uid, errU := uuid.Parse(userIDStr)
+	if errC != nil || errU != nil {
+		return false, errors.New("invalid identifiers")
 	}
-	if res.RowsAffected > 0 {
-		payload := model.ReadPayload{
-			ChatID:       chatID,
-			UserID:       userID,
-			LastSequence: lastSequence,
-		}
-		data, _ := json.Marshal(payload)
-		r.redisClient.Publish(ctx, "dialog_read:"+chatID, data)
+
+	err := r.db.Queries.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
+		DialogID:         cid,
+		UserID:           uid,
+		LastReadSequence: lastSequence,
+	})
+	if err != nil {
+		return false, err
 	}
+
+	payload := model.ReadPayload{
+		ChatID:       chatID,
+		UserID:       userIDStr,
+		LastSequence: lastSequence,
+	}
+	data, _ := json.Marshal(payload)
+	r.redisClient.Publish(ctx, "dialog_read:"+chatID, data)
+
 	return true, nil
 }
 
 // TerminateSession is the resolver for the terminateSession field.
 func (r *mutationResolver) TerminateSession(ctx context.Context, id string) (bool, error) {
-	userID, ok := ctx.Value(middleware.AuthUserIDKey).(string)
-	if !ok {
+	userIDStr := middleware.GetUserID(ctx)
+	if userIDStr == "" {
 		return false, fmt.Errorf("unauthorized")
 	}
 
-	err := r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Session{}).Error
+	sid, _ := uuid.Parse(id)
+
+	err := r.db.Queries.DeactivateSession(ctx, sid)
 	if err != nil {
 		return false, err
 	}
 
+	r.redisClient.Publish(ctx, "kill:session:"+id, "terminated")
 	return true, nil
 }
 
 // Logout is the resolver for the logout field.
 func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
-	authID := middleware.GetUserID(ctx)
-	sessionID := middleware.GetSessionID(ctx)
-
-	if authID == "" || sessionID == "" {
+	sessionIDStr := middleware.GetSessionID(ctx)
+	if sessionIDStr == "" {
 		return false, errors.New("no active session found")
 	}
 
-	if err := r.userRepo.TerminateSession(sessionID); err != nil {
+	sid, _ := uuid.Parse(sessionIDStr)
+	if err := r.db.Queries.DeactivateSession(ctx, sid); err != nil {
 		return false, err
 	}
 
-	r.redisClient.Publish(ctx, "kill:session:"+sessionID, "terminated")
-
+	r.redisClient.Publish(ctx, "kill:session:"+sessionIDStr, "terminated")
 	return true, nil
 }
 
@@ -396,7 +483,25 @@ func (r *queryResolver) Sessions(ctx context.Context, userID string) ([]*models.
 	if authID != userID {
 		return nil, errors.New("permission denied")
 	}
-	return r.userRepo.GetSessions(userID)
+
+	uid, _ := uuid.Parse(userID)
+	dbSessions, err := r.db.Queries.GetSessionsByUserID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	sessions := make([]*models.Session, len(dbSessions))
+	for i, s := range dbSessions {
+		sessions[i] = &models.Session{
+			ID:        s.ID.String(),
+			UserID:    s.UserID.String(),
+			IPAddress: s.IpAddress,
+			Device:    s.Device,
+			CreatedAt: s.CreatedAt,
+			IsActive:  s.IsActive,
+		}
+	}
+	return sessions, nil
 }
 
 // MyChats is the resolver for the myChats field.
@@ -405,7 +510,7 @@ func (r *queryResolver) MyChats(ctx context.Context) ([]*model.Chat, error) {
 	if authID == "" {
 		return nil, errors.New("unauthorized access")
 	}
-	resp, err := r.chatClient.GetMyChats(ctx, &chatpb.GetMyChatsRequest{
+	resp, err := r.chatClient.GetMyChats(ctx, &chatv1.GetMyChatsRequest{
 		UserId: authID,
 	})
 	if err != nil {
@@ -428,7 +533,7 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (*mo
 	if authID == "" {
 		return nil, errors.New("unauthorized access")
 	}
-	resp, err := r.chatClient.GetChat(ctx, &chatpb.GetChatRequest{
+	resp, err := r.chatClient.GetChat(ctx, &chatv1.GetChatRequest{
 		ChatId: id,
 		Slug:   slug,
 		UserId: authID,
@@ -441,7 +546,7 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (*mo
 
 // MessageHistory is the resolver for the messageHistory field.
 func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit int, offset int) ([]*models.Message, error) {
-	resp, err := r.messagesClient.GetHistory(ctx, &messagespb.GetHistoryRequest{
+	resp, err := r.messagesClient.GetHistory(ctx, &messagesv1.GetHistoryRequest{
 		ChatId: chatID,
 		Limit:  int32(limit),
 		Offset: int32(offset),
@@ -452,16 +557,20 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 	var msgs []*models.Message
 	for _, m := range resp.Messages {
 		sentAt, _ := time.Parse(time.RFC3339, m.SentAt)
+		mID, _ := uuid.Parse(m.Id)
+		cID, _ := uuid.Parse(m.ChatId)
+		aID, _ := uuid.Parse(m.SenderId)
+
 		msgs = append(msgs, &models.Message{
-			ID:           m.Id,
-			DialogID:     m.ChatId,
-			AuthorID:     m.SenderId,
+			ID:           mID,
+			DialogID:     cID,
+			AuthorID:     aID,
 			Content:      m.Text,
 			CreatedAt:    sentAt,
 			Sequence:     m.Sequence,
 			IsEdited:     m.IsEdited,
 			IsEncrypted:  m.IsEncrypted,
-			EncryptionIV: m.EncryptionIv,
+			EncryptionIv: m.EncryptionIv,
 		})
 	}
 	return msgs, nil
@@ -472,20 +581,51 @@ func (r *queryResolver) SearchUsers(ctx context.Context, username string) ([]*mo
 	if len(username) < 3 {
 		return nil, errors.New("search query must be at least 3 characters")
 	}
-	return r.userRepo.SearchByUsername(username)
+
+	dbUsers, err := r.userRepo.SearchByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]*models.User, len(dbUsers))
+	for i, u := range dbUsers {
+		users[i] = &models.User{
+			ID:        u.ID,
+			Email:     u.Email,
+			FirstName: u.FirstName,
+			LastName:  nullStringToPointer(u.LastName),
+			Username:  nullStringToPointer(u.Username),
+		}
+	}
+	return users, nil
 }
 
 // DialogRead is the resolver for the dialogRead field.
 func (r *queryResolver) DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error) {
-	panic(fmt.Errorf("not implemented: DialogRead - dialogRead"))
+	cID, _ := uuid.Parse(chatID)
+	uID, _ := uuid.Parse(middleware.GetUserID(ctx))
+
+	member, err := r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: cID,
+		UserID:   uID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.ReadPayload{
+		ChatID:       chatID,
+		UserID:       uID.String(),
+		LastSequence: member.LastReadSequence,
+	}, nil
 }
 
 // Device is the resolver for the device field.
 func (r *sessionResolver) Device(ctx context.Context, obj *models.Session) (*string, error) {
 	if obj.Device == "" {
-		return StringPtr("Unknown Device"), nil
+		res := "Unknown Device"
+		return &res, nil
 	}
-
 	name := r.uaService.Parse(obj.Device)
 	return &name, nil
 }
@@ -493,9 +633,9 @@ func (r *sessionResolver) Device(ctx context.Context, obj *models.Session) (*str
 // Location is the resolver for the location field.
 func (r *sessionResolver) Location(ctx context.Context, obj *models.Session) (*string, error) {
 	if obj.IPAddress == "" || obj.IPAddress == "127.0.0.1" || obj.IPAddress == "::1" {
-		return StringPtr("Local Network"), nil
+		res := "Local Network"
+		return &res, nil
 	}
-
 	res := r.geoService.Lookup(obj.IPAddress)
 	return &res, nil
 }
@@ -518,17 +658,21 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 		return nil, errors.New("unauthorized")
 	}
 
-	var count int64
-	err := r.db.Model(&models.DialogMember{}).
-		Where("dialog_id = ? AND user_id = ?", chatID, authID).
-		Count(&count).Error
+	cID, err := uuid.Parse(chatID)
+	if err != nil {
+		return nil, errors.New("invalid chat id")
+	}
+	uID, _ := uuid.Parse(authID)
 
-	if err != nil || count == 0 {
+	_, err = r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: cID,
+		UserID:   uID,
+	})
+	if err != nil {
 		return nil, errors.New("forbidden")
 	}
 
 	msgChan := make(chan *models.Message, 1)
-
 	chatPubSub := r.redisClient.Subscribe(ctx, "chat:"+chatID)
 	killPubSub := r.redisClient.Subscribe(ctx, "kill:session:"+sessionID)
 
@@ -537,16 +681,13 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 		defer killPubSub.Close()
 		defer close(msgChan)
 
-		chatCh := chatPubSub.Channel()
-		killCh := killPubSub.Channel()
-
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-killCh:
+			case <-killPubSub.Channel():
 				return
-			case msg, ok := <-chatCh:
+			case msg, ok := <-chatPubSub.Channel():
 				if !ok {
 					return
 				}
@@ -554,6 +695,7 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 				if err := json.Unmarshal([]byte(msg.Payload), &m); err != nil {
 					continue
 				}
+
 				select {
 				case msgChan <- &m:
 				case <-ctx.Done():
@@ -570,48 +712,69 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 func (r *subscriptionResolver) UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error) {
 	statusChan := make(chan *model.UserStatusPayload, 1)
 	pubsub := r.redisClient.Subscribe(ctx, "presence:updates")
+
 	go func() {
 		defer pubsub.Close()
 		defer close(statusChan)
-		ch := pubsub.Channel()
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case msg, ok := <-ch:
-				if !ok || msg == nil {
+			case msg, ok := <-pubsub.Channel():
+				if !ok {
 					return
 				}
-				var p model.UserStatusPayload
-				if err := json.Unmarshal([]byte(msg.Payload), &p); err == nil {
-					select {
-					case statusChan <- &p:
-					case <-ctx.Done():
-						return
-					}
+
+				var p repositories.PresenceStatus
+				if err := json.Unmarshal([]byte(msg.Payload), &p); err != nil {
+					continue
+				}
+
+				if chatID != "" {
+					// ...
+				}
+
+				payload := &model.UserStatusPayload{
+					UserID: p.UserID.String(),
+					Status: p.Status,
+				}
+
+				if p.Status == "offline" && p.LastSeen != "" {
+					payload.LastSeen = &p.LastSeen
+				}
+
+				select {
+				case statusChan <- payload:
+				case <-ctx.Done():
+					return
 				}
 			}
 		}
 	}()
+
 	return statusChan, nil
 }
 
 // DialogRead is the resolver for the dialogRead field.
 func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
 	readChan := make(chan *model.ReadPayload, 1)
 	pubsub := r.redisClient.Subscribe(ctx, "dialog_read:"+chatID)
-	authID := middleware.GetUserID(ctx)
 
 	go func() {
 		defer pubsub.Close()
 		defer close(readChan)
 
-		ch := pubsub.Channel()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case msg, ok := <-ch:
+			case msg, ok := <-pubsub.Channel():
 				if !ok || msg == nil {
 					return
 				}
@@ -635,9 +798,14 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 	return readChan, nil
 }
 
+// ID is the resolver for the id field.
+func (r *userResolver) ID(ctx context.Context, obj *models.User) (string, error) {
+	return obj.ID.String(), nil
+}
+
 // Status is the resolver for the status field.
 func (r *userResolver) Status(ctx context.Context, obj *models.User) (string, error) {
-	return LoadPresence(ctx, obj.ID)
+	return LoadPresence(ctx, obj.ID.String())
 }
 
 // Message returns MessageResolver implementation.

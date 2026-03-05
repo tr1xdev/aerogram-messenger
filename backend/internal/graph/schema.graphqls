@@ -153,4 +153,5 @@ type Subscription {
 type UserStatusPayload {
    userId: ID!
    status: String!
+   lastSeen: String
 }

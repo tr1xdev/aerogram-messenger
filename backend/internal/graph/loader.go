@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader/v7"
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
@@ -16,15 +17,20 @@ type loaderCtxKey string
 const loadersKey loaderCtxKey = "dataloaders"
 
 type Loaders struct {
-	UserLoader     *dataloader.Loader[string, *models.User]
-	PresenceLoader *dataloader.Loader[string, string]
+	UserLoader     *dataloader.Loader[uuid.UUID, *models.User]
+	PresenceLoader *dataloader.Loader[uuid.UUID, string]
 }
 
 func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.PresenceRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userBatchFn := func(ctx context.Context, keys []string) []*dataloader.Result[*models.User] {
-				res, err := client.GetUsers(ctx, &userpb.GetUsersRequest{Ids: keys})
+			userBatchFn := func(ctx context.Context, keys []uuid.UUID) []*dataloader.Result[*models.User] {
+				stringKeys := make([]string, len(keys))
+				for i, k := range keys {
+					stringKeys[i] = k.String()
+				}
+
+				res, err := client.GetUsers(ctx, &userpb.GetUsersRequest{Ids: stringKeys})
 				output := make([]*dataloader.Result[*models.User], len(keys))
 				if err != nil {
 					for i := range output {
@@ -33,10 +39,11 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 					return output
 				}
 
-				userMap := make(map[string]*models.User)
+				userMap := make(map[uuid.UUID]*models.User)
 				for _, u := range res.Users {
-					userMap[u.Id] = &models.User{
-						ID:               u.Id,
+					uid, _ := uuid.Parse(u.Id)
+					userMap[uid] = &models.User{
+						ID:               uid,
 						FirstName:        u.FirstName,
 						LastName:         u.LastName,
 						Username:         u.Username,
@@ -57,7 +64,7 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 				return output
 			}
 
-			presenceBatchFn := func(ctx context.Context, keys []string) []*dataloader.Result[string] {
+			presenceBatchFn := func(ctx context.Context, keys []uuid.UUID) []*dataloader.Result[string] {
 				res, err := pRepo.GetStatuses(ctx, keys)
 				output := make([]*dataloader.Result[string], len(keys))
 				if err != nil {
@@ -92,8 +99,11 @@ func LoadUser(ctx context.Context, id string) (*models.User, error) {
 	if !ok {
 		return nil, fmt.Errorf("dataloaders not found")
 	}
-	thunk := loaders.UserLoader.Load(ctx, id)
-	return thunk()
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+	return loaders.UserLoader.Load(ctx, uid)()
 }
 
 func LoadPresence(ctx context.Context, id string) (string, error) {
@@ -101,6 +111,9 @@ func LoadPresence(ctx context.Context, id string) (string, error) {
 	if !ok {
 		return "offline", nil
 	}
-	thunk := loaders.PresenceLoader.Load(ctx, id)
-	return thunk()
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return "offline", nil
+	}
+	return loaders.PresenceLoader.Load(ctx, uid)()
 }
