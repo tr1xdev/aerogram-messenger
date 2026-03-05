@@ -1,17 +1,34 @@
 package database
 
 import (
-	"log"
+	"context"
+	"database/sql"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/tr1xdev/aerogram-messenger/internal/database/sqlc"
 )
 
-func NewPostgres(dsn string) (*gorm.DB, error) {
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+type DB struct {
+	Conn    *sql.DB
+	Queries *dbgen.Queries
+}
+
+func NewPostgres(dsn string) (*DB, error) {
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		log.Fatalf("could not connect to PostgreSQL database: %v", err)
 		return nil, err
 	}
-	return db, nil
+
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+
+	return &DB{
+		Conn:    db,
+		Queries: dbgen.New(db),
+	}, nil
+}
+
+func (db *DB) Close() error {
+	return db.Conn.Close()
 }
