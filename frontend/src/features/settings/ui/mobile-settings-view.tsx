@@ -106,9 +106,15 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
               />
               <SettingsButton
                 icon={UserCircle}
-                label="User ID"
+                label="Account ID"
                 type="copy"
                 value={user?.id}
+              />
+              <SettingsButton
+                icon={ShieldCheck}
+                label="Public Key"
+                type="copy"
+                value={user?.publicKey}
               />
               <SettingsButton icon={Plus} label="Add Account" type="action" />
             </div>

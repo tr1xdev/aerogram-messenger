@@ -1,6 +1,7 @@
 import { type LucideIcon, ChevronRight, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface SettingsButtonProps {
   icon?: LucideIcon;
@@ -27,6 +28,9 @@ export const SettingsButton = ({
     if (type === "copy" && value) {
       navigator.clipboard.writeText(value);
       setCopied(true);
+      toast.success(`${label} copied to clipboard`, {
+        duration: 2000,
+      });
       setTimeout(() => setCopied(false), 2000);
     }
     onClick?.();
@@ -71,7 +75,7 @@ export const SettingsButton = ({
             {label}
           </span>
           {type === "copy" && value && (
-            <span className="text-[13px] text-muted-foreground font-normal tabular-nums">
+            <span className="text-[13px] text-muted-foreground font-normal tabular-nums truncate max-w-[240px]">
               {value}
             </span>
           )}
@@ -92,9 +96,10 @@ export const SettingsButton = ({
               )}
             </div>
           )}
-          {type === "standard" && (
-            <ChevronRight className="h-4 w-4 text-muted-foreground/20 transition-transform group-hover:translate-x-0.5" />
-          )}
+          {(type === "standard" || type === "link" || type === "action") &&
+            !value && (
+              <ChevronRight className="h-4 w-4 text-muted-foreground/20 transition-transform group-hover:translate-x-0.5" />
+            )}
         </div>
       </div>
     </button>
