@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { LastMessageContent } from "./last-message-content";
 import { MessageStatus } from "./message-status";
 import type { Chat } from "@/entities/chat/model/types";
+import { cn } from "@/lib/utils";
 
 interface ChatMenuItemProps {
   chat: Chat;
@@ -18,6 +19,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
     otherMember?.user.first_name || otherMember?.user.username || "Chat";
   const initial = displayName[0].toUpperCase();
   const isMe = chat.lastMessage?.sender.id === myId;
+  const isOnline = otherMember?.user.status === "online";
 
   return (
     <SidebarMenuItem>
@@ -31,11 +33,20 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
           params={{ chatId: chat.id }}
           className="flex items-center gap-3"
         >
-          <Avatar className="h-12 w-12 border border-border/40 shrink-0">
-            <AvatarFallback className="bg-primary/5 text-primary font-bold">
-              {initial}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative shrink-0">
+            <Avatar className="h-12 w-12 border border-border/40 overflow-visible">
+              <AvatarFallback className="bg-primary/5 text-primary font-bold">
+                {initial}
+              </AvatarFallback>
+            </Avatar>
+            <span
+              className={cn(
+                "absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background z-10 transition-colors",
+                isOnline ? "bg-green-500" : "bg-zinc-500",
+              )}
+            />
+          </div>
+
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-baseline mb-1">
               <span className="text-[15px] font-bold truncate leading-none">
