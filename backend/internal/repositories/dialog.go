@@ -2,64 +2,98 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
-	"gorm.io/gorm"
+	"github.com/google/uuid"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 )
 
 type DialogRepository struct {
-	db *gorm.DB
+	db *database.DB
 }
 
-func NewDialogRepository(db *gorm.DB) *DialogRepository {
+func NewDialogRepository(db *database.DB) *DialogRepository {
 	return &DialogRepository{db: db}
 }
 
-func (r *DialogRepository) CreateDialog(ctx context.Context, dialog *models.Dialog, members []models.DialogMember, settings *models.DialogSettings) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(dialog).Error; err != nil {
-			return err
+func (r *DialogRepository) CreateDialog(
+	ctx context.Context,
+	dParams dbgen.CreateDialogParams,
+	mParams []dbgen.AddDialogMemberParams,
+	sParams dbgen.CreateDialogSettingsParams,
+) error {
+	tx, err := r.db.Conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	qtx := r.db.Queries.WithTx(tx)
+
+	if _, err := qtx.CreateDialog(ctx, dParams); err != nil {
+		return fmt.Errorf("create dialog: %w", err)
+	}
+
+	if err := qtx.CreateDialogSettings(ctx, sParams); err != nil {
+		return fmt.Errorf("create settings: %w", err)
+	}
+
+	for _, member := range mParams {
+		if err := qtx.AddDialogMember(ctx, member); err != nil {
+			return fmt.Errorf("add member: %w", err)
 		}
-		if err := tx.Create(settings).Error; err != nil {
-			return err
-		}
-		if len(members) > 0 {
-			if err := tx.Create(&members).Error; err != nil {
-				return err
-			}
-		}
-		return nil
+	}
+
+	return tx.Commit()
+}
+
+func (r *DialogRepository) GetUserDialogs(ctx context.Context, userID string) ([]dbgen.Dialog, error) {
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id: %w", err)
+	}
+
+	return r.db.Queries.GetUserDialogs(ctx, uid)
+}
+
+func (r *DialogRepository) GetDialogByID(ctx context.Context, id string) (dbgen.Dialog, error) {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return dbgen.Dialog{}, fmt.Errorf("invalid dialog id: %w", err)
+	}
+
+	return r.db.Queries.GetDialogByID(ctx, uid)
+}
+
+func (r *DialogRepository) GetMember(ctx context.Context, dialogID, userID string) (dbgen.DialogMember, error) {
+	did, err := uuid.Parse(dialogID)
+	if err != nil {
+		return dbgen.DialogMember{}, fmt.Errorf("invalid dialog id: %w", err)
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return dbgen.DialogMember{}, fmt.Errorf("invalid user id: %w", err)
+	}
+
+	return r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: did,
+		UserID:   uid,
 	})
 }
 
-func (r *DialogRepository) GetUserDialogs(ctx context.Context, userID string) ([]models.Dialog, error) {
-	var dialogs []models.Dialog
-	err := r.db.WithContext(ctx).
-		Table("dialogs").
-		Select("dialogs.*").
-		Joins("JOIN dialog_members ON dialog_members.dialog_id = dialogs.id").
-		Where("dialog_members.user_id = ?", userID).
-		Order("dialog_members.is_pinned DESC, dialogs.last_message_at DESC").
-		Find(&dialogs).Error
-	return dialogs, err
+func (r *DialogRepository) GetMembers(ctx context.Context, dialogID string) ([]dbgen.DialogMember, error) {
+	did, err := uuid.Parse(dialogID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dialog id: %w", err)
+	}
+
+	return r.db.Queries.GetDialogMembers(ctx, did)
 }
 
-func (r *DialogRepository) GetDialogByID(ctx context.Context, id string) (*models.Dialog, error) {
-	var dialog models.Dialog
-	err := r.db.WithContext(ctx).First(&dialog, "id = ?", id).Error
-	return &dialog, err
-}
-
-func (r *DialogRepository) GetMember(ctx context.Context, dialogID, userID string) (*models.DialogMember, error) {
-	var member models.DialogMember
-	err := r.db.WithContext(ctx).
-		Where("dialog_id = ? AND user_id = ?", dialogID, userID).
-		First(&member).Error
-	return &member, err
-}
-
-func (r *DialogRepository) GetMembers(ctx context.Context, dialogID string) ([]models.DialogMember, error) {
-	var members []models.DialogMember
-	err := r.db.WithContext(ctx).Where("dialog_id = ?", dialogID).Find(&members).Error
-	return members, err
+func (r *DialogRepository) GetDialogByUsername(ctx context.Context, username string) (dbgen.Dialog, error) {
+	if username == "" {
+		return dbgen.Dialog{}, fmt.Errorf("username is empty")
+	}
+	return r.db.Queries.GetDialogByUsername(ctx, database.ToNullString(&username))
 }
