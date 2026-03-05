@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +17,7 @@ import { ChatMenuItem } from "@/features/chat/ui/chat-menu-item";
 import { SettingsDialog } from "@/features/settings/ui/settings-dialog";
 import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
 import { useConnectionStore } from "@/store/connection";
-import type { Chat } from "@/entities/chat/model/types";
+import type { Chat, User } from "@/entities/chat/model/types";
 
 export function AppSidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -26,7 +26,7 @@ export function AppSidebar() {
   const pathname = useRouterState().location.pathname;
   const isWsConnected = useConnectionStore((s) => s.isWsConnected);
 
-  const user = userData?.me;
+  const user: User | undefined = userData?.me;
   const chats: Chat[] = chatsData?.myChats ?? [];
 
   return (
@@ -97,18 +97,19 @@ export function AppSidebar() {
           {user ? (
             <div className="flex items-center gap-3">
               <Avatar className="h-9 w-9 border border-border/50">
-                <AvatarFallback className="font-bold text-xs bg-primary/10 text-primary">
-                  {(user.first_name || user.username || "?")[0].toUpperCase()}
+                <AvatarFallback className="font-bold text-xs bg-primary/10 text-primary uppercase">
+                  {(user.first_name || user.username || "?")[0]}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex flex-col min-w-0">
+              <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-sm font-bold truncate">
                   {user.first_name || user.username}
                 </span>
                 <span className="text-[11px] text-muted-foreground font-medium">
-                  Settings & Profile
+                  Settings
                 </span>
               </div>
+              <Settings className="h-4 w-4 text-muted-foreground/50" />
             </div>
           ) : (
             <Skeleton className="h-9 w-full rounded-lg" />
