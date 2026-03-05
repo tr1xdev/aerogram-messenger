@@ -7,14 +7,12 @@ import {
   GET_MESSAGE_HISTORY,
   GET_MY_CHATS,
 } from "../api/chat.gql";
-import type { Message, Chat } from "@/entities/chat/model/types";
+import type { Message, Chat, StatusChanged } from "@/entities/chat/model/types";
 
 interface MessageAddedData {
   messageAdded: Message;
 }
-interface StatusChanged {
-  userStatusChanged: { userId: string; status: string };
-}
+
 interface DialogReadData {
   dialogRead: { chatID: string; userID: string; lastSequence: number };
 }
@@ -59,7 +57,7 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
             ? {
                 ...c,
                 lastMessage: newMessage,
-                unreadCount: isFromMe ? 0 : c.unreadCount + 1,
+                unreadCount: isFromMe ? 0 : (c.unreadCount || 0) + 1,
               }
             : c,
         );
@@ -78,29 +76,11 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       client.cache.modify({
         id: client.cache.identify({ __typename: "Chat", id: payload.chatID }),
         fields: {
-          lastReadSequence: (prev) => Math.max(prev || 0, payload.lastSequence),
-          unreadCount: (prev) => (isMe ? 0 : prev),
+          lastReadSequence: (prev: number) =>
+            Math.max(prev || 0, payload.lastSequence),
+          unreadCount: (prev: number) => (isMe ? 0 : prev),
         },
       });
-
-      const sidebar = client.readQuery<{ myChats: Chat[] }>({
-        query: GET_MY_CHATS,
-      });
-      if (sidebar) {
-        const updated = sidebar.myChats.map((c) =>
-          c.id === payload.chatID
-            ? {
-                ...c,
-                lastReadSequence: Math.max(
-                  c.lastReadSequence || 0,
-                  payload.lastSequence,
-                ),
-                unreadCount: isMe ? 0 : c.unreadCount,
-              }
-            : c,
-        );
-        client.writeQuery({ query: GET_MY_CHATS, data: { myChats: updated } });
-      }
     },
   });
 
@@ -115,10 +95,12 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
         fragment: gql`
           fragment UserStatusUpdate on User {
             status
+            lastSeen
           }
         `,
         data: {
           status: payload.status,
+          lastSeen: payload.lastSeen || null,
         },
         broadcast: true,
       });

@@ -55,3 +55,11 @@ export interface Session {
   isCurrent: boolean;
   createdAt: string;
 }
+
+export interface StatusChanged {
+  userStatusChanged: {
+    userId: string;
+    status: string;
+    lastSeen?: string;
+  };
+}

@@ -239,6 +239,7 @@ export const USER_PRESENCE_SUBSCRIPTION = gql`
     userStatusChanged(chatId: $chatId) {
       userId
       status
+      lastSeen
     }
   }
 `;
