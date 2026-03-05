@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
+import { useNavigate } from "@tanstack/react-router";
 import { GET_USER_BY_ID } from "@/features/chat/api/chat.gql";
 import {
   Popover,
@@ -16,15 +17,35 @@ interface ChatUserPopoverProps {
 }
 
 export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
-  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const [open, setOpen] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkMobile = (): void => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   const { data, loading, error } = useQuery<{ getUser: User }>(GET_USER_BY_ID, {
     variables: { id: userId },
-    skip: !open,
+    skip: !open || isMobile,
   });
 
+  const handleTriggerClick = (e: React.MouseEvent): void => {
+    if (isMobile) {
+      e.preventDefault();
+      e.stopPropagation();
+      navigate({ to: "/user/$userId", params: { userId } });
+    }
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
+    <Popover open={isMobile ? false : open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild onClick={handleTriggerClick}>
+        {children}
+      </PopoverTrigger>
 
       <PopoverContent
         className="w-72 p-0 overflow-hidden border-border/50 shadow-xl"
@@ -70,7 +91,7 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
                     Bio
                   </p>
                   <p className="text-sm leading-relaxed text-foreground/90">
-                    No bio provided yet.
+                    {data.getUser.bio || "No bio provided yet."}
                   </p>
                 </div>
 
