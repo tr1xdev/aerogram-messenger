@@ -23,12 +23,10 @@ interface SentCacheEntry {
   time: number;
   text: string;
 }
-
 const PAGE_VARIANTS: Variants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.2 } },
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
-
 const MATCH_THRESHOLD_MS = 5000;
 
 export const Route = createFileRoute("/(protected)/_layout/chat/$chatId")({
@@ -43,7 +41,6 @@ function ChatRoute() {
 function ChatPage({ chatId }: { chatId: string }) {
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
   const [sentCache, setSentCache] = useState<SentCacheEntry[]>([]);
-
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
   const inputRef = useRef<string>(input);
 
@@ -70,27 +67,26 @@ function ChatPage({ chatId }: { chatId: string }) {
 
   const totalUnread = useMemo((): number => {
     const myChats: Chat[] = chatsData?.myChats ?? [];
-    return myChats.reduce((acc: number, c: Chat) => {
-      return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
-    }, 0);
+    return myChats.reduce(
+      (acc: number, c: Chat) =>
+        c.id === chatId ? acc : acc + (c.unreadCount ?? 0),
+      0,
+    );
   }, [chatsData?.myChats, chatId]);
 
   const allMessages = useMemo((): Message[] => {
     if (!me) return messages;
-
     const serverIds = new Set<string>(messages.map((m) => m.id));
     const usedCacheIds = new Set<string>();
 
     const patchedServerMessages = messages.map((m: Message): Message => {
       if (m.sender.id === me.id && m.isEncrypted) {
         const msgTime = new Date(m.sentAt).getTime();
-
         const match = sentCache.find(
           (c) =>
             !usedCacheIds.has(c.id) &&
             Math.abs(c.time - msgTime) < MATCH_THRESHOLD_MS,
         );
-
         if (match) {
           usedCacheIds.add(match.id);
           return { ...m, isEncrypted: false, text: match.text };
@@ -101,29 +97,20 @@ function ChatPage({ chatId }: { chatId: string }) {
 
     const filteredOptimistic = optimisticMsgs.filter((om: Message): boolean => {
       if (serverIds.has(om.id)) return false;
-
       const omTime = new Date(om.sentAt).getTime();
-      const hasArrivedOnServer = messages.some(
+      return !messages.some(
         (m) =>
           m.sender.id === me.id &&
           Math.abs(new Date(m.sentAt).getTime() - omTime) < 2000,
       );
-
-      return !hasArrivedOnServer;
     });
 
-    return [...patchedServerMessages, ...filteredOptimistic].sort(
-      (a: Message, b: Message) => {
-        const timeA = new Date(a.sentAt).getTime();
-        const timeB = new Date(b.sentAt).getTime();
-
-        if (Math.abs(timeA - timeB) > 2000) return timeA - timeB;
-        if (a.sequence !== undefined && b.sequence !== undefined) {
-          return a.sequence - b.sequence;
-        }
-        return timeA - timeB;
-      },
-    );
+    return [...patchedServerMessages, ...filteredOptimistic].sort((a, b) => {
+      const timeA = new Date(a.sentAt).getTime();
+      const timeB = new Date(b.sentAt).getTime();
+      if (Math.abs(timeA - timeB) > 2000) return timeA - timeB;
+      return (a.sequence ?? 0) - (b.sequence ?? 0) || timeA - timeB;
+    });
   }, [messages, optimisticMsgs, me, sentCache]);
 
   const { checkAndMarkRead } = useMarkDialog(
@@ -137,69 +124,56 @@ function ChatPage({ chatId }: { chatId: string }) {
     checkAndMarkRead();
   }, [allMessages, checkAndMarkRead]);
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkAndMarkRead();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [checkAndMarkRead]);
-
   const handleSend = useCallback(async (): Promise<void> => {
     const currentInput = inputRef.current.trim();
     if (!currentInput || isSending || !me) return;
-
-    const val = currentInput;
     const nowTime = Date.now();
     const tempId = crypto.randomUUID();
 
     setSentCache((prev) => {
-      const next = [...prev, { id: tempId, time: nowTime, text: val }];
+      const next = [...prev, { id: tempId, time: nowTime, text: currentInput }];
       return next.length > 50 ? next.slice(-50) : next;
     });
 
-    const newMsg: Message = {
-      id: tempId,
-      chatId,
-      text: val,
-      sentAt: new Date(nowTime).toISOString(),
-      isRead: false,
-      isEdited: false,
-      isEncrypted: false,
-      sender: me,
-    };
-
-    setOptimisticMsgs((prev) => [...prev, newMsg]);
+    setOptimisticMsgs((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        chatId,
+        text: currentInput,
+        sentAt: new Date(nowTime).toISOString(),
+        isRead: false,
+        isEdited: false,
+        isEncrypted: false,
+        sender: me,
+      },
+    ]);
     resetInput();
 
     try {
-      await sendMessage(val);
-    } catch (error: unknown) {
-      setInput(val);
+      await sendMessage(currentInput);
+    } catch {
+      setInput(currentInput);
       setSentCache((prev) => prev.filter((c) => c.id !== tempId));
-      console.error("[ChatPage] Send failed", error);
     } finally {
       setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
     }
   }, [chatId, isSending, me, resetInput, sendMessage, setInput]);
 
   return (
-    <div className="flex flex-col h-full bg-background w-full fixed inset-0 z-[60] md:relative md:z-auto overflow-hidden">
+    <div className="flex flex-col h-full bg-background w-full fixed inset-0 z-60 md:relative md:z-auto overflow-hidden">
       <ChatHeader
         title={chat?.title}
         photoUrl={chat?.photoUrl}
         totalUnread={totalUnread}
         members={chat?.members}
         meId={me?.id}
+        chatId={chatId}
       />
 
       <main className="flex-1 relative overflow-hidden bg-background">
         {isInitialLoading ? (
           <motion.div
-            key="skeleton"
             variants={PAGE_VARIANTS}
             initial="initial"
             animate="animate"
@@ -213,10 +187,9 @@ function ChatPage({ chatId }: { chatId: string }) {
             </div>
           </motion.div>
         ) : allMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
-            <p className="text-sm">No messages yet.</p>
-            <p className="text-xs">Type a message to start the conversation.</p>
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
+            <MessageSquare className="h-16 w-16 mb-4 stroke-1" />
+            <p className="font-medium text-sm">No messages here yet</p>
           </div>
         ) : (
           <div className="h-full w-full">
@@ -231,7 +204,7 @@ function ChatPage({ chatId }: { chatId: string }) {
         )}
       </main>
 
-      <footer className="shrink-0 border-t">
+      <footer className="shrink-0 border-t border-border/40 bg-background/80 backdrop-blur-lg">
         <MessageComposer
           input={input}
           setInput={setInput}
