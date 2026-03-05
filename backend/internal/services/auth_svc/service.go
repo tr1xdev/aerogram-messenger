@@ -2,26 +2,22 @@ package auth_svc
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
 )
 
 type Server struct {
@@ -29,14 +25,13 @@ type Server struct {
 	authRepo *repositories.AuthRepository
 	userRepo *repositories.UserRepository
 	cfg      *config.Config
-	db       *gorm.DB
+	db       *database.DB
 }
 
-func NewServer(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *Server {
-	resendKey := os.Getenv("RESEND_TOKEN")
+func NewServer(db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config) *Server {
 	return &Server{
 		db:       db,
-		authRepo: repositories.NewAuthRepository(rdb, resendKey),
+		authRepo: repositories.NewAuthRepository(db, rdb, mailer, 10*time.Minute),
 		userRepo: repositories.NewUserRepository(db),
 		cfg:      cfg,
 	}
@@ -47,11 +42,10 @@ func (s *Server) getMetadata(ctx context.Context) (string, string) {
 	if !ok {
 		return "unknown", "unknown"
 	}
-	ip := "unknown"
+	ip, ua := "unknown", "unknown"
 	if v := md.Get("x-real-ip"); len(v) > 0 {
 		ip = v[0]
 	}
-	ua := "unknown"
 	if v := md.Get("x-client-device"); len(v) > 0 {
 		ua = v[0]
 	} else if v := md.Get("user-agent"); len(v) > 0 {
@@ -61,11 +55,6 @@ func (s *Server) getMetadata(ctx context.Context) (string, string) {
 }
 
 func (s *Server) createAccessToken(userID, sessionID string, verified bool) (string, error) {
-	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
-	if secret == "" {
-		return "", status.Error(codes.Internal, "security configuration missing")
-	}
-
 	ttl := s.cfg.JWT.TTL()
 	if ttl == 0 {
 		ttl = time.Hour * 24
@@ -80,249 +69,131 @@ func (s *Server) createAccessToken(userID, sessionID string, verified bool) (str
 	}
 
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString([]byte(secret))
+	return t.SignedString([]byte(s.cfg.JWT.Secret))
 }
 
 func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb.SignUpResponse, error) {
 	if req.Email == "" || req.FirstName == "" || req.Password == "" {
-		return nil, status.Error(codes.InvalidArgument, "email, first name, and password are required")
+		return nil, status.Error(codes.InvalidArgument, "required fields missing")
 	}
 
-	existing, err := s.userRepo.GetByEmail(req.Email)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, status.Error(codes.Internal, "failed to verify account availability")
-	}
-	if existing != nil {
-		return nil, status.Error(codes.AlreadyExists, "an account with this email already exists")
+	if _, err := s.userRepo.GetByEmail(ctx, req.Email); err == nil {
+		return nil, status.Error(codes.AlreadyExists, "email already registered")
 	}
 
-	pwHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to process security credentials")
+	pwHash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	newID := uuid.New()
+
+	params := dbgen.CreateUserParams{
+		ID:        newID,
+		Email:     req.Email,
+		FirstName: req.FirstName,
+		Password:  string(pwHash),
+		Status:    "offline",
+		LastName:  database.ToNullString(req.LastName),
+		Username:  database.ToNullString(req.Username),
 	}
 
-	user := &models.User{
-		ID:              uuid.NewString(),
-		Email:           req.Email,
-		FirstName:       req.FirstName,
-		LastName:        req.LastName,
-		Username:        req.Username,
-		Password:        string(pwHash),
-		IsPremium:       false,
-		IsEmailVerified: false,
-		CreatedAt:       time.Now(),
+	if _, err := s.userRepo.CreateUser(ctx, params); err != nil {
+		return nil, status.Error(codes.Internal, "storage error")
 	}
 
-	if err := s.db.Create(user).Error; err != nil {
-		return nil, status.Error(codes.Internal, "failed to create user profile")
-	}
-
-	verificationID := uuid.NewString()
-	err = s.authRepo.StoreAndSendCode(ctx, verificationID, user.ID, user.Email, user.FirstName)
-	if err != nil {
+	verID := uuid.NewString()
+	if err := s.authRepo.StoreAndSendCode(ctx, verID, newID.String(), req.Email, req.FirstName); err != nil {
 		if os.Getenv("APP_ENV") != "development" {
-			return nil, status.Error(codes.Internal, "failed to send verification code")
+			return nil, status.Error(codes.Internal, "email delivery failed")
 		}
-		fmt.Printf("=== [DEV MODE] Ignoring email error in SignUp: %v\n", err)
+		fmt.Printf("DEBUG: skip email error: %v\n", err)
 	}
 
-	return &authpb.SignUpResponse{
-		UserId: verificationID,
-	}, nil
+	return &authpb.SignUpResponse{UserId: verID}, nil
 }
 
 func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
-	if req.Email == "" || req.Password == "" {
-		return nil, status.Error(codes.InvalidArgument, "email and password are required")
+	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	if err != nil || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)) != nil {
+		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
-	user, err := s.userRepo.GetByEmail(req.Email)
-	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "invalid email or password")
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, status.Error(codes.Unauthenticated, "invalid email or password")
-	}
-
-	if !user.IsEmailVerified {
-		return nil, status.Error(codes.PermissionDenied, "please verify your email address before logging in")
-	}
-
-	verificationID := uuid.NewString()
-	err = s.authRepo.StoreAndSendCode(ctx, verificationID, user.ID, user.Email, user.FirstName)
-	if err != nil {
+	verID := uuid.NewString()
+	if err := s.authRepo.StoreAndSendCode(ctx, verID, user.ID.String(), user.Email, user.FirstName); err != nil {
 		if os.Getenv("APP_ENV") != "development" {
-			return nil, status.Error(codes.Internal, "failed to send verification code")
+			return nil, status.Error(codes.Internal, "email delivery failed")
 		}
-		fmt.Printf("=== [DEV MODE] Ignoring email error in Login: %v\n", err)
 	}
 
-	return &authpb.LoginResponse{
-		UserId: verificationID,
-	}, nil
+	return &authpb.LoginResponse{UserId: verID}, nil
 }
 
 func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest) (*authpb.VerifyEmailResponse, error) {
-	if req.UserId == "" || req.Code == "" {
-		return nil, status.Error(codes.InvalidArgument, "verification ID and code are required")
+	realUserIDStr, err := s.authRepo.VerifyCode(ctx, req.UserId, req.Code)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
-	realUserID, err := s.authRepo.VerifyCode(ctx, req.UserId, req.Code)
+	uid, err := uuid.Parse(realUserIDStr)
 	if err != nil {
-		switch {
-		case errors.Is(err, repositories.ErrCodeExpired):
-			return nil, status.Error(codes.DeadlineExceeded, "the verification code has expired")
-		case errors.Is(err, repositories.ErrCodeInvalid):
-			return nil, status.Error(codes.InvalidArgument, "invalid verification code")
-		case errors.Is(err, repositories.ErrTooManyAttempts):
-			return nil, status.Error(codes.ResourceExhausted, "too many failed attempts. please request a new code")
-		default:
-			return nil, status.Error(codes.Internal, "an error occurred during verification")
-		}
+		return nil, status.Error(codes.Internal, "invalid user identity")
 	}
 
 	ip, ua := s.getMetadata(ctx)
-	var accessToken, rawRefresh string
+	sid := uuid.New()
 
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		var user models.User
-		if err := tx.Where("id = ?", realUserID).First(&user).Error; err != nil {
-			return status.Error(codes.NotFound, "user profile not found")
-		}
-
-		if !user.IsEmailVerified {
-			user.IsEmailVerified = true
-			if err := tx.Save(&user).Error; err != nil {
-				return status.Error(codes.Internal, "failed to update user status")
-			}
-		}
-
-		rawRefresh = uuid.NewString()
-		sum := sha256.Sum256([]byte(rawRefresh))
-		refresh := &models.RefreshToken{
-			ID:       uuid.NewString(),
-			UserID:   user.ID,
-			Token:    hex.EncodeToString(sum[:]),
-			Expiry:   time.Now().Add(s.cfg.JWT.TTL() * 24),
-			IsActive: true,
-		}
-		if err := tx.Create(refresh).Error; err != nil {
-			return status.Error(codes.Internal, "failed to provision refresh token")
-		}
-
-		session := &models.Session{
-			ID:        uuid.NewString(),
-			UserID:    user.ID,
-			IPAddress: ip,
-			Device:    ua,
-			IsActive:  true,
-			CreatedAt: time.Now(),
-		}
-		if err := tx.Create(session).Error; err != nil {
-			return status.Error(codes.Internal, "failed to establish session")
-		}
-
-		var tokenErr error
-		accessToken, tokenErr = s.createAccessToken(user.ID, session.ID, true)
-		if tokenErr != nil {
-			return tokenErr
-		}
-
-		return nil
-	})
-
+	tx, err := s.db.Conn.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, "tx error")
+	}
+	defer tx.Rollback()
+
+	qtx := s.db.Queries.WithTx(tx)
+
+	_, err = qtx.CreateSession(ctx, dbgen.CreateSessionParams{
+		ID:        sid,
+		UserID:    uid,
+		IpAddress: ip,
+		Device:    ua,
+	})
+	if err != nil {
+		fmt.Printf("[DATABASE ERROR]: %v\n", err)
+		return nil, status.Error(codes.Internal, "session creation failed")
+	}
+
+	token, err := s.createAccessToken(uid.String(), sid.String(), true)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "token error")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, status.Error(codes.Internal, "commit error")
 	}
 
 	return &authpb.VerifyEmailResponse{
-		AccessToken:  accessToken,
-		RefreshToken: rawRefresh,
+		AccessToken:  token,
+		RefreshToken: sid.String(),
 	}, nil
 }
 
 func (s *Server) RefreshToken(ctx context.Context, req *authpb.RefreshTokenRequest) (*authpb.RefreshTokenResponse, error) {
-	if req.RefreshToken == "" {
-		return nil, status.Error(codes.InvalidArgument, "refresh token is required")
-	}
-
-	sum := sha256.Sum256([]byte(req.RefreshToken))
-	hashedToken := hex.EncodeToString(sum[:])
-
-	var oldToken models.RefreshToken
-	if err := s.db.Where("token = ? AND is_active = ? AND expiry > ?", hashedToken, true, time.Now()).First(&oldToken).Error; err != nil {
-		return nil, status.Error(codes.Unauthenticated, "session expired or invalid")
-	}
-
-	ip, ua := s.getMetadata(ctx)
-	var accessToken, newRawRefresh string
-
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		oldToken.IsActive = false
-		if err := tx.Save(&oldToken).Error; err != nil {
-			return status.Error(codes.Internal, "failed to rotate session")
-		}
-
-		newRawRefresh = uuid.NewString()
-		newSum := sha256.Sum256([]byte(newRawRefresh))
-		newRefreshToken := &models.RefreshToken{
-			ID:       uuid.NewString(),
-			UserID:   oldToken.UserID,
-			Token:    hex.EncodeToString(newSum[:]),
-			Expiry:   time.Now().Add(s.cfg.JWT.TTL() * 24),
-			IsActive: true,
-		}
-		if err := tx.Create(newRefreshToken).Error; err != nil {
-			return status.Error(codes.Internal, "failed to create new session")
-		}
-
-		session := &models.Session{
-			ID:        uuid.NewString(),
-			UserID:    oldToken.UserID,
-			IPAddress: ip,
-			Device:    ua,
-			IsActive:  true,
-			CreatedAt: time.Now(),
-		}
-		if err := tx.Create(session).Error; err != nil {
-			return status.Error(codes.Internal, "failed to register session")
-		}
-
-		var tokenErr error
-		accessToken, tokenErr = s.createAccessToken(oldToken.UserID, session.ID, true)
-		if tokenErr != nil {
-			return tokenErr
-		}
-
-		return nil
-	})
-
+	sid, err := uuid.Parse(req.RefreshToken)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, "invalid token format")
+	}
+
+	session, err := s.db.Queries.GetActiveSession(ctx, dbgen.GetActiveSessionParams{
+		ID:     sid,
+		UserID: uuid.Nil,
+	})
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "session not found")
+	}
+
+	token, err := s.createAccessToken(session.UserID.String(), session.ID.String(), true)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "token generation failed")
 	}
 
 	return &authpb.RefreshTokenResponse{
-		AccessToken:  accessToken,
-		RefreshToken: newRawRefresh,
-	}, nil
-}
-
-func (s *Server) GetUser(ctx context.Context, req *authpb.GetUserRequest) (*authpb.GetUserResponse, error) {
-	var user models.User
-	if err := s.db.WithContext(ctx).Where("id = ?", req.UserId).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "user not found")
-		}
-		return nil, status.Error(codes.Internal, "database error")
-	}
-
-	return &authpb.GetUserResponse{
-		Id:        user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Username:  user.Username,
-		Status:    user.Status,
+		AccessToken:  token,
+		RefreshToken: session.ID.String(),
 	}, nil
 }
