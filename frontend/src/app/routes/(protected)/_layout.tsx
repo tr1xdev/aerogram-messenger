@@ -11,6 +11,7 @@ import { MobileNav } from "@/features/navigation/ui/mobile-nav";
 import { cn } from "@/lib/utils";
 import { useMe } from "@/features/chat/lib/use-messages";
 import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
+import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/(protected)/_layout")({
   beforeLoad: () => {
@@ -55,6 +56,13 @@ function LayoutComponent() {
 
         {!isChatOpen && <MobileNav />}
       </div>
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          className:
+            "bg-zinc-900 text-white border-zinc-800 text-[13px] h-10 px-4 rounded-xl shadow-2xl",
+        }}
+      />
     </SidebarProvider>
   );
 }
