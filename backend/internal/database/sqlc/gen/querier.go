@@ -12,14 +12,38 @@ import (
 )
 
 type Querier interface {
+	AddDialogMember(ctx context.Context, arg AddDialogMemberParams) error
 	CheckUserExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CountUnreadMessages(ctx context.Context, arg CountUnreadMessagesParams) (int64, error)
+	CreateDialog(ctx context.Context, arg CreateDialogParams) (Dialog, error)
+	CreateDialogSettings(ctx context.Context, arg CreateDialogSettingsParams) error
+	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeactivateAllUserSessions(ctx context.Context, userID uuid.UUID) error
+	DeactivateSession(ctx context.Context, id uuid.UUID) error
+	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
+	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]Message, error)
+	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)
+	GetDialogByUsername(ctx context.Context, username sql.NullString) (Dialog, error)
+	GetDialogMember(ctx context.Context, arg GetDialogMemberParams) (DialogMember, error)
+	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]DialogMember, error)
+	GetMessageByID(ctx context.Context, id uuid.UUID) (Message, error)
+	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
+	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserDialogs(ctx context.Context, userID uuid.UUID) ([]Dialog, error)
 	GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]User, error)
-	SearchUsersByUsername(ctx context.Context, dollar_1 sql.NullString) ([]User, error)
+	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
 	SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString) ([]User, error)
+	SoftDeleteMessage(ctx context.Context, arg SoftDeleteMessageParams) error
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
+	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
+	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error
+	UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error)
+	UpdateSessionActivity(ctx context.Context, id uuid.UUID) error
+	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error
 }
 

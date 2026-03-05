@@ -26,16 +26,8 @@ func (q *Queries) CheckUserExists(ctx context.Context, id uuid.UUID) (bool, erro
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
-    id,
-    username,
-    first_name,
-    last_name,
-    email,
-    password,
-    status,
-    public_key,
-    encrypted_priv_key,
-    encryption_iv
+    id, username, first_name, last_name, email, password,
+    status, public_key, encrypted_priv_key, encryption_iv
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
@@ -199,11 +191,11 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Us
 
 const searchUsersByUsername = `-- name: SearchUsersByUsername :many
 SELECT id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
-WHERE username ILIKE $1 || '%' AND username != '' AND deleted_at IS NULL
+WHERE username ILIKE $1::text || '%' AND username != '' AND deleted_at IS NULL
 LIMIT 20
 `
 
-func (q *Queries) SearchUsersByUsername(ctx context.Context, dollar_1 sql.NullString) ([]User, error) {
+func (q *Queries) SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error) {
 	rows, err := q.db.QueryContext(ctx, searchUsersByUsername, dollar_1)
 	if err != nil {
 		return nil, err
@@ -301,6 +293,63 @@ WHERE id = $1
 func (q *Queries) SoftDeleteUser(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, softDeleteUser, id)
 	return err
+}
+
+const updateUser = `-- name: UpdateUser :one
+UPDATE users
+SET
+    first_name = COALESCE($1, first_name),
+    last_name = COALESCE($2, last_name),
+    username = COALESCE($3, username),
+    public_key = COALESCE($4, public_key),
+    encrypted_priv_key = COALESCE($5, encrypted_priv_key),
+    encryption_iv = COALESCE($6, encryption_iv),
+    updated_at = NOW()
+WHERE id = $7
+RETURNING id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at
+`
+
+type UpdateUserParams struct {
+	FirstName        sql.NullString `json:"first_name"`
+	LastName         sql.NullString `json:"last_name"`
+	Username         sql.NullString `json:"username"`
+	PublicKey        sql.NullString `json:"public_key"`
+	EncryptedPrivKey sql.NullString `json:"encrypted_priv_key"`
+	EncryptionIv     sql.NullString `json:"encryption_iv"`
+	ID               uuid.UUID      `json:"id"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUser,
+		arg.FirstName,
+		arg.LastName,
+		arg.Username,
+		arg.PublicKey,
+		arg.EncryptedPrivKey,
+		arg.EncryptionIv,
+		arg.ID,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.Password,
+		&i.Status,
+		&i.IsPremium,
+		&i.IsEmailVerified,
+		&i.VerificationToken,
+		&i.VerificationExpiry,
+		&i.PublicKey,
+		&i.EncryptedPrivKey,
+		&i.EncryptionIv,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }
 
 const updateUserStatus = `-- name: UpdateUserStatus :exec
