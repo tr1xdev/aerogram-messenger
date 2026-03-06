@@ -160,6 +160,10 @@ function ChatPage({ chatId }: { chatId: string }) {
     chat?.lastReadSequence,
   );
 
+  const handleMarkRead = useCallback((): void => {
+    checkAndMarkRead();
+  }, [checkAndMarkRead]);
+
   useEffect(() => {
     checkAndMarkRead();
   }, [allMessages, checkAndMarkRead]);
@@ -173,7 +177,7 @@ function ChatPage({ chatId }: { chatId: string }) {
         await editMessage(editingMessage.id, currentInput);
         cancelAction();
       } catch (err) {
-        console.error("Edit failed", err);
+        console.error(err);
       }
       return;
     }
@@ -209,7 +213,7 @@ function ChatPage({ chatId }: { chatId: string }) {
     } catch (error: unknown) {
       setInput(val);
       setSentCache((prev) => prev.filter((c) => c.id !== tempId));
-      console.error("[ChatPage] Send failed", error);
+      console.error(error);
     } finally {
       setOptimisticMsgs((prev) => prev.filter((m) => m.id !== tempId));
     }
@@ -231,7 +235,7 @@ function ChatPage({ chatId }: { chatId: string }) {
   }, [replyingTo, decryptedReplyText]);
 
   return (
-    <div className="flex flex-col h-full bg-background w-full fixed inset-0 z-[60] md:relative md:z-auto overflow-hidden">
+    <div className="flex flex-col h-[100dvh] bg-background w-full md:relative overflow-hidden">
       <ChatHeader
         title={chat?.title}
         photoUrl={chat?.photoUrl}
@@ -240,7 +244,7 @@ function ChatPage({ chatId }: { chatId: string }) {
         meId={me?.id}
       />
 
-      <main className="flex-1 relative overflow-hidden bg-background">
+      <main className="flex-1 relative min-h-0 bg-background">
         {isInitialLoading ? (
           <motion.div
             key="skeleton"
@@ -263,18 +267,16 @@ function ChatPage({ chatId }: { chatId: string }) {
             <p className="text-xs">Type a message to start the conversation.</p>
           </div>
         ) : (
-          <div className="h-full w-full">
-            <MessageList
-              chatId={chatId}
-              messages={allMessages}
-              members={chat?.members}
-              myId={me?.id}
-              lastReadSequence={chat?.lastReadSequence}
-              onMarkRead={checkAndMarkRead}
-              onReply={handleReplyInitiate}
-              onEdit={handleEditInitiate}
-            />
-          </div>
+          <MessageList
+            chatId={chatId}
+            messages={allMessages}
+            members={chat?.members}
+            myId={me?.id}
+            lastReadSequence={chat?.lastReadSequence}
+            onMarkRead={handleMarkRead}
+            onReply={handleReplyInitiate}
+            onEdit={handleEditInitiate}
+          />
         )}
       </main>
 

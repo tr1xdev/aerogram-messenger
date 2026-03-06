@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, memo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
@@ -20,7 +20,7 @@ interface MessageListProps {
   onEdit: (message: Message) => void;
 }
 
-export function MessageList({
+export const MessageList = memo(function MessageList({
   chatId,
   messages,
   members,
@@ -32,15 +32,43 @@ export function MessageList({
 }: MessageListProps) {
   const { decryptMessage } = useChatActions(chatId);
   const [decryptedMap, setDecryptedMap] = useState<Record<string, string>>({});
+  const mapRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    messages.forEach(async (m) => {
-      if (m.replyTo && m.replyTo.isEncrypted && !decryptedMap[m.replyTo.id]) {
-        const txt = await decryptMessage(m.replyTo);
-        setDecryptedMap((prev) => ({ ...prev, [m.replyTo!.id]: txt }));
+    let isMounted = true;
+
+    const fetchDecrypted = async () => {
+      let hasChanges = false;
+      const newEntries: Record<string, string> = {};
+
+      for (const m of messages) {
+        if (
+          m.replyTo &&
+          m.replyTo.isEncrypted &&
+          !mapRef.current[m.replyTo.id]
+        ) {
+          try {
+            const txt = await decryptMessage(m.replyTo);
+            newEntries[m.replyTo.id] = txt;
+            mapRef.current[m.replyTo.id] = txt;
+            hasChanges = true;
+          } catch {
+            // ...
+          }
+        }
       }
-    });
-  }, [messages, decryptMessage, decryptedMap]);
+
+      if (isMounted && hasChanges) {
+        setDecryptedMap((prev) => ({ ...prev, ...newEntries }));
+      }
+    };
+
+    fetchDecrypted();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [messages, decryptMessage]);
 
   const processedMessages = useMemo(() => {
     return messages.map((m) => {
@@ -138,4 +166,4 @@ export function MessageList({
       </AnimatePresence>
     </div>
   );
-}
+});

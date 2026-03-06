@@ -576,6 +576,7 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
+
 	var msgs []*models.Message
 	for _, m := range resp.Messages {
 		sentAt, _ := time.Parse(time.RFC3339, m.SentAt)
@@ -583,7 +584,7 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 		cID, _ := uuid.Parse(m.ChatId)
 		aID, _ := uuid.Parse(m.SenderId)
 
-		msgs = append(msgs, &models.Message{
+		msg := &models.Message{
 			ID:           mID,
 			DialogID:     cID,
 			AuthorID:     aID,
@@ -593,7 +594,23 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 			IsEdited:     m.IsEdited,
 			IsEncrypted:  m.IsEncrypted,
 			EncryptionIv: toStringPtr(m.EncryptionIv),
-		})
+		}
+
+		if m.ReplyToId != nil && *m.ReplyToId != "" {
+			parsed, err := uuid.Parse(*m.ReplyToId)
+			if err == nil {
+				msg.ReplyToID = &parsed
+			}
+		}
+
+		if m.ForwardedFromId != nil && *m.ForwardedFromId != "" {
+			parsed, err := uuid.Parse(*m.ForwardedFromId)
+			if err == nil {
+				msg.ForwardFromID = &parsed
+			}
+		}
+
+		msgs = append(msgs, msg)
 	}
 	return msgs, nil
 }

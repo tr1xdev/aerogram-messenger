@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { SendHorizontal, X, Pencil, Reply } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ interface MessageComposerProps {
   onCancelAction: () => void;
 }
 
-export function MessageComposer({
+export const MessageComposer = memo(function MessageComposer({
   input,
   setInput,
   onSend,
@@ -27,38 +28,38 @@ export function MessageComposer({
   const activeAction = editingMessage || replyingTo;
 
   return (
-    <footer className="p-3 md:p-4 bg-background/95 backdrop-blur-sm border-t border-border/50">
-      <div className="max-w-5xl mx-auto flex flex-col">
+    <footer className="p-3 md:p-4 bg-background/95 backdrop-blur-sm border-t border-border/50 shrink-0">
+      <div className="max-w-5xl mx-auto flex flex-col min-w-0 overflow-hidden">
         <AnimatePresence mode="wait">
           {activeAction && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
+              className="overflow-hidden min-w-0"
             >
-              <div className="flex items-center gap-3 px-4 py-2 bg-muted/40 rounded-t-2xl border-l-4 border-primary/60 mb-1">
-                <div className="shrink-0 text-primary">
+              <div className="flex items-center gap-3 px-3 py-2 bg-muted/30 rounded-t-xl border-l-2 border-primary mx-2 mb-0 relative min-w-0 overflow-hidden">
+                <div className="shrink-0 text-primary opacity-80">
                   {editingMessage ? (
                     <Pencil className="h-4 w-4" />
                   ) : (
                     <Reply className="h-4 w-4" />
                   )}
                 </div>
-                <div className="flex-1 min-w-0 flex flex-col">
-                  <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                <div className="flex-1 min-w-0 grid grid-cols-1 overflow-hidden">
+                  <span className="text-[12px] font-medium text-primary truncate block">
                     {editingMessage
                       ? "Edit Message"
                       : replyingTo?.sender.first_name || "User"}
                   </span>
-                  <span className="text-sm text-muted-foreground truncate">
+                  <span className="text-[13px] text-muted-foreground truncate block leading-tight">
                     {activeAction.text}
                   </span>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded-full hover:bg-muted"
+                  className="h-7 w-7 rounded-full shrink-0 hover:bg-muted/80 text-muted-foreground"
                   onClick={onCancelAction}
                 >
                   <X className="h-4 w-4" />
@@ -69,7 +70,7 @@ export function MessageComposer({
         </AnimatePresence>
 
         <form
-          className="flex items-end gap-2.5 relative"
+          className="flex items-end gap-2.5 relative pt-1 min-w-0"
           onSubmit={(e) => {
             e.preventDefault();
             if (input.trim() && !disabled) {
@@ -77,7 +78,7 @@ export function MessageComposer({
             }
           }}
         >
-          <div className="relative flex-1 flex items-center">
+          <div className="relative flex-1 min-w-0 flex items-center">
             <Input
               placeholder={editingMessage ? "Edit message..." : "Message"}
               value={input}
@@ -86,7 +87,8 @@ export function MessageComposer({
                 "w-full min-h-[44px] rounded-[22px] bg-muted/30 px-5 py-3",
                 "border border-border focus-visible:border-border/80 focus-visible:ring-1 focus-visible:ring-ring/20 focus-visible:bg-muted/60",
                 "transition-all duration-200 placeholder:text-muted-foreground/60",
-                activeAction && "rounded-t-none",
+                activeAction &&
+                  "rounded-tl-none rounded-tr-none border-t-transparent",
               )}
             />
           </div>
@@ -109,4 +111,4 @@ export function MessageComposer({
       </div>
     </footer>
   );
-}
+});
