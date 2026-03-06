@@ -24,6 +24,7 @@ type Chat {
    lastReadSequence: Long!
    members: [ChatMember!]
    messages: [Message!]!
+   createdAt: String!
 }
 
 type Message {
@@ -148,6 +149,7 @@ type Subscription {
    messageAdded(chatId: ID!): Message!
    userStatusChanged(chatId: ID!): UserStatusPayload!
    dialogRead(chatID: String!): ReadPayload!
+   chatCreated(userId: ID!): Chat!
 }
 
 type UserStatusPayload {

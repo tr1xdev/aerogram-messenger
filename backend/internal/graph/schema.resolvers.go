@@ -365,9 +365,6 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 	if authID == "" {
 		return nil, errors.New("unauthorized")
 	}
-	if authID == userID {
-		return nil, errors.New("cannot create chat with yourself")
-	}
 
 	req := &chatv1.CreateChatRequest{
 		Type:           chatv1.ChatType_CHAT_TYPE_PRIVATE,
@@ -377,10 +374,18 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 
 	resp, err := r.chatClient.CreateChat(ctx, req)
 	if err != nil {
-		return nil, mapGRPCError(err)
+		return nil, err
 	}
 
-	return r.enrichChat(ctx, authID, resp.Chat)
+	enriched, err := r.enrichChat(ctx, authID, resp.Chat)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, _ := json.Marshal(enriched)
+	r.redisClient.Publish(ctx, "user_chats:"+userID, payload)
+
+	return enriched, nil
 }
 
 // SendTypingEvent is the resolver for the sendTypingEvent field.
@@ -796,6 +801,46 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 	}()
 
 	return readChan, nil
+}
+
+// ChatCreated is the resolver for the chatCreated field.
+func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (<-chan *model.Chat, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" || authID != userID {
+		return nil, errors.New("forbidden")
+	}
+
+	chatChan := make(chan *model.Chat, 1)
+	pubsub := r.redisClient.Subscribe(ctx, "user_chats:"+userID)
+
+	go func() {
+		defer pubsub.Close()
+		defer close(chatChan)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-pubsub.Channel():
+				if !ok {
+					return
+				}
+
+				var c model.Chat
+				if err := json.Unmarshal([]byte(msg.Payload), &c); err != nil {
+					continue
+				}
+
+				select {
+				case chatChan <- &c:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return chatChan, nil
 }
 
 // ID is the resolver for the id field.

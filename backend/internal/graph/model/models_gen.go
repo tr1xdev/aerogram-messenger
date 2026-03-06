@@ -28,6 +28,7 @@ type Chat struct {
 	LastReadSequence int64             `json:"lastReadSequence"`
 	Members          []*ChatMember     `json:"members,omitempty"`
 	Messages         []*models.Message `json:"messages"`
+	CreatedAt        string            `json:"createdAt"`
 }
 
 type ChatMember struct {

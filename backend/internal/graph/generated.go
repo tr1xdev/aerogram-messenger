@@ -57,6 +57,7 @@ type ComplexityRoot struct {
 	}
 
 	Chat struct {
+		CreatedAt        func(childComplexity int) int
 		ID               func(childComplexity int) int
 		IsPinned         func(childComplexity int) int
 		LastMessage      func(childComplexity int) int
@@ -136,6 +137,7 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
+		ChatCreated       func(childComplexity int, userID string) int
 		DialogRead        func(childComplexity int, chatID string) int
 		MessageAdded      func(childComplexity int, chatID string) int
 		UserStatusChanged func(childComplexity int, chatID string) int
@@ -215,6 +217,7 @@ type SubscriptionResolver interface {
 	MessageAdded(ctx context.Context, chatID string) (<-chan *models.Message, error)
 	UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error)
 	DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
+	ChatCreated(ctx context.Context, userID string) (<-chan *model.Chat, error)
 }
 type UserResolver interface {
 	ID(ctx context.Context, obj *models.User) (string, error)
@@ -248,6 +251,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.AuthPayload.UserID(childComplexity), true
 
+	case "Chat.createdAt":
+		if e.complexity.Chat.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.Chat.CreatedAt(childComplexity), true
 	case "Chat.id":
 		if e.complexity.Chat.ID == nil {
 			break
@@ -698,6 +707,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Session.Location(childComplexity), true
 
+	case "Subscription.chatCreated":
+		if e.complexity.Subscription.ChatCreated == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_chatCreated_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.ChatCreated(childComplexity, args["userId"].(string)), true
 	case "Subscription.dialogRead":
 		if e.complexity.Subscription.DialogRead == nil {
 			break
@@ -1249,6 +1269,17 @@ func (ec *executionContext) field_Query_sessions_args(ctx context.Context, rawAr
 	return args, nil
 }
 
+func (ec *executionContext) field_Subscription_chatCreated_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["userId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Subscription_dialogRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1760,6 +1791,35 @@ func (ec *executionContext) fieldContext_Chat_messages(_ context.Context, field 
 				return ec.fieldContext_Message_forwardedFrom(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Message", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Chat_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Chat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Chat_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Chat_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Chat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -2553,6 +2613,8 @@ func (ec *executionContext) fieldContext_Mutation_createChat(ctx context.Context
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
 				return ec.fieldContext_Chat_messages(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Chat_createdAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Chat", field.Name)
 		},
@@ -2832,6 +2894,8 @@ func (ec *executionContext) fieldContext_Mutation_createDirectChat(ctx context.C
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
 				return ec.fieldContext_Chat_messages(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Chat_createdAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Chat", field.Name)
 		},
@@ -3156,6 +3220,8 @@ func (ec *executionContext) fieldContext_Query_myChats(_ context.Context, field 
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
 				return ec.fieldContext_Chat_messages(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Chat_createdAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Chat", field.Name)
 		},
@@ -3212,6 +3278,8 @@ func (ec *executionContext) fieldContext_Query_chat(ctx context.Context, field g
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
 				return ec.fieldContext_Chat_messages(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Chat_createdAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Chat", field.Name)
 		},
@@ -3960,6 +4028,75 @@ func (ec *executionContext) fieldContext_Subscription_dialogRead(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Subscription_dialogRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_chatCreated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_chatCreated,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().ChatCreated(ctx, fc.Args["userId"].(string))
+		},
+		nil,
+		ec.marshalNChat2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐChat,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_chatCreated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Chat_id(ctx, field)
+			case "type":
+				return ec.fieldContext_Chat_type(ctx, field)
+			case "slug":
+				return ec.fieldContext_Chat_slug(ctx, field)
+			case "title":
+				return ec.fieldContext_Chat_title(ctx, field)
+			case "photoUrl":
+				return ec.fieldContext_Chat_photoUrl(ctx, field)
+			case "membersCount":
+				return ec.fieldContext_Chat_membersCount(ctx, field)
+			case "unreadCount":
+				return ec.fieldContext_Chat_unreadCount(ctx, field)
+			case "isPinned":
+				return ec.fieldContext_Chat_isPinned(ctx, field)
+			case "lastMessage":
+				return ec.fieldContext_Chat_lastMessage(ctx, field)
+			case "lastReadSequence":
+				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
+			case "members":
+				return ec.fieldContext_Chat_members(ctx, field)
+			case "messages":
+				return ec.fieldContext_Chat_messages(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Chat_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Chat", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_chatCreated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6106,6 +6243,11 @@ func (ec *executionContext) _Chat(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createdAt":
+			out.Values[i] = ec._Chat_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -7108,6 +7250,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_userStatusChanged(ctx, fields[0])
 	case "dialogRead":
 		return ec._Subscription_dialogRead(ctx, fields[0])
+	case "chatCreated":
+		return ec._Subscription_chatCreated(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
