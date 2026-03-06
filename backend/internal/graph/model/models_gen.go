@@ -28,6 +28,7 @@ type Chat struct {
 	LastReadSequence int64             `json:"lastReadSequence"`
 	Members          []*ChatMember     `json:"members,omitempty"`
 	Messages         []*models.Message `json:"messages"`
+	CreatedAt        string            `json:"createdAt"`
 }
 
 type ChatMember struct {
@@ -73,8 +74,9 @@ type UpdateUserInput struct {
 }
 
 type UserStatusPayload struct {
-	UserID string `json:"userId"`
-	Status string `json:"status"`
+	UserID   string  `json:"userId"`
+	Status   string  `json:"status"`
+	LastSeen *string `json:"lastSeen,omitempty"`
 }
 
 type VerifyEmailInput struct {

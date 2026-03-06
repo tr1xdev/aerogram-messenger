@@ -3,11 +3,17 @@ package repositories
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
+
+type PresenceStatus struct {
+	UserID   uuid.UUID `json:"userId"`
+	Status   string    `json:"status"`
+	LastSeen string    `json:"lastSeen,omitempty"`
+}
 
 type PresenceRepository struct {
 	redis *redis.Client
@@ -17,28 +23,36 @@ func NewPresenceRepository(rdb *redis.Client) *PresenceRepository {
 	return &PresenceRepository{redis: rdb}
 }
 
-func (r *PresenceRepository) key(userID string) string {
-	return fmt.Sprintf("presence:%s", userID)
+func (r *PresenceRepository) key(userID uuid.UUID) string {
+	return "presence:" + userID.String()
 }
 
-func (r *PresenceRepository) SetOnline(ctx context.Context, userID string) error {
-	err := r.redis.Set(ctx, r.key(userID), "online", 0).Err()
-	if err != nil {
+func (r *PresenceRepository) SetOnline(ctx context.Context, userID uuid.UUID, ttl time.Duration) error {
+	if err := r.redis.Set(ctx, r.key(userID), "online", ttl).Err(); err != nil {
 		return err
 	}
-	return r.publishStatus(ctx, userID, "online")
+
+	payload, _ := json.Marshal(PresenceStatus{
+		UserID: userID,
+		Status: "online",
+	})
+	return r.redis.Publish(ctx, "presence:updates", payload).Err()
 }
 
-func (r *PresenceRepository) SetOffline(ctx context.Context, userID string) error {
+func (r *PresenceRepository) SetOffline(ctx context.Context, userID uuid.UUID) error {
 	lastSeen := time.Now().Format(time.RFC3339)
-	err := r.redis.Set(ctx, r.key(userID), lastSeen, 0).Err()
-	if err != nil {
-		return err
-	}
-	return r.publishStatus(ctx, userID, lastSeen)
+
+	_ = r.redis.Set(ctx, r.key(userID), lastSeen, 24*time.Hour).Err()
+
+	payload, _ := json.Marshal(PresenceStatus{
+		UserID:   userID,
+		Status:   lastSeen,
+		LastSeen: lastSeen,
+	})
+	return r.redis.Publish(ctx, "presence:updates", payload).Err()
 }
 
-func (r *PresenceRepository) GetStatus(ctx context.Context, userID string) (string, error) {
+func (r *PresenceRepository) GetStatus(ctx context.Context, userID uuid.UUID) (string, error) {
 	val, err := r.redis.Get(ctx, r.key(userID)).Result()
 	if err == redis.Nil {
 		return "offline", nil
@@ -49,9 +63,9 @@ func (r *PresenceRepository) GetStatus(ctx context.Context, userID string) (stri
 	return val, nil
 }
 
-func (r *PresenceRepository) GetStatuses(ctx context.Context, userIDs []string) (map[string]string, error) {
+func (r *PresenceRepository) GetStatuses(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]string, error) {
 	if len(userIDs) == 0 {
-		return make(map[string]string), nil
+		return make(map[uuid.UUID]string), nil
 	}
 
 	keys := make([]string, len(userIDs))
@@ -64,22 +78,15 @@ func (r *PresenceRepository) GetStatuses(ctx context.Context, userIDs []string) 
 		return nil, err
 	}
 
-	result := make(map[string]string)
+	result := make(map[uuid.UUID]string)
 	for i, val := range values {
 		status := "offline"
 		if val != nil {
-			status = val.(string)
+			if s, ok := val.(string); ok {
+				status = s
+			}
 		}
 		result[userIDs[i]] = status
 	}
-
 	return result, nil
-}
-
-func (r *PresenceRepository) publishStatus(ctx context.Context, userID, status string) error {
-	payload, _ := json.Marshal(map[string]string{
-		"userId": userID,
-		"status": status,
-	})
-	return r.redis.Publish(ctx, "presence:updates", payload).Err()
 }

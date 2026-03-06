@@ -6,6 +6,7 @@ export interface User {
   username?: string;
   photoUrl?: string;
   status: string;
+  bio?: string;
   publicKey?: string;
   encryptedPrivKey?: string;
   encryptionIv?: string;
@@ -44,6 +45,7 @@ export interface Chat {
   unreadCount: number;
   lastReadSequence: number;
   messages?: Message[];
+  createdAt: string;
 }
 
 export interface Session {
@@ -54,4 +56,12 @@ export interface Session {
   isActive: boolean;
   isCurrent: boolean;
   createdAt: string;
+}
+
+export interface StatusChanged {
+  userStatusChanged: {
+    userId: string;
+    status: string;
+    lastSeen?: string;
+  };
 }

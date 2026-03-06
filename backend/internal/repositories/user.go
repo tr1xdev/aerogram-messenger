@@ -1,119 +1,73 @@
 package repositories
 
 import (
-	"errors"
+	"context"
+	"database/sql"
 
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
-	"gorm.io/gorm"
-)
-
-var (
-	ErrInternalDBError   = errors.New("internal db error")
-	ErrUserAlreadyExists = errors.New("user already exists")
-	ErrUserNotFound      = errors.New("user not found")
+	"github.com/google/uuid"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 )
 
 type UserRepository struct {
-	db *gorm.DB
+	db *database.DB
 }
 
-func NewUserRepository(db *gorm.DB) *UserRepository {
+func NewUserRepository(db *database.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) GetByIDs(ids []string) ([]*models.User, error) {
-	var users []*models.User
-	if len(ids) == 0 {
-		return users, nil
-	}
-	if err := r.db.Where("id IN ?", ids).Find(&users).Error; err != nil {
-		return nil, ErrInternalDBError
-	}
-	return users, nil
+func (r *UserRepository) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
+	return r.db.Queries.CreateUser(ctx, arg)
 }
 
-func (r *UserRepository) IsUserExists(u *models.User) (bool, error) {
-	var count int64
-	if err := r.db.Model(&models.User{}).Where("id = ?", u.ID).Count(&count).Error; err != nil {
-		return false, ErrInternalDBError
-	}
-	return count > 0, nil
+func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (dbgen.User, error) {
+	return r.db.Queries.GetUserByID(ctx, id)
 }
 
-func (r *UserRepository) CreateUser(u *models.User) error {
-	if err := r.db.Create(u).Error; err != nil {
-		return ErrInternalDBError
-	}
-	return nil
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (dbgen.User, error) {
+	return r.db.Queries.GetUserByEmail(ctx, email)
 }
 
-func (r *UserRepository) GetByID(id string) (*models.User, error) {
-	var u models.User
-	if err := r.db.First(&u, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, ErrInternalDBError
-	}
-	return &u, nil
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (dbgen.User, error) {
+	return r.db.Queries.GetUserByUsername(ctx, database.StringToNullString(username))
 }
 
-func (r *UserRepository) SearchByUsername(query string) ([]*models.User, error) {
-	var users []*models.User
-	err := r.db.Where("username ILIKE ? AND username != ''", query+"%").Limit(20).Find(&users).Error
-	return users, err
+func (r *UserRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]dbgen.User, error) {
+	return r.db.Queries.GetUsersByIDs(ctx, ids)
 }
 
-func (r *UserRepository) UpdateProfile(id string, updates map[string]interface{}) (*models.User, error) {
-	var u models.User
-	if err := r.db.Model(&u).Where("id = ?", id).Updates(updates).Error; err != nil {
-		return nil, ErrInternalDBError
-	}
-	return r.GetByID(id)
+func (r *UserRepository) SearchByUsername(ctx context.Context, query string) ([]dbgen.User, error) {
+	return r.db.Queries.SearchUsersByUsername(ctx, query)
 }
 
-func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
-	var u models.User
-	if err := r.db.Where("email = ?", email).First(&u).Error; err != nil {
-		return nil, err
-	}
-	return &u, nil
+func (r *UserRepository) GlobalSearch(ctx context.Context, query string) ([]dbgen.User, error) {
+	return r.db.Queries.SearchUsersGlobal(ctx, sql.NullString{String: query, Valid: true})
 }
 
-func (r *UserRepository) GetSessions(userID string) ([]*models.Session, error) {
-	var sessions []*models.Session
-	if err := r.db.Where("user_id = ?", userID).Find(&sessions).Error; err != nil {
-		return nil, err
-	}
-	return sessions, nil
+func (r *UserRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string) error {
+	return r.db.Queries.UpdateUserStatus(ctx, dbgen.UpdateUserStatusParams{
+		ID:     id,
+		Status: status,
+	})
 }
 
-func (r *UserRepository) Search(query string) ([]*models.User, error) {
-	var users []*models.User
-	err := r.db.Where("username ILIKE ? OR first_name ILIKE ?", "%"+query+"%", "%"+query+"%").
-		Limit(20).
-		Find(&users).Error
-	return users, err
+func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.Queries.SoftDeleteUser(ctx, id)
 }
 
-func (r *UserRepository) TerminateSession(sessionID string) error {
-	if err := r.db.Model(&models.Session{}).Where("id = ?", sessionID).Update("is_active", false).Error; err != nil {
-		return ErrInternalDBError
-	}
-	return nil
+func (r *UserRepository) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
+	return r.db.Queries.CheckUserExists(ctx, id)
 }
 
-func (r *UserRepository) TerminateUserSessions(userID string) error {
-	if err := r.db.Model(&models.Session{}).Where("user_id = ?", userID).Update("is_active", false).Error; err != nil {
-		return ErrInternalDBError
-	}
-	return nil
+func (r *UserRepository) GetSessions(ctx context.Context, userID uuid.UUID) ([]dbgen.Session, error) {
+	return r.db.Queries.GetSessionsByUserID(ctx, userID)
 }
 
-func (r *UserRepository) GetActiveSession(sessionID string) (*models.Session, error) {
-	var s models.Session
-	if err := r.db.Where("id = ? AND is_active = ?", sessionID, true).First(&s).Error; err != nil {
-		return nil, err
-	}
-	return &s, nil
+func (r *UserRepository) TerminateSession(ctx context.Context, sessionID uuid.UUID) error {
+	return r.db.Queries.DeactivateSession(ctx, sessionID)
+}
+
+func (r *UserRepository) Update(ctx context.Context, params dbgen.UpdateUserParams) (dbgen.User, error) {
+	return r.db.Queries.UpdateUser(ctx, params)
 }

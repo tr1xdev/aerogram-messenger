@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,12 +35,12 @@ func TestPresenceServer(t *testing.T) {
 
 	t.Run("SetOnline", func(t *testing.T) {
 		mr.FlushAll()
-		userID := "user_1"
+		userID := uuid.New().String()
 
 		req := &presencepb.SetOnlineRequest{UserId: userID}
 		res, err := server.SetOnline(ctx, req)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, res.Ok)
 
 		val, _ := mr.Get("presence:" + userID)
@@ -48,25 +49,25 @@ func TestPresenceServer(t *testing.T) {
 
 	t.Run("IsOnline_True", func(t *testing.T) {
 		mr.FlushAll()
-		userID := "user_2"
+		userID := uuid.New().String()
 		mr.Set("presence:"+userID, "online")
 
 		req := &presencepb.IsOnlineRequest{UserId: userID}
 		res, err := server.IsOnline(ctx, req)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, res.Online)
 	})
 
 	t.Run("SetOffline", func(t *testing.T) {
 		mr.FlushAll()
-		userID := "user_3"
+		userID := uuid.New().String()
 		mr.Set("presence:"+userID, "online")
 
 		req := &presencepb.SetOfflineRequest{UserId: userID}
 		res, err := server.SetOffline(ctx, req)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, res.Ok)
 
 		val, _ := mr.Get("presence:" + userID)
@@ -75,17 +76,21 @@ func TestPresenceServer(t *testing.T) {
 
 	t.Run("GetBulk", func(t *testing.T) {
 		mr.FlushAll()
-		mr.Set("presence:u1", "online")
-		mr.Set("presence:u2", "offline")
+		u1 := uuid.New().String()
+		u2 := uuid.New().String()
+		u3 := uuid.New().String()
+
+		mr.Set("presence:"+u1, "online")
+		mr.Set("presence:"+u2, "offline")
 
 		req := &presencepb.GetBulkRequest{
-			UserIds: []string{"u1", "u2", "u3"},
+			UserIds: []string{u1, u2, u3},
 		}
 		res, err := server.GetBulk(ctx, req)
 
-		assert.NoError(t, err)
-		assert.True(t, res.Online["u1"])
-		assert.False(t, res.Online["u2"])
-		assert.False(t, res.Online["u3"])
+		require.NoError(t, err)
+		assert.True(t, res.Online[u1])
+		assert.False(t, res.Online[u2])
+		assert.False(t, res.Online[u3])
 	})
 }

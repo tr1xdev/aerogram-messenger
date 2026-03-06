@@ -2,59 +2,55 @@ package user_svc
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	errorspb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/errors/v1"
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 func ptr[T any](v T) *T {
 	return &v
 }
 
-func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-
-	err = db.AutoMigrate(&models.User{})
-	require.NoError(t, err)
-
-	return db
-}
-
 func TestUserInfo(t *testing.T) {
-	db := setupTestDB(t)
+	db := database.SetupTestDB(t)
 	server := NewServer(db)
 	ctx := context.Background()
 
-	testUser := models.User{
-		ID:        "user_1",
+	userID := uuid.New()
+	username := "alice_hub"
+
+	_, err := server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
+		ID:        userID,
+		Username:  sql.NullString{String: username, Valid: true},
 		FirstName: "Alice",
-		Username:  ptr("alice_hub"),
 		Email:     "alice@test.com",
-	}
-	db.Create(&testUser)
+		Password:  "hash",
+		Status:    "online",
+	})
+	require.NoError(t, err)
 
 	t.Run("success_by_id", func(t *testing.T) {
 		req := &userpb.UserInfoRequest{
-			Identifier: &userpb.UserInfoRequest_Id{Id: "user_1"},
+			Identifier: &userpb.UserInfoRequest_Id{Id: userID.String()},
 		}
 		resp, err := server.UserInfo(ctx, req)
 
 		assert.NoError(t, err)
 		require.NotNil(t, resp.GetUser())
 		assert.Equal(t, "Alice", resp.GetUser().FirstName)
-		assert.Equal(t, "alice_hub", *resp.GetUser().Username)
+		assert.Equal(t, username, *resp.GetUser().Username)
 	})
 
 	t.Run("not_found", func(t *testing.T) {
 		req := &userpb.UserInfoRequest{
-			Identifier: &userpb.UserInfoRequest_Id{Id: "unknown"},
+			Identifier: &userpb.UserInfoRequest_Id{Id: uuid.New().String()},
 		}
 		resp, err := server.UserInfo(ctx, req)
 
@@ -65,21 +61,24 @@ func TestUserInfo(t *testing.T) {
 }
 
 func TestUpdateUser(t *testing.T) {
-	db := setupTestDB(t)
+	db := database.SetupTestDB(t)
 	server := NewServer(db)
 	ctx := context.Background()
 
-	testUser := models.User{
-		ID:        "user_update",
+	userID := uuid.New()
+	_, err := server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
+		ID:        userID,
 		FirstName: "OldName",
 		Email:     "update@test.com",
-	}
-	db.Create(&testUser)
+		Password:  "hash",
+		Status:    "online",
+	})
+	require.NoError(t, err)
 
 	t.Run("partial_update_success", func(t *testing.T) {
 		newName := "NewName"
 		req := &userpb.UpdateUserRequest{
-			Id:        "user_update",
+			Id:        userID.String(),
 			FirstName: &newName,
 		}
 
@@ -88,23 +87,59 @@ func TestUpdateUser(t *testing.T) {
 		require.NotNil(t, resp.GetUser())
 		assert.Equal(t, newName, resp.GetUser().FirstName)
 
-		var updated models.User
-		db.First(&updated, "id = ?", "user_update")
+		updated, err := server.userRepo.GetByID(ctx, userID)
+		assert.NoError(t, err)
 		assert.Equal(t, newName, updated.FirstName)
 	})
 }
 
 func TestGetUsers(t *testing.T) {
-	db := setupTestDB(t)
+	db := database.SetupTestDB(t)
 	server := NewServer(db)
 	ctx := context.Background()
 
-	db.Create(&models.User{ID: "u1", FirstName: "User1", Email: "u1@test.com"})
-	db.Create(&models.User{ID: "u2", FirstName: "User2", Email: "u2@test.com"})
+	u1 := uuid.New()
+	u2 := uuid.New()
 
-	req := &userpb.GetUsersRequest{Ids: []string{"u1", "u2"}}
+	_, _ = server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
+		ID: u1, FirstName: "User1", Email: "u1@test.com", Password: "p", Status: "s",
+	})
+	_, _ = server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
+		ID: u2, FirstName: "User2", Email: "u2@test.com", Password: "p", Status: "s",
+	})
+
+	req := &userpb.GetUsersRequest{Ids: []string{u1.String(), u2.String()}}
 	resp, err := server.GetUsers(ctx, req)
 
 	assert.NoError(t, err)
 	assert.Len(t, resp.Users, 2)
+}
+
+func TestSearchUsers(t *testing.T) {
+	db := database.SetupTestDB(t)
+	server := NewServer(db)
+	ctx := context.Background()
+
+	searchID := uuid.New()
+	_, err := server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
+		ID:        searchID,
+		Username:  sql.NullString{String: "search_me", Valid: true},
+		FirstName: "Search",
+		Email:     "search@test.com",
+		Password:  "p",
+		Status:    "s",
+	})
+	require.NoError(t, err)
+
+	t.Run("search_by_username", func(t *testing.T) {
+		req := &userpb.SearchUsersRequest{
+			Query:  "search",
+			Global: false,
+		}
+		resp, err := server.SearchUsers(ctx, req)
+
+		assert.NoError(t, err)
+		assert.NotEmpty(t, resp.Users)
+		assert.Equal(t, "search_me", *resp.Users[0].Username)
+	})
 }

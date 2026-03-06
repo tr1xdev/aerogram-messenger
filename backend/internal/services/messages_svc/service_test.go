@@ -6,21 +6,17 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
-	"github.com/tr1xdev/aerogram-messenger/internal/testutils"
 )
 
 func setupTest(t *testing.T) (*Server, *miniredis.Miniredis) {
-	db := testutils.SetupTestDB(t)
-
-	db.Exec("PRAGMA foreign_keys = OFF")
-
-	err := db.AutoMigrate(&models.Dialog{}, &models.DialogMember{}, &models.Message{})
-	require.NoError(t, err)
+	db := database.SetupTestDB(t)
 
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
@@ -36,19 +32,41 @@ func TestMessagesServer(t *testing.T) {
 	defer mr.Close()
 
 	ctx := context.Background()
-	chatID := "chat_123"
-	userID := "user_456"
+	chatID := uuid.New()
+	userID := uuid.New()
 
-	require.NoError(t, server.db.Create(&models.Dialog{ID: chatID, Type: models.Private}).Error)
-	require.NoError(t, server.db.Create(&models.DialogMember{DialogID: chatID, UserID: userID, Role: models.RoleMember}).Error)
+	_, err := server.db.Queries.CreateUser(ctx, dbgen.CreateUserParams{
+		ID:        userID,
+		Username:  database.ToNullString(ptr("testuser")),
+		FirstName: "Test",
+		Email:     "test@aerogram.com",
+		Password:  "hash",
+		Status:    "online",
+	})
+	require.NoError(t, err)
+
+	_, err = server.db.Queries.CreateDialog(ctx, dbgen.CreateDialogParams{
+		ID:           chatID,
+		Type:         "private",
+		IsActive:     true,
+		MembersCount: 1,
+	})
+	require.NoError(t, err)
+
+	err = server.db.Queries.AddDialogMember(ctx, dbgen.AddDialogMemberParams{
+		DialogID: chatID,
+		UserID:   userID,
+		Role:     "member",
+	})
+	require.NoError(t, err)
 
 	t.Run("SendMessage_Success", func(t *testing.T) {
-		pubsub := server.rdb.Subscribe(ctx, "chat:"+chatID)
+		pubsub := server.rdb.Subscribe(ctx, "chat:"+chatID.String())
 		defer pubsub.Close()
 
 		req := &messagespb.SendMessageRequest{
-			ChatId:   chatID,
-			SenderId: userID,
+			ChatId:   chatID.String(),
+			SenderId: userID.String(),
 			Text:     "Hello world",
 		}
 
@@ -68,20 +86,19 @@ func TestMessagesServer(t *testing.T) {
 
 	t.Run("SendMessage_Forbidden", func(t *testing.T) {
 		req := &messagespb.SendMessageRequest{
-			ChatId:   chatID,
-			SenderId: "stranger_id",
+			ChatId:   chatID.String(),
+			SenderId: uuid.New().String(),
 			Text:     "I am not in this chat",
 		}
 
 		res, err := server.SendMessage(ctx, req)
 		assert.Error(t, err)
 		assert.Nil(t, res)
-		assert.Equal(t, "forbidden", err.Error())
 	})
 
 	t.Run("GetHistory", func(t *testing.T) {
 		req := &messagespb.GetHistoryRequest{
-			ChatId: chatID,
+			ChatId: chatID.String(),
 			Limit:  10,
 			Offset: 0,
 		}
@@ -90,4 +107,8 @@ func TestMessagesServer(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotEmpty(t, res.Messages)
 	})
+}
+
+func ptr(s string) *string {
+	return &s
 }

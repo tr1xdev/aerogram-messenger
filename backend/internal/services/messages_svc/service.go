@@ -2,66 +2,77 @@ package messages_svc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"time"
 
-	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	"gorm.io/gorm"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
+	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Server struct {
 	messagespb.UnimplementedMessagesServiceServer
-	db  *gorm.DB
-	rdb *redis.Client
+	db          *database.DB
+	rdb         *redis.Client
+	messageRepo *repositories.MessageRepository
+	dialogRepo  *repositories.DialogRepository
 }
 
-func NewServer(db *gorm.DB, rdb *redis.Client) *Server {
-	return &Server{db: db, rdb: rdb}
+func NewServer(db *database.DB, rdb *redis.Client) *Server {
+	return &Server{
+		db:          db,
+		rdb:         rdb,
+		messageRepo: repositories.NewMessageRepository(db),
+		dialogRepo:  repositories.NewDialogRepository(db),
+	}
 }
 
 func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageRequest) (*messagespb.SendMessageResponse, error) {
-	var count int64
-	s.db.Model(&models.DialogMember{}).
-		Where("dialog_id = ? AND user_id = ?", req.ChatId, req.SenderId).
-		Count(&count)
-
-	if count == 0 {
-		return nil, errors.New("forbidden")
+	chatID, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+	senderID, err := uuid.Parse(req.SenderId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
 
-	msg := &models.Message{
-		ID:           uuid.NewString(),
-		DialogID:     req.ChatId,
-		AuthorID:     req.SenderId,
+	_, err = s.dialogRepo.GetMember(ctx, req.ChatId, req.SenderId)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, "forbidden")
+	}
+
+	msg, err := s.messageRepo.Create(ctx, dbgen.CreateMessageParams{
+		ID:           uuid.New(),
+		DialogID:     chatID,
+		AuthorID:     senderID,
 		Content:      req.Text,
 		IsEncrypted:  req.IsEncrypted,
-		EncryptionIV: req.EncryptionIv,
-		ReplyToID:    req.ReplyToId,
-		CreatedAt:    time.Now(),
-	}
-
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(msg).Error; err != nil {
-			return err
-		}
-
-		return tx.Model(&models.Dialog{}).
-			Where("id = ?", req.ChatId).
-			Updates(map[string]interface{}{
-				"last_message_id": msg.ID,
-				"last_message_at": msg.CreatedAt,
-			}).Error
+		EncryptionIv: database.ToNullString(req.EncryptionIv),
+		ReplyToID:    database.ToNullUUIDPtr(req.ReplyToId),
+		IsSystem:     false,
 	})
-
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	pb := mapModelToProto(msg)
+	err = s.dialogRepo.UpdateLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
+		ID:            chatID,
+		LastMessageID: uuid.NullUUID{UUID: msg.ID, Valid: true},
+		LastMessageAt: sql.NullTime{Time: msg.CreatedAt, Valid: true},
+	})
+	if err != nil {
+		fmt.Printf("failed to update dialog last message: %v\n", err)
+	}
+
+	pb := s.mapDBToProto(msg)
 	data, _ := json.Marshal(pb)
 	s.rdb.Publish(ctx, "chat:"+req.ChatId, data)
 
@@ -69,106 +80,81 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 }
 
 func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
-	var msgs []models.Message
-
-	err := s.db.
-		Where("dialog_id = ? AND is_deleted = false", req.ChatId).
-		Order("sequence DESC").
-		Limit(int(req.Limit)).
-		Offset(int(req.Offset)).
-		Find(&msgs).Error
-
+	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+	msgs, err := s.messageRepo.GetHistory(ctx, chatID, req.Limit, req.Offset)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	res := make([]*messagespb.Message, 0, len(msgs))
-	for i := range msgs {
-		res = append(res, mapModelToProto(&msgs[i]))
+	for _, m := range msgs {
+		res = append(res, s.mapDBToProto(m))
 	}
 
 	return &messagespb.GetHistoryResponse{Messages: res}, nil
 }
 
 func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessageRequest) (*messagespb.UpdateMessageResponse, error) {
-	var msg models.Message
+	id, _ := uuid.Parse(req.Id)
+	senderID, _ := uuid.Parse(req.SenderId)
 
-	if err := s.db.First(&msg, "id = ?", req.Id).Error; err != nil {
-		return nil, err
+	msg, err := s.messageRepo.Update(ctx, id, senderID, req.Text)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to update")
 	}
 
-	if msg.AuthorID != req.SenderId {
-		return nil, errors.New("forbidden")
-	}
-
-	if err := s.db.Model(&msg).
-		Updates(map[string]interface{}{
-			"content":   req.Text,
-			"is_edited": true,
-		}).Error; err != nil {
-		return nil, err
-	}
-
-	return &messagespb.UpdateMessageResponse{
-		Message: mapModelToProto(&msg),
-	}, nil
+	return &messagespb.UpdateMessageResponse{Message: s.mapDBToProto(msg)}, nil
 }
 
 func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessageRequest) (*messagespb.DeleteMessageResponse, error) {
-	err := s.db.Model(&models.Message{}).
-		Where("id = ? AND author_id = ?", req.Id, req.SenderId).
-		Update("is_deleted", true).Error
+	id, _ := uuid.Parse(req.Id)
+	senderID, _ := uuid.Parse(req.SenderId)
 
-	if err != nil {
-		return nil, err
+	if err := s.messageRepo.Delete(ctx, id, senderID); err != nil {
+		return nil, status.Error(codes.Internal, "failed to delete")
 	}
 
 	return &messagespb.DeleteMessageResponse{Success: true}, nil
 }
 
 func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadRequest) (*messagespb.MarkAsReadResponse, error) {
-	var lastMsg models.Message
-	if err := s.db.First(&lastMsg, "id = ?", req.LastMessageId).Error; err != nil {
-		return nil, err
+	chatID, _ := uuid.Parse(req.ChatId)
+	userID, _ := uuid.Parse(req.UserId)
+	msgID, _ := uuid.Parse(req.LastMessageId)
+
+	msg, err := s.messageRepo.GetByID(ctx, msgID)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "message not found")
 	}
 
-	err := s.db.Model(&models.DialogMember{}).
-		Where("dialog_id = ? AND user_id = ?", req.ChatId, req.UserId).
-		Update("last_read_sequence", lastMsg.Sequence).Error
-
-	if err != nil {
-		return nil, err
+	if err := s.messageRepo.MarkRead(ctx, chatID, userID, msg.Sequence); err != nil {
+		return nil, status.Error(codes.Internal, "failed to mark read")
 	}
 
 	return &messagespb.MarkAsReadResponse{Success: true}, nil
 }
 
-func mapModelToProto(m *models.Message) *messagespb.Message {
+func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 	pb := &messagespb.Message{
-		Id:           m.ID,
-		ChatId:       m.DialogID,
-		SenderId:     m.AuthorID,
-		Text:         m.Content,
-		SentAt:       m.CreatedAt.Format(time.RFC3339),
-		Sequence:     m.Sequence,
-		IsEdited:     m.IsEdited,
-		IsEncrypted:  m.IsEncrypted,
-		EncryptionIv: m.EncryptionIV,
-		IsSystem:     m.IsSystem,
-		ReplyToId:    m.ReplyToID,
+		Id:          m.ID.String(),
+		ChatId:      m.DialogID.String(),
+		SenderId:    m.AuthorID.String(),
+		Text:        m.Content,
+		SentAt:      m.CreatedAt.Format(time.RFC3339),
+		Sequence:    m.Sequence,
+		IsEdited:    m.IsEdited,
+		IsEncrypted: m.IsEncrypted,
+		IsSystem:    m.IsSystem,
 	}
-
-	if m.ForwardFromID != nil {
-		pb.ForwardedFromId = m.ForwardFromID
+	if m.EncryptionIv.Valid {
+		pb.EncryptionIv = &m.EncryptionIv.String
 	}
-
-	if m.MediaURL != nil {
-		pb.MediaUrl = m.MediaURL
+	if m.ReplyToID.Valid {
+		id := m.ReplyToID.UUID.String()
+		pb.ReplyToId = &id
 	}
-
-	if m.MediaType != nil {
-		pb.MediaType = m.MediaType
-	}
-
 	return pb
 }

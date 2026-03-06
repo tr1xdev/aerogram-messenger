@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader/v7"
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
@@ -35,15 +36,16 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 
 				userMap := make(map[string]*models.User)
 				for _, u := range res.Users {
+					uid, _ := uuid.Parse(u.Id)
 					userMap[u.Id] = &models.User{
-						ID:               u.Id,
+						ID:               uid,
 						FirstName:        u.FirstName,
-						LastName:         u.LastName,
-						Username:         u.Username,
+						LastName:         toStringPtr(u.LastName),
+						Username:         toStringPtr(u.Username),
 						Email:            u.GetEmail(),
-						PublicKey:        u.PublicKey,
-						EncryptedPrivKey: u.EncryptedPrivKey,
-						EncryptionIv:     u.EncryptionIv,
+						PublicKey:        toStringPtr(u.PublicKey),
+						EncryptedPrivKey: toStringPtr(u.EncryptedPrivKey),
+						EncryptionIv:     toStringPtr(u.EncryptionIv),
 					}
 				}
 
@@ -58,7 +60,12 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 			}
 
 			presenceBatchFn := func(ctx context.Context, keys []string) []*dataloader.Result[string] {
-				res, err := pRepo.GetStatuses(ctx, keys)
+				uids := make([]uuid.UUID, len(keys))
+				for i, k := range keys {
+					uids[i], _ = uuid.Parse(k)
+				}
+
+				res, err := pRepo.GetStatuses(ctx, uids)
 				output := make([]*dataloader.Result[string], len(keys))
 				if err != nil {
 					for i := range output {
@@ -66,7 +73,7 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 					}
 					return output
 				}
-				for i, id := range keys {
+				for i, id := range uids {
 					status := "offline"
 					if s, ok := res[id]; ok {
 						status = s

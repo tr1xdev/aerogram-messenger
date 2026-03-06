@@ -1,37 +1,57 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "system";
 
 interface ThemeStore {
   theme: Theme;
-  toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
 }
+
+const applyTheme = (theme: Theme) => {
+  const root = window.document.documentElement;
+  root.classList.remove("light", "dark");
+
+  if (theme === "system") {
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+      .matches
+      ? "dark"
+      : "light";
+    root.classList.add(systemTheme);
+    return;
+  }
+
+  root.classList.add(theme);
+};
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
-    (set, get) => ({
-      theme: "light",
-      toggleTheme: () => {
-        const newTheme = get().theme === "light" ? "dark" : "light";
-        document.documentElement.classList.toggle("dark", newTheme === "dark");
-        set({ theme: newTheme });
+    (set) => ({
+      theme: "system",
+      setTheme: (theme) => {
+        applyTheme(theme);
+        set({ theme });
       },
     }),
     {
       name: "theme-storage",
       storage: createJSONStorage(() => localStorage),
-      onRehydrateStorage: () => {
-        const stored = localStorage.getItem("theme-storage");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.state?.theme === "dark") {
-            document.documentElement.classList.add("dark");
-          } else {
-            document.documentElement.classList.remove("dark");
-          }
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          applyTheme(state.theme);
         }
       },
     },
   ),
 );
+
+if (typeof window !== "undefined") {
+  window
+    .matchMedia("(prefers-color-scheme: dark)")
+    .addEventListener("change", () => {
+      const state = useThemeStore.getState();
+      if (state.theme === "system") {
+        applyTheme("system");
+      }
+    });
+}

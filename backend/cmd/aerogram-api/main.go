@@ -8,20 +8,22 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
-	"github.com/99designs/gqlgen/graphql/handler/extension"
-	"github.com/99designs/gqlgen/graphql/handler/lru"
-	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
+	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/tr1xdev/aerogram-messenger/internal/api"
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/auth_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/chat_svc"
@@ -30,95 +32,73 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/services/presence_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/ua_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/user_svc"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/websocket"
-	"github.com/redis/go-redis/v9"
-	"github.com/vektah/gqlparser/v2/ast"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"gorm.io/gorm"
 
-	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
-	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
-	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
-	presencepb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
-	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
+	authv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
+	userv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 )
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to load config: %v", err)
 	}
 
 	db, err := database.NewPostgres(cfg.PostgresDSN())
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to connect to postgres: %v", err)
 	}
+	defer db.Close()
 
 	rdb := database.NewRedis(cfg.RedisAddr(), cfg.RedisPassword(), 0)
-	userRepo := repositories.NewUserRepository(db)
-	presenceRepo := repositories.NewPresenceRepository(rdb)
+	defer rdb.Close()
 
-	geoService := geo_svc.New("assets/GeoLite2-City.mmdb")
-	defer geoService.Close()
+	uRepo := repositories.NewUserRepository(db)
+	pRepo := repositories.NewPresenceRepository(rdb)
 
-	uaService := ua_svc.New()
+	templatePath := "internal/templates/verification.html"
+	emailSvc, err := mailer.NewResendService(cfg.Resend.Token, cfg.Resend.From, templatePath)
+	if err != nil {
+		log.Printf("Warning: mailer init error: %v", err)
+	}
 
-	db.Exec("CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";")
-
-	db.AutoMigrate(
-		&models.User{},
-		&models.Session{},
-		&models.Dialog{},
-		&models.DialogMember{},
-		&models.DialogSettings{},
-		&models.Message{},
-		&models.MessageRevision{},
-		&models.MessageAction{},
-	)
+	geoSvc := geo_svc.New("assets/GeoLite2-City.mmdb")
+	defer geoSvc.Close()
+	uaSvc := ua_svc.New()
 
 	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.GRPC.Host, cfg.Server.GRPC.Port)
 	grpcLis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to listen grpc: %v", err)
 	}
 
 	grpcServer := grpc.NewServer()
-	initGRPC(grpcServer, db, rdb, cfg, presenceRepo)
+	registerGRPCServices(grpcServer, db, rdb, emailSvc, cfg, pRepo)
 
 	go func() {
+		log.Printf("gRPC server listening on %s", grpcAddr)
 		if err := grpcServer.Serve(grpcLis); err != nil && err != grpc.ErrServerStopped {
-			log.Fatalf("gRPC error: %v", err)
+			log.Fatalf("grpc serve error: %v", err)
 		}
 	}()
 
 	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to create grpc client: %v", err)
 	}
 	defer conn.Close()
 
-	userClient := userpb.NewUserServiceClient(conn)
-
-	srv := initGraphQL(db, userRepo, rdb, presenceRepo, conn, cfg, geoService, uaService)
 	router := chi.NewRouter()
+	applyMiddleware(router, cfg, db, conn, pRepo)
 
-	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight"},
-		AllowCredentials: true,
-	}))
+	gqlServer := initGraphQL(db, uRepo, rdb, pRepo, conn, cfg, geoSvc, uaSvc)
+	api.SetupRoutes(router, gqlServer)
 
-	router.Use(graph.LoaderMiddleware(userClient, presenceRepo))
-	router.Use(middleware.AuthMiddleware(cfg, db))
-	api.SetupRoutes(router, srv)
-
+	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 	httpServer := &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port),
+		Addr:    httpAddr,
 		Handler: router,
 	}
 
@@ -126,14 +106,14 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("HTTP server on %s", httpServer.Addr)
+		log.Printf("HTTP server listening on %s", httpAddr)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP error: %v", err)
+			log.Fatalf("http listen error: %v", err)
 		}
 	}()
 
 	<-stop
-	log.Println("Shutting down servers...")
+	log.Println("Shutting down gracefully...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -141,26 +121,33 @@ func main() {
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		log.Printf("HTTP shutdown error: %v", err)
 	}
-
 	grpcServer.GracefulStop()
-
-	sqlDB, _ := db.DB()
-	if sqlDB != nil {
-		sqlDB.Close()
-	}
-	rdb.Close()
+	log.Println("Server stopped")
 }
 
-func initGRPC(s *grpc.Server, db *gorm.DB, rdb *redis.Client, cfg *config.Config, pRepo *repositories.PresenceRepository) {
-	authpb.RegisterAuthServiceServer(s, auth_svc.NewServer(db, rdb, cfg))
-	chatpb.RegisterChatServiceServer(s, chat_svc.NewServer(db))
-	messagespb.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
-	presencepb.RegisterPresenceServiceServer(s, presence_svc.NewServer(pRepo))
-	userpb.RegisterUserServiceServer(s, user_svc.NewServer(db))
+func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pRepo *repositories.PresenceRepository) {
+	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, rdb, mailer, cfg))
+	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(db))
+	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
+	presencev1.RegisterPresenceServiceServer(s, presence_svc.NewServer(pRepo))
+	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
+}
+
+func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn, pRepo *repositories.PresenceRepository) {
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight"},
+		AllowCredentials: true,
+	}))
+
+	userClient := userv1.NewUserServiceClient(conn)
+	r.Use(graph.LoaderMiddleware(userClient, pRepo))
+	r.Use(middleware.AuthMiddleware(cfg, db))
 }
 
 func initGraphQL(
-	db *gorm.DB,
+	db *database.DB,
 	uRepo *repositories.UserRepository,
 	rdb *redis.Client,
 	pRepo *repositories.PresenceRepository,
@@ -169,85 +156,18 @@ func initGraphQL(
 	geoSvc *geo_svc.Service,
 	uaSvc *ua_svc.Service,
 ) *handler.Server {
-	authClient := authpb.NewAuthServiceClient(conn)
-	chatClient := chatpb.NewChatServiceClient(conn)
-	msgClient := messagespb.NewMessagesServiceClient(conn)
-	userClient := userpb.NewUserServiceClient(conn)
-
 	resolver := graph.NewResolver(
 		db,
 		uRepo,
-		authClient,
-		chatClient,
-		msgClient,
-		userClient,
+		authv1.NewAuthServiceClient(conn),
+		chatv1.NewChatServiceClient(conn),
+		messagesv1.NewMessagesServiceClient(conn),
+		userv1.NewUserServiceClient(conn),
 		rdb,
 		pRepo,
 		geoSvc,
 		uaSvc,
 	)
 
-	schema := graph.NewExecutableSchema(graph.Config{Resolvers: resolver})
-	srv := handler.New(schema)
-
-	srv.AddTransport(transport.Websocket{
-		KeepAlivePingInterval: 10 * time.Second,
-		Upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
-		},
-		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
-			auth, ok := initPayload["Authorization"].(string)
-			if !ok || auth == "" {
-				return ctx, nil, nil
-			}
-
-			tokenString := strings.TrimPrefix(auth, "Bearer ")
-			secret := cfg.JWT.Secret
-
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-				}
-				return []byte(secret), nil
-			})
-
-			if err == nil && token.Valid {
-				if claims, ok := token.Claims.(jwt.MapClaims); ok {
-					userID, _ := claims["sub"].(string)
-					sessionID, _ := claims["sid"].(string)
-
-					if userID != "" && sessionID != "" {
-						var session models.Session
-						err := db.Select("id").Where("id = ? AND user_id = ? AND is_active = ?", sessionID, userID, true).First(&session).Error
-						if err != nil {
-							return nil, nil, fmt.Errorf("session terminated")
-						}
-
-						newCtx := context.WithValue(ctx, middleware.AuthUserIDKey, userID)
-						newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sessionID)
-						newCtx = context.WithValue(newCtx, middleware.AuthTokenKey, tokenString)
-
-						_ = pRepo.SetOnline(newCtx, userID)
-						go func() {
-							<-newCtx.Done()
-							_ = pRepo.SetOffline(context.Background(), userID)
-						}()
-
-						return newCtx, nil, nil
-					}
-				}
-			}
-			return ctx, nil, nil
-		},
-	})
-
-	srv.AddTransport(transport.Options{})
-	srv.AddTransport(transport.GET{})
-	srv.AddTransport(transport.POST{})
-	srv.AddTransport(transport.MultipartForm{})
-
-	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-	srv.Use(extension.Introspection{})
-
-	return srv
+	return graph.NewGraphQLServer(resolver, cfg, db, pRepo)
 }

@@ -1,173 +1,85 @@
 package repositories
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"html/template"
 	"math/big"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/resend/resend-go/v3"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
 )
 
 var (
 	ErrCodeInvalid     = errors.New("invalid verification code")
 	ErrCodeExpired     = errors.New("verification code expired")
 	ErrTooManyAttempts = errors.New("too many attempts")
-	ErrResendCooldown  = errors.New("resend cooldown active")
 )
 
+type EmailProvider interface {
+	SendCode(ctx context.Context, to, code, name string) error
+}
+
 type AuthRepository struct {
-	rdb       *redis.Client
-	resend    *resend.Client
-	codeTTL   time.Duration
-	resendTTL time.Duration
+	db      *database.DB
+	rdb     *redis.Client
+	mailer  EmailProvider
+	codeTTL time.Duration
 }
 
-func NewAuthRepository(rdb *redis.Client, resendKey string) *AuthRepository {
-	return &AuthRepository{
-		rdb:       rdb,
-		resend:    resend.NewClient(resendKey),
-		codeTTL:   15 * time.Minute,
-		resendTTL: 60 * time.Second,
-	}
+func NewAuthRepository(db *database.DB, rdb *redis.Client, mailer EmailProvider, ttl time.Duration) *AuthRepository {
+	return &AuthRepository{db: db, rdb: rdb, mailer: mailer, codeTTL: ttl}
 }
 
-func (r *AuthRepository) codeKey(verificationID string) string {
-	return "auth:verify:" + verificationID
-}
+func (r *AuthRepository) StoreAndSendCode(ctx context.Context, verID, userID, email, name string) error {
+	num, _ := rand.Int(rand.Reader, big.NewInt(1000000))
+	code := fmt.Sprintf("%06d", num.Int64())
 
-func (r *AuthRepository) generateCode() (string, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
-}
-
-func (r *AuthRepository) StoreAndSendCode(ctx context.Context, verificationID, userID, email, firstName string) error {
-	code, err := r.generateCode()
-	if err != nil {
-		return err
-	}
-
-	env := os.Getenv("APP_ENV")
-	testEmail := os.Getenv("TEST_EMAIL")
-
-	if env == "development" {
-		fmt.Printf("=== [DEV MODE] Code for %s: %s (VerifID: %s)\n", email, code, verificationID)
-	}
+	fmt.Printf("DEBUG: Verification code for %s is %s\n", email, code)
 
 	sum := sha256.Sum256([]byte(code))
 	hash := hex.EncodeToString(sum[:])
+	key := "auth:verify:" + verID
 
-	pipe := r.rdb.TxPipeline()
-	key := r.codeKey(verificationID)
-	pipe.HSet(ctx, key, "hash", hash, "user_id", userID, "attempts", 0)
-	pipe.Expire(ctx, key, r.codeTTL)
+	err := r.rdb.HSet(ctx, key, map[string]interface{}{
+		"hash":     hash,
+		"user_id":  userID,
+		"attempts": 0,
+	}).Err()
 
-	if _, err := pipe.Exec(ctx); err != nil {
-		return err
-	}
-
-	if env == "development" && (os.Getenv("RESEND_TOKEN") == "" || os.Getenv("RESEND_TOKEN") == "test") {
-		return nil
-	}
-
-	templatePath := "internal/templates/verification.html"
-	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
-		return fmt.Errorf("verification template not found at %s", templatePath)
-	}
-
-	tmpl, err := template.ParseFiles(templatePath)
 	if err != nil {
 		return err
 	}
+	r.rdb.Expire(ctx, key, r.codeTTL)
 
-	var body bytes.Buffer
-	data := struct {
-		FirstName string
-		Code      string
-	}{
-		FirstName: firstName,
-		Code:      code,
-	}
-
-	if err := tmpl.Execute(&body, data); err != nil {
-		return err
-	}
-
-	targetEmail := email
-	if env == "development" && testEmail != "" {
-		targetEmail = testEmail
-	}
-
-	from := os.Getenv("RESEND_FROM")
-	if from == "" {
-		from = "onboarding@resend.dev"
-	}
-
-	_, err = r.resend.Emails.Send(&resend.SendEmailRequest{
-		From:    from,
-		To:      []string{targetEmail},
-		Subject: fmt.Sprintf("%s is your verification code", code),
-		Html:    body.String(),
-	})
-
-	return err
+	return r.mailer.SendCode(ctx, email, code, name)
 }
 
-func (r *AuthRepository) VerifyCode(ctx context.Context, verificationID, code string) (string, error) {
-	key := r.codeKey(verificationID)
-
+func (r *AuthRepository) VerifyCode(ctx context.Context, verID, code string) (string, error) {
+	key := "auth:verify:" + verID
 	data, err := r.rdb.HGetAll(ctx, key).Result()
 	if err != nil || len(data) == 0 {
 		return "", ErrCodeExpired
 	}
 
-	attempts, _ := strconv.Atoi(data["attempts"])
+	var attempts int
+	fmt.Sscanf(data["attempts"], "%d", &attempts)
 	if attempts >= 5 {
 		r.rdb.Del(ctx, key)
 		return "", ErrTooManyAttempts
 	}
 
 	sum := sha256.Sum256([]byte(code))
-	if !secureCompare(data["hash"], hex.EncodeToString(sum[:])) {
+	if subtle.ConstantTimeCompare([]byte(data["hash"]), []byte(hex.EncodeToString(sum[:]))) != 1 {
 		r.rdb.HIncrBy(ctx, key, "attempts", 1)
 		return "", ErrCodeInvalid
 	}
 
 	r.rdb.Del(ctx, key)
-
 	return data["user_id"], nil
-}
-
-func secureCompare(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	var r byte
-	for i := range a {
-		r |= a[i] ^ b[i]
-	}
-	return r == 0
-}
-
-func (r *AuthRepository) GetCodeForTest(ctx context.Context, verificationID string) (string, error) {
-	key := r.codeKey(verificationID)
-
-	code := "123456"
-	sum := sha256.Sum256([]byte(code))
-	hash := hex.EncodeToString(sum[:])
-
-	err := r.rdb.HSet(ctx, key, "hash", hash).Err()
-	return code, err
 }

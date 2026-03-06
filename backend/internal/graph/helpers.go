@@ -3,7 +3,10 @@ package graph
 import (
 	"context"
 	"errors"
+	"reflect"
 
+	"github.com/google/uuid"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
@@ -11,6 +14,9 @@ import (
 )
 
 func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb.Chat) (*model.Chat, error) {
+	parsedAuthID, _ := uuid.Parse(authID)
+	chatID, _ := uuid.Parse(pbChat.Id)
+
 	chatType := model.ChatTypePrivate
 	switch pbChat.Type {
 	case chatpb.ChatType_CHAT_TYPE_GROUP:
@@ -19,17 +25,16 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		chatType = model.ChatTypeChannel
 	}
 
-	var dbMembers []models.DialogMember
-	r.db.WithContext(ctx).Where("dialog_id = ?", pbChat.Id).Find(&dbMembers)
+	dbMembers, _ := r.db.Queries.GetDialogMembers(ctx, chatID)
 
-	idsMap := make(map[string]bool)
+	idsMap := make(map[uuid.UUID]bool)
 	var isPinned bool
 	var myReadSeq int64
 	var pReadSeq int64
 
 	for _, m := range dbMembers {
 		idsMap[m.UserID] = true
-		if m.UserID == authID {
+		if m.UserID == parsedAuthID {
 			isPinned = m.IsPinned
 			myReadSeq = m.LastReadSequence
 		} else {
@@ -43,22 +48,40 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 
 	var lastMsg *models.Message
 	if pbChat.LastMessageId != "" {
-		var msg models.Message
-		if err := r.db.WithContext(ctx).First(&msg, "id = ?", pbChat.LastMessageId).Error; err == nil {
-			lastMsg = &msg
-			idsMap[msg.AuthorID] = true
+		if mID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
+			if m, err := r.db.Queries.GetMessageByID(ctx, mID); err == nil {
+				lastMsg = &models.Message{
+					ID:           m.ID,
+					DialogID:     m.DialogID,
+					AuthorID:     m.AuthorID,
+					Content:      m.Content,
+					CreatedAt:    m.CreatedAt,
+					Sequence:     m.Sequence,
+					IsEncrypted:  m.IsEncrypted,
+					EncryptionIv: toStringPtr(m.EncryptionIv),
+				}
+				idsMap[m.AuthorID] = true
+			}
 		}
 	}
 
-	userIDs := make([]string, 0, len(idsMap))
+	userIDs := make([]uuid.UUID, 0, len(idsMap))
 	for id := range idsMap {
 		userIDs = append(userIDs, id)
 	}
 
-	users, _ := r.userRepo.GetByIDs(userIDs)
-	userMap := make(map[string]*models.User)
-	for _, u := range users {
-		userMap[u.ID] = u
+	dbUsers, _ := r.userRepo.GetByIDs(ctx, userIDs)
+	userMap := make(map[uuid.UUID]*models.User)
+	for _, u := range dbUsers {
+		userMap[u.ID] = &models.User{
+			ID:               u.ID,
+			FirstName:        u.FirstName,
+			LastName:         toStringPtr(u.LastName),
+			Username:         toStringPtr(u.Username),
+			PublicKey:        toStringPtr(u.PublicKey),
+			EncryptedPrivKey: toStringPtr(u.EncryptedPrivKey),
+			EncryptionIv:     toStringPtr(u.EncryptionIv),
+		}
 	}
 
 	var gqlMembers []*model.ChatMember
@@ -77,8 +100,8 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 
 	displayTitle := pbChat.Title
 	if chatType == model.ChatTypePrivate {
-		for _, u := range users {
-			if u.ID != authID {
+		for id, u := range userMap {
+			if id != parsedAuthID {
 				displayTitle = u.FirstName
 				if u.LastName != nil && *u.LastName != "" {
 					displayTitle += " " + *u.LastName
@@ -87,14 +110,12 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 			}
 		}
 	}
-	if displayTitle == "" {
-		displayTitle = "Chat"
-	}
 
-	var unreadCount int64
-	r.db.WithContext(ctx).Model(&models.Message{}).
-		Where("dialog_id = ? AND author_id != ? AND sequence > ?", pbChat.Id, authID, myReadSeq).
-		Count(&unreadCount)
+	uCount, _ := r.db.Queries.CountUnreadMessages(ctx, dbgen.CountUnreadMessagesParams{
+		DialogID: chatID,
+		AuthorID: parsedAuthID,
+		Sequence: myReadSeq,
+	})
 
 	return &model.Chat{
 		ID:               pbChat.Id,
@@ -104,11 +125,65 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		MembersCount:     int(pbChat.MembersCount),
 		Members:          gqlMembers,
 		LastMessage:      lastMsg,
-		UnreadCount:      int(unreadCount),
+		UnreadCount:      int(uCount),
 		IsPinned:         isPinned,
 		LastReadSequence: pReadSeq,
-		Messages:         []*models.Message{},
 	}, nil
+}
+
+func toStringPtr(val interface{}) *string {
+	if val == nil {
+		return nil
+	}
+
+	switch v := val.(type) {
+	case string:
+		return &v
+	case *string:
+		return v
+	case []byte:
+		s := string(v)
+		return &s
+	}
+
+	type scanner interface {
+		Value() (interface{}, error)
+	}
+
+	if s, ok := val.(scanner); ok {
+		raw, err := s.Value()
+		if err == nil && raw != nil {
+			switch r := raw.(type) {
+			case string:
+				return &r
+			case []byte:
+				str := string(r)
+				return &str
+			}
+		}
+	}
+
+	rv := reflect.ValueOf(val)
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+
+	if rv.Kind() == reflect.Struct {
+		valid := rv.FieldByName("Valid")
+		str := rv.FieldByName("String")
+		if valid.IsValid() && str.IsValid() && valid.Kind() == reflect.Bool && str.Kind() == reflect.String {
+			if valid.Bool() {
+				s := str.String()
+				return &s
+			}
+			return nil
+		}
+	}
+
+	return nil
 }
 
 func mapGRPCError(err error) error {
@@ -119,8 +194,4 @@ func mapGRPCError(err error) error {
 		return errors.New(st.Message())
 	}
 	return err
-}
-
-func StringPtr(s string) *string {
-	return &s
 }

@@ -2,7 +2,9 @@ package presence_svc
 
 import (
 	"context"
+	"time"
 
+	"github.com/google/uuid"
 	presencepb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
@@ -19,34 +21,68 @@ func NewServer(repo *repositories.PresenceRepository) *Server {
 }
 
 func (s *Server) SetOnline(ctx context.Context, req *presencepb.SetOnlineRequest) (*presencepb.SetOnlineResponse, error) {
-	err := s.repo.SetOnline(ctx, req.UserId)
+	uid, err := uuid.Parse(req.UserId)
 	if err != nil {
-		return &presencepb.SetOnlineResponse{Ok: false}, status.Error(codes.Internal, "failed to set online status")
+		return nil, status.Error(codes.InvalidArgument, "invalid user id")
 	}
+
+	if err := s.repo.SetOnline(ctx, uid, 30*time.Second); err != nil {
+		return nil, status.Error(codes.Internal, "failed to set online")
+	}
+
 	return &presencepb.SetOnlineResponse{Ok: true}, nil
 }
 
 func (s *Server) SetOffline(ctx context.Context, req *presencepb.SetOfflineRequest) (*presencepb.SetOfflineResponse, error) {
-	err := s.repo.SetOffline(ctx, req.UserId)
+	uid, err := uuid.Parse(req.UserId)
 	if err != nil {
-		return &presencepb.SetOfflineResponse{Ok: false}, status.Error(codes.Internal, "failed to set offline status")
+		return nil, status.Error(codes.InvalidArgument, "invalid user id")
 	}
+
+	if err := s.repo.SetOffline(ctx, uid); err != nil {
+		return nil, status.Error(codes.Internal, "failed to set offline")
+	}
+
 	return &presencepb.SetOfflineResponse{Ok: true}, nil
 }
 
 func (s *Server) IsOnline(ctx context.Context, req *presencepb.IsOnlineRequest) (*presencepb.IsOnlineResponse, error) {
-	statusStr, err := s.repo.GetStatus(ctx, req.UserId)
+	uid, err := uuid.Parse(req.UserId)
 	if err != nil {
-		return &presencepb.IsOnlineResponse{Online: false}, status.Error(codes.Internal, "failed to retrieve status")
+		return nil, status.Error(codes.InvalidArgument, "invalid user id")
 	}
-	return &presencepb.IsOnlineResponse{Online: statusStr == "online"}, nil
+
+	statuses, err := s.repo.GetStatuses(ctx, []uuid.UUID{uid})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get status")
+	}
+
+	return &presencepb.IsOnlineResponse{Online: statuses[uid] == "online"}, nil
 }
 
 func (s *Server) GetBulk(ctx context.Context, req *presencepb.GetBulkRequest) (*presencepb.GetBulkResponse, error) {
-	res := make(map[string]bool, len(req.UserIds))
-	for _, id := range req.UserIds {
-		statusStr, _ := s.repo.GetStatus(ctx, id)
-		res[id] = statusStr == "online"
+	if len(req.UserIds) == 0 {
+		return &presencepb.GetBulkResponse{Online: make(map[string]bool)}, nil
 	}
+
+	uids := make([]uuid.UUID, len(req.UserIds))
+	for i, idStr := range req.UserIds {
+		uid, err := uuid.Parse(idStr)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid user id at index %d", i)
+		}
+		uids[i] = uid
+	}
+
+	statuses, err := s.repo.GetStatuses(ctx, uids)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get bulk statuses")
+	}
+
+	res := make(map[string]bool, len(uids))
+	for _, uid := range uids {
+		res[uid.String()] = statuses[uid] == "online"
+	}
+
 	return &presencepb.GetBulkResponse{Online: res}, nil
 }

@@ -56,6 +56,7 @@ export const GET_MY_CHATS = gql`
       unreadCount
       lastReadSequence
       members {
+        lastReadSequence
         user {
           id
           email
@@ -92,6 +93,7 @@ export const GET_CHAT_BY_ID = gql`
       type
       lastReadSequence
       members {
+        lastReadSequence
         user {
           id
           email
@@ -238,6 +240,45 @@ export const USER_PRESENCE_SUBSCRIPTION = gql`
   subscription OnUserStatusChanged($chatId: ID!) {
     userStatusChanged(chatId: $chatId) {
       userId
+      status
+      lastSeen
+    }
+  }
+`;
+
+export const CHAT_CREATED_SUBSCRIPTION = gql`
+  subscription OnChatCreated($userId: String!) {
+    chatCreated(userID: $userId) {
+      id
+      type
+      title
+      photoUrl
+      unreadCount
+      isPinned
+      createdAt
+      lastReadSequence
+      lastMessage {
+        id
+        text
+        sentAt
+        sequence
+        sender {
+          id
+          username
+        }
+      }
+    }
+  }
+`;
+
+export const GET_USER_BY_ID = gql`
+  query GetUser($id: ID!) {
+    getUser(id: $id) {
+      id
+      email
+      first_name
+      last_name
+      username
       status
     }
   }

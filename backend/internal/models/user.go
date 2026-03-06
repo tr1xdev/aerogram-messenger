@@ -3,25 +3,25 @@ package models
 import (
 	"time"
 
-	"gorm.io/gorm"
+	"github.com/google/uuid"
 )
 
 type User struct {
-	ID                 string  `gorm:"primaryKey;size:36"`
-	Username           *string `gorm:"size:16;uniqueIndex"`
-	FirstName          string  `gorm:"size:50;not null"`
-	LastName           *string `gorm:"size:50"`
-	Email              string  `gorm:"size:255;uniqueIndex;not null"`
-	Password           string  `gorm:"not null"`
-	Status             string  `gorm:"size:20;default:'OFFLINE'"`
-	IsPremium          bool    `gorm:"not null;default:false"`
-	IsEmailVerified    bool    `gorm:"default:false"`
-	VerificationToken  string
-	VerificationExpiry time.Time
-	PublicKey          *string
-	EncryptedPrivKey   *string
-	EncryptionIv       *string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	DeletedAt          gorm.DeletedAt `gorm:"index"`
+	ID                 uuid.UUID  `json:"id"`
+	Username           *string    `json:"username"`
+	FirstName          string     `json:"first_name"`
+	LastName           *string    `json:"last_name"`
+	Email              string     `json:"email"`
+	Password           string     `json:"-"`
+	Status             string     `json:"status"`
+	IsPremium          bool       `json:"isPremium"`
+	IsEmailVerified    bool       `json:"isEmailVerified"`
+	VerificationToken  string     `json:"-"`
+	VerificationExpiry time.Time  `json:"-"`
+	PublicKey          *string    `json:"publicKey"`
+	EncryptedPrivKey   *string    `json:"encryptedPrivKey"`
+	EncryptionIv       *string    `json:"encryptionIv"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	DeletedAt          *time.Time `json:"-"`
 }
