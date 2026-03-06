@@ -60,7 +60,9 @@ function LayoutComponent() {
   const isProfileOpen = !!userMatch && isMobile;
   const isChatOpen = pathname.includes("/chat/");
   const isSettingsPage = pathname === "/settings";
+
   const isDetailView = isChatOpen || isProfileOpen || isSettingsPage;
+  const shouldHideNav = isChatOpen || isProfileOpen;
 
   const { data: meData } = useMe();
   useE2EEInit(meData?.me);
@@ -99,7 +101,7 @@ function LayoutComponent() {
           </AnimatePresence>
         </div>
 
-        {!isDetailView && <MobileNav />}
+        {!shouldHideNav && <MobileNav />}
       </div>
       <Toaster
         position="bottom-center"
