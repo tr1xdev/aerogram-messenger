@@ -1,5 +1,21 @@
 import { gql } from "@apollo/client";
 
+export const DELETE_MESSAGE = gql`
+  mutation DeleteMessage($id: ID!) {
+    deleteMessage(id: $id)
+  }
+`;
+
+export const UPDATE_MESSAGE = gql`
+  mutation UpdateMessage($id: ID!, $text: String!) {
+    updateMessage(id: $id, text: $text) {
+      id
+      text
+      isEdited
+    }
+  }
+`;
+
 export const GET_SESSIONS = gql`
   query GetSessions($userId: ID!) {
     sessions(userId: $userId) {
@@ -119,6 +135,16 @@ export const GET_MESSAGE_HISTORY = gql`
       isEdited
       isEncrypted
       encryptionIv
+      replyTo {
+        id
+        text
+        isEncrypted
+        encryptionIv
+        sender {
+          id
+          first_name
+        }
+      }
       sender {
         id
         email
@@ -154,6 +180,12 @@ export const SEND_MESSAGE = gql`
       sequence
       isEncrypted
       encryptionIv
+      replyTo {
+        id
+        text
+        isEncrypted
+        encryptionIv
+      }
       sender {
         id
         first_name
@@ -213,6 +245,12 @@ export const MESSAGE_SUBSCRIPTION = gql`
       isEdited
       isEncrypted
       encryptionIv
+      replyTo {
+        id
+        text
+        isEncrypted
+        encryptionIv
+      }
       sender {
         id
         email

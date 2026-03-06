@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
@@ -7,32 +7,67 @@ import { MessageBubble } from "./message-bubble";
 import { DateDivider } from "./date-divider";
 import type { Message, ChatMember } from "@/entities/chat/model/types";
 import { useChatScroll } from "../lib/use-chat-scroll";
+import { useChatActions } from "../lib/use-messages";
 
 interface MessageListProps {
+  chatId: string;
   messages: Message[];
   members?: ChatMember[];
   myId?: string;
   lastReadSequence?: number;
   onMarkRead: () => void;
+  onReply: (message: Message) => void;
+  onEdit: (message: Message) => void;
 }
 
 export function MessageList({
+  chatId,
   messages,
   members,
   myId,
   lastReadSequence,
   onMarkRead,
+  onReply,
+  onEdit,
 }: MessageListProps) {
+  const { decryptMessage } = useChatActions(chatId);
+  const [decryptedMap, setDecryptedMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    messages.forEach(async (m) => {
+      if (m.replyTo && m.replyTo.isEncrypted && !decryptedMap[m.replyTo.id]) {
+        const txt = await decryptMessage(m.replyTo);
+        setDecryptedMap((prev) => ({ ...prev, [m.replyTo!.id]: txt }));
+      }
+    });
+  }, [messages, decryptMessage, decryptedMap]);
+
+  const processedMessages = useMemo(() => {
+    return messages.map((m) => {
+      if (m.replyTo && decryptedMap[m.replyTo.id]) {
+        return {
+          ...m,
+          replyTo: {
+            ...m.replyTo,
+            text: decryptedMap[m.replyTo.id],
+            isEncrypted: false,
+          },
+        };
+      }
+      return m;
+    });
+  }, [messages, decryptedMap]);
+
   const groupedMessages = useMemo(() => {
     const groups: { date: string; items: Message[] }[] = [];
-    messages.forEach((msg) => {
+    processedMessages.forEach((msg) => {
       const d = new Date(msg.sentAt).toDateString();
       const g = groups.find((it) => it.date === d);
       if (g) g.items.push(msg);
       else groups.push({ date: d, items: [msg] });
     });
     return groups;
-  }, [messages]);
+  }, [processedMessages]);
 
   const peerPublicKey = useMemo(() => {
     return members?.find((m) => m.user.id !== myId)?.user.publicKey;
@@ -67,6 +102,8 @@ export function MessageList({
                       lastReadSequence !== undefined &&
                       lastReadSequence >= m.sequence
                     }
+                    onReply={onReply}
+                    onEdit={onEdit}
                   />
                 ))}
               </div>

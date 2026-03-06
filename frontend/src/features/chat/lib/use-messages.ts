@@ -1,5 +1,8 @@
-import { useQuery, useMutation } from "@apollo/client/react/index.js";
-import { type MutationOptions } from "@apollo/client/index.js";
+import {
+  useQuery,
+  useMutation,
+  type MutationFunctionOptions,
+} from "@apollo/client/react/index.js";
 import {
   SEND_MESSAGE,
   MARK_DIALOG_AS_READ,
@@ -9,8 +12,10 @@ import {
   GET_MY_CHATS,
   SEARCH_USERS,
   CREATE_DIRECT_CHAT,
+  DELETE_MESSAGE,
+  UPDATE_MESSAGE,
 } from "../api/chat.gql";
-import { encryptText, getPrivateKey } from "@/shared/lib/crypto";
+import { encryptText, decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type {
   Message,
   User,
@@ -61,31 +66,58 @@ export function useChatActions(chatId: string) {
   const [createDirect] = useMutation<{ createDirectChat: Chat }>(
     CREATE_DIRECT_CHAT,
   );
+  const [remove] = useMutation<{ deleteMessage: boolean }>(DELETE_MESSAGE);
+  const [update] = useMutation<{ updateMessage: Message }>(UPDATE_MESSAGE);
+
+  const decryptMessage = async (message: Message): Promise<string> => {
+    if (!message.isEncrypted || !message.encryptionIv || !meData?.me)
+      return message.text;
+
+    const me = meData.me;
+    const chat = chatData?.chat;
+    const peer = chat?.members?.find(
+      (m: ChatMember) => m.user.id !== me.id,
+    )?.user;
+
+    if (!peer?.publicKey) return message.text;
+
+    try {
+      const myPrivKeyObj = await getPrivateKey(me.id);
+      if (!myPrivKeyObj) return message.text;
+
+      return await decryptText(
+        message.text,
+        message.encryptionIv,
+        peer.publicKey,
+        myPrivKeyObj,
+      );
+    } catch {
+      return "[Ошибка расшифровки]";
+    }
+  };
 
   const sendMessage = async (
     text: string,
-    options?: MutationOptions<{ sendMessage: Message }>,
+    options?: MutationFunctionOptions<{ sendMessage: Message }>,
   ): Promise<void> => {
     const me = meData?.me;
     const chat = chatData?.chat;
-    const peerMember = chat?.members?.find(
-      (m: ChatMember): boolean => m.user.id !== me?.id,
-    );
-    const peer = peerMember?.user;
-
+    const peer = chat?.members?.find(
+      (m: ChatMember) => m.user.id !== me?.id,
+    )?.user;
     const isPrivate = chat?.type === "PRIVATE" || chat?.type === "DIRECT";
 
-    let finalVariables = {
+    let finalVariables: Record<string, unknown> = {
       chatId,
       text,
       isEncrypted: false,
-      encryptionIv: undefined as string | undefined,
+      encryptionIv: undefined,
+      replyToId: options?.variables?.replyToId,
     };
 
     if (isPrivate && peer?.publicKey && me) {
       try {
         const myPrivKeyObj = await getPrivateKey(me.id);
-
         if (myPrivKeyObj) {
           const encrypted = await encryptText(
             text,
@@ -105,8 +137,47 @@ export function useChatActions(chatId: string) {
     }
 
     await send({
-      variables: finalVariables,
       ...options,
+      variables: finalVariables,
+    });
+  };
+
+  const editMessage = async (id: string, newText: string): Promise<void> => {
+    const me = meData?.me;
+    const chat = chatData?.chat;
+    const peer = chat?.members?.find(
+      (m: ChatMember) => m.user.id !== me?.id,
+    )?.user;
+    const isPrivate = chat?.type === "PRIVATE" || chat?.type === "DIRECT";
+
+    let finalText = newText;
+
+    if (isPrivate && peer?.publicKey && me) {
+      try {
+        const myPrivKeyObj = await getPrivateKey(me.id);
+        if (myPrivKeyObj) {
+          const encrypted = await encryptText(
+            newText,
+            peer.publicKey,
+            myPrivKeyObj,
+          );
+          finalText = encrypted.ciphertext;
+        }
+      } catch (err: unknown) {
+        console.error("[E2EE] Re-encryption failed", err);
+      }
+    }
+
+    await update({ variables: { id, text: finalText } });
+  };
+
+  const deleteMessage = async (id: string): Promise<void> => {
+    await remove({
+      variables: { id },
+      update: (cache) => {
+        cache.evict({ id: cache.identify({ __typename: "Message", id }) });
+        cache.gc();
+      },
     });
   };
 
@@ -119,5 +190,13 @@ export function useChatActions(chatId: string) {
     return result.data?.createDirectChat;
   };
 
-  return { sendMessage, isSending: loading, markAsRead, createChat };
+  return {
+    sendMessage,
+    decryptMessage,
+    isSending: loading,
+    markAsRead,
+    createChat,
+    deleteMessage,
+    editMessage,
+  };
 }
