@@ -2,7 +2,6 @@ import { ChevronLeft, MoreVertical, Phone, Video } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import type { ChatMember } from "@/entities/chat/model/types";
@@ -84,7 +83,6 @@ export function ChatHeader({
         >
           <Video className="h-5 w-5" />
         </Button>
-        <ThemeToggle />
         <Button
           variant="ghost"
           size="icon"
