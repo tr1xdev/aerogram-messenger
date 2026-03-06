@@ -107,6 +107,7 @@ type Session {
 
 type Query {
    me: User!
+   getUser(id: ID!): User!
    sessions(userId: ID!): [Session!]!
    myChats: [Chat!]!
    chat(id: ID, slug: String): Chat!

@@ -6,6 +6,7 @@ export interface User {
   username?: string;
   photoUrl?: string;
   status: string;
+  bio?: string;
   publicKey?: string;
   encryptedPrivKey?: string;
   encryptionIv?: string;

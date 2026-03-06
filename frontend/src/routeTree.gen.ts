@@ -15,6 +15,7 @@ import { Route as publicLoginRouteImport } from './app/routes/(public)/login'
 import { Route as protectedLayoutRouteImport } from './app/routes/(protected)/_layout'
 import { Route as protectedLayoutIndexRouteImport } from './app/routes/(protected)/_layout/index'
 import { Route as protectedLayoutSettingsRouteImport } from './app/routes/(protected)/_layout/settings'
+import { Route as protectedLayoutUserUserIdRouteImport } from './app/routes/(protected)/_layout/user.$userId'
 import { Route as protectedLayoutChatChatIdRouteImport } from './app/routes/(protected)/_layout/chat.$chatId'
 
 const publicSignupRoute = publicSignupRouteImport.update({
@@ -46,6 +47,12 @@ const protectedLayoutSettingsRoute = protectedLayoutSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => protectedLayoutRoute,
 } as any)
+const protectedLayoutUserUserIdRoute =
+  protectedLayoutUserUserIdRouteImport.update({
+    id: '/user/$userId',
+    path: '/user/$userId',
+    getParentRoute: () => protectedLayoutRoute,
+  } as any)
 const protectedLayoutChatChatIdRoute =
   protectedLayoutChatChatIdRouteImport.update({
     id: '/chat/$chatId',
@@ -60,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof protectedLayoutSettingsRoute
   '/': typeof protectedLayoutIndexRoute
   '/chat/$chatId': typeof protectedLayoutChatChatIdRoute
+  '/user/$userId': typeof protectedLayoutUserUserIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof publicLoginRoute
@@ -68,6 +76,7 @@ export interface FileRoutesByTo {
   '/settings': typeof protectedLayoutSettingsRoute
   '/': typeof protectedLayoutIndexRoute
   '/chat/$chatId': typeof protectedLayoutChatChatIdRoute
+  '/user/$userId': typeof protectedLayoutUserUserIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,12 +87,27 @@ export interface FileRoutesById {
   '/(protected)/_layout/settings': typeof protectedLayoutSettingsRoute
   '/(protected)/_layout/': typeof protectedLayoutIndexRoute
   '/(protected)/_layout/chat/$chatId': typeof protectedLayoutChatChatIdRoute
+  '/(protected)/_layout/user/$userId': typeof protectedLayoutUserUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/login' | '/otp' | '/signup' | '/settings' | '/' | '/chat/$chatId'
+  fullPaths:
+    | '/login'
+    | '/otp'
+    | '/signup'
+    | '/settings'
+    | '/'
+    | '/chat/$chatId'
+    | '/user/$userId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/otp' | '/signup' | '/settings' | '/' | '/chat/$chatId'
+  to:
+    | '/login'
+    | '/otp'
+    | '/signup'
+    | '/settings'
+    | '/'
+    | '/chat/$chatId'
+    | '/user/$userId'
   id:
     | '__root__'
     | '/(protected)/_layout'
@@ -93,6 +117,7 @@ export interface FileRouteTypes {
     | '/(protected)/_layout/settings'
     | '/(protected)/_layout/'
     | '/(protected)/_layout/chat/$chatId'
+    | '/(protected)/_layout/user/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -146,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof protectedLayoutSettingsRouteImport
       parentRoute: typeof protectedLayoutRoute
     }
+    '/(protected)/_layout/user/$userId': {
+      id: '/(protected)/_layout/user/$userId'
+      path: '/user/$userId'
+      fullPath: '/user/$userId'
+      preLoaderRoute: typeof protectedLayoutUserUserIdRouteImport
+      parentRoute: typeof protectedLayoutRoute
+    }
     '/(protected)/_layout/chat/$chatId': {
       id: '/(protected)/_layout/chat/$chatId'
       path: '/chat/$chatId'
@@ -160,12 +192,14 @@ interface protectedLayoutRouteChildren {
   protectedLayoutSettingsRoute: typeof protectedLayoutSettingsRoute
   protectedLayoutIndexRoute: typeof protectedLayoutIndexRoute
   protectedLayoutChatChatIdRoute: typeof protectedLayoutChatChatIdRoute
+  protectedLayoutUserUserIdRoute: typeof protectedLayoutUserUserIdRoute
 }
 
 const protectedLayoutRouteChildren: protectedLayoutRouteChildren = {
   protectedLayoutSettingsRoute: protectedLayoutSettingsRoute,
   protectedLayoutIndexRoute: protectedLayoutIndexRoute,
   protectedLayoutChatChatIdRoute: protectedLayoutChatChatIdRoute,
+  protectedLayoutUserUserIdRoute: protectedLayoutUserUserIdRoute,
 }
 
 const protectedLayoutRouteWithChildren = protectedLayoutRoute._addFileChildren(

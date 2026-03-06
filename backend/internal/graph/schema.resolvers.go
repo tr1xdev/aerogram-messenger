@@ -482,6 +482,24 @@ func (r *queryResolver) Me(ctx context.Context) (*models.User, error) {
 	return LoadUser(ctx, authID)
 }
 
+// GetUser is the resolver for the getUser field.
+func (r *queryResolver) GetUser(ctx context.Context, id string) (*models.User, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	user, err := LoadUser(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+
+	return user, nil
+}
+
 // Sessions is the resolver for the sessions field.
 func (r *queryResolver) Sessions(ctx context.Context, userID string) ([]*models.Session, error) {
 	authID := middleware.GetUserID(ctx)
@@ -851,6 +869,24 @@ func (r *userResolver) ID(ctx context.Context, obj *models.User) (string, error)
 // Status is the resolver for the status field.
 func (r *userResolver) Status(ctx context.Context, obj *models.User) (string, error) {
 	return LoadPresence(ctx, obj.ID.String())
+}
+
+// EncryptedPrivKey is the resolver for the encryptedPrivKey field.
+func (r *userResolver) EncryptedPrivKey(ctx context.Context, obj *models.User) (*string, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" || obj.ID != authID {
+		return nil, nil
+	}
+	return obj.EncryptedPrivKey, nil
+}
+
+// EncryptionIv is the resolver for the encryptionIv field.
+func (r *userResolver) EncryptionIv(ctx context.Context, obj *models.User) (*string, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" || obj.ID != authID {
+		return nil, nil
+	}
+	return obj.EncryptionIv, nil
 }
 
 // Message returns MessageResolver implementation.

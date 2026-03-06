@@ -268,3 +268,16 @@ export const CHAT_CREATED_SUBSCRIPTION = gql`
     }
   }
 `;
+
+export const GET_USER_BY_ID = gql`
+  query GetUser($id: ID!) {
+    getUser(id: $id) {
+      id
+      email
+      first_name
+      last_name
+      username
+      status
+    }
+  }
+`;
