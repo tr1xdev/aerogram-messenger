@@ -2,16 +2,15 @@ package graph
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+	"reflect"
 
 	"github.com/google/uuid"
-	"google.golang.org/grpc/status"
-
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
+	"google.golang.org/grpc/status"
 )
 
 func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb.Chat) (*model.Chat, error) {
@@ -19,20 +18,19 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 	chatID, _ := uuid.Parse(pbChat.Id)
 
 	chatType := model.ChatTypePrivate
-	if pbChat.Type == chatpb.ChatType_CHAT_TYPE_GROUP {
+	switch pbChat.Type {
+	case chatpb.ChatType_CHAT_TYPE_GROUP:
 		chatType = model.ChatTypeGroup
-	} else if pbChat.Type == chatpb.ChatType_CHAT_TYPE_CHANNEL {
+	case chatpb.ChatType_CHAT_TYPE_CHANNEL:
 		chatType = model.ChatTypeChannel
 	}
 
 	dbMembers, _ := r.db.Queries.GetDialogMembers(ctx, chatID)
 
-	var (
-		isPinned  bool
-		myReadSeq int64
-		pReadSeq  int64
-		idsMap    = make(map[uuid.UUID]bool)
-	)
+	idsMap := make(map[uuid.UUID]bool)
+	var isPinned bool
+	var myReadSeq int64
+	var pReadSeq int64
 
 	for _, m := range dbMembers {
 		idsMap[m.UserID] = true
@@ -50,8 +48,8 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 
 	var lastMsg *models.Message
 	if pbChat.LastMessageId != "" {
-		if msgID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
-			if m, err := r.db.Queries.GetMessageByID(ctx, msgID); err == nil {
+		if mID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
+			if m, err := r.db.Queries.GetMessageByID(ctx, mID); err == nil {
 				lastMsg = &models.Message{
 					ID:           m.ID,
 					DialogID:     m.DialogID,
@@ -60,7 +58,7 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 					CreatedAt:    m.CreatedAt,
 					Sequence:     m.Sequence,
 					IsEncrypted:  m.IsEncrypted,
-					EncryptionIv: nullStringToPointer(m.EncryptionIv),
+					EncryptionIv: toStringPtr(m.EncryptionIv),
 				}
 				idsMap[m.AuthorID] = true
 			}
@@ -74,17 +72,15 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 
 	dbUsers, _ := r.userRepo.GetByIDs(ctx, userIDs)
 	userMap := make(map[uuid.UUID]*models.User)
-	for i := range dbUsers {
-		u := dbUsers[i]
+	for _, u := range dbUsers {
 		userMap[u.ID] = &models.User{
 			ID:               u.ID,
-			Username:         nullStringToPointer(u.Username),
 			FirstName:        u.FirstName,
-			LastName:         nullStringToPointer(u.LastName),
-			Email:            u.Email,
-			PublicKey:        nullStringToPointer(u.PublicKey),
-			EncryptedPrivKey: nullStringToPointer(u.EncryptedPrivKey),
-			EncryptionIv:     nullStringToPointer(u.EncryptionIv),
+			LastName:         toStringPtr(u.LastName),
+			Username:         toStringPtr(u.Username),
+			PublicKey:        toStringPtr(u.PublicKey),
+			EncryptedPrivKey: toStringPtr(u.EncryptedPrivKey),
+			EncryptionIv:     toStringPtr(u.EncryptionIv),
 		}
 	}
 
@@ -135,6 +131,61 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 	}, nil
 }
 
+func toStringPtr(val interface{}) *string {
+	if val == nil {
+		return nil
+	}
+
+	switch v := val.(type) {
+	case string:
+		return &v
+	case *string:
+		return v
+	case []byte:
+		s := string(v)
+		return &s
+	}
+
+	type scanner interface {
+		Value() (interface{}, error)
+	}
+
+	if s, ok := val.(scanner); ok {
+		raw, err := s.Value()
+		if err == nil && raw != nil {
+			switch r := raw.(type) {
+			case string:
+				return &r
+			case []byte:
+				str := string(r)
+				return &str
+			}
+		}
+	}
+
+	rv := reflect.ValueOf(val)
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+
+	if rv.Kind() == reflect.Struct {
+		valid := rv.FieldByName("Valid")
+		str := rv.FieldByName("String")
+		if valid.IsValid() && str.IsValid() && valid.Kind() == reflect.Bool && str.Kind() == reflect.String {
+			if valid.Bool() {
+				s := str.String()
+				return &s
+			}
+			return nil
+		}
+	}
+
+	return nil
+}
+
 func mapGRPCError(err error) error {
 	if err == nil {
 		return nil
@@ -143,15 +194,4 @@ func mapGRPCError(err error) error {
 		return errors.New(st.Message())
 	}
 	return err
-}
-
-func StringPtr(s string) *string {
-	return &s
-}
-
-func nullStringToPointer(s sql.NullString) *string {
-	if !s.Valid {
-		return nil
-	}
-	return &s.String
 }

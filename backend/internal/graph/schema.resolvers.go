@@ -68,12 +68,14 @@ func (r *messageResolver) ReplyTo(ctx context.Context, obj *models.Message) (*mo
 		return nil, nil
 	}
 	return &models.Message{
-		ID:        m.ID,
-		DialogID:  m.DialogID,
-		AuthorID:  m.AuthorID,
-		Content:   m.Content,
-		CreatedAt: m.CreatedAt,
-		Sequence:  m.Sequence,
+		ID:           m.ID,
+		DialogID:     m.DialogID,
+		AuthorID:     m.AuthorID,
+		Content:      m.Content,
+		CreatedAt:    m.CreatedAt,
+		Sequence:     m.Sequence,
+		IsEncrypted:  m.IsEncrypted,
+		EncryptionIv: toStringPtr(m.EncryptionIv),
 	}, nil
 }
 
@@ -87,12 +89,14 @@ func (r *messageResolver) ForwardedFrom(ctx context.Context, obj *models.Message
 		return nil, nil
 	}
 	return &models.Message{
-		ID:        m.ID,
-		DialogID:  m.DialogID,
-		AuthorID:  m.AuthorID,
-		Content:   m.Content,
-		CreatedAt: m.CreatedAt,
-		Sequence:  m.Sequence,
+		ID:           m.ID,
+		DialogID:     m.DialogID,
+		AuthorID:     m.AuthorID,
+		Content:      m.Content,
+		CreatedAt:    m.CreatedAt,
+		Sequence:     m.Sequence,
+		IsEncrypted:  m.IsEncrypted,
+		EncryptionIv: toStringPtr(m.EncryptionIv),
 	}, nil
 }
 
@@ -100,12 +104,15 @@ func (r *messageResolver) ForwardedFrom(ctx context.Context, obj *models.Message
 func (r *mutationResolver) TerminateAllOtherSessions(ctx context.Context) (bool, error) {
 	userIDStr := middleware.GetUserID(ctx)
 	sessionIDStr := middleware.GetSessionID(ctx)
-	if userIDStr == "" {
+	if userIDStr == "" || sessionIDStr == "" {
 		return false, fmt.Errorf("unauthorized")
 	}
 
-	uid, _ := uuid.Parse(userIDStr)
-	sid, _ := uuid.Parse(sessionIDStr)
+	uid, errU := uuid.Parse(userIDStr)
+	sid, errS := uuid.Parse(sessionIDStr)
+	if errU != nil || errS != nil {
+		return false, fmt.Errorf("invalid session or user id")
+	}
 
 	sessions, err := r.db.Queries.GetSessionsByUserID(ctx, uid)
 	if err != nil {
@@ -408,33 +415,38 @@ func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string) (
 
 // MarkDialogAsRead is the resolver for the markDialogAsRead field.
 func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error) {
-	userIDStr := middleware.GetUserID(ctx)
-	if userIDStr == "" {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
 		return false, errors.New("unauthorized")
 	}
 
-	cid, errC := uuid.Parse(chatID)
-	uid, errU := uuid.Parse(userIDStr)
-	if errC != nil || errU != nil {
-		return false, errors.New("invalid identifiers")
+	uid, err := uuid.Parse(authID)
+	if err != nil {
+		return false, errors.New("invalid user id")
 	}
 
-	err := r.db.Queries.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
+	cid, err := uuid.Parse(chatID)
+	if err != nil {
+		return false, errors.New("invalid chat id")
+	}
+
+	err = r.db.Queries.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
 		DialogID:         cid,
 		UserID:           uid,
 		LastReadSequence: lastSequence,
 	})
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to db update: %w", err)
 	}
 
-	payload := model.ReadPayload{
-		ChatID:       chatID,
-		UserID:       userIDStr,
-		LastSequence: lastSequence,
+	payload := map[string]interface{}{
+		"chatID":       chatID,
+		"userID":       authID,
+		"lastSequence": lastSequence,
 	}
+
 	data, _ := json.Marshal(payload)
-	r.redisClient.Publish(ctx, "dialog_read:"+chatID, data)
+	r.redisClient.Publish(ctx, "chat:"+chatID+":read", data)
 
 	return true, nil
 }
@@ -484,20 +496,7 @@ func (r *queryResolver) Me(ctx context.Context) (*models.User, error) {
 
 // GetUser is the resolver for the getUser field.
 func (r *queryResolver) GetUser(ctx context.Context, id string) (*models.User, error) {
-	authID := middleware.GetUserID(ctx)
-	if authID == "" {
-		return nil, errors.New("unauthorized")
-	}
-
-	user, err := LoadUser(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, errors.New("user not found")
-	}
-
-	return user, nil
+	return LoadUser(ctx, id)
 }
 
 // Sessions is the resolver for the sessions field.
@@ -593,7 +592,7 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 			Sequence:     m.Sequence,
 			IsEdited:     m.IsEdited,
 			IsEncrypted:  m.IsEncrypted,
-			EncryptionIv: m.EncryptionIv,
+			EncryptionIv: toStringPtr(m.EncryptionIv),
 		})
 	}
 	return msgs, nil
@@ -616,8 +615,8 @@ func (r *queryResolver) SearchUsers(ctx context.Context, username string) ([]*mo
 			ID:        u.ID,
 			Email:     u.Email,
 			FirstName: u.FirstName,
-			LastName:  nullStringToPointer(u.LastName),
-			Username:  nullStringToPointer(u.Username),
+			LastName:  toStringPtr(u.LastName),
+			Username:  toStringPtr(u.Username),
 		}
 	}
 	return users, nil
@@ -625,20 +624,32 @@ func (r *queryResolver) SearchUsers(ctx context.Context, username string) ([]*mo
 
 // DialogRead is the resolver for the dialogRead field.
 func (r *queryResolver) DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error) {
-	cID, _ := uuid.Parse(chatID)
-	uID, _ := uuid.Parse(middleware.GetUserID(ctx))
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	uID, err := uuid.Parse(authID)
+	if err != nil {
+		return nil, errors.New("invalid user id")
+	}
+
+	cID, err := uuid.Parse(chatID)
+	if err != nil {
+		return nil, errors.New("invalid chat id")
+	}
 
 	member, err := r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
 		DialogID: cID,
 		UserID:   uID,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dialog member not found: %w", err)
 	}
 
 	return &model.ReadPayload{
 		ChatID:       chatID,
-		UserID:       uID.String(),
+		UserID:       authID,
 		LastSequence: member.LastReadSequence,
 	}, nil
 }
@@ -787,7 +798,7 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 	}
 
 	readChan := make(chan *model.ReadPayload, 1)
-	pubsub := r.redisClient.Subscribe(ctx, "dialog_read:"+chatID)
+	pubsub := r.redisClient.Subscribe(ctx, "chat:"+chatID+":read")
 
 	go func() {
 		defer pubsub.Close()
@@ -798,7 +809,7 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 			case <-ctx.Done():
 				return
 			case msg, ok := <-pubsub.Channel():
-				if !ok || msg == nil {
+				if !ok {
 					return
 				}
 
@@ -807,12 +818,10 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 					continue
 				}
 
-				if payload.UserID != authID {
-					select {
-					case readChan <- &payload:
-					case <-ctx.Done():
-						return
-					}
+				select {
+				case readChan <- &payload:
+				case <-ctx.Done():
+					return
 				}
 			}
 		}
@@ -873,19 +882,11 @@ func (r *userResolver) Status(ctx context.Context, obj *models.User) (string, er
 
 // EncryptedPrivKey is the resolver for the encryptedPrivKey field.
 func (r *userResolver) EncryptedPrivKey(ctx context.Context, obj *models.User) (*string, error) {
-	authID := middleware.GetUserID(ctx)
-	if authID == "" || obj.ID != authID {
-		return nil, nil
-	}
 	return obj.EncryptedPrivKey, nil
 }
 
 // EncryptionIv is the resolver for the encryptionIv field.
 func (r *userResolver) EncryptionIv(ctx context.Context, obj *models.User) (*string, error) {
-	authID := middleware.GetUserID(ctx)
-	if authID == "" || obj.ID != authID {
-		return nil, nil
-	}
 	return obj.EncryptionIv, nil
 }
 
