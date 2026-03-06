@@ -53,7 +53,6 @@ func (r *DialogRepository) GetUserDialogs(ctx context.Context, userID string) ([
 	if err != nil {
 		return nil, fmt.Errorf("invalid user id: %w", err)
 	}
-
 	return r.db.Queries.GetUserDialogs(ctx, uid)
 }
 
@@ -62,7 +61,6 @@ func (r *DialogRepository) GetDialogByID(ctx context.Context, id string) (dbgen.
 	if err != nil {
 		return dbgen.Dialog{}, fmt.Errorf("invalid dialog id: %w", err)
 	}
-
 	return r.db.Queries.GetDialogByID(ctx, uid)
 }
 
@@ -75,7 +73,6 @@ func (r *DialogRepository) GetMember(ctx context.Context, dialogID, userID strin
 	if err != nil {
 		return dbgen.DialogMember{}, fmt.Errorf("invalid user id: %w", err)
 	}
-
 	return r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
 		DialogID: did,
 		UserID:   uid,
@@ -87,7 +84,6 @@ func (r *DialogRepository) GetMembers(ctx context.Context, dialogID string) ([]d
 	if err != nil {
 		return nil, fmt.Errorf("invalid dialog id: %w", err)
 	}
-
 	return r.db.Queries.GetDialogMembers(ctx, did)
 }
 
@@ -96,4 +92,8 @@ func (r *DialogRepository) GetDialogByUsername(ctx context.Context, username str
 		return dbgen.Dialog{}, fmt.Errorf("username is empty")
 	}
 	return r.db.Queries.GetDialogByUsername(ctx, database.ToNullString(&username))
+}
+
+func (r *DialogRepository) UpdateLastMessage(ctx context.Context, params dbgen.UpdateDialogLastMessageParams) error {
+	return r.db.Queries.UpdateDialogLastMessage(ctx, params)
 }

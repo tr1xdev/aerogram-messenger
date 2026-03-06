@@ -29,6 +29,10 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (dbgen.Us
 	return r.db.Queries.GetUserByEmail(ctx, email)
 }
 
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (dbgen.User, error) {
+	return r.db.Queries.GetUserByUsername(ctx, database.StringToNullString(username))
+}
+
 func (r *UserRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]dbgen.User, error) {
 	return r.db.Queries.GetUsersByIDs(ctx, ids)
 }

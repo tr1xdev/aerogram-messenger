@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
@@ -27,7 +28,7 @@ func (r *MessageRepository) Create(ctx context.Context, arg dbgen.CreateMessageP
 
 	msg, err := qtx.CreateMessage(ctx, arg)
 	if err != nil {
-		return dbgen.Message{}, err
+		return dbgen.Message{}, fmt.Errorf("create message: %w", err)
 	}
 
 	err = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
@@ -36,7 +37,7 @@ func (r *MessageRepository) Create(ctx context.Context, arg dbgen.CreateMessageP
 		LastMessageAt: database.ToNullTime(&msg.CreatedAt),
 	})
 	if err != nil {
-		return dbgen.Message{}, err
+		return dbgen.Message{}, fmt.Errorf("update dialog last message: %w", err)
 	}
 
 	return msg, tx.Commit()
