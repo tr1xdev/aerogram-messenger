@@ -81,7 +81,12 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
 
               <div className="flex items-center gap-1 shrink-0">
                 {chat.lastMessage && (
-                  <MessageStatus isRead={chat.lastMessage.isRead} isMe={isMe} />
+                  <MessageStatus
+                    isRead={chat.lastMessage.isRead}
+                    isMe={isMe}
+                    sequence={chat.lastMessage.sequence}
+                    lastReadSequence={chat.lastReadSequence}
+                  />
                 )}
                 {chat.unreadCount > 0 && (
                   <Badge className="h-5 min-w-[20px] px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none">
