@@ -61,7 +61,7 @@ export function AppSidebar() {
         <SidebarContent className="scrollbar-none">
           <SidebarGroup className="p-0">
             <SidebarGroupContent>
-              <SidebarMenu className="gap-0">
+              <SidebarMenu className="gap-0 pb-16 md:pb-0">
                 {isLoading && !chatsData
                   ? Array(8)
                       .fill(0)
@@ -92,7 +92,7 @@ export function AppSidebar() {
 
         <SidebarFooter
           onClick={() => setSettingsOpen(true)}
-          className="p-4 border-t border-border/40 bg-muted/5 hover:bg-muted/10 transition-colors cursor-pointer"
+          className="hidden md:flex p-4 border-t border-border/40 bg-muted/5 hover:bg-muted/10 transition-colors cursor-pointer"
         >
           {user ? (
             <div className="flex items-center gap-3">

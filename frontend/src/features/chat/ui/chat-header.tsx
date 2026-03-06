@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import type { ChatMember } from "@/entities/chat/model/types";
+import { ChatUserPopover } from "./chat-user-popover";
 
 interface ChatHeaderProps {
   title?: string;
@@ -23,8 +24,8 @@ export function ChatHeader({
   meId,
 }: ChatHeaderProps) {
   const navigate = useNavigate();
-  const other = members?.find((m) => m.user.id !== meId);
-  const status = other?.user.status;
+  const otherMember = members?.find((m) => m.user.id !== meId);
+  const status = otherMember?.user.status;
 
   return (
     <header className="flex h-16 items-center justify-between px-4 border-b shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -45,27 +46,47 @@ export function ChatHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
-          <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
-            <AvatarImage src={photoUrl || ""} />
-            <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
-              {title?.[0].toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col min-w-0">
-            <span className="text-[15px] font-bold truncate leading-none">
-              {title}
-            </span>
-            <span
-              className={cn(
-                "text-[11px] mt-1 font-medium",
-                status === "online" ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              {status ? formatLastSeen(status) : "Offline"}
-            </span>
+        {otherMember ? (
+          <ChatUserPopover userId={otherMember.user.id}>
+            <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
+              <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
+                <AvatarImage src={photoUrl || ""} />
+                <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
+                  {title?.[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col min-w-0 text-left">
+                <span className="text-[15px] font-bold truncate leading-none">
+                  {title}
+                </span>
+                <span
+                  className={cn(
+                    "text-[11px] mt-1 font-medium",
+                    status === "online"
+                      ? "text-primary"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {status ? formatLastSeen(status) : "Offline"}
+                </span>
+              </div>
+            </div>
+          </ChatUserPopover>
+        ) : (
+          <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
+            <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
+              <AvatarImage src={photoUrl || ""} />
+              <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
+                {title?.[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col min-w-0 text-left">
+              <span className="text-[15px] font-bold truncate leading-none">
+                {title}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="flex items-center gap-1">
