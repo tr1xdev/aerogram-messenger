@@ -56,6 +56,7 @@ export const GET_MY_CHATS = gql`
       unreadCount
       lastReadSequence
       members {
+        lastReadSequence
         user {
           id
           email
@@ -92,6 +93,7 @@ export const GET_CHAT_BY_ID = gql`
       type
       lastReadSequence
       members {
+        lastReadSequence
         user {
           id
           email
