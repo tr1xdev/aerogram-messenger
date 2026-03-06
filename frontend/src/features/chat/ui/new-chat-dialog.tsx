@@ -22,6 +22,7 @@ import type { User, Chat } from "@/entities/chat/model/types";
 export function NewChatDialog() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
   const { data, loading: isSearching } = useSearchUsers(search);
   const { createChat } = useChatActions("");
   const navigate = useNavigate();
@@ -30,15 +31,19 @@ export function NewChatDialog() {
   const users = data?.searchUsers || [];
 
   const handleCreate = async (userID: string) => {
+    if (isCreating) return;
+    setIsCreating(true);
+
     try {
       const newChat = await createChat(userID);
       if (newChat) {
         const existingData = client.readQuery<{ myChats: Chat[] }>({
           query: GET_MY_CHATS,
         });
+
         if (existingData) {
           const alreadyExists = existingData.myChats.some(
-            (c: Chat) => c.id === newChat.id,
+            (c) => c.id === newChat.id,
           );
           if (!alreadyExists) {
             client.writeQuery({
@@ -49,23 +54,22 @@ export function NewChatDialog() {
             });
           }
         }
+
         setOpen(false);
         setSearch("");
         navigate({ to: "/chat/$chatId", params: { chatId: newChat.id } });
       }
     } catch (error: unknown) {
-      console.error(error);
+      console.error("Failed to create chat:", error);
+    } finally {
+      setIsCreating(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-9 w-9 rounded-full hover:bg-muted transition"
-        >
+        <Button size="icon" variant="ghost" className="h-9 w-9 rounded-full">
           <Plus className="h-5 w-5" />
         </Button>
       </DialogTrigger>
@@ -85,44 +89,52 @@ export function NewChatDialog() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search users"
               className="pl-9 h-9"
+              disabled={isCreating}
             />
           </div>
         </div>
 
         <div className="max-h-[320px] overflow-y-auto">
-          {isSearching ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          {isSearching || isCreating ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              {isCreating && (
+                <p className="text-xs text-muted-foreground">
+                  Creating chat...
+                </p>
+              )}
             </div>
           ) : users.length ? (
             users.map((user: User) => (
               <button
                 key={user.id}
                 onClick={() => handleCreate(user.id)}
+                disabled={isCreating}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/70 transition text-left disabled:opacity-50"
               >
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback>{user.first_name?.[0]}</AvatarFallback>
+                <Avatar className="h-9 w-9 border border-border/50">
+                  <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
+                    {user.first_name?.[0].toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
-
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
+                  <p className="text-sm font-medium truncate text-foreground">
                     {user.first_name} {user.last_name}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-[12px] text-muted-foreground truncate">
                     @{user.username}
                   </p>
                 </div>
               </button>
             ))
-          ) : search.length >= 2 ? (
-            <p className="text-center text-sm text-muted-foreground py-10">
-              No users found
-            </p>
           ) : (
-            <p className="text-center text-sm text-muted-foreground py-10">
-              Start typing to search
-            </p>
+            <div className="text-center py-10">
+              <p className="text-sm text-muted-foreground">
+                {search.length >= 2
+                  ? "No users found"
+                  : "Start typing to search"}
+              </p>
+            </div>
           )}
         </div>
       </DialogContent>

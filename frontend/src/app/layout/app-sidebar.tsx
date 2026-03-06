@@ -59,9 +59,22 @@ export function AppSidebar() {
   const handleLogout = async () => {
     try {
       await logoutMutation();
+
+      localStorage.clear();
+      sessionStorage.clear();
+
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+
       setAuth(false);
-    } catch (error) {
+      window.location.href = "/auth/login";
+    } catch (error: unknown) {
       console.error("Logout failed", error);
+      localStorage.clear();
+      window.location.href = "/auth/login";
     }
   };
 

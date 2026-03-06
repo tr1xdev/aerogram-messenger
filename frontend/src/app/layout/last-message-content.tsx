@@ -14,18 +14,24 @@ export function LastMessageContent({
   myId,
   chat,
 }: LastMessageContentProps) {
-  const [decryptedText, setDecryptedText] = useState<string | null>(
-    message.isEncrypted ? null : message.text,
-  );
+  const [decryptedText, setDecryptedText] = useState<string | null>(null);
+  const [prevMessageId, setPrevMessageId] = useState<string | null>(null);
+
+  if (message.id !== prevMessageId) {
+    setPrevMessageId(message.id);
+    setDecryptedText(message.isEncrypted ? null : message.text);
+  }
 
   useEffect(() => {
     let isMounted = true;
+
     if (!message.isEncrypted) return;
 
     const performDecryption = async (): Promise<void> => {
       try {
         const isMe = message.sender.id === myId;
         const otherMember = chat.members?.find((m) => m.user.id !== myId);
+
         const targetPublicKey = isMe
           ? otherMember?.user.publicKey
           : message.sender.publicKey;
@@ -33,7 +39,7 @@ export function LastMessageContent({
         const myPrivKeyObj = await getPrivateKey(myId);
 
         if (!targetPublicKey || !myPrivKeyObj || !message.encryptionIv) {
-          if (isMounted) setDecryptedText("Encrypted");
+          if (isMounted) setDecryptedText("Encrypted message");
           return;
         }
 
@@ -45,8 +51,11 @@ export function LastMessageContent({
         );
 
         if (isMounted) setDecryptedText(clearText);
-      } catch {
-        if (isMounted) setDecryptedText("Decryption error");
+      } catch (error: unknown) {
+        if (isMounted) {
+          console.error("Decryption failed:", error);
+          setDecryptedText("Decryption error");
+        }
       }
     };
 
@@ -56,19 +65,22 @@ export function LastMessageContent({
     };
   }, [
     message.id,
+    message.text,
     message.isEncrypted,
     message.encryptionIv,
+    message.sender.id,
+    message.sender.publicKey,
     myId,
     chat.members,
   ]);
 
-  if (decryptedText === null) {
+  if (decryptedText === null && message.isEncrypted) {
     return <Skeleton className="h-3 w-24 mt-1" />;
   }
 
   return (
     <span className="truncate animate-in fade-in duration-300">
-      {decryptedText}
+      {decryptedText ?? message.text}
     </span>
   );
 }

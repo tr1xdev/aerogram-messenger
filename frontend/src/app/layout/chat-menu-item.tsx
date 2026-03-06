@@ -18,10 +18,15 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
   const otherMember: ChatMember | undefined = chat.members?.find(
     (m) => m.user.id !== myId,
   );
+
   const isRead: boolean =
     isMe &&
     lastMsg?.sequence !== undefined &&
+    chat.lastReadSequence !== undefined &&
     chat.lastReadSequence >= lastMsg.sequence;
+
+  // Безопасное вычисление времени: если нет сообщения и createdAt в схеме, используем текущее время
+  const displayTime = lastMsg ? new Date(lastMsg.sentAt) : new Date();
 
   return (
     <SidebarMenuItem>
@@ -58,14 +63,12 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
               >
                 {chat.title}
               </span>
-              {lastMsg && (
-                <span className="text-[11px] text-muted-foreground font-medium ml-2">
-                  {new Date(lastMsg.sentAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              )}
+              <span className="text-[11px] text-muted-foreground font-medium ml-2 shrink-0">
+                {displayTime.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2">
               <div
@@ -78,7 +81,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
               >
                 {lastMsg ? (
                   <>
-                    <span className="opacity-70 shrink-0">
+                    <span className="opacity-70 shrink-0 text-xs">
                       {isMe
                         ? "You: "
                         : `${lastMsg.sender.first_name || "User"}: `}
@@ -95,7 +98,9 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                     )}
                   </>
                 ) : (
-                  "No messages"
+                  <span className="italic opacity-50 text-xs">
+                    No messages yet
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
@@ -109,7 +114,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                   </div>
                 )}
                 {!isMe && chat.unreadCount > 0 && (
-                  <span className="h-4.5 min-w-[18px] px-1 flex items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold">
+                  <span className="h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold">
                     {chat.unreadCount}
                   </span>
                 )}
