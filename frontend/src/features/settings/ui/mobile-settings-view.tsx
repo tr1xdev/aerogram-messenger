@@ -14,6 +14,7 @@ import {
   HelpCircle,
   ShieldCheck,
   Gift,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useRef, useEffect } from "react";
@@ -64,11 +65,20 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
             {displayName}
           </span>
         </div>
+        <button className="p-2 hover:bg-accent rounded-full transition-colors">
+          <Pencil className="h-4 w-4 text-primary" />
+        </button>
       </header>
 
       <ScrollArea ref={scrollRef} className="h-full w-full">
         <div className="relative flex flex-col items-center pt-16 pb-10">
           <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-primary/5 to-transparent -z-10" />
+
+          <div className="absolute top-4 right-4 z-20">
+            <button className="flex items-center justify-center h-10 w-10 rounded-full bg-background/50 backdrop-blur-md border border-border/40 shadow-sm active:scale-95 transition-all hover:bg-background/80">
+              <Pencil className="h-4.5 w-4.5 text-foreground/80" />
+            </button>
+          </div>
 
           <div className="relative">
             <Avatar className="h-32 w-32 ring-4 ring-background shadow-2xl">
