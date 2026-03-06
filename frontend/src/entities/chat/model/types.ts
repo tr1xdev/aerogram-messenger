@@ -44,6 +44,7 @@ export interface Chat {
   unreadCount: number;
   lastReadSequence: number;
   messages?: Message[];
+  createdAt: string;
 }
 
 export interface Session {

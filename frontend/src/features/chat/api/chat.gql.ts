@@ -243,3 +243,28 @@ export const USER_PRESENCE_SUBSCRIPTION = gql`
     }
   }
 `;
+
+export const CHAT_CREATED_SUBSCRIPTION = gql`
+  subscription OnChatCreated($userId: String!) {
+    chatCreated(userID: $userId) {
+      id
+      type
+      title
+      photoUrl
+      unreadCount
+      isPinned
+      createdAt
+      lastReadSequence
+      lastMessage {
+        id
+        text
+        sentAt
+        sequence
+        sender {
+          id
+          username
+        }
+      }
+    }
+  }
+`;
