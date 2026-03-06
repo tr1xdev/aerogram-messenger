@@ -33,6 +33,7 @@ type Querier interface {
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserByUsername(ctx context.Context, username sql.NullString) (User, error)
 	GetUserDialogs(ctx context.Context, userID uuid.UUID) ([]Dialog, error)
 	GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]User, error)
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)

@@ -39,6 +39,13 @@ func (db *DB) Close() error {
 	return db.Conn.Close()
 }
 
+func StringToNullString(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{Valid: false}
+	}
+	return sql.NullString{String: s, Valid: true}
+}
+
 func ToNullUUID(s string) uuid.NullUUID {
 	uid, err := uuid.Parse(s)
 	if err != nil {

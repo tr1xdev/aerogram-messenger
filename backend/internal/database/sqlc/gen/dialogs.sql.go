@@ -14,17 +14,20 @@ import (
 
 const addDialogMember = `-- name: AddDialogMember :exec
 INSERT INTO dialog_members (
-    dialog_id, user_id, role, joined_at, notifications_on
+    dialog_id, user_id, role, joined_at, notifications_on,
+    is_pinned, last_read_sequence, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, NOW(), $4
+    $1, $2, $3, NOW(), $4, $5, $6, NOW(), NOW()
 )
 `
 
 type AddDialogMemberParams struct {
-	DialogID        uuid.UUID `json:"dialog_id"`
-	UserID          uuid.UUID `json:"user_id"`
-	Role            string    `json:"role"`
-	NotificationsOn bool      `json:"notifications_on"`
+	DialogID         uuid.UUID `json:"dialog_id"`
+	UserID           uuid.UUID `json:"user_id"`
+	Role             string    `json:"role"`
+	NotificationsOn  bool      `json:"notifications_on"`
+	IsPinned         bool      `json:"is_pinned"`
+	LastReadSequence int64     `json:"last_read_sequence"`
 }
 
 func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams) error {
@@ -33,6 +36,8 @@ func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams
 		arg.UserID,
 		arg.Role,
 		arg.NotificationsOn,
+		arg.IsPinned,
+		arg.LastReadSequence,
 	)
 	return err
 }
@@ -40,9 +45,10 @@ func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams
 const createDialog = `-- name: CreateDialog :one
 INSERT INTO dialogs (
     id, type, name, username, photo_url, bio, description,
-    invite_link, creator_id, members_count, is_active
+    invite_link, creator_id, members_count, is_active,
+    is_verified, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW()
 ) RETURNING id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_active, created_at, updated_at, deleted_at
 `
 
@@ -58,6 +64,7 @@ type CreateDialogParams struct {
 	CreatorID    uuid.NullUUID  `json:"creator_id"`
 	MembersCount int32          `json:"members_count"`
 	IsActive     bool           `json:"is_active"`
+	IsVerified   bool           `json:"is_verified"`
 }
 
 func (q *Queries) CreateDialog(ctx context.Context, arg CreateDialogParams) (Dialog, error) {
@@ -73,6 +80,7 @@ func (q *Queries) CreateDialog(ctx context.Context, arg CreateDialogParams) (Dia
 		arg.CreatorID,
 		arg.MembersCount,
 		arg.IsActive,
+		arg.IsVerified,
 	)
 	var i Dialog
 	err := row.Scan(
@@ -100,9 +108,10 @@ func (q *Queries) CreateDialog(ctx context.Context, arg CreateDialogParams) (Dia
 
 const createDialogSettings = `-- name: CreateDialogSettings :exec
 INSERT INTO dialog_settings (
-    dialog_id, permissions, slow_mode_delay, is_history_hidden, is_signatures_enabled
+    dialog_id, permissions, slow_mode_delay, is_history_hidden,
+    is_signatures_enabled, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5
+    $1, $2, $3, $4, $5, NOW(), NOW()
 )
 `
 
@@ -261,8 +270,14 @@ func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]D
 const getUserDialogs = `-- name: GetUserDialogs :many
 SELECT d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at, d.deleted_at FROM dialogs d
 JOIN dialog_members dm ON dm.dialog_id = d.id
-WHERE dm.user_id = $1 AND d.deleted_at IS NULL
-ORDER BY dm.is_pinned DESC, d.last_message_at DESC
+WHERE dm.user_id = $1
+  AND d.deleted_at IS NULL
+  AND (
+    d.creator_id = $1 -- always show to the creator
+    OR
+    EXISTS (SELECT 1 FROM messages m WHERE m.dialog_id = d.id LIMIT 1) -- show to others only if messages exist
+  )
+ORDER BY dm.is_pinned DESC, COALESCE(d.last_message_at, d.created_at) DESC
 `
 
 func (q *Queries) GetUserDialogs(ctx context.Context, userID uuid.UUID) ([]Dialog, error) {

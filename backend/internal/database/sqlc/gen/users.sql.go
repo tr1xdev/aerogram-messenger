@@ -27,9 +27,11 @@ func (q *Queries) CheckUserExists(ctx context.Context, id uuid.UUID) (bool, erro
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     id, username, first_name, last_name, email, password,
-    status, public_key, encrypted_priv_key, encryption_iv
+    status, public_key, encrypted_priv_key, encryption_iv,
+    created_at, updated_at, is_premium, is_email_verified
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+    NOW(), NOW(), DEFAULT, DEFAULT
 )
 RETURNING id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at
 `
@@ -120,6 +122,36 @@ WHERE id = $1 AND deleted_at IS NULL LIMIT 1
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.Password,
+		&i.Status,
+		&i.IsPremium,
+		&i.IsEmailVerified,
+		&i.VerificationToken,
+		&i.VerificationExpiry,
+		&i.PublicKey,
+		&i.EncryptedPrivKey,
+		&i.EncryptionIv,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+WHERE username = $1 AND deleted_at IS NULL LIMIT 1
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
 	var i User
 	err := row.Scan(
 		&i.ID,

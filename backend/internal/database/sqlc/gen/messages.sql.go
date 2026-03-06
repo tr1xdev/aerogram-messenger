@@ -8,7 +8,6 @@ package dbgen
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -34,9 +33,9 @@ func (q *Queries) CountUnreadMessages(ctx context.Context, arg CountUnreadMessag
 const createMessage = `-- name: CreateMessage :one
 INSERT INTO messages (
     id, dialog_id, author_id, content, is_encrypted,
-    encryption_iv, reply_to_id, created_at, updated_at
+    encryption_iv, reply_to_id, is_system, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $8
+    $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
 ) RETURNING id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, media_url, media_type, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at
 `
 
@@ -48,7 +47,7 @@ type CreateMessageParams struct {
 	IsEncrypted  bool           `json:"is_encrypted"`
 	EncryptionIv sql.NullString `json:"encryption_iv"`
 	ReplyToID    uuid.NullUUID  `json:"reply_to_id"`
-	CreatedAt    time.Time      `json:"created_at"`
+	IsSystem     bool           `json:"is_system"`
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error) {
@@ -60,7 +59,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		arg.IsEncrypted,
 		arg.EncryptionIv,
 		arg.ReplyToID,
-		arg.CreatedAt,
+		arg.IsSystem,
 	)
 	var i Message
 	err := row.Scan(
@@ -186,7 +185,9 @@ func (q *Queries) SoftDeleteMessage(ctx context.Context, arg SoftDeleteMessagePa
 
 const updateDialogLastMessage = `-- name: UpdateDialogLastMessage :exec
 UPDATE dialogs
-SET last_message_id = $2, last_message_at = $3
+SET last_message_id = $2,
+    last_message_at = $3,
+    updated_at = NOW()
 WHERE id = $1
 `
 
@@ -203,7 +204,7 @@ func (q *Queries) UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogL
 
 const updateMemberReadSequence = `-- name: UpdateMemberReadSequence :exec
 UPDATE dialog_members
-SET last_read_sequence = $3
+SET last_read_sequence = $3, updated_at = NOW()
 WHERE dialog_id = $1 AND user_id = $2
 `
 

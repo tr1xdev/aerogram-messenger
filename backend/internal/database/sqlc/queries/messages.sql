@@ -1,9 +1,9 @@
 -- name: CreateMessage :one
 INSERT INTO messages (
     id, dialog_id, author_id, content, is_encrypted,
-    encryption_iv, reply_to_id, created_at, updated_at
+    encryption_iv, reply_to_id, is_system, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $8
+    $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
 ) RETURNING *;
 
 -- name: GetMessageByID :one
@@ -28,12 +28,14 @@ WHERE id = $1 AND author_id = $2;
 
 -- name: UpdateDialogLastMessage :exec
 UPDATE dialogs
-SET last_message_id = $2, last_message_at = $3
+SET last_message_id = $2,
+    last_message_at = $3,
+    updated_at = NOW()
 WHERE id = $1;
 
 -- name: UpdateMemberReadSequence :exec
 UPDATE dialog_members
-SET last_read_sequence = $3
+SET last_read_sequence = $3, updated_at = NOW()
 WHERE dialog_id = $1 AND user_id = $2;
 
 -- name: CountUnreadMessages :one
