@@ -45,6 +45,11 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
 	}
 
+	creatorUUID, err := uuid.Parse(creatorIDStr)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid creator id")
+	}
+
 	newID := uuid.New()
 
 	dParams := dbgen.CreateDialogParams{
@@ -52,9 +57,14 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		Type:         s.mapProtoTypeToDB(req.Type),
 		Name:         database.ToNullString(req.Title),
 		Username:     database.ToNullString(req.Slug),
-		CreatorID:    database.ToNullUUID(creatorIDStr),
+		PhotoUrl:     database.ToNullString(nil),
+		Bio:          database.ToNullString(nil),
+		Description:  database.ToNullString(nil),
+		InviteLink:   database.ToNullString(nil),
+		CreatorID:    uuid.NullUUID{UUID: creatorUUID, Valid: true},
 		MembersCount: int32(len(req.ParticipantIds)),
 		IsActive:     true,
+		IsVerified:   false,
 	}
 
 	mParams := make([]dbgen.AddDialogMemberParams, len(req.ParticipantIds))
@@ -70,10 +80,12 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		}
 
 		mParams[i] = dbgen.AddDialogMemberParams{
-			DialogID:        newID,
-			UserID:          uid,
-			Role:            role,
-			NotificationsOn: true,
+			DialogID:         newID,
+			UserID:           uid,
+			Role:             role,
+			NotificationsOn:  true,
+			IsPinned:         false,
+			LastReadSequence: 0,
 		}
 	}
 
@@ -85,9 +97,8 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		IsSignaturesEnabled: false,
 	}
 
-	err := s.dialogRepo.CreateDialog(ctx, dParams, mParams, sParams)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to create chat")
+	if err := s.dialogRepo.CreateDialog(ctx, dParams, mParams, sParams); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, newID.String())
@@ -99,7 +110,6 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		Chat: s.mapDBDialogToProto(dialog),
 	}, nil
 }
-
 func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) (*chatpb.GetMyChatsResponse, error) {
 	userID := s.getUserID(ctx, req.UserId)
 	if userID == "" {

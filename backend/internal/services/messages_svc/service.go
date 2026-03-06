@@ -2,7 +2,9 @@ package messages_svc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -55,10 +57,19 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		IsEncrypted:  req.IsEncrypted,
 		EncryptionIv: database.ToNullString(req.EncryptionIv),
 		ReplyToID:    database.ToNullUUIDPtr(req.ReplyToId),
-		CreatedAt:    time.Now(),
+		IsSystem:     false,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	err = s.dialogRepo.UpdateLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
+		ID:            chatID,
+		LastMessageID: uuid.NullUUID{UUID: msg.ID, Valid: true},
+		LastMessageAt: sql.NullTime{Time: msg.CreatedAt, Valid: true},
+	})
+	if err != nil {
+		fmt.Printf("failed to update dialog last message: %v\n", err)
 	}
 
 	pb := s.mapDBToProto(msg)

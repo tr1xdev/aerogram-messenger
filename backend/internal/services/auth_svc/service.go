@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -77,32 +78,46 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 		return nil, status.Error(codes.InvalidArgument, "required fields missing")
 	}
 
-	if _, err := s.userRepo.GetByEmail(ctx, req.Email); err == nil {
-		return nil, status.Error(codes.AlreadyExists, "email already registered")
+	pwHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to process password")
 	}
 
-	pwHash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	newID := uuid.New()
-
 	params := dbgen.CreateUserParams{
 		ID:        newID,
 		Email:     req.Email,
 		FirstName: req.FirstName,
 		Password:  string(pwHash),
-		Status:    "offline",
+		Status:    "OFFLINE",
 		LastName:  database.ToNullString(req.LastName),
 		Username:  database.ToNullString(req.Username),
 	}
 
 	if _, err := s.userRepo.CreateUser(ctx, params); err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "23505") || strings.Contains(errStr, "unique constraint") {
+			if strings.Contains(errStr, "email") {
+				return nil, status.Error(codes.AlreadyExists, "email already registered")
+			}
+			if strings.Contains(errStr, "username") {
+				return nil, status.Error(codes.AlreadyExists, "username already taken")
+			}
+		}
 		return nil, status.Error(codes.Internal, "storage error")
 	}
 
 	verID := uuid.NewString()
-	if err := s.authRepo.StoreAndSendCode(ctx, verID, newID.String(), req.Email, req.FirstName); err != nil {
-		if os.Getenv("APP_ENV") != "development" {
-			return nil, status.Error(codes.Internal, "email delivery failed")
+	targetEmail := req.Email
+	if os.Getenv("APP_ENV") == "development" {
+		if testEmail := os.Getenv("TEST_EMAIL"); testEmail != "" {
+			targetEmail = testEmail
 		}
+	}
+
+	fmt.Printf("[AUTH] Created User: %s, Email: %s, VerID: %s\n", newID.String(), req.Email, verID)
+
+	if err := s.authRepo.StoreAndSendCode(ctx, verID, newID.String(), targetEmail, req.FirstName); err != nil {
 		fmt.Printf("DEBUG: skip email error: %v\n", err)
 	}
 
@@ -110,8 +125,16 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 }
 
 func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
+	if req.Email == "" || req.Password == "" {
+		return nil, status.Error(codes.InvalidArgument, "email and password required")
+	}
+
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
-	if err != nil || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)) != nil {
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
@@ -154,7 +177,6 @@ func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest
 		Device:    ua,
 	})
 	if err != nil {
-		fmt.Printf("[DATABASE ERROR]: %v\n", err)
 		return nil, status.Error(codes.Internal, "session creation failed")
 	}
 
@@ -184,7 +206,7 @@ func (s *Server) RefreshToken(ctx context.Context, req *authpb.RefreshTokenReque
 		UserID: uuid.Nil,
 	})
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "session not found")
+		return nil, status.Error(codes.Unauthenticated, "session expired or not found")
 	}
 
 	token, err := s.createAccessToken(session.UserID.String(), session.ID.String(), true)
