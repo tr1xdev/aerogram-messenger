@@ -33,6 +33,10 @@ interface MessageBubbleProps {
   onForward?: (message: Message) => void;
 }
 
+interface HighlightEvent extends Event {
+  detail?: { id: string };
+}
+
 export const MessageBubble = memo(function MessageBubble({
   message,
   isMe,
@@ -48,12 +52,12 @@ export const MessageBubble = memo(function MessageBubble({
   const [decryptedReplyText, setDecryptedReplyText] = useState<string | null>(
     null,
   );
+  const [isHighlighted, setIsHighlighted] = useState(false);
 
   const isTemp = message.id.startsWith("temp-") || message.id.length < 10;
 
   useEffect(() => {
     let isMounted = true;
-
     const decrypt = async (
       text: string,
       iv: string,
@@ -80,7 +84,6 @@ export const MessageBubble = memo(function MessageBubble({
         );
         if (isMounted) setDecryptedText(res || "Decryption error");
       }
-
       if (message.replyTo?.isEncrypted && message.replyTo.encryptionIv) {
         const isReplyMe = message.replyTo.sender.id === myId;
         const res = await decrypt(
@@ -92,12 +95,62 @@ export const MessageBubble = memo(function MessageBubble({
         if (isMounted) setDecryptedReplyText(res);
       }
     };
-
     processAll();
     return () => {
       isMounted = false;
     };
   }, [message, myId, isMe, peerPublicKey]);
+
+  const handleScrollToReply = () => {
+    if (!message.replyTo) return;
+    const targetId = `msg-${message.replyTo.id}`;
+    const element = document.getElementById(targetId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      const highlightEvent = new CustomEvent("highlight-message", {
+        detail: { id: message.replyTo.id },
+      });
+      window.dispatchEvent(highlightEvent);
+    }
+  };
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let observer: IntersectionObserver | null = null;
+
+    const handleHighlight = (e: Event) => {
+      const event = e as HighlightEvent;
+      if (event.detail?.id === message.id) {
+        const element = document.getElementById(`msg-${message.id}`);
+        if (!element) return;
+
+        if (observer) observer.disconnect();
+
+        observer = new IntersectionObserver(
+          (entries) => {
+            if (entries[0].isIntersecting) {
+              setTimeout(() => {
+                setIsHighlighted(true);
+                timeoutId = setTimeout(() => setIsHighlighted(false), 500);
+              }, 100);
+              observer?.disconnect();
+            }
+          },
+          { threshold: 0.1 },
+        );
+
+        observer.observe(element);
+        setTimeout(() => observer?.disconnect(), 3000);
+      }
+    };
+
+    window.addEventListener("highlight-message", handleHighlight);
+    return () => {
+      window.removeEventListener("highlight-message", handleHighlight);
+      if (observer) observer.disconnect();
+      clearTimeout(timeoutId);
+    };
+  }, [message.id]);
 
   const displayText = message.isEncrypted
     ? (decryptedText ?? "...")
@@ -113,9 +166,13 @@ export const MessageBubble = memo(function MessageBubble({
   return (
     <ContextMenu>
       <ContextMenuTrigger
+        id={`msg-${message.id}`}
         className={cn(
-          "flex w-full mb-1 px-4 min-w-0 overflow-hidden",
+          "flex w-full mb-1 px-4 min-w-0 overflow-hidden transition-colors ease-in-out",
           isMe ? "justify-end" : "justify-start",
+          isHighlighted
+            ? "bg-black/60 dark:bg-white/20 duration-100"
+            : "duration-700",
         )}
       >
         <div className="grid grid-cols-1 max-w-[85%] sm:max-w-[70%] min-w-0">
@@ -131,15 +188,10 @@ export const MessageBubble = memo(function MessageBubble({
             {message.replyTo && (
               <div
                 className={cn(
-                  "mb-1.5 flex flex-col relative rounded-sm px-2 py-1 cursor-pointer overflow-hidden transition-colors hover:brightness-95 min-w-0 w-full shrink-0",
+                  "mb-1.5 flex flex-col relative rounded-sm px-2 py-1 cursor-pointer overflow-hidden transition-colors hover:brightness-90 min-w-0 w-full shrink-0",
                   isMe ? "bg-primary-foreground/10" : "bg-primary/5",
                 )}
-                onClick={() => {
-                  const el = document.getElementById(
-                    `msg-${message.replyTo?.id}`,
-                  );
-                  el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                }}
+                onClick={handleScrollToReply}
               >
                 <div
                   className={cn(
