@@ -4,8 +4,9 @@ import {
   useLayoutEffect,
   type ChangeEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
-import { SendHorizontal, X, Pencil, Reply } from "lucide-react";
+import { X, Pencil, Reply, ArrowUp, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,22 +30,19 @@ export const MessageComposer = memo(function MessageComposer({
   replyingTo,
   editingMessage,
   onCancelAction,
-}: MessageComposerProps) {
-  const activeAction = editingMessage || replyingTo;
+}: MessageComposerProps): ReactNode {
+  const activeAction: Message | null = editingMessage || replyingTo;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasText: boolean = input.trim().length > 0;
 
-  useLayoutEffect(() => {
-    const textarea = textareaRef.current;
+  useLayoutEffect((): void => {
+    const textarea: HTMLTextAreaElement | null = textareaRef.current;
     if (textarea) {
-      // 1. Мгновенно сбрасываем высоту в auto, чтобы браузер пересчитал scrollHeight под текущий текст
       textarea.style.height = "auto";
-
-      // 2. Получаем реальную высоту контента
-      const scrollHeight = textarea.scrollHeight;
-
-      // 3. Устанавливаем итоговую высоту (минимум 44px, максимум 200px)
-      // Мы используем inline-style напрямую для максимальной производительности
-      const targetHeight = scrollHeight > 44 ? Math.min(scrollHeight, 200) : 44;
+      const scrollHeight: number = textarea.scrollHeight;
+      const targetHeight: number =
+        scrollHeight > 38 ? Math.min(scrollHeight, 200) : 38;
       textarea.style.height = `${targetHeight}px`;
     }
   }, [input]);
@@ -56,14 +54,25 @@ export const MessageComposer = memo(function MessageComposer({
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() && !disabled) {
+      if (hasText && !disabled) {
         onSend();
       }
     }
   };
 
+  const handleAttachmentClick = (): void => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const files: FileList | null = e.target.files;
+    if (files && files.length > 0) {
+      e.target.value = "";
+    }
+  };
+
   return (
-    <footer className="p-3 md:p-4 bg-background/95 backdrop-blur-sm border-t border-border/50 shrink-0">
+    <footer className="p-2 md:p-3 bg-background shrink-0">
       <div className="max-w-5xl mx-auto flex flex-col min-w-0">
         <AnimatePresence mode="wait">
           {activeAction && (
@@ -74,79 +83,103 @@ export const MessageComposer = memo(function MessageComposer({
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
               className="overflow-hidden min-w-0"
             >
-              <div className="flex items-center gap-3 px-3 py-2 bg-muted/30 rounded-t-xl border-l-2 border-primary mx-2 mb-0 relative min-w-0">
+              <div className="flex items-center gap-3 px-3 py-1.5 bg-muted/20 rounded-t-2xl border-l-2 border-primary mx-1 ml-[46px] mb-0 relative min-w-0">
                 <div className="shrink-0 text-primary opacity-80">
                   {editingMessage ? (
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-3.5 w-3.5" />
                   ) : (
-                    <Reply className="h-4 w-4" />
+                    <Reply className="h-3.5 w-3.5" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0 grid grid-cols-1">
-                  <span className="text-[12px] font-medium text-primary truncate block">
+                  <span className="text-[11px] font-semibold text-primary truncate block">
                     {editingMessage
                       ? "Edit Message"
                       : replyingTo?.sender.first_name || "User"}
                   </span>
-                  <span className="text-[13px] text-muted-foreground truncate block leading-tight">
+                  <span className="text-[12px] text-muted-foreground truncate block leading-tight">
                     {activeAction.text}
                   </span>
                 </div>
                 <button
                   type="button"
-                  className="h-7 w-7 flex items-center justify-center rounded-full shrink-0 hover:bg-muted transition-colors text-muted-foreground"
+                  className="h-6 w-6 flex items-center justify-center rounded-full shrink-0 hover:bg-muted transition-colors text-muted-foreground"
                   onClick={onCancelAction}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className="flex items-end gap-2.5 relative pt-1 min-w-0">
+        <div className="flex items-end gap-2 relative min-w-0">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            multiple
+          />
+          <Button
+            type="button"
+            size="icon"
+            onClick={handleAttachmentClick}
+            className="h-[38px] w-[38px] rounded-full shrink-0 bg-muted/40 border border-border/50 text-muted-foreground hover:text-primary hover:bg-muted/60 transition-colors shadow-none"
+          >
+            <Paperclip className="h-5 w-5" />
+          </Button>
+
           <div className="relative flex-1 min-w-0">
             <div
               className={cn(
-                "w-full rounded-[22px] bg-muted/30 border border-border overflow-hidden transition-colors duration-200 focus-within:bg-muted/50 focus-within:border-primary/30",
+                "w-full rounded-[20px] bg-muted/40 border border-border/50 transition-all duration-200 focus-within:bg-muted/60 focus-within:border-border pr-1",
                 activeAction &&
                   "rounded-tl-none rounded-tr-none border-t-transparent",
               )}
             >
-              <textarea
-                ref={textareaRef}
-                placeholder={editingMessage ? "Edit message..." : "Message"}
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                rows={1}
-                className={cn(
-                  "w-full resize-none bg-transparent px-5 py-[11px] text-sm focus:outline-none block",
-                  "max-h-[200px] overflow-y-auto scrollbar-none",
-                  "leading-[22px]",
-                )}
-                style={{ height: "44px" }}
-              />
+              <div className="relative flex items-end">
+                <textarea
+                  ref={textareaRef}
+                  placeholder={editingMessage ? "Edit message..." : "Message"}
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  rows={1}
+                  className={cn(
+                    "w-full resize-none bg-transparent px-4 py-[9px] text-[15px] focus:outline-none block",
+                    "max-h-[200px] overflow-y-auto scrollbar-none leading-[20px]",
+                  )}
+                  style={{ height: "38px" }}
+                />
+
+                <div className="flex items-center justify-center h-[38px] pr-1 shrink-0">
+                  <AnimatePresence initial={false}>
+                    {hasText && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <Button
+                          type="button"
+                          onClick={(): void => {
+                            if (hasText && !disabled) onSend();
+                          }}
+                          disabled={disabled}
+                          size="icon"
+                          className="h-[28px] w-[28px] rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-90"
+                        >
+                          <ArrowUp className="h-4 w-4" strokeWidth={3} />
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
             </div>
           </div>
-
-          <Button
-            type="button"
-            onClick={() => {
-              if (input.trim() && !disabled) onSend();
-            }}
-            disabled={disabled || !input.trim()}
-            size="icon"
-            className={cn(
-              "h-[44px] w-[44px] rounded-full shrink-0 transition-all active:scale-95 mb-[0.5px]",
-              "border border-border shadow-sm",
-              !input.trim()
-                ? "bg-muted/50 text-muted-foreground/60 border-border/70"
-                : "bg-primary text-primary-foreground border-primary",
-            )}
-          >
-            <SendHorizontal className="h-5 w-5 ml-0.5" />
-          </Button>
         </div>
       </div>
     </footer>
