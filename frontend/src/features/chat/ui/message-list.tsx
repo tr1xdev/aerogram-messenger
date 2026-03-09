@@ -1,4 +1,11 @@
-import { useMemo, useState, useEffect, useRef, memo } from "react";
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  memo,
+  type ReactNode,
+} from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
@@ -20,6 +27,11 @@ interface MessageListProps {
   onEdit: (message: Message) => void;
 }
 
+interface GroupedMessages {
+  date: string;
+  items: Message[];
+}
+
 export const MessageList = memo(function MessageList({
   chatId,
   messages,
@@ -29,16 +41,16 @@ export const MessageList = memo(function MessageList({
   onMarkRead,
   onReply,
   onEdit,
-}: MessageListProps) {
+}: MessageListProps): ReactNode {
   const { decryptMessage } = useChatActions(chatId);
   const [decryptedMap, setDecryptedMap] = useState<Record<string, string>>({});
   const mapRef = useRef<Record<string, string>>({});
 
-  useEffect(() => {
-    let isMounted = true;
+  useEffect((): (() => void) => {
+    let isMounted: boolean = true;
 
-    const fetchDecrypted = async () => {
-      let hasChanges = false;
+    const fetchDecrypted = async (): Promise<void> => {
+      let hasChanges: boolean = false;
       const newEntries: Record<string, string> = {};
 
       for (const m of messages) {
@@ -48,30 +60,35 @@ export const MessageList = memo(function MessageList({
           !mapRef.current[m.replyTo.id]
         ) {
           try {
-            const txt = await decryptMessage(m.replyTo);
+            const txt: string = await decryptMessage(m.replyTo);
             newEntries[m.replyTo.id] = txt;
             mapRef.current[m.replyTo.id] = txt;
             hasChanges = true;
-          } catch {
-            // ...
+          } catch (err: unknown) {
+            console.error("Failed to decrypt reply:", err);
           }
         }
       }
 
       if (isMounted && hasChanges) {
-        setDecryptedMap((prev) => ({ ...prev, ...newEntries }));
+        setDecryptedMap(
+          (prev: Record<string, string>): Record<string, string> => ({
+            ...prev,
+            ...newEntries,
+          }),
+        );
       }
     };
 
     fetchDecrypted();
 
-    return () => {
+    return (): void => {
       isMounted = false;
     };
   }, [messages, decryptMessage]);
 
-  const processedMessages = useMemo(() => {
-    return messages.map((m) => {
+  const processedMessages = useMemo((): Message[] => {
+    return messages.map((m: Message): Message => {
       if (m.replyTo && decryptedMap[m.replyTo.id]) {
         return {
           ...m,
@@ -86,19 +103,22 @@ export const MessageList = memo(function MessageList({
     });
   }, [messages, decryptedMap]);
 
-  const groupedMessages = useMemo(() => {
-    const groups: { date: string; items: Message[] }[] = [];
-    processedMessages.forEach((msg) => {
-      const d = new Date(msg.sentAt).toDateString();
-      const g = groups.find((it) => it.date === d);
+  const groupedMessages = useMemo((): GroupedMessages[] => {
+    const groups: GroupedMessages[] = [];
+    processedMessages.forEach((msg: Message): void => {
+      const d: string = new Date(msg.sentAt).toDateString();
+      const g: GroupedMessages | undefined = groups.find(
+        (it: GroupedMessages): boolean => it.date === d,
+      );
       if (g) g.items.push(msg);
       else groups.push({ date: d, items: [msg] });
     });
     return groups;
   }, [processedMessages]);
 
-  const peerPublicKey = useMemo(() => {
-    return members?.find((m) => m.user.id !== myId)?.user.publicKey;
+  const peerPublicKey: string | undefined = useMemo((): string | undefined => {
+    return members?.find((m: ChatMember): boolean => m.user.id !== myId)?.user
+      .publicKey;
   }, [members, myId]);
 
   const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
@@ -109,34 +129,38 @@ export const MessageList = memo(function MessageList({
     });
 
   return (
-    <div className="h-full w-full relative">
+    <div className="h-full w-full relative bg-transparent">
       <ScrollArea ref={scrollRef} className="h-full w-full">
         <div className="px-4 py-6 w-full flex flex-col max-w-4xl mx-auto">
-          {groupedMessages.map((g) => (
-            <div key={g.date} className="flex flex-col mb-6">
-              <DateDivider date={g.items[0].sentAt} />
-              <div className="flex flex-col space-y-1">
-                {g.items.map((m) => (
-                  <MessageBubble
-                    key={m.id}
-                    message={m}
-                    myId={myId ?? ""}
-                    peerPublicKey={peerPublicKey}
-                    isMe={m.sender.id === myId}
-                    isRead={
-                      m.sender.id === myId &&
-                      !m.id.startsWith("temp-") &&
-                      m.sequence !== undefined &&
-                      lastReadSequence !== undefined &&
-                      lastReadSequence >= m.sequence
-                    }
-                    onReply={onReply}
-                    onEdit={onEdit}
-                  />
-                ))}
+          {groupedMessages.map(
+            (g: GroupedMessages): ReactNode => (
+              <div key={g.date} className="flex flex-col mb-6">
+                <DateDivider date={g.items[0].sentAt} />
+                <div className="flex flex-col space-y-1">
+                  {g.items.map(
+                    (m: Message): ReactNode => (
+                      <MessageBubble
+                        key={m.id}
+                        message={m}
+                        myId={myId ?? ""}
+                        peerPublicKey={peerPublicKey}
+                        isMe={m.sender.id === myId}
+                        isRead={
+                          m.sender.id === myId &&
+                          !m.id.startsWith("temp-") &&
+                          m.sequence !== undefined &&
+                          lastReadSequence !== undefined &&
+                          lastReadSequence >= m.sequence
+                        }
+                        onReply={onReply}
+                        onEdit={onEdit}
+                      />
+                    ),
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ),
+          )}
         </div>
       </ScrollArea>
 
@@ -152,7 +176,7 @@ export const MessageList = memo(function MessageList({
               size="icon"
               variant="secondary"
               className="rounded-full shadow-lg bg-background/95 hover:bg-background border h-10 w-10"
-              onClick={() => scrollToBottom("smooth")}
+              onClick={(): void => scrollToBottom("smooth")}
             >
               <ArrowDown className="h-5 w-5" />
               {unreadCount > 0 && (

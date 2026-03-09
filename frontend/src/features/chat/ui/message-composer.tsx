@@ -2,6 +2,7 @@ import {
   memo,
   useRef,
   useLayoutEffect,
+  useEffect,
   type ChangeEvent,
   type KeyboardEvent,
   type ReactNode,
@@ -35,6 +36,12 @@ export const MessageComposer = memo(function MessageComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasText: boolean = input.trim().length > 0;
+
+  useEffect((): void => {
+    if (activeAction) {
+      textareaRef.current?.focus();
+    }
+  }, [activeAction]);
 
   useLayoutEffect((): void => {
     const textarea: HTMLTextAreaElement | null = textareaRef.current;
