@@ -15,9 +15,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Plus, Loader2 } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { GET_MY_CHATS } from "../api/chat.gql";
 import type { User, Chat } from "@/entities/chat/model/types";
+import { FiEdit2 } from "react-icons/fi";
 
 export function NewChatDialog() {
   const [open, setOpen] = useState(false);
@@ -70,7 +71,7 @@ export function NewChatDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="icon" variant="ghost" className="h-9 w-9 rounded-full">
-          <Plus className="h-5 w-5" />
+          <FiEdit2 className="h-6 w-6" />
         </Button>
       </DialogTrigger>
 
