@@ -15,11 +15,28 @@ interface ChatMenuItemProps {
 
 export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
   const otherMember = chat.members?.find((m) => m.user.id !== myId);
-  const displayName =
-    otherMember?.user.first_name || otherMember?.user.username || "Chat";
+  const otherUser = otherMember?.user;
+  const displayName = otherUser
+    ? [otherUser.first_name, otherUser.last_name].filter(Boolean).join(" ") ||
+      otherUser.username ||
+      "Chat"
+    : "Chat";
   const initial = displayName[0].toUpperCase();
-  const isMe = chat.lastMessage?.sender.id === myId;
   const isOnline = otherMember?.user.status === "online";
+
+  const lastMessage = chat.lastMessage;
+  const isMe = lastMessage?.sender.id === myId;
+  const sender = lastMessage?.sender;
+
+  const isGroup = (chat.members?.length ?? 0) > 2;
+  const showSenderName = isGroup || isMe;
+  const senderName =
+    showSenderName && sender
+      ? isMe
+        ? "You"
+        : [sender.first_name, sender.last_name].filter(Boolean).join(" ") ||
+          sender.username
+      : null;
 
   return (
     <SidebarMenuItem>
@@ -34,66 +51,68 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
           className="flex items-center gap-3"
         >
           <div className="relative shrink-0">
-            <Avatar className="h-12 w-12 border border-border/40 overflow-visible">
-              <AvatarFallback className="bg-primary/5 text-primary font-bold">
+            <Avatar className="h-14 w-14 border border-border/40 overflow-visible">
+              <AvatarFallback className="bg-primary/5 text-primary font-bold text-lg">
                 {initial}
               </AvatarFallback>
             </Avatar>
-            <span
-              className={cn(
-                "absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background z-10 transition-colors",
-                isOnline ? "bg-green-500" : "bg-zinc-500",
-              )}
-            />
+            {isOnline && (
+              <span
+                className={cn(
+                  "absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-background z-10 transition-colors bg-green-500",
+                )}
+              />
+            )}
           </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-baseline mb-1">
-              <span className="text-[15px] font-bold truncate leading-none">
+          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+            <div className="flex justify-between items-baseline">
+              <span className="text-[15px] font-bold truncate leading-tight">
                 {displayName}
               </span>
-              {chat.lastMessage && (
-                <span className="text-[10px] text-muted-foreground font-medium uppercase shrink-0 ml-2">
-                  {new Date(chat.lastMessage.sentAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-[13px] text-muted-foreground/80 truncate font-medium flex items-center min-w-0">
-                {isMe && (
-                  <span className="mr-1 shrink-0 text-primary/70">You:</span>
-                )}
-                <div className="truncate">
-                  {chat.lastMessage && myId ? (
-                    <LastMessageContent
-                      message={chat.lastMessage}
-                      myId={myId}
-                      chat={chat}
-                    />
-                  ) : (
-                    "No messages yet"
-                  )}
-                </div>
-              </div>
 
-              <div className="flex items-center gap-1 shrink-0">
-                {chat.lastMessage && (
+              {lastMessage && (
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
                   <MessageStatus
-                    isRead={chat.lastMessage.isRead}
+                    isRead={lastMessage.isRead}
                     isMe={isMe}
-                    sequence={chat.lastMessage.sequence}
+                    sequence={lastMessage.sequence}
                     lastReadSequence={chat.lastReadSequence}
                   />
-                )}
-                {chat.unreadCount > 0 && (
-                  <Badge className="h-5 min-w-[20px] px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none">
-                    {chat.unreadCount}
-                  </Badge>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {new Date(lastMessage.sentAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {senderName && (
+              <div className="text-sm font-normal text-foreground truncate leading-tight">
+                {senderName}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-normal text-muted-foreground/80 truncate leading-tight min-w-0">
+                {lastMessage && myId ? (
+                  <LastMessageContent
+                    message={lastMessage}
+                    myId={myId}
+                    chat={chat}
+                  />
+                ) : (
+                  "No messages yet"
                 )}
               </div>
+
+              {chat.unreadCount > 0 && (
+                <Badge className="h-5 min-w-[20px] px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shrink-0">
+                  {chat.unreadCount}
+                </Badge>
+              )}
             </div>
           </div>
         </Link>
