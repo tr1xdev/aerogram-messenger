@@ -2,6 +2,7 @@ package chat_svc
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
@@ -37,6 +38,42 @@ func (s *Server) getUserID(ctx context.Context, reqID string) string {
 		}
 	}
 	return ""
+}
+
+func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chatpb.PinChatResponse, error) {
+	userID := s.getUserID(ctx, req.UserId)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+	}
+
+	err := s.dialogRepo.Pin(ctx, req.ChatId, userID, req.Pinned)
+	if err != nil {
+		if strings.Contains(err.Error(), "limit reached") {
+			return nil, status.Error(codes.FailedPrecondition, err.Error())
+		}
+		return nil, status.Error(codes.Internal, "failed to pin chat")
+	}
+
+	return &chatpb.PinChatResponse{Success: true}, nil
+}
+
+func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) (*chatpb.DeleteChatResponse, error) {
+	userID := s.getUserID(ctx, req.UserId)
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+	}
+
+	_, err := s.dialogRepo.GetMember(ctx, req.ChatId, userID)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, "you cannot delete a chat you are not a member of")
+	}
+
+	err = s.dialogRepo.Delete(ctx, req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to delete chat")
+	}
+
+	return &chatpb.DeleteChatResponse{Success: true}, nil
 }
 
 func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) (*chatpb.CreateChatResponse, error) {
@@ -110,6 +147,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		Chat: s.mapDBDialogToProto(dialog),
 	}, nil
 }
+
 func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) (*chatpb.GetMyChatsResponse, error) {
 	userID := s.getUserID(ctx, req.UserId)
 	if userID == "" {
@@ -123,21 +161,10 @@ func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) 
 
 	res := make([]*chatpb.Chat, 0, len(dialogs))
 	for _, d := range dialogs {
-		res = append(res, s.mapDBDialogToProto(d))
+		res = append(res, s.mapGetUserDialogsRowToProto(d))
 	}
 
 	return &chatpb.GetMyChatsResponse{Chats: res}, nil
-}
-
-func (s *Server) mapProtoTypeToDB(t chatpb.ChatType) string {
-	switch t {
-	case chatpb.ChatType_CHAT_TYPE_GROUP:
-		return "group"
-	case chatpb.ChatType_CHAT_TYPE_CHANNEL:
-		return "channel"
-	default:
-		return "private"
-	}
 }
 
 func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chatpb.GetChatResponse, error) {
@@ -161,10 +188,22 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 	}, nil
 }
 
+func (s *Server) mapProtoTypeToDB(t chatpb.ChatType) string {
+	switch t {
+	case chatpb.ChatType_CHAT_TYPE_GROUP:
+		return "group"
+	case chatpb.ChatType_CHAT_TYPE_CHANNEL:
+		return "channel"
+	default:
+		return "private"
+	}
+}
+
 func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatpb.Chat {
 	res := &chatpb.Chat{
 		Id:           d.ID.String(),
 		MembersCount: int32(d.MembersCount),
+		IsVerified:   d.IsVerified,
 	}
 
 	if d.Name.Valid {
@@ -176,6 +215,9 @@ func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatpb.Chat {
 	if d.LastMessageID.Valid {
 		res.LastMessageId = d.LastMessageID.UUID.String()
 	}
+	if d.PhotoUrl.Valid {
+		res.PhotoUrl = d.PhotoUrl.String
+	}
 
 	switch d.Type {
 	case "group":
@@ -185,6 +227,25 @@ func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatpb.Chat {
 	default:
 		res.Type = chatpb.ChatType_CHAT_TYPE_PRIVATE
 	}
+
+	return res
+}
+
+func (s *Server) mapGetUserDialogsRowToProto(row dbgen.GetUserDialogsRow) *chatpb.Chat {
+	res := s.mapDBDialogToProto(dbgen.Dialog{
+		ID:            row.ID,
+		Type:          row.Type,
+		Name:          row.Name,
+		Username:      row.Username,
+		MembersCount:  row.MembersCount,
+		LastMessageID: row.LastMessageID,
+		IsVerified:    row.IsVerified,
+		PhotoUrl:      row.PhotoUrl,
+	})
+
+	res.IsPinned = row.IsPinned
+	res.UnreadCount = int32(row.UnreadCount)
+	res.LastReadSequence = row.LastReadSequence
 
 	return res
 }

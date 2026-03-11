@@ -28,23 +28,23 @@ func (r *MessageRepository) Create(ctx context.Context, arg dbgen.CreateMessageP
 
 	msg, err := qtx.CreateMessage(ctx, arg)
 	if err != nil {
-		return dbgen.Message{}, fmt.Errorf("create message: %w", err)
+		return dbgen.Message{}, fmt.Errorf("failed to create message: %w", err)
 	}
 
 	err = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
 		ID:            arg.DialogID,
-		LastMessageID: database.ToNullUUID(msg.ID.String()),
+		LastMessageID: uuid.NullUUID{UUID: msg.ID, Valid: true},
 		LastMessageAt: database.ToNullTime(&msg.CreatedAt),
 	})
 	if err != nil {
-		return dbgen.Message{}, fmt.Errorf("update dialog last message: %w", err)
+		return dbgen.Message{}, fmt.Errorf("failed to update dialog: %w", err)
 	}
 
-	return msg, tx.Commit()
-}
+	if err := tx.Commit(); err != nil {
+		return dbgen.Message{}, err
+	}
 
-func (r *MessageRepository) GetByID(ctx context.Context, id uuid.UUID) (dbgen.Message, error) {
-	return r.db.Queries.GetMessageByID(ctx, id)
+	return msg, nil
 }
 
 func (r *MessageRepository) GetHistory(ctx context.Context, chatID uuid.UUID, limit, offset int32) ([]dbgen.Message, error) {
@@ -53,6 +53,10 @@ func (r *MessageRepository) GetHistory(ctx context.Context, chatID uuid.UUID, li
 		Limit:    limit,
 		Offset:   offset,
 	})
+}
+
+func (r *MessageRepository) GetByID(ctx context.Context, id uuid.UUID) (dbgen.Message, error) {
+	return r.db.Queries.GetMessageByID(ctx, id)
 }
 
 func (r *MessageRepository) Update(ctx context.Context, id, authorID uuid.UUID, content string) (dbgen.Message, error) {
@@ -70,10 +74,10 @@ func (r *MessageRepository) Delete(ctx context.Context, id, authorID uuid.UUID) 
 	})
 }
 
-func (r *MessageRepository) MarkRead(ctx context.Context, chatID, userID uuid.UUID, sequence int64) error {
+func (r *MessageRepository) MarkRead(ctx context.Context, chatID, userID uuid.UUID, seq int64) error {
 	return r.db.Queries.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
 		DialogID:         chatID,
 		UserID:           userID,
-		LastReadSequence: sequence,
+		LastReadSequence: seq,
 	})
 }

@@ -23,6 +23,8 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ID is the resolver for the id field.
@@ -250,7 +252,7 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) (*models.Message, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
-		return nil, errors.New("unauthorized")
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
 	resp, err := r.messagesClient.SendMessage(ctx, &messagesv1.SendMessageRequest{
@@ -265,10 +267,7 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		return nil, mapGRPCError(err)
 	}
 
-	sentAt, err := time.Parse(time.RFC3339, resp.Message.SentAt)
-	if err != nil {
-		sentAt = time.Now()
-	}
+	sentAt, _ := time.Parse(time.RFC3339, resp.Message.SentAt)
 
 	msg := &models.Message{
 		ID:           uuid.MustParse(resp.Message.Id),
@@ -279,12 +278,11 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		EncryptionIv: resp.Message.EncryptionIv,
 		Sequence:     resp.Message.Sequence,
 		CreatedAt:    sentAt,
-		UpdatedAt:    sentAt,
-		IsEdited:     false,
+		IsSystem:     resp.Message.IsSystem,
 	}
 
-	if replyToID != nil {
-		parsed, _ := uuid.Parse(*replyToID)
+	if resp.Message.ReplyToId != nil {
+		parsed, _ := uuid.Parse(*resp.Message.ReplyToId)
 		msg.ReplyToID = &parsed
 	}
 
@@ -358,6 +356,24 @@ func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) 
 		ChatId: id,
 		UserId: authID,
 		Pinned: pinned,
+	})
+	if err != nil {
+		return false, mapGRPCError(err)
+	}
+
+	return resp.Success, nil
+}
+
+// DeleteChat is the resolver for the deleteChat field.
+func (r *mutationResolver) DeleteChat(ctx context.Context, id string) (bool, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return false, errors.New("unauthorized")
+	}
+
+	resp, err := r.chatClient.DeleteChat(ctx, &chatv1.DeleteChatRequest{
+		ChatId: id,
+		UserId: authID,
 	})
 	if err != nil {
 		return false, mapGRPCError(err)
@@ -692,18 +708,14 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 		return nil, errors.New("unauthorized")
 	}
 
-	cID, err := uuid.Parse(chatID)
-	if err != nil {
-		return nil, errors.New("invalid chat id")
-	}
-	uID, _ := uuid.Parse(authID)
-
-	_, err = r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
-		DialogID: cID,
-		UserID:   uID,
+	uid, _ := uuid.Parse(authID)
+	cid, _ := uuid.Parse(chatID)
+	_, err := r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: cid,
+		UserID:   uid,
 	})
 	if err != nil {
-		return nil, errors.New("forbidden")
+		return nil, errors.New("forbidden: you are not a member")
 	}
 
 	msgChan := make(chan *models.Message, 1)
@@ -725,6 +737,7 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 				if !ok {
 					return
 				}
+
 				var m models.Message
 				if err := json.Unmarshal([]byte(msg.Payload), &m); err != nil {
 					continue

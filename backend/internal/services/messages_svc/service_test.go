@@ -37,7 +37,7 @@ func TestMessagesServer(t *testing.T) {
 
 	_, err := server.db.Queries.CreateUser(ctx, dbgen.CreateUserParams{
 		ID:        userID,
-		Username:  database.ToNullString(ptr("testuser")),
+		Username:  database.ToNullString(ptrStr("testuser")),
 		FirstName: "Test",
 		Email:     "test@aerogram.com",
 		Password:  "hash",
@@ -60,28 +60,31 @@ func TestMessagesServer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	t.Run("SendMessage_Success", func(t *testing.T) {
+	t.Run("SendMessage_And_Sequence_Increment", func(t *testing.T) {
 		pubsub := server.rdb.Subscribe(ctx, "chat:"+chatID.String())
 		defer pubsub.Close()
 
 		req := &messagespb.SendMessageRequest{
 			ChatId:   chatID.String(),
 			SenderId: userID.String(),
-			Text:     "Hello world",
+			Text:     "First message",
 		}
 
-		res, err := server.SendMessage(ctx, req)
+		res1, err := server.SendMessage(ctx, req)
 		require.NoError(t, err)
-		require.NotNil(t, res)
-		assert.Equal(t, "Hello world", res.Message.Text)
+		assert.Equal(t, int64(1), res1.Message.Sequence)
+
+		req.Text = "Second message"
+		res2, err := server.SendMessage(ctx, req)
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), res2.Message.Sequence)
 
 		msg, err := pubsub.ReceiveMessage(ctx)
 		assert.NoError(t, err)
-
 		var receivedMsg messagespb.Message
 		err = json.Unmarshal([]byte(msg.Payload), &receivedMsg)
 		assert.NoError(t, err)
-		assert.Equal(t, res.Message.Id, receivedMsg.Id)
+		assert.Equal(t, res1.Message.Id, receivedMsg.Id)
 	})
 
 	t.Run("SendMessage_Forbidden", func(t *testing.T) {
@@ -106,9 +109,12 @@ func TestMessagesServer(t *testing.T) {
 		res, err := server.GetHistory(ctx, req)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, res.Messages)
+		if len(res.Messages) >= 2 {
+			assert.True(t, res.Messages[0].Sequence > res.Messages[1].Sequence)
+		}
 	})
 }
 
-func ptr(s string) *string {
+func ptrStr(s string) *string {
 	return &s
 }

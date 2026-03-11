@@ -9,6 +9,8 @@ import (
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 )
 
+const MaxPinnedChats = 5
+
 type DialogRepository struct {
 	db *database.DB
 }
@@ -48,7 +50,7 @@ func (r *DialogRepository) CreateDialog(
 	return tx.Commit()
 }
 
-func (r *DialogRepository) GetUserDialogs(ctx context.Context, userID string) ([]dbgen.Dialog, error) {
+func (r *DialogRepository) GetUserDialogs(ctx context.Context, userID string) ([]dbgen.GetUserDialogsRow, error) {
 	uid, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid user id: %w", err)
@@ -96,4 +98,46 @@ func (r *DialogRepository) GetDialogByUsername(ctx context.Context, username str
 
 func (r *DialogRepository) UpdateLastMessage(ctx context.Context, params dbgen.UpdateDialogLastMessageParams) error {
 	return r.db.Queries.UpdateDialogLastMessage(ctx, params)
+}
+
+func (r *DialogRepository) Pin(ctx context.Context, dialogID, userID string, pinned bool) error {
+	did, err := uuid.Parse(dialogID)
+	if err != nil {
+		return fmt.Errorf("invalid dialog id: %w", err)
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user id: %w", err)
+	}
+
+	if pinned {
+		count, err := r.db.Queries.CountPinnedDialogs(ctx, uid)
+		if err != nil {
+			return fmt.Errorf("failed to count pinned chats: %w", err)
+		}
+
+		currentMember, err := r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+			DialogID: did,
+			UserID:   uid,
+		})
+
+		if err == nil && !currentMember.IsPinned && count >= MaxPinnedChats {
+			return fmt.Errorf("limit reached: maximum %d pinned chats allowed", MaxPinnedChats)
+		}
+	}
+
+	return r.db.Queries.PinDialog(ctx, dbgen.PinDialogParams{
+		DialogID: did,
+		UserID:   uid,
+		IsPinned: pinned,
+	})
+}
+
+func (r *DialogRepository) Delete(ctx context.Context, dialogID string) error {
+	did, err := uuid.Parse(dialogID)
+	if err != nil {
+		return fmt.Errorf("invalid dialog id: %w", err)
+	}
+
+	return r.db.Queries.DeleteDialog(ctx, did)
 }

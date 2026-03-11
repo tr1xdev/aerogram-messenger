@@ -2,9 +2,7 @@ package messages_svc
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,7 +44,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 
 	_, err = s.dialogRepo.GetMember(ctx, req.ChatId, req.SenderId)
 	if err != nil {
-		return nil, status.Error(codes.PermissionDenied, "forbidden")
+		return nil, status.Error(codes.PermissionDenied, "you are not a member of this chat")
 	}
 
 	msg, err := s.messageRepo.Create(ctx, dbgen.CreateMessageParams{
@@ -60,19 +58,11 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		IsSystem:     false,
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	err = s.dialogRepo.UpdateLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
-		ID:            chatID,
-		LastMessageID: uuid.NullUUID{UUID: msg.ID, Valid: true},
-		LastMessageAt: sql.NullTime{Time: msg.CreatedAt, Valid: true},
-	})
-	if err != nil {
-		fmt.Printf("failed to update dialog last message: %v\n", err)
+		return nil, status.Error(codes.Internal, "failed to save message")
 	}
 
 	pb := s.mapDBToProto(msg)
+
 	data, _ := json.Marshal(pb)
 	s.rdb.Publish(ctx, "chat:"+req.ChatId, data)
 
@@ -84,46 +74,70 @@ func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryReque
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
-	msgs, err := s.messageRepo.GetHistory(ctx, chatID, req.Limit, req.Offset)
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+
+	msgs, err := s.messageRepo.GetHistory(ctx, chatID, limit, req.Offset)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, "failed to fetch history")
 	}
 
 	res := make([]*messagespb.Message, 0, len(msgs))
 	for _, m := range msgs {
 		res = append(res, s.mapDBToProto(m))
 	}
-
 	return &messagespb.GetHistoryResponse{Messages: res}, nil
 }
 
 func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessageRequest) (*messagespb.UpdateMessageResponse, error) {
-	id, _ := uuid.Parse(req.Id)
-	senderID, _ := uuid.Parse(req.SenderId)
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid message id")
+	}
+	senderID, err := uuid.Parse(req.SenderId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
+	}
 
 	msg, err := s.messageRepo.Update(ctx, id, senderID, req.Text)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to update")
+		return nil, status.Error(codes.Internal, "failed to update (check if you are the author)")
 	}
-
 	return &messagespb.UpdateMessageResponse{Message: s.mapDBToProto(msg)}, nil
 }
 
 func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessageRequest) (*messagespb.DeleteMessageResponse, error) {
-	id, _ := uuid.Parse(req.Id)
-	senderID, _ := uuid.Parse(req.SenderId)
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid message id")
+	}
+	senderID, err := uuid.Parse(req.SenderId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
+	}
 
 	if err := s.messageRepo.Delete(ctx, id, senderID); err != nil {
 		return nil, status.Error(codes.Internal, "failed to delete")
 	}
-
 	return &messagespb.DeleteMessageResponse{Success: true}, nil
 }
 
 func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadRequest) (*messagespb.MarkAsReadResponse, error) {
-	chatID, _ := uuid.Parse(req.ChatId)
-	userID, _ := uuid.Parse(req.UserId)
-	msgID, _ := uuid.Parse(req.LastMessageId)
+	chatID, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+	userID, err := uuid.Parse(req.UserId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid user id")
+	}
+	msgID, err := uuid.Parse(req.LastMessageId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid message id")
+	}
 
 	msg, err := s.messageRepo.GetByID(ctx, msgID)
 	if err != nil {
@@ -131,9 +145,8 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 	}
 
 	if err := s.messageRepo.MarkRead(ctx, chatID, userID, msg.Sequence); err != nil {
-		return nil, status.Error(codes.Internal, "failed to mark read")
+		return nil, status.Error(codes.Internal, "failed to mark as read")
 	}
-
 	return &messagespb.MarkAsReadResponse{Success: true}, nil
 }
 

@@ -78,4 +78,45 @@ func TestChatServer(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 	})
+
+	t.Run("PinChat_Success", func(t *testing.T) {
+		uID := uuid.New().String()
+		chatID := uuid.New()
+		createUser(t, server, uID)
+		uUUID := uuid.MustParse(uID)
+
+		_, err := server.db.Queries.CreateDialog(ctx, dbgen.CreateDialogParams{
+			ID:       chatID,
+			Type:     "private",
+			IsActive: true,
+		})
+		require.NoError(t, err)
+
+		err = server.db.Queries.AddDialogMember(ctx, dbgen.AddDialogMemberParams{
+			DialogID: chatID,
+			UserID:   uUUID,
+			Role:     "member",
+		})
+		require.NoError(t, err)
+
+		md := metadata.Pairs("user-id", uID)
+		authCtx := metadata.NewIncomingContext(ctx, md)
+
+		req := &chatpb.PinChatRequest{
+			ChatId: chatID.String(),
+			UserId: uID,
+			Pinned: true,
+		}
+
+		res, err := server.PinChat(authCtx, req)
+		assert.NoError(t, err)
+		assert.True(t, res.Success)
+
+		member, err := server.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+			DialogID: chatID,
+			UserID:   uUUID,
+		})
+		assert.NoError(t, err)
+		assert.True(t, member.IsPinned)
+	})
 }
