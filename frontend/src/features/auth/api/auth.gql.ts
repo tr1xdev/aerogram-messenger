@@ -28,8 +28,8 @@ export const VERIFY_EMAIL_MUTATION = gql`
 export const REFRESH_TOKEN_MUTATION = gql`
   mutation RefreshToken($token: String!) {
     refreshToken(token: $token) {
-      accessToken
-      refreshToken
+      access_token
+      refresh_token
     }
   }
 `;
