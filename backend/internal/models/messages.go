@@ -28,24 +28,24 @@ const (
 )
 
 type Message struct {
-	ID            uuid.UUID      `json:"id"`
-	DialogID      uuid.UUID      `json:"chatId"`
-	AuthorID      uuid.UUID      `json:"senderId"`
-	Content       string         `json:"text"`
-	IsEncrypted   bool           `json:"isEncrypted"`
-	EncryptionIv  *string        `json:"encryptionIv"`
-	Sequence      int64          `json:"sequence"`
-	ReplyToID     *uuid.UUID     `json:"replyToId,omitempty"`
-	ForwardFromID *uuid.UUID     `json:"forwardFromId,omitempty"`
-	MediaURL      *string        `json:"mediaUrl,omitempty"`
-	MediaType     *string        `json:"mediaType,omitempty"`
-	IsEdited      bool           `json:"isEdited"`
-	IsDeleted     bool           `json:"isDeleted"`
-	IsSystem      bool           `json:"isSystem"`
+	ID            uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
+	DialogID      uuid.UUID      `gorm:"type:uuid;index" json:"chatId"`
+	AuthorID      uuid.UUID      `gorm:"type:uuid;index" json:"senderId"`
+	Content       string         `gorm:"type:text" json:"text"`
+	IsEncrypted   bool           `gorm:"default:false" json:"isEncrypted"`
+	EncryptionIv  *string        `gorm:"type:text" json:"encryptionIv,omitempty"`
+	Sequence      int64          `gorm:"index" json:"sequence"`
+	ReplyToID     *uuid.UUID     `gorm:"type:uuid" json:"replyToId,omitempty"`
+	ForwardFromID *uuid.UUID     `gorm:"type:uuid" json:"forwardFromId,omitempty"`
+	MediaURL      *string        `gorm:"type:varchar(2048)" json:"mediaUrl,omitempty"`
+	MediaType     *string        `gorm:"type:varchar(100)" json:"mediaType,omitempty"`
+	IsEdited      bool           `gorm:"default:false" json:"isEdited"`
+	IsDeleted     bool           `gorm:"default:false" json:"isDeleted"`
+	IsSystem      bool           `gorm:"default:false" json:"isSystem"`
 	CreatedAt     time.Time      `json:"sentAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
-	DeletedAt     gorm.DeletedAt `json:"-"`
-	Sender        *User          `json:"sender,omitempty"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	Sender        *User          `gorm:"foreignKey:AuthorID" json:"sender,omitempty"`
 }
 
 type Dialog struct {
@@ -77,7 +77,7 @@ type DialogMember struct {
 	LastReadMessageID *uuid.UUID `gorm:"type:uuid;index" json:"last_read_message_id,omitempty"`
 	LastReadSequence  int64      `gorm:"index" json:"last_read_sequence"`
 	MutedUntil        *time.Time `gorm:"index" json:"muted_until,omitempty"`
-	IsPinned          bool       `gorm:"default:false" json:"is_pinned"`
+	IsPinned          bool       `gorm:"default:false;index" json:"is_pinned"`
 	CustomTitle       *string    `gorm:"type:varchar(100)" json:"custom_title,omitempty"`
 	NotificationsOn   bool       `gorm:"default:true" json:"notifications_on"`
 	CreatedAt         time.Time  `gorm:"autoCreateTime" json:"created_at"`

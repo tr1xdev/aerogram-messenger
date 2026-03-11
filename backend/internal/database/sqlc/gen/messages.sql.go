@@ -33,9 +33,9 @@ func (q *Queries) CountUnreadMessages(ctx context.Context, arg CountUnreadMessag
 const createMessage = `-- name: CreateMessage :one
 INSERT INTO messages (
     id, dialog_id, author_id, content, is_encrypted,
-    encryption_iv, reply_to_id, is_system, created_at, updated_at
+    encryption_iv, reply_to_id, is_system, is_deleted, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
+    $1, $2, $3, $4, $5, $6, $7, $8, false, NOW(), NOW()
 ) RETURNING id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, media_url, media_type, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at
 `
 
@@ -138,6 +138,18 @@ func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) 
 	return items, nil
 }
 
+const getLastSequence = `-- name: GetLastSequence :one
+SELECT COALESCE(MAX(sequence), 0)::BIGINT FROM messages
+WHERE dialog_id = $1
+`
+
+func (q *Queries) GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getLastSequence, dialogID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getMessageByID = `-- name: GetMessageByID :one
 SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, media_url, media_type, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages WHERE id = $1 LIMIT 1
 `
@@ -165,6 +177,26 @@ func (q *Queries) GetMessageByID(ctx context.Context, id uuid.UUID) (Message, er
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const markAllAsRead = `-- name: MarkAllAsRead :exec
+UPDATE dialog_members
+SET last_read_sequence = (
+    SELECT COALESCE(MAX(m.sequence), 0)
+    FROM messages m
+    WHERE m.dialog_id = dialog_members.dialog_id
+), updated_at = NOW()
+WHERE dialog_members.dialog_id = $1 AND dialog_members.user_id = $2
+`
+
+type MarkAllAsReadParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error {
+	_, err := q.db.ExecContext(ctx, markAllAsRead, arg.DialogID, arg.UserID)
+	return err
 }
 
 const softDeleteMessage = `-- name: SoftDeleteMessage :exec
