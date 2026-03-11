@@ -215,41 +215,57 @@ export function AppSidebar() {
           >
             <div className="flex flex-col min-h-[calc(100%+52px)]">
               <div className="px-4 pt-0 pb-2 shrink-0 bg-background h-[48px] flex items-end">
-                <div className="relative flex items-center h-10 w-full">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={searchQuery}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setSearchQuery(e.target.value)
-                    }
-                    className="w-full h-full px-4 rounded-xl text-[14px] bg-muted/60 border-none outline-none transition-all"
-                  />
-                  <div
-                    className={cn(
-                      "absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 gap-2.5",
-                      isFocused || searchQuery
-                        ? "opacity-0 scale-95"
-                        : "opacity-100",
+                <div className="flex items-center gap-2 w-full">
+                  <div className="relative flex-1 flex items-center h-10">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={searchQuery}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setIsFocused(false)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setSearchQuery(e.target.value)
+                      }
+                      className="w-full h-full pl-4 pr-10 rounded-xl text-[14px] bg-muted/60 border-none outline-none transition-all"
+                    />
+                    <div
+                      className={cn(
+                        "absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 gap-2.5",
+                        isFocused || searchQuery
+                          ? "opacity-0 scale-95"
+                          : "opacity-100",
+                      )}
+                    >
+                      <Search className="h-4 w-4 text-muted-foreground/40" />
+                      <span className="text-[14px] text-muted-foreground/70 font-medium">
+                        Search
+                      </span>
+                    </div>
+                    {searchQuery && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery("");
+                          setDebouncedQuery("");
+                          inputRef.current?.focus();
+                        }}
+                        className="absolute right-3 p-1 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     )}
-                  >
-                    <Search className="h-4 w-4 text-muted-foreground/40" />
-                    <span className="text-[14px] text-muted-foreground/70 font-medium">
-                      Search messages or users
-                    </span>
                   </div>
+
                   {(searchQuery || isFocused) && (
                     <button
                       onClick={() => {
                         setSearchQuery("");
                         setDebouncedQuery("");
+                        setIsFocused(false);
                         inputRef.current?.blur();
                       }}
-                      className="absolute right-3 p-1 rounded-full hover:bg-muted text-muted-foreground"
+                      className="flex items-center justify-center h-10 w-10 shrink-0 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground transition-all animate-in fade-in slide-in-from-right-2"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-5 w-5" />
                     </button>
                   )}
                 </div>
