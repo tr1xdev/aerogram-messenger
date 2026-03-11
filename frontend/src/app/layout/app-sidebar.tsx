@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouterState, useNavigate } from "@tanstack/react-router";
 import { useApolloClient } from "@apollo/client/react";
-import { Loader2, Search, MoreVertical, X } from "lucide-react";
+import { Loader2, Search, MoreVertical, X, Settings } from "lucide-react";
 import { HiDownload } from "react-icons/hi";
+import { IoChatbubbles } from "react-icons/io5";
+import { BsFillPinFill } from "react-icons/bs";
 import {
   Sidebar,
   SidebarContent,
@@ -11,6 +13,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -52,10 +55,7 @@ export function AppSidebar() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedQuery, setDebouncedQuery] = useState<string>("");
   const [isCreating, setIsCreating] = useState<boolean>(false);
-  const [indicatorStyle, setIndicatorStyle] = useState<{
-    left: number;
-    width: number;
-  }>({ left: 0, width: 0 });
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [isFocused, setIsFocused] = useState<boolean>(false);
 
   const foldersRef = useRef<HTMLDivElement>(null);
@@ -64,8 +64,8 @@ export function AppSidebar() {
 
   const client = useApolloClient();
   const navigate = useNavigate();
-  const pathname: string = useRouterState().location.pathname;
-  const isWsConnected: boolean = useConnectionStore((s) => s.isWsConnected);
+  const pathname = useRouterState().location.pathname;
+  const isWsConnected = useConnectionStore((s) => s.isWsConnected);
 
   const { data: userData } = useMe();
   const { data: chatsData, loading: isLoadingChats } = useMyChats();
@@ -73,24 +73,24 @@ export function AppSidebar() {
     useSearchUsers(debouncedQuery);
   const { createChat } = useChatActions("");
 
-  const user: User | undefined = useMemo(() => userData?.me, [userData]);
-  const chats: Chat[] = useMemo(
-    () => chatsData?.myChats ?? [],
-    [chatsData?.myChats],
-  );
+  const user = useMemo(() => userData?.me as User | undefined, [userData]);
+  const chats = useMemo(() => chatsData?.myChats ?? [], [chatsData]);
+
+  const pinnedChats = useMemo(() => chats.filter((c) => c.isPinned), [chats]);
+  const otherChats = useMemo(() => chats.filter((c) => !c.isPinned), [chats]);
 
   const folders: ChatFolder[] = useMemo(() => {
-    const totalUnread: number = chats.reduce(
-      (acc: number, chat: Chat) => acc + (chat.unreadCount || 0),
+    const totalUnread = chats.reduce(
+      (acc, chat) => acc + (chat.unreadCount || 0),
       0,
     );
     return [{ id: "all", label: "All chats", unread: totalUnread }];
   }, [chats]);
 
-  const filteredLocalChats: Chat[] = useMemo(() => {
+  const filteredLocalChats = useMemo(() => {
     if (!debouncedQuery) return [];
-    const q: string = debouncedQuery.toLowerCase();
-    return chats.filter((c: Chat) => c.title.toLowerCase().includes(q));
+    const q = debouncedQuery.toLowerCase();
+    return chats.filter((c) => c.title.toLowerCase().includes(q));
   }, [debouncedQuery, chats]);
 
   useEffect(() => {
@@ -98,21 +98,13 @@ export function AppSidebar() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  useEffect(() => {
-    const el: HTMLDivElement | null = scrollRef.current;
-    if (el && !isLoadingChats && chats.length > 0 && !searchQuery) {
-      el.scrollTop = 52;
-    }
-  }, [isLoadingChats, chats.length, searchQuery]);
-
   const updateIndicator = useCallback(() => {
-    const container: HTMLDivElement | null = foldersRef.current;
+    const container = foldersRef.current;
     if (!container) return;
-    const active: HTMLButtonElement | null = container.querySelector(
+    const active = container.querySelector(
       `[data-folder-id="${activeFolder}"]`,
-    );
-    const label: HTMLSpanElement | null =
-      active?.querySelector(".folder-label") || null;
+    ) as HTMLButtonElement;
+    const label = active?.querySelector(".folder-label") as HTMLSpanElement;
     if (active && label) {
       setIndicatorStyle({
         left: active.offsetLeft + label.offsetLeft,
@@ -123,27 +115,25 @@ export function AppSidebar() {
 
   useEffect(() => {
     updateIndicator();
-    const observer: ResizeObserver = new ResizeObserver(updateIndicator);
+    const observer = new ResizeObserver(updateIndicator);
     if (foldersRef.current) observer.observe(foldersRef.current);
     return () => observer.disconnect();
   }, [updateIndicator, chats]);
 
-  const handleSelectUser = async (userId: string): Promise<void> => {
+  const handleSelectUser = async (userId: string) => {
     if (isCreating) return;
     setIsCreating(true);
     try {
-      const newChat: Chat | undefined = await createChat(userId);
+      const newChat = await createChat(userId);
       if (newChat) {
-        const existing: MyChatsData | null = client.readQuery<MyChatsData>({
-          query: GET_MY_CHATS,
-        });
+        const existing = client.readQuery<MyChatsData>({ query: GET_MY_CHATS });
         if (existing) {
           client.writeQuery<MyChatsData>({
             query: GET_MY_CHATS,
             data: {
               myChats: [
                 newChat,
-                ...existing.myChats.filter((c: Chat) => c.id !== newChat.id),
+                ...existing.myChats.filter((c) => c.id !== newChat.id),
               ],
             },
           });
@@ -210,8 +200,12 @@ export function AppSidebar() {
         <SidebarContent className="flex-1 min-h-0 relative bg-background">
           <div
             ref={scrollRef}
-            className="h-full overflow-y-auto scrollbar-none touch-pan-y overscroll-contain"
-            style={{ WebkitOverflowScrolling: "touch" }}
+            className="h-full overflow-y-auto scrollbar-hide touch-pan-y overscroll-contain"
+            style={{
+              WebkitOverflowScrolling: "touch",
+              msOverflowStyle: "none",
+              scrollbarWidth: "none",
+            }}
           >
             <div className="flex flex-col min-h-[calc(100%+52px)]">
               <div className="px-4 pt-0 pb-2 shrink-0 bg-background h-[48px] flex items-end">
@@ -223,9 +217,7 @@ export function AppSidebar() {
                       value={searchQuery}
                       onFocus={() => setIsFocused(true)}
                       onBlur={() => setIsFocused(false)}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setSearchQuery(e.target.value)
-                      }
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full h-full pl-4 pr-10 rounded-xl text-[14px] bg-muted/60 border-none outline-none transition-all"
                     />
                     <div
@@ -238,7 +230,7 @@ export function AppSidebar() {
                     >
                       <Search className="h-4 w-4 text-muted-foreground/40" />
                       <span className="text-[14px] text-muted-foreground/70 font-medium">
-                        Search
+                        Search messages or users
                       </span>
                     </div>
                     {searchQuery && (
@@ -263,7 +255,7 @@ export function AppSidebar() {
                         setIsFocused(false);
                         inputRef.current?.blur();
                       }}
-                      className="flex items-center justify-center h-10 w-10 shrink-0 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground transition-all animate-in fade-in slide-in-from-right-2"
+                      className="flex items-center justify-center h-10 w-10 shrink-0 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all animate-in fade-in slide-in-from-right-2"
                     >
                       <X className="h-5 w-5" />
                     </button>
@@ -271,47 +263,49 @@ export function AppSidebar() {
                 </div>
               </div>
 
-              <div className="sticky top-0 z-40 bg-background px-4 border-b border-border/5 shrink-0">
-                <div className="relative flex items-center h-11">
-                  <div
-                    ref={foldersRef}
-                    className="flex items-center overflow-x-auto scrollbar-none w-full h-full touch-pan-x"
-                  >
-                    <button className="shrink-0 pr-3 py-2 text-muted-foreground/30 hover:text-foreground transition-colors">
-                      <HiDownload className="h-5 w-5" />
-                    </button>
-                    {folders.map((f: ChatFolder) => (
-                      <button
-                        key={f.id}
-                        data-folder-id={f.id}
-                        onClick={() => setActiveFolder(f.id)}
-                        className={cn(
-                          "shrink-0 px-4 h-9 flex items-center text-[13.5px] font-semibold transition-all relative",
-                          f.id === activeFolder
-                            ? "text-sky-500"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="folder-label">{f.label}</span>
-                          {f.unread > 0 && (
-                            <span className="h-4 px-1 min-w-[16px] flex items-center justify-center text-[10px] rounded-full bg-blue-500/90 text-white font-bold">
-                              {f.unread}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    ))}
+              {chats.length > 0 && (
+                <div className="sticky top-0 z-40 bg-background px-4 border-b border-border/5 shrink-0">
+                  <div className="relative flex items-center h-11">
                     <div
-                      className="absolute bottom-0 h-[2.5px] bg-sky-500 rounded-t-xl transition-all duration-300"
-                      style={{
-                        left: indicatorStyle.left,
-                        width: indicatorStyle.width,
-                      }}
-                    />
+                      ref={foldersRef}
+                      className="flex items-center overflow-x-auto scrollbar-hide w-full h-full touch-pan-x"
+                    >
+                      <button className="shrink-0 pr-3 py-2 text-muted-foreground/30 hover:text-foreground transition-colors">
+                        <HiDownload className="h-5 w-5" />
+                      </button>
+                      {folders.map((f) => (
+                        <button
+                          key={f.id}
+                          data-folder-id={f.id}
+                          onClick={() => setActiveFolder(f.id)}
+                          className={cn(
+                            "shrink-0 px-4 h-9 flex items-center text-[13.5px] font-semibold transition-all relative",
+                            f.id === activeFolder
+                              ? "text-sky-500"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="folder-label">{f.label}</span>
+                            {f.unread > 0 && (
+                              <span className="h-4 px-1 min-w-[16px] flex items-center justify-center text-[10px] rounded-full bg-blue-500/90 text-white font-bold">
+                                {f.unread}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                      <div
+                        className="absolute bottom-0 h-[2.5px] bg-sky-500 rounded-t-xl transition-all duration-300"
+                        style={{
+                          left: indicatorStyle.left,
+                          width: indicatorStyle.width,
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex-1 bg-background">
                 {searchQuery ? (
@@ -324,42 +318,88 @@ export function AppSidebar() {
                       isSearchingGlobal ||
                       isCreating
                     }
-                    onSelectChat={(id: string) => {
+                    onSelectChat={(id) => {
                       setSearchQuery("");
                       navigate({ to: "/chat/$chatId", params: { chatId: id } });
                     }}
                     onSelectUser={handleSelectUser}
                   />
+                ) : chats.length === 0 && !isLoadingChats ? (
+                  <div className="flex flex-col items-center justify-center h-[60vh] text-center px-8 animate-in fade-in zoom-in-95 duration-500">
+                    <div className="w-20 h-20 bg-muted/30 rounded-3xl flex items-center justify-center mb-5">
+                      <IoChatbubbles className="h-10 w-10 text-muted-foreground/20" />
+                    </div>
+                    <h3 className="text-[16px] font-bold text-foreground/80">
+                      No chats yet
+                    </h3>
+                    <p className="text-[13px] text-muted-foreground/60 mt-1 max-w-[200px]">
+                      Search for users to start a conversation
+                    </p>
+                  </div>
                 ) : (
-                  <SidebarGroup className="p-0">
-                    <SidebarGroupContent>
-                      <SidebarMenu className="gap-0">
-                        {isLoadingChats && !chatsData
-                          ? Array(10)
-                              .fill(0)
-                              .map((_: number, i: number) => (
-                                <div
-                                  key={i}
-                                  className="flex items-center gap-3 px-4 py-3.5"
-                                >
-                                  <Skeleton className="h-12 w-12 rounded-full shrink-0" />
-                                  <div className="flex-1 space-y-2">
-                                    <Skeleton className="h-3 w-24" />
-                                    <Skeleton className="h-3 w-full opacity-40" />
-                                  </div>
-                                </div>
-                              ))
-                          : chats.map((chat: Chat) => (
-                              <ChatMenuItem
-                                key={chat.id}
-                                chat={chat}
-                                isActive={pathname.includes(chat.id)}
-                                myId={user?.id}
-                              />
-                            ))}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
+                  <>
+                    {isLoadingChats && !chatsData ? (
+                      <div className="gap-0">
+                        {Array(10)
+                          .fill(0)
+                          .map((_, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-3 px-4 py-3.5"
+                            >
+                              <Skeleton className="h-12 w-12 rounded-full shrink-0" />
+                              <div className="flex-1 space-y-2">
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-3 w-full opacity-40" />
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <>
+                        {pinnedChats.length > 0 && (
+                          <SidebarGroup className="p-0">
+                            <SidebarGroupLabel className="px-4 pt-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/50 flex items-center gap-2">
+                              <BsFillPinFill className="h-3 w-3" />
+                              Pinned Chats
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                              <SidebarMenu className="gap-0">
+                                {pinnedChats.map((chat) => (
+                                  <ChatMenuItem
+                                    key={chat.id}
+                                    chat={chat}
+                                    isActive={pathname.includes(chat.id)}
+                                    myId={user?.id}
+                                  />
+                                ))}
+                              </SidebarMenu>
+                            </SidebarGroupContent>
+                          </SidebarGroup>
+                        )}
+
+                        <SidebarGroup className="p-0">
+                          {pinnedChats.length > 0 && (
+                            <SidebarGroupLabel className="px-4 pt-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                              All Chats
+                            </SidebarGroupLabel>
+                          )}
+                          <SidebarGroupContent>
+                            <SidebarMenu className="gap-0">
+                              {otherChats.map((chat) => (
+                                <ChatMenuItem
+                                  key={chat.id}
+                                  chat={chat}
+                                  isActive={pathname.includes(chat.id)}
+                                  myId={user?.id}
+                                />
+                              ))}
+                            </SidebarMenu>
+                          </SidebarGroupContent>
+                        </SidebarGroup>
+                      </>
+                    )}
+                  </>
                 )}
               </div>
               <div className="h-[max(80px,env(safe-area-inset-bottom))] w-full shrink-0 bg-background" />
@@ -372,20 +412,23 @@ export function AppSidebar() {
           onClick={() => setSettingsOpen(true)}
         >
           {user ? (
-            <div className="flex items-center gap-3 w-full">
-              <Avatar className="h-9 w-9 border border-border/10 shrink-0">
-                <AvatarFallback className="font-bold text-[11px] bg-primary/10 text-primary uppercase">
-                  {user.first_name?.[0] || user.username?.[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[13.5px] font-bold truncate leading-tight">
-                  {user.first_name} {user.last_name}
-                </span>
-                <span className="text-[11px] text-muted-foreground/60 font-medium">
-                  Settings
-                </span>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar className="h-9 w-9 border border-border/10 shrink-0">
+                  <AvatarFallback className="font-bold text-[11px] bg-primary/10 text-primary uppercase">
+                    {user.first_name?.[0] || user.username?.[0] || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[13.5px] font-bold truncate leading-tight text-foreground">
+                    {user.first_name} {user.last_name}
+                  </span>
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    Settings
+                  </span>
+                </div>
               </div>
+              <Settings className="h-4.5 w-4.5 text-gray-500" />
             </div>
           ) : (
             <Skeleton className="h-9 w-full rounded-xl" />
