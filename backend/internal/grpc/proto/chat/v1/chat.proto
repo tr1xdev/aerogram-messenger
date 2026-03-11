@@ -9,6 +9,7 @@ service ChatService {
   rpc GetMyChats(GetMyChatsRequest) returns (GetMyChatsResponse);
   rpc PinChat(PinChatRequest) returns (PinChatResponse);
   rpc GetChat(GetChatRequest) returns (GetChatResponse);
+  rpc DeleteChat(DeleteChatRequest) returns (DeleteChatResponse);
 }
 
 enum ChatType {
@@ -16,6 +17,15 @@ enum ChatType {
   CHAT_TYPE_PRIVATE = 1;
   CHAT_TYPE_GROUP = 2;
   CHAT_TYPE_CHANNEL = 3;
+}
+
+message DeleteChatRequest {
+  string chat_id = 1;
+  string user_id = 2;
+}
+
+message DeleteChatResponse {
+  bool success = 1;
 }
 
 message GetChatRequest {
@@ -41,6 +51,8 @@ message Chat {
   optional string description = 10;
   bool is_verified = 11;
   optional string pinned_message_id = 12;
+  bool is_pinned = 13;
+  int32 unread_count = 14;
 }
 
 message CreateChatRequest {
