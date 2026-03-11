@@ -52,6 +52,7 @@ export const GET_MY_CHATS = gql`
       id
       type
       title
+      isPinned
       photoUrl
       unreadCount
       lastReadSequence
@@ -281,5 +282,51 @@ export const GET_USER_BY_ID = gql`
       username
       status
     }
+  }
+`;
+
+export const PIN_CHAT = gql`
+  mutation PinChat($id: ID!, $pinned: Boolean!) {
+    pinChat(id: $id, pinned: $pinned)
+  }
+`;
+
+export const DELETE_MESSAGE = gql`
+  mutation DeleteMessage($id: ID!) {
+    deleteMessage(id: $id)
+  }
+`;
+
+export const UPDATE_MESSAGE = gql`
+  mutation UpdateMessage($id: ID!, $text: String!) {
+    updateMessage(id: $id, text: $text) {
+      id
+      text
+      isEdited
+    }
+  }
+`;
+
+export const TERMINATE_SESSION = gql`
+  mutation TerminateSession($id: ID!) {
+    terminateSession(id: $id)
+  }
+`;
+
+export const SEND_TYPING_EVENT = gql`
+  mutation SendTypingEvent($chatID: String!) {
+    sendTypingEvent(chatID: $chatID)
+  }
+`;
+
+export const LOGOUT = gql`
+  mutation Logout {
+    logout
+  }
+`;
+
+export const DELETE_CHAT = gql`
+  mutation DeleteChat($id: ID!) {
+    deleteChat(id: $id)
   }
 `;

@@ -46,6 +46,7 @@ export interface Chat {
   lastReadSequence: number;
   messages?: Message[];
   createdAt: string;
+  isPinned: boolean;
 }
 
 export interface Session {
