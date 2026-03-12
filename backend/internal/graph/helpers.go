@@ -3,7 +3,7 @@ package graph
 import (
 	"context"
 	"errors"
-	"reflect"
+	"fmt"
 
 	"github.com/google/uuid"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
@@ -14,8 +14,15 @@ import (
 )
 
 func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb.Chat) (*model.Chat, error) {
-	parsedAuthID, _ := uuid.Parse(authID)
-	chatID, _ := uuid.Parse(pbChat.Id)
+	parsedAuthID, err := uuid.Parse(authID)
+	if err != nil {
+		return nil, fmt.Errorf("auth id parse fail: %w", err)
+	}
+
+	chatID, err := uuid.Parse(pbChat.Id)
+	if err != nil {
+		return nil, fmt.Errorf("chat id parse fail: %w", err)
+	}
 
 	chatType := model.ChatTypePrivate
 	switch pbChat.Type {
@@ -25,15 +32,18 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		chatType = model.ChatTypeChannel
 	}
 
-	dbMembers, _ := r.db.Queries.GetDialogMembers(ctx, chatID)
+	dbMembers, err := r.db.Queries.GetDialogMembers(ctx, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch members fail: %w", err)
+	}
 
-	idsMap := make(map[uuid.UUID]bool)
+	idsMap := make(map[uuid.UUID]struct{}, len(dbMembers)+1)
 	var isPinned bool
 	var myReadSeq int64
 	var pReadSeq int64
 
 	for _, m := range dbMembers {
-		idsMap[m.UserID] = true
+		idsMap[m.UserID] = struct{}{}
 		if m.UserID == parsedAuthID {
 			isPinned = m.IsPinned
 			myReadSeq = m.LastReadSequence
@@ -60,7 +70,7 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 					IsEncrypted:  m.IsEncrypted,
 					EncryptionIv: toStringPtr(m.EncryptionIv),
 				}
-				idsMap[m.AuthorID] = true
+				idsMap[m.AuthorID] = struct{}{}
 			}
 		}
 	}
@@ -70,8 +80,12 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		userIDs = append(userIDs, id)
 	}
 
-	dbUsers, _ := r.userRepo.GetByIDs(ctx, userIDs)
-	userMap := make(map[uuid.UUID]*models.User)
+	dbUsers, err := r.userRepo.GetByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("fetch users fail: %w", err)
+	}
+
+	userMap := make(map[uuid.UUID]*models.User, len(dbUsers))
 	for _, u := range dbUsers {
 		userMap[u.ID] = &models.User{
 			ID:               u.ID,
@@ -84,7 +98,7 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		}
 	}
 
-	var gqlMembers []*model.ChatMember
+	gqlMembers := make([]*model.ChatMember, 0, len(dbMembers))
 	for _, m := range dbMembers {
 		if u, ok := userMap[m.UserID]; ok {
 			gqlMembers = append(gqlMembers, &model.ChatMember{
@@ -144,45 +158,16 @@ func toStringPtr(val interface{}) *string {
 	case []byte:
 		s := string(v)
 		return &s
-	}
-
-	type scanner interface {
-		Value() (interface{}, error)
-	}
-
-	if s, ok := val.(scanner); ok {
-		raw, err := s.Value()
-		if err == nil && raw != nil {
-			switch r := raw.(type) {
-			case string:
-				return &r
-			case []byte:
-				str := string(r)
-				return &str
-			}
+	case interface {
+		IsValid() bool
+		String() string
+	}:
+		if v.IsValid() {
+			s := v.String()
+			return &s
 		}
+		return nil
 	}
-
-	rv := reflect.ValueOf(val)
-	if rv.Kind() == reflect.Ptr {
-		if rv.IsNil() {
-			return nil
-		}
-		rv = rv.Elem()
-	}
-
-	if rv.Kind() == reflect.Struct {
-		valid := rv.FieldByName("Valid")
-		str := rv.FieldByName("String")
-		if valid.IsValid() && str.IsValid() && valid.Kind() == reflect.Bool && str.Kind() == reflect.String {
-			if valid.Bool() {
-				s := str.String()
-				return &s
-			}
-			return nil
-		}
-	}
-
 	return nil
 }
 

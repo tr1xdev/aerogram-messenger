@@ -77,6 +77,7 @@ type DeleteChatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ChatId        string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ForEveryone   bool                   `protobuf:"varint,3,opt,name=for_everyone,json=forEveryone,proto3" json:"for_everyone,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -123,6 +124,13 @@ func (x *DeleteChatRequest) GetUserId() string {
 		return x.UserId
 	}
 	return ""
+}
+
+func (x *DeleteChatRequest) GetForEveryone() bool {
+	if x != nil {
+		return x.ForEveryone
+	}
+	return false
 }
 
 type DeleteChatResponse struct {
@@ -737,10 +745,11 @@ var File_chat_v1_chat_proto protoreflect.FileDescriptor
 
 const file_chat_v1_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x12chat/v1/chat.proto\x12\achat.v1\"E\n" +
+	"\x12chat/v1/chat.proto\x12\achat.v1\"h\n" +
 	"\x11DeleteChatRequest\x12\x17\n" +
 	"\achat_id\x18\x01 \x01(\tR\x06chatId\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\".\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12!\n" +
+	"\ffor_everyone\x18\x03 \x01(\bR\vforEveryone\".\n" +
 	"\x12DeleteChatResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"u\n" +
 	"\x0eGetChatRequest\x12\x1c\n" +

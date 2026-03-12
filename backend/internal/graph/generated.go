@@ -94,7 +94,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		CreateChat                func(childComplexity int, typeArg model.ChatType, participantIds []string, slug *string, title *string) int
 		CreateDirectChat          func(childComplexity int, userID string) int
-		DeleteChat                func(childComplexity int, id string) int
+		DeleteChat                func(childComplexity int, id string, forEveryone *bool) int
 		DeleteMessage             func(childComplexity int, id string) int
 		Login                     func(childComplexity int, input model.LoginInput) int
 		Logout                    func(childComplexity int) int
@@ -140,6 +140,7 @@ type ComplexityRoot struct {
 
 	Subscription struct {
 		ChatCreated       func(childComplexity int, userID string) int
+		ChatDeleted       func(childComplexity int, userID string) int
 		DialogRead        func(childComplexity int, chatID string) int
 		MessageAdded      func(childComplexity int, chatID string) int
 		UserStatusChanged func(childComplexity int, chatID string) int
@@ -192,7 +193,7 @@ type MutationResolver interface {
 	UpdateMessage(ctx context.Context, id string, text string) (*models.Message, error)
 	DeleteMessage(ctx context.Context, id string) (bool, error)
 	PinChat(ctx context.Context, id string, pinned bool) (bool, error)
-	DeleteChat(ctx context.Context, id string) (bool, error)
+	DeleteChat(ctx context.Context, id string, forEveryone *bool) (bool, error)
 	CreateDirectChat(ctx context.Context, userID string) (*model.Chat, error)
 	SendTypingEvent(ctx context.Context, chatID string) (bool, error)
 	MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error)
@@ -222,6 +223,7 @@ type SubscriptionResolver interface {
 	UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error)
 	DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
 	ChatCreated(ctx context.Context, userID string) (<-chan *model.Chat, error)
+	ChatDeleted(ctx context.Context, userID string) (<-chan string, error)
 }
 type UserResolver interface {
 	ID(ctx context.Context, obj *models.User) (string, error)
@@ -449,7 +451,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.DeleteChat(childComplexity, args["id"].(string)), true
+		return e.complexity.Mutation.DeleteChat(childComplexity, args["id"].(string), args["forEveryone"].(*bool)), true
 	case "Mutation.deleteMessage":
 		if e.complexity.Mutation.DeleteMessage == nil {
 			break
@@ -747,6 +749,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Subscription.ChatCreated(childComplexity, args["userId"].(string)), true
+	case "Subscription.chatDeleted":
+		if e.complexity.Subscription.ChatDeleted == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_chatDeleted_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.ChatDeleted(childComplexity, args["userId"].(string)), true
 	case "Subscription.dialogRead":
 		if e.complexity.Subscription.DialogRead == nil {
 			break
@@ -1058,6 +1071,11 @@ func (ec *executionContext) field_Mutation_deleteChat_args(ctx context.Context, 
 		return nil, err
 	}
 	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "forEveryone", ec.unmarshalOBoolean2ᚖbool)
+	if err != nil {
+		return nil, err
+	}
+	args["forEveryone"] = arg1
 	return args, nil
 }
 
@@ -1321,6 +1339,17 @@ func (ec *executionContext) field_Query_sessions_args(ctx context.Context, rawAr
 }
 
 func (ec *executionContext) field_Subscription_chatCreated_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["userId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_chatDeleted_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userId", ec.unmarshalNID2string)
@@ -2904,7 +2933,7 @@ func (ec *executionContext) _Mutation_deleteChat(ctx context.Context, field grap
 		ec.fieldContext_Mutation_deleteChat,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().DeleteChat(ctx, fc.Args["id"].(string))
+			return ec.resolvers.Mutation().DeleteChat(ctx, fc.Args["id"].(string), fc.Args["forEveryone"].(*bool))
 		},
 		nil,
 		ec.marshalNBoolean2bool,
@@ -4250,6 +4279,47 @@ func (ec *executionContext) fieldContext_Subscription_chatCreated(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Subscription_chatCreated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_chatDeleted(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_chatDeleted,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().ChatDeleted(ctx, fc.Args["userId"].(string))
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_chatDeleted(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_chatDeleted_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7434,6 +7504,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_dialogRead(ctx, fields[0])
 	case "chatCreated":
 		return ec._Subscription_chatCreated(ctx, fields[0])
+	case "chatDeleted":
+		return ec._Subscription_chatDeleted(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
