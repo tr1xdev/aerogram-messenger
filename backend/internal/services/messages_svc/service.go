@@ -42,12 +42,19 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
 
-	_, err = s.dialogRepo.GetMember(ctx, req.ChatId, req.SenderId)
-	if err != nil {
+	if _, err := s.dialogRepo.GetMember(ctx, req.ChatId, req.SenderId); err != nil {
 		return nil, status.Error(codes.PermissionDenied, "you are not a member of this chat")
 	}
 
-	msg, err := s.messageRepo.Create(ctx, dbgen.CreateMessageParams{
+	tx, err := s.db.Conn.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to start transaction")
+	}
+	defer tx.Rollback()
+
+	qtx := s.db.Queries.WithTx(tx)
+
+	msg, err := qtx.CreateMessage(ctx, dbgen.CreateMessageParams{
 		ID:           uuid.New(),
 		DialogID:     chatID,
 		AuthorID:     senderID,
@@ -61,9 +68,23 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.Internal, "failed to save message")
 	}
 
-	pb := s.mapDBToProto(msg)
+	err = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
+		ID:            chatID,
+		LastMessageID: database.UUIDToNullUUID(msg.ID),
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to update dialog")
+	}
 
-	data, _ := json.Marshal(pb)
+	if err := tx.Commit(); err != nil {
+		return nil, status.Error(codes.Internal, "failed to commit transaction")
+	}
+
+	pb := s.mapDBToProto(msg)
+	data, _ := json.Marshal(map[string]interface{}{
+		"type":    "new_message",
+		"payload": pb,
+	})
 	s.rdb.Publish(ctx, "chat:"+req.ChatId, data)
 
 	return &messagespb.SendMessageResponse{Message: pb}, nil
