@@ -63,12 +63,37 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
 	}
 
-	_, err := s.dialogRepo.GetMember(ctx, req.ChatId, userID)
+	uid, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, status.Error(codes.PermissionDenied, "you cannot delete a chat you are not a member of")
+		return nil, status.Error(codes.InvalidArgument, "invalid user id")
 	}
 
-	err = s.dialogRepo.Delete(ctx, req.ChatId)
+	did, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+
+	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "chat not found")
+	}
+
+	if req.ForEveryone {
+		isOwner := dialog.CreatorID.Valid && dialog.CreatorID.UUID == uid
+		isPrivate := dialog.Type == "private"
+
+		if isPrivate || isOwner {
+			err = s.db.Queries.HardDeleteDialog(ctx, did)
+		} else {
+			return nil, status.Error(codes.PermissionDenied, "only owner can delete for everyone")
+		}
+	} else {
+		err = s.db.Queries.DeleteDialogMember(ctx, dbgen.DeleteDialogMemberParams{
+			DialogID: did,
+			UserID:   uid,
+		})
+	}
+
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to delete chat")
 	}
@@ -94,19 +119,14 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		Type:         s.mapProtoTypeToDB(req.Type),
 		Name:         database.ToNullString(req.Title),
 		Username:     database.ToNullString(req.Slug),
-		PhotoUrl:     database.ToNullString(nil),
-		Bio:          database.ToNullString(nil),
-		Description:  database.ToNullString(nil),
-		InviteLink:   database.ToNullString(nil),
 		CreatorID:    uuid.NullUUID{UUID: creatorUUID, Valid: true},
 		MembersCount: int32(len(req.ParticipantIds)),
 		IsActive:     true,
-		IsVerified:   false,
 	}
 
 	mParams := make([]dbgen.AddDialogMemberParams, len(req.ParticipantIds))
 	for i, pID := range req.ParticipantIds {
-		uid, err := uuid.Parse(pID)
+		pUUID, err := uuid.Parse(pID)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, "invalid participant id")
 		}
@@ -118,7 +138,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 
 		mParams[i] = dbgen.AddDialogMemberParams{
 			DialogID:         newID,
-			UserID:           uid,
+			UserID:           pUUID,
 			Role:             role,
 			NotificationsOn:  true,
 			IsPinned:         false,
@@ -140,7 +160,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, newID.String())
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch created chat")
+		return nil, status.Error(codes.Internal, "failed to fetch chat")
 	}
 
 	return &chatpb.CreateChatResponse{
@@ -171,10 +191,50 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 	var dialog dbgen.Dialog
 	var err error
 
+	userID := s.getUserID(ctx, req.UserId)
+
 	if req.ChatId != nil && *req.ChatId != "" {
 		dialog, err = s.dialogRepo.GetDialogByID(ctx, *req.ChatId)
 	} else if req.Slug != nil && *req.Slug != "" {
-		dialog, err = s.dialogRepo.GetDialogByUsername(ctx, *req.Slug)
+		slug, _ := strings.CutPrefix(*req.Slug, "@")
+
+		dialog, err = s.dialogRepo.GetDialogByUsername(ctx, slug)
+
+		if err != nil && userID != "" {
+			userRepo := repositories.NewUserRepository(s.db)
+			targetUser, userErr := userRepo.GetByUsername(ctx, slug)
+
+			if userErr == nil {
+				targetUserID := targetUser.ID.String()
+
+				existingDialog, diagErr := s.dialogRepo.GetPrivateDialogByMembers(ctx, userID, targetUserID)
+				if diagErr == nil {
+					return &chatpb.GetChatResponse{
+						Chat: s.mapDBDialogToProto(existingDialog),
+					}, nil
+				}
+
+				title := targetUser.FirstName
+				if targetUser.LastName.Valid {
+					title += " " + targetUser.LastName.String
+				}
+
+				chatRes := &chatpb.Chat{
+					Id:           targetUserID,
+					Type:         chatpb.ChatType_CHAT_TYPE_PRIVATE,
+					Title:        title,
+					MembersCount: 2,
+				}
+
+				if targetUser.Username.Valid {
+					chatRes.Slug = targetUser.Username.String
+				}
+
+				return &chatpb.GetChatResponse{
+					Chat: chatRes,
+				}, nil
+			}
+		}
 	} else {
 		return nil, status.Error(codes.InvalidArgument, "chat_id or slug required")
 	}

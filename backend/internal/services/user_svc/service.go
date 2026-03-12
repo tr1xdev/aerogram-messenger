@@ -12,6 +12,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Server struct {
@@ -39,7 +40,7 @@ func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*us
 		}
 		u, err = s.userRepo.GetByID(ctx, uid)
 	case *userpb.UserInfoRequest_Username:
-		u, err = s.userRepo.GetByEmail(ctx, v.Username)
+		u, err = s.userRepo.GetByUsername(ctx, v.Username)
 	default:
 		return nil, status.Error(codes.InvalidArgument, "identifier required")
 	}
@@ -108,32 +109,6 @@ func (s *Server) SearchUsers(ctx context.Context, req *userpb.SearchUsersRequest
 	return &userpb.SearchUsersResponse{Users: pbUsers}, nil
 }
 
-func (s *Server) mapDBToProto(u dbgen.User) *userpb.User {
-	res := &userpb.User{
-		Id:        u.ID.String(),
-		FirstName: u.FirstName,
-		Email:     &u.Email,
-	}
-
-	if u.Username.Valid {
-		res.Username = &u.Username.String
-	}
-	if u.LastName.Valid {
-		res.LastName = &u.LastName.String
-	}
-	if u.PublicKey.Valid {
-		res.PublicKey = &u.PublicKey.String
-	}
-	if u.EncryptedPrivKey.Valid {
-		res.EncryptedPrivKey = &u.EncryptedPrivKey.String
-	}
-	if u.EncryptionIv.Valid {
-		res.EncryptionIv = &u.EncryptionIv.String
-	}
-
-	return res
-}
-
 func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) (*userpb.UpdateUserResponse, error) {
 	uid, err := uuid.Parse(req.Id)
 	if err != nil {
@@ -160,4 +135,31 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 			User: s.mapDBToProto(updatedUser),
 		},
 	}, nil
+}
+
+func (s *Server) mapDBToProto(u dbgen.User) *userpb.User {
+	res := &userpb.User{
+		Id:        u.ID.String(),
+		FirstName: u.FirstName,
+		Email:     &u.Email,
+		CreatedAt: timestamppb.New(u.CreatedAt),
+	}
+
+	if u.Username.Valid {
+		res.Username = &u.Username.String
+	}
+	if u.LastName.Valid {
+		res.LastName = &u.LastName.String
+	}
+	if u.PublicKey.Valid {
+		res.PublicKey = &u.PublicKey.String
+	}
+	if u.EncryptedPrivKey.Valid {
+		res.EncryptedPrivKey = &u.EncryptedPrivKey.String
+	}
+	if u.EncryptionIv.Valid {
+		res.EncryptionIv = &u.EncryptionIv.String
+	}
+
+	return res
 }

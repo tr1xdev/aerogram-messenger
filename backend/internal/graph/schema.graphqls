@@ -139,7 +139,7 @@ type Mutation {
    updateMessage(id: ID!, text: String!): Message!
    deleteMessage(id: ID!): Boolean!
    pinChat(id: ID!, pinned: Boolean!): Boolean!
-   deleteChat(id: ID!): Boolean!
+   deleteChat(id: ID!, forEveryone: Boolean): Boolean!
    createDirectChat(userID: String!): Chat!
    sendTypingEvent(chatID: String!): Boolean!
    markDialogAsRead(chatID: String!, lastSequence: Long!): Boolean!
@@ -152,6 +152,7 @@ type Subscription {
    userStatusChanged(chatId: ID!): UserStatusPayload!
    dialogRead(chatID: String!): ReadPayload!
    chatCreated(userId: ID!): Chat!
+   chatDeleted(userId: ID!): ID!
 }
 
 type UserStatusPayload {

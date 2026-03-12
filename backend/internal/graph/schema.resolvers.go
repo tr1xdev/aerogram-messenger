@@ -65,10 +65,12 @@ func (r *messageResolver) ReplyTo(ctx context.Context, obj *models.Message) (*mo
 	if obj.ReplyToID == nil || *obj.ReplyToID == uuid.Nil {
 		return nil, nil
 	}
+
 	m, err := r.db.Queries.GetMessageByID(ctx, *obj.ReplyToID)
 	if err != nil {
 		return nil, nil
 	}
+
 	return &models.Message{
 		ID:           m.ID,
 		DialogID:     m.DialogID,
@@ -118,13 +120,20 @@ func (r *mutationResolver) TerminateAllOtherSessions(ctx context.Context) (bool,
 
 	sessions, err := r.db.Queries.GetSessionsByUserID(ctx, uid)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to fetch sessions: %w", err)
 	}
 
 	for _, s := range sessions {
 		if s.ID != sid {
-			r.db.Queries.DeactivateSession(ctx, s.ID)
-			r.redisClient.Publish(ctx, "kill:session:"+s.ID.String(), "terminated")
+			err := r.db.Queries.DeactivateSession(ctx, s.ID)
+			if err != nil {
+				return false, fmt.Errorf("failed to deactivate session %s: %w", s.ID, err)
+			}
+
+			err = r.redisClient.Publish(ctx, "kill:session:"+s.ID.String(), "terminated").Err()
+			if err != nil {
+				return false, fmt.Errorf("failed to notify session termination: %w", err)
+			}
 		}
 	}
 
@@ -188,12 +197,13 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input model.UpdateUse
 	if authID == "" {
 		return nil, errors.New("unauthorized access")
 	}
+
 	uid, err := uuid.Parse(authID)
 	if err != nil {
 		return nil, errors.New("invalid user id")
 	}
 
-	_, err = r.userRepo.Update(ctx, dbgen.UpdateUserParams{
+	params := dbgen.UpdateUserParams{
 		ID:               uid,
 		FirstName:        database.ToNullString(input.FirstName),
 		LastName:         database.ToNullString(input.LastName),
@@ -201,8 +211,9 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input model.UpdateUse
 		PublicKey:        database.ToNullString(input.PublicKey),
 		EncryptedPrivKey: database.ToNullString(input.EncryptedPrivKey),
 		EncryptionIv:     database.ToNullString(input.EncryptionIv),
-	})
-	if err != nil {
+	}
+
+	if _, err = r.userRepo.Update(ctx, params); err != nil {
 		return nil, fmt.Errorf("failed to update profile: %w", err)
 	}
 
@@ -232,8 +243,13 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 	}
 
 	enumKey := "CHAT_TYPE_" + strings.ToUpper(string(typeArg))
+	typeValue, ok := chatv1.ChatType_value[enumKey]
+	if !ok {
+		return nil, fmt.Errorf("unsupported chat type: %s", typeArg)
+	}
+
 	req := &chatv1.CreateChatRequest{
-		Type:           chatv1.ChatType(chatv1.ChatType_value[enumKey]),
+		Type:           chatv1.ChatType(typeValue),
 		ParticipantIds: participantIds,
 		CreatorId:      authID,
 		Title:          title,
@@ -245,7 +261,16 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 		return nil, mapGRPCError(err)
 	}
 
-	return r.enrichChat(ctx, authID, resp.Chat)
+	if resp.Chat == nil {
+		return nil, errors.New("chat service returned empty response")
+	}
+
+	enriched, err := r.enrichChat(ctx, authID, resp.Chat)
+	if err != nil {
+		return nil, fmt.Errorf("failed to enrich chat: %w", err)
+	}
+
+	return enriched, nil
 }
 
 // SendMessage is the resolver for the sendMessage field.
@@ -267,12 +292,30 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		return nil, mapGRPCError(err)
 	}
 
-	sentAt, _ := time.Parse(time.RFC3339, resp.Message.SentAt)
+	sentAt, err := time.Parse(time.RFC3339, resp.Message.SentAt)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sent at time format: %w", err)
+	}
+
+	msgID, err := uuid.Parse(resp.Message.Id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid message id: %w", err)
+	}
+
+	dialogID, err := uuid.Parse(resp.Message.ChatId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dialog id: %w", err)
+	}
+
+	authorID, err := uuid.Parse(resp.Message.SenderId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid author id: %w", err)
+	}
 
 	msg := &models.Message{
-		ID:           uuid.MustParse(resp.Message.Id),
-		DialogID:     uuid.MustParse(resp.Message.ChatId),
-		AuthorID:     uuid.MustParse(resp.Message.SenderId),
+		ID:           msgID,
+		DialogID:     dialogID,
+		AuthorID:     authorID,
 		Content:      resp.Message.Text,
 		IsEncrypted:  resp.Message.IsEncrypted,
 		EncryptionIv: resp.Message.EncryptionIv,
@@ -282,12 +325,22 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	}
 
 	if resp.Message.ReplyToId != nil {
-		parsed, _ := uuid.Parse(*resp.Message.ReplyToId)
+		parsed, err := uuid.Parse(*resp.Message.ReplyToId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid reply to id: %w", err)
+		}
 		msg.ReplyToID = &parsed
 	}
 
-	payload, _ := json.Marshal(msg)
-	r.redisClient.Publish(ctx, "chat:"+chatID, payload)
+	payload, err := json.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal message payload: %w", err)
+	}
+
+	err = r.redisClient.Publish(ctx, "chat:"+chatID, payload).Err()
+	if err != nil {
+		return nil, fmt.Errorf("failed to publish message to redis: %w", err)
+	}
 
 	return msg, nil
 }
@@ -299,30 +352,57 @@ func (r *mutationResolver) UpdateMessage(ctx context.Context, id string, text st
 		return nil, errors.New("unauthorized")
 	}
 
-	resp, err := r.messagesClient.UpdateMessage(ctx, &messagesv1.UpdateMessageRequest{
+	req := &messagesv1.UpdateMessageRequest{
 		Id:       id,
 		SenderId: authID,
 		Text:     text,
-	})
+	}
+
+	resp, err := r.messagesClient.UpdateMessage(ctx, req)
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
 
-	sentAt, _ := time.Parse(time.RFC3339, resp.Message.SentAt)
+	sentAt, err := time.Parse(time.RFC3339, resp.Message.SentAt)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sent at format: %w", err)
+	}
+
+	msgID, err := uuid.Parse(resp.Message.Id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid message id: %w", err)
+	}
+
+	authorID, err := uuid.Parse(resp.Message.SenderId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid author id: %w", err)
+	}
+
+	dialogID, err := uuid.Parse(resp.Message.ChatId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid chat id: %w", err)
+	}
 
 	msg := &models.Message{
-		ID:        uuid.MustParse(resp.Message.Id),
+		ID:        msgID,
 		Content:   resp.Message.Text,
-		AuthorID:  uuid.MustParse(resp.Message.SenderId),
-		DialogID:  uuid.MustParse(resp.Message.ChatId),
+		AuthorID:  authorID,
+		DialogID:  dialogID,
 		CreatedAt: sentAt,
 		UpdatedAt: time.Now(),
 		Sequence:  resp.Message.Sequence,
 		IsEdited:  true,
 	}
 
-	payload, _ := json.Marshal(msg)
-	r.redisClient.Publish(ctx, "chat:"+resp.Message.ChatId, payload)
+	payload, err := json.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update payload: %w", err)
+	}
+
+	channel := fmt.Sprintf("chat:%s", resp.Message.ChatId)
+	if err = r.redisClient.Publish(ctx, channel, payload).Err(); err != nil {
+		return nil, fmt.Errorf("failed to publish update to redis: %w", err)
+	}
 
 	return msg, nil
 }
@@ -365,18 +445,48 @@ func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) 
 }
 
 // DeleteChat is the resolver for the deleteChat field.
-func (r *mutationResolver) DeleteChat(ctx context.Context, id string) (bool, error) {
+func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryone *bool) (bool, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return false, errors.New("unauthorized")
 	}
 
+	deleteForEveryone := false
+	if forEveryone != nil {
+		deleteForEveryone = *forEveryone
+	}
+
+	chatID, err := uuid.Parse(id)
+	if err != nil {
+		return false, fmt.Errorf("invalid chat id: %w", err)
+	}
+
+	// get members before we delete anything to notify them via redis
+	members, err := r.db.Queries.GetDialogMembers(ctx, chatID)
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch members: %w", err)
+	}
+
+	// call grpc chat service
 	resp, err := r.chatClient.DeleteChat(ctx, &chatv1.DeleteChatRequest{
-		ChatId: id,
-		UserId: authID,
+		ChatId:      id,
+		UserId:      authID,
+		ForEveryone: deleteForEveryone,
 	})
 	if err != nil {
 		return false, mapGRPCError(err)
+	}
+
+	if resp.Success {
+		if deleteForEveryone {
+			// notify all participants that chat is gone globally
+			for _, m := range members {
+				r.redisClient.Publish(ctx, "user_chats_deleted:"+m.UserID.String(), id)
+			}
+		} else {
+			// notify only current user for local cleanup
+			r.redisClient.Publish(ctx, "user_chats_deleted:"+authID, id)
+		}
 	}
 
 	return resp.Success, nil
@@ -397,16 +507,23 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 
 	resp, err := r.chatClient.CreateChat(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, mapGRPCError(err)
 	}
 
 	enriched, err := r.enrichChat(ctx, authID, resp.Chat)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to enrich chat: %w", err)
 	}
 
-	payload, _ := json.Marshal(enriched)
-	r.redisClient.Publish(ctx, "user_chats:"+userID, payload)
+	payload, err := json.Marshal(enriched)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal chat payload: %w", err)
+	}
+
+	err = r.redisClient.Publish(ctx, "user_chats:"+userID, payload).Err()
+	if err != nil {
+		return nil, fmt.Errorf("failed to publish to redis: %w", err)
+	}
 
 	return enriched, nil
 }
@@ -415,16 +532,28 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string) (bool, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
-		return false, nil
+		return false, errors.New("unauthorized")
 	}
 
-	payload := map[string]interface{}{
-		"userId": authID,
-		"status": "typing",
-		"chatId": chatID,
+	uid, err := uuid.Parse(authID)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id: %w", err)
 	}
-	data, _ := json.Marshal(payload)
-	r.redisClient.Publish(ctx, "presence:updates", data)
+
+	payload := repositories.PresenceStatus{
+		UserID: uid,
+		Status: "typing",
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal typing event: %w", err)
+	}
+
+	err = r.redisClient.Publish(ctx, "presence:updates", data).Err()
+	if err != nil {
+		return false, fmt.Errorf("failed to publish typing event: %w", err)
+	}
 
 	return true, nil
 }
@@ -438,12 +567,12 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, 
 
 	uid, err := uuid.Parse(authID)
 	if err != nil {
-		return false, errors.New("invalid user id")
+		return false, fmt.Errorf("invalid user id: %w", err)
 	}
 
 	cid, err := uuid.Parse(chatID)
 	if err != nil {
-		return false, errors.New("invalid chat id")
+		return false, fmt.Errorf("invalid chat id: %w", err)
 	}
 
 	err = r.db.Queries.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
@@ -452,17 +581,24 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, 
 		LastReadSequence: lastSequence,
 	})
 	if err != nil {
-		return false, fmt.Errorf("failed to db update: %w", err)
+		return false, fmt.Errorf("failed to update read sequence in database: %w", err)
 	}
 
-	payload := map[string]interface{}{
-		"chatID":       chatID,
-		"userID":       authID,
-		"lastSequence": lastSequence,
+	payload := model.ReadPayload{
+		ChatID:       chatID,
+		UserID:       authID,
+		LastSequence: lastSequence,
 	}
 
-	data, _ := json.Marshal(payload)
-	r.redisClient.Publish(ctx, "chat:"+chatID+":read", data)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal read payload: %w", err)
+	}
+
+	err = r.redisClient.Publish(ctx, "chat:"+chatID+":read", data).Err()
+	if err != nil {
+		return false, fmt.Errorf("failed to publish read event to redis: %w", err)
+	}
 
 	return true, nil
 }
@@ -474,14 +610,21 @@ func (r *mutationResolver) TerminateSession(ctx context.Context, id string) (boo
 		return false, fmt.Errorf("unauthorized")
 	}
 
-	sid, _ := uuid.Parse(id)
-
-	err := r.db.Queries.DeactivateSession(ctx, sid)
+	sid, err := uuid.Parse(id)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("invalid session id: %w", err)
 	}
 
-	r.redisClient.Publish(ctx, "kill:session:"+id, "terminated")
+	err = r.db.Queries.DeactivateSession(ctx, sid)
+	if err != nil {
+		return false, fmt.Errorf("failed to deactivate session: %w", err)
+	}
+
+	err = r.redisClient.Publish(ctx, "kill:session:"+id, "terminated").Err()
+	if err != nil {
+		return false, fmt.Errorf("failed to publish termination event: %w", err)
+	}
+
 	return true, nil
 }
 
@@ -492,12 +635,20 @@ func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
 		return false, errors.New("no active session found")
 	}
 
-	sid, _ := uuid.Parse(sessionIDStr)
-	if err := r.db.Queries.DeactivateSession(ctx, sid); err != nil {
-		return false, err
+	sid, err := uuid.Parse(sessionIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid session id in context: %w", err)
 	}
 
-	r.redisClient.Publish(ctx, "kill:session:"+sessionIDStr, "terminated")
+	if err := r.db.Queries.DeactivateSession(ctx, sid); err != nil {
+		return false, fmt.Errorf("failed to deactivate session in db: %w", err)
+	}
+
+	err = r.redisClient.Publish(ctx, "kill:session:"+sessionIDStr, "terminated").Err()
+	if err != nil {
+		return false, fmt.Errorf("failed to publish logout event: %w", err)
+	}
+
 	return true, nil
 }
 
@@ -522,10 +673,14 @@ func (r *queryResolver) Sessions(ctx context.Context, userID string) ([]*models.
 		return nil, errors.New("permission denied")
 	}
 
-	uid, _ := uuid.Parse(userID)
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id: %w", err)
+	}
+
 	dbSessions, err := r.db.Queries.GetSessionsByUserID(ctx, uid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch sessions from database: %w", err)
 	}
 
 	sessions := make([]*models.Session, len(dbSessions))
@@ -539,6 +694,7 @@ func (r *queryResolver) Sessions(ctx context.Context, userID string) ([]*models.
 			IsActive:  s.IsActive,
 		}
 	}
+
 	return sessions, nil
 }
 
@@ -548,12 +704,18 @@ func (r *queryResolver) MyChats(ctx context.Context) ([]*model.Chat, error) {
 	if authID == "" {
 		return nil, errors.New("unauthorized access")
 	}
+
 	resp, err := r.chatClient.GetMyChats(ctx, &chatv1.GetMyChatsRequest{
 		UserId: authID,
 	})
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
+
+	if resp == nil || resp.Chats == nil {
+		return []*model.Chat{}, nil
+	}
+
 	chats := make([]*model.Chat, 0, len(resp.Chats))
 	for _, c := range resp.Chats {
 		enriched, err := r.enrichChat(ctx, authID, c)
@@ -562,6 +724,7 @@ func (r *queryResolver) MyChats(ctx context.Context) ([]*model.Chat, error) {
 		}
 		chats = append(chats, enriched)
 	}
+
 	return chats, nil
 }
 
@@ -571,6 +734,7 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (*mo
 	if authID == "" {
 		return nil, errors.New("unauthorized access")
 	}
+
 	resp, err := r.chatClient.GetChat(ctx, &chatv1.GetChatRequest{
 		ChatId: id,
 		Slug:   slug,
@@ -579,6 +743,11 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (*mo
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
+
+	if resp == nil || resp.Chat == nil {
+		return nil, errors.New("chat not found")
+	}
+
 	return r.enrichChat(ctx, authID, resp.Chat)
 }
 
@@ -592,12 +761,28 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
-	var msgs []*models.Message
+
+	msgs := make([]*models.Message, 0, len(resp.Messages))
 	for _, m := range resp.Messages {
-		sentAt, _ := time.Parse(time.RFC3339, m.SentAt)
-		mID, _ := uuid.Parse(m.Id)
-		cID, _ := uuid.Parse(m.ChatId)
-		aID, _ := uuid.Parse(m.SenderId)
+		sentAt, err := time.Parse(time.RFC3339, m.SentAt)
+		if err != nil {
+			return nil, fmt.Errorf("invalid sent at format for message %s: %w", m.Id, err)
+		}
+
+		mID, err := uuid.Parse(m.Id)
+		if err != nil {
+			return nil, fmt.Errorf("invalid message id: %w", err)
+		}
+
+		cID, err := uuid.Parse(m.ChatId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid chat id: %w", err)
+		}
+
+		aID, err := uuid.Parse(m.SenderId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid author id: %w", err)
+		}
 
 		msgs = append(msgs, &models.Message{
 			ID:           mID,
@@ -622,7 +807,7 @@ func (r *queryResolver) SearchUsers(ctx context.Context, username string) ([]*mo
 
 	dbUsers, err := r.userRepo.SearchByUsername(ctx, username)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to search users: %w", err)
 	}
 
 	users := make([]*models.User, len(dbUsers))
@@ -635,6 +820,7 @@ func (r *queryResolver) SearchUsers(ctx context.Context, username string) ([]*mo
 			Username:  toStringPtr(u.Username),
 		}
 	}
+
 	return users, nil
 }
 
@@ -647,12 +833,12 @@ func (r *queryResolver) DialogRead(ctx context.Context, chatID string) (*model.R
 
 	uID, err := uuid.Parse(authID)
 	if err != nil {
-		return nil, errors.New("invalid user id")
+		return nil, fmt.Errorf("invalid user id: %w", err)
 	}
 
 	cID, err := uuid.Parse(chatID)
 	if err != nil {
-		return nil, errors.New("invalid chat id")
+		return nil, fmt.Errorf("invalid chat id: %w", err)
 	}
 
 	member, err := r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
@@ -660,7 +846,7 @@ func (r *queryResolver) DialogRead(ctx context.Context, chatID string) (*model.R
 		UserID:   uID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("dialog member not found: %w", err)
+		return nil, fmt.Errorf("dialog member not found or database error: %w", err)
 	}
 
 	return &model.ReadPayload{
@@ -708,9 +894,17 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 		return nil, errors.New("unauthorized")
 	}
 
-	uid, _ := uuid.Parse(authID)
-	cid, _ := uuid.Parse(chatID)
-	_, err := r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+	uid, err := uuid.Parse(authID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id: %w", err)
+	}
+
+	cid, err := uuid.Parse(chatID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid chat id: %w", err)
+	}
+
+	_, err = r.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
 		DialogID: cid,
 		UserID:   uid,
 	})
@@ -718,7 +912,7 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 		return nil, errors.New("forbidden: you are not a member")
 	}
 
-	msgChan := make(chan *models.Message, 1)
+	msgChan := make(chan *models.Message, 10)
 	chatPubSub := r.redisClient.Subscribe(ctx, "chat:"+chatID)
 	killPubSub := r.redisClient.Subscribe(ctx, "kill:session:"+sessionID)
 
@@ -745,6 +939,8 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 
 				select {
 				case msgChan <- &m:
+				case <-time.After(time.Millisecond * 100):
+					return
 				case <-ctx.Done():
 					return
 				}
@@ -757,7 +953,7 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 
 // UserStatusChanged is the resolver for the userStatusChanged field.
 func (r *subscriptionResolver) UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error) {
-	statusChan := make(chan *model.UserStatusPayload, 1)
+	statusChan := make(chan *model.UserStatusPayload, 10)
 	pubsub := r.redisClient.Subscribe(ctx, "presence:updates")
 
 	go func() {
@@ -778,10 +974,6 @@ func (r *subscriptionResolver) UserStatusChanged(ctx context.Context, chatID str
 					continue
 				}
 
-				if chatID != "" {
-					// ...
-				}
-
 				payload := &model.UserStatusPayload{
 					UserID: p.UserID.String(),
 					Status: p.Status,
@@ -793,6 +985,8 @@ func (r *subscriptionResolver) UserStatusChanged(ctx context.Context, chatID str
 
 				select {
 				case statusChan <- payload:
+				case <-time.After(time.Millisecond * 100):
+					continue
 				case <-ctx.Done():
 					return
 				}
@@ -810,7 +1004,7 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 		return nil, errors.New("unauthorized")
 	}
 
-	readChan := make(chan *model.ReadPayload, 1)
+	readChan := make(chan *model.ReadPayload, 10)
 	pubsub := r.redisClient.Subscribe(ctx, "chat:"+chatID+":read")
 
 	go func() {
@@ -833,6 +1027,8 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 
 				select {
 				case readChan <- &payload:
+				case <-time.After(time.Millisecond * 100):
+					continue
 				case <-ctx.Done():
 					return
 				}
@@ -850,7 +1046,7 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 		return nil, errors.New("forbidden")
 	}
 
-	chatChan := make(chan *model.Chat, 1)
+	chatChan := make(chan *model.Chat, 5)
 	pubsub := r.redisClient.Subscribe(ctx, "user_chats:"+userID)
 
 	go func() {
@@ -873,6 +1069,8 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 
 				select {
 				case chatChan <- &c:
+				case <-time.After(time.Millisecond * 100):
+					continue
 				case <-ctx.Done():
 					return
 				}
@@ -881,6 +1079,42 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 	}()
 
 	return chatChan, nil
+}
+
+// ChatDeleted is the resolver for the chatDeleted field.
+func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (<-chan string, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" || authID != userID {
+		return nil, errors.New("forbidden")
+	}
+
+	deleteChan := make(chan string, 5)
+	pubsub := r.redisClient.Subscribe(ctx, "user_chats_deleted:"+userID)
+
+	go func() {
+		defer pubsub.Close()
+		defer close(deleteChan)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-pubsub.Channel():
+				if !ok {
+					return
+				}
+				select {
+				case deleteChan <- msg.Payload:
+				case <-time.After(time.Millisecond * 100):
+					continue
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return deleteChan, nil
 }
 
 // ID is the resolver for the id field.
