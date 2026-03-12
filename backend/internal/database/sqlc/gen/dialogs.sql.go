@@ -45,8 +45,11 @@ func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams
 
 const countPinnedDialogs = `-- name: CountPinnedDialogs :one
 SELECT COUNT(*)
-FROM dialog_members
-WHERE user_id = $1 AND is_pinned = true
+FROM dialog_members dm
+JOIN dialogs d ON d.id = dm.dialog_id
+WHERE dm.user_id = $1
+  AND dm.is_pinned = true
+  AND d.deleted_at IS NULL
 `
 
 func (q *Queries) CountPinnedDialogs(ctx context.Context, userID uuid.UUID) (int64, error) {
@@ -156,6 +159,21 @@ WHERE id = $1
 
 func (q *Queries) DeleteDialog(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, deleteDialog, id)
+	return err
+}
+
+const deleteDialogMember = `-- name: DeleteDialogMember :exec
+DELETE FROM dialog_members
+WHERE dialog_id = $1 AND user_id = $2
+`
+
+type DeleteDialogMemberParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteDialogMember(ctx context.Context, arg DeleteDialogMemberParams) error {
+	_, err := q.db.ExecContext(ctx, deleteDialogMember, arg.DialogID, arg.UserID)
 	return err
 }
 
@@ -292,6 +310,48 @@ func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]D
 	return items, nil
 }
 
+const getPrivateDialogByMembers = `-- name: GetPrivateDialogByMembers :one
+SELECT d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at, d.deleted_at
+FROM dialogs d
+JOIN dialog_members dm1 ON d.id = dm1.dialog_id
+JOIN dialog_members dm2 ON d.id = dm2.dialog_id
+WHERE d.type = 'private'
+  AND dm1.user_id = $1
+  AND dm2.user_id = $2
+LIMIT 1
+`
+
+type GetPrivateDialogByMembersParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	UserID_2 uuid.UUID `json:"user_id_2"`
+}
+
+func (q *Queries) GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateDialogByMembersParams) (Dialog, error) {
+	row := q.db.QueryRowContext(ctx, getPrivateDialogByMembers, arg.UserID, arg.UserID_2)
+	var i Dialog
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Name,
+		&i.Username,
+		&i.PhotoUrl,
+		&i.Bio,
+		&i.Description,
+		&i.InviteLink,
+		&i.PinnedMessageID,
+		&i.CreatorID,
+		&i.LastMessageID,
+		&i.LastMessageAt,
+		&i.MembersCount,
+		&i.IsVerified,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const getUserDialogs = `-- name: GetUserDialogs :many
 SELECT
     d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at, d.deleted_at,
@@ -303,15 +363,12 @@ SELECT
         WHERE m.dialog_id = d.id
           AND m.sequence > dm.last_read_sequence
           AND m.author_id != $1
+          AND m.is_deleted = false
     ) AS unread_count
 FROM dialogs d
 JOIN dialog_members dm ON dm.dialog_id = d.id
 WHERE dm.user_id = $1
-  AND d.deleted_at IS NULL
-  AND (
-    d.creator_id = $1
-    OR EXISTS (SELECT 1 FROM messages m WHERE m.dialog_id = d.id LIMIT 1)
-  )
+  AND d.is_active = true
 ORDER BY dm.is_pinned DESC, COALESCE(d.last_message_at, d.created_at) DESC
 `
 
@@ -382,6 +439,15 @@ func (q *Queries) GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]Get
 		return nil, err
 	}
 	return items, nil
+}
+
+const hardDeleteDialog = `-- name: HardDeleteDialog :exec
+DELETE FROM dialogs WHERE id = $1
+`
+
+func (q *Queries) HardDeleteDialog(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, hardDeleteDialog, id)
+	return err
 }
 
 const pinDialog = `-- name: PinDialog :exec

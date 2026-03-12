@@ -46,6 +46,13 @@ func StringToNullString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: true}
 }
 
+func UUIDToNullUUID(id uuid.UUID) uuid.NullUUID {
+	return uuid.NullUUID{
+		UUID:  id,
+		Valid: id != uuid.Nil,
+	}
+}
+
 func ToNullUUID(s string) uuid.NullUUID {
 	uid, err := uuid.Parse(s)
 	if err != nil {

@@ -24,6 +24,7 @@ type Querier interface {
 	DeactivateAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	DeactivateSession(ctx context.Context, id uuid.UUID) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
+	DeleteDialogMember(ctx context.Context, arg DeleteDialogMemberParams) error
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]Message, error)
 	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)
@@ -32,6 +33,7 @@ type Querier interface {
 	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]DialogMember, error)
 	GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int64, error)
 	GetMessageByID(ctx context.Context, id uuid.UUID) (Message, error)
+	GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateDialogByMembersParams) (Dialog, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -39,6 +41,7 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, username sql.NullString) (User, error)
 	GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]GetUserDialogsRow, error)
 	GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]User, error)
+	HardDeleteDialog(ctx context.Context, id uuid.UUID) error
 	MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error
 	PinDialog(ctx context.Context, arg PinDialogParams) error
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
