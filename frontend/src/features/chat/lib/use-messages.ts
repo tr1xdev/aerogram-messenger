@@ -54,6 +54,7 @@ export function useSearchUsers(username: string) {
 export function useChatActions(chatId: string) {
   const { data: meData } = useMe();
   const { data: chatData } = useChatDetails(chatId);
+  const { data: myChatsData } = useMyChats();
 
   const [send, { loading: isSending }] = useMutation<{ sendMessage: Message }>(
     SEND_MESSAGE,
@@ -71,13 +72,13 @@ export function useChatActions(chatId: string) {
     text: string,
     options?: MutationOptions<{ sendMessage: Message }>,
   ): Promise<void> => {
-    const me = meData?.me;
-    const chat = chatData?.chat;
-    const peerMember = chat?.members?.find(
+    const me: User | undefined = meData?.me;
+    const chat: Chat | undefined = chatData?.chat;
+    const peerMember: ChatMember | undefined = chat?.members?.find(
       (m: ChatMember): boolean => m.user.id !== me?.id,
     );
-    const peer = peerMember?.user;
-    const isPrivate = chat?.type === "PRIVATE";
+    const peer: User | undefined = peerMember?.user;
+    const isPrivate: boolean = chat?.type === "PRIVATE";
 
     let finalVariables: {
       chatId: string;
@@ -92,13 +93,10 @@ export function useChatActions(chatId: string) {
 
     if (isPrivate && peer?.publicKey && me) {
       try {
-        const myPrivKeyObj = await getPrivateKey(me.id);
+        const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
         if (myPrivKeyObj) {
-          const encrypted = await encryptText(
-            text,
-            peer.publicKey,
-            myPrivKeyObj,
-          );
+          const encrypted: { ciphertext: string; iv: string } =
+            await encryptText(text, peer.publicKey, myPrivKeyObj);
           finalVariables = {
             ...finalVariables,
             text: encrypted.ciphertext,
@@ -125,8 +123,8 @@ export function useChatActions(chatId: string) {
         cache.modify({
           id: cache.identify({ __typename: "Chat", id: chatId }),
           fields: {
-            unreadCount: () => 0,
-            lastReadSequence: () => lastSequence,
+            unreadCount: (): number => 0,
+            lastReadSequence: (): number => lastSequence,
           },
         });
       },
@@ -134,35 +132,59 @@ export function useChatActions(chatId: string) {
   };
 
   const createChat = async (userID: string): Promise<Chat | undefined> => {
-    const result = await createDirect({ variables: { userID } });
-    return result.data?.createDirectChat;
+    try {
+      const result = await createDirect({ variables: { userID } });
+      return result.data?.createDirectChat;
+    } catch {
+      toast.error("Failed to create chat", {
+        description: "Please try again later.",
+      });
+      return undefined;
+    }
   };
 
   const togglePin = async (pinned: boolean): Promise<void> => {
+    if (pinned) {
+      const pinnedCount: number =
+        myChatsData?.myChats.filter((c: Chat): boolean => c.isPinned).length ??
+        0;
+
+      if (pinnedCount >= 5) {
+        toast.error("Limit reached", {
+          description: "You can pin up to 5 chats maximum.",
+        });
+        return;
+      }
+    }
+
     try {
       await pin({
         variables: { id: chatId, pinned },
-        optimisticResponse: { pinChat: true },
+        optimisticResponse: {
+          pinChat: true,
+        },
         update: (cache: ApolloCache) => {
+          const cacheId: string | undefined = cache.identify({
+            __typename: "Chat",
+            id: chatId,
+          });
           cache.modify({
-            id: cache.identify({ __typename: "Chat", id: chatId }),
+            id: cacheId,
             fields: {
-              isPinned: () => pinned,
+              isPinned: (): boolean => pinned,
             },
           });
         },
       });
     } catch (err: unknown) {
-      const error = err as Error;
-      if (error.message.toLowerCase().includes("limit reached")) {
-        toast.error("Pin limit reached", {
-          description: "You can only pin up to 5 chats.",
-        });
-      } else {
-        toast.error("Action failed", {
-          description: "Could not update pin status.",
-        });
-      }
+      const error: Error = err as Error;
+      const isLimit: boolean = error.message.toLowerCase().includes("limit");
+
+      toast.error(isLimit ? "Pin limit reached" : "Action failed", {
+        description: isLimit
+          ? "The server did not allow pinning more chats."
+          : "Something went wrong while updating chat status.",
+      });
     }
   };
 
@@ -171,7 +193,7 @@ export function useChatActions(chatId: string) {
       const { data } = await remove({
         variables: { id: chatId },
         update: (cache: ApolloCache) => {
-          const existing = cache.readQuery<{ myChats: Chat[] }>({
+          const existing: { myChats: Chat[] } | null = cache.readQuery({
             query: GET_MY_CHATS,
           });
 
@@ -179,7 +201,9 @@ export function useChatActions(chatId: string) {
             cache.writeQuery({
               query: GET_MY_CHATS,
               data: {
-                myChats: existing.myChats.filter((c) => c.id !== chatId),
+                myChats: existing.myChats.filter(
+                  (c: Chat): boolean => c.id !== chatId,
+                ),
               },
             });
           }
@@ -190,15 +214,18 @@ export function useChatActions(chatId: string) {
           cache.gc();
         },
       });
+
       if (data?.deleteChat) {
-        toast.success("Chat deleted");
+        toast.success("Chat removed", {
+          description: "The conversation was deleted from your account.",
+        });
         return true;
       }
       return false;
     } catch (err: unknown) {
-      const error = err as Error;
+      const error: Error = err as Error;
       toast.error("Delete failed", {
-        description: error.message || "Something went wrong",
+        description: error.message || "Failed to delete the chat.",
       });
       return false;
     }
