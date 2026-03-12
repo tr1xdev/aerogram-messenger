@@ -28,23 +28,29 @@ let isRefreshing: boolean = false;
 let isLoggingOut: boolean = false;
 let pendingRequests: PendingRequestCallback[] = [];
 
+const authChannel = new BroadcastChannel("auth_sync");
+
 const resolvePendingRequests = (): void => {
-  console.log(
-    `[AUTH-DEBUG] Resolving ${pendingRequests.length} pending requests`,
-  );
-  pendingRequests.forEach((callback: PendingRequestCallback) => callback());
+  pendingRequests.forEach((callback) => callback());
   pendingRequests = [];
+};
+
+authChannel.onmessage = (event) => {
+  if (event.data.type === "REFRESH_SUCCESS") {
+    resolvePendingRequests();
+  }
+  if (event.data.type === "LOGOUT" && !isLoggingOut) {
+    logoutAll();
+  }
 };
 
 export const logoutAll = async (): Promise<void> => {
   if (isLoggingOut) return;
   isLoggingOut = true;
 
-  console.warn(
-    "[AUTH-DEBUG] Logout triggered. Clearing storage and redirecting.",
-  );
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
+  authChannel.postMessage({ type: "LOGOUT" });
 
   await client.clearStore();
 
@@ -81,14 +87,7 @@ const interceptorLink: ApolloLink = new ApolloLink(
             stringified.includes("session terminated");
 
           if (isUnauthorized) {
-            console.warn(
-              `[AUTH-DEBUG] Unauthorized detected in ${operation.operationName}`,
-            );
-
             if (operation.operationName === "RefreshToken") {
-              console.error(
-                "[AUTH-DEBUG] RefreshToken mutation failed with unauthorized. Logging out.",
-              );
               logoutAll();
               observer.next(response);
               observer.complete();
@@ -98,9 +97,6 @@ const interceptorLink: ApolloLink = new ApolloLink(
             const refresh: string | null =
               localStorage.getItem("refresh_token");
             if (!refresh) {
-              console.error(
-                "[AUTH-DEBUG] No refresh token found in storage. Redirecting to login.",
-              );
               logoutAll();
               observer.next(response);
               observer.complete();
@@ -109,7 +105,6 @@ const interceptorLink: ApolloLink = new ApolloLink(
 
             if (!isRefreshing) {
               isRefreshing = true;
-              console.log("[AUTH-DEBUG] Starting REFRESH_TOKEN_MUTATION...");
 
               client
                 .mutate<RefreshTokenResponse>({
@@ -118,9 +113,6 @@ const interceptorLink: ApolloLink = new ApolloLink(
                 })
                 .then(({ data }: FetchResult<RefreshTokenResponse>) => {
                   if (data?.refreshToken) {
-                    console.log(
-                      "[AUTH-DEBUG] Refresh success! Updating tokens.",
-                    );
                     localStorage.setItem(
                       "access_token",
                       data.refreshToken.access_token,
@@ -129,16 +121,13 @@ const interceptorLink: ApolloLink = new ApolloLink(
                       "refresh_token",
                       data.refreshToken.refresh_token,
                     );
+                    authChannel.postMessage({ type: "REFRESH_SUCCESS" });
                     resolvePendingRequests();
                   } else {
-                    throw new Error("Refresh mutation returned no data");
+                    throw new Error();
                   }
                 })
-                .catch((err: Error) => {
-                  console.error(
-                    "[AUTH-DEBUG] Refresh mutation error:",
-                    err.message,
-                  );
+                .catch(() => {
                   pendingRequests = [];
                   logoutAll();
                 })
@@ -147,9 +136,6 @@ const interceptorLink: ApolloLink = new ApolloLink(
                 });
             }
 
-            console.log(
-              `[AUTH-DEBUG] Queueing request: ${operation.operationName}`,
-            );
             pendingRequests.push(() => {
               const newToken: string | null =
                 localStorage.getItem("access_token");
@@ -175,14 +161,7 @@ const interceptorLink: ApolloLink = new ApolloLink(
             observer.complete();
           }
         },
-        error: (err: Error) => {
-          console.error(
-            `[AUTH-DEBUG] Network/Execution error in ${operation.operationName}:`,
-            err,
-          );
-          observer.error(err);
-        },
-        complete: () => {},
+        error: (err: Error) => observer.error(err),
       });
 
       handle = subscription;
@@ -196,15 +175,39 @@ const interceptorLink: ApolloLink = new ApolloLink(
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
     url: "ws://localhost:8080/query",
-    connectionParams: (): Record<string, string> => {
-      const token: string | null = localStorage.getItem("access_token");
+    lazy: false,
+    connectionParams: async () => {
+      if (isRefreshing) {
+        await new Promise<void>((resolve) => pendingRequests.push(resolve));
+      }
+      const token = localStorage.getItem("access_token");
       return { Authorization: token ? `Bearer ${token}` : "" };
     },
+    keepAlive: 10000,
+    connectionAckWaitTimeout: 15000,
+    shouldRetry: () => true,
+    retryAttempts: Infinity,
+    retryWait: async (retries) => {
+      const delay =
+        retries < 5 ? 1000 : Math.min(1000 * Math.pow(2, retries - 5), 30000);
+
+      const jitter = Math.random() * 0.2 * delay;
+      await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+    },
     on: {
-      connected: (): void =>
-        useConnectionStore.getState().setIsWsConnected(true),
-      closed: (): void => useConnectionStore.getState().setIsWsConnected(false),
-      error: (): void => useConnectionStore.getState().setIsWsConnected(false),
+      opened: () => console.log("[WS] Socket opened"),
+      connected: () => {
+        console.log("[WS] Connected to server");
+        useConnectionStore.getState().setIsWsConnected(true);
+      },
+      closed: (event) => {
+        console.log("[WS] Connection closed", event);
+        useConnectionStore.getState().setIsWsConnected(false);
+      },
+      error: (err) => {
+        console.error("[WS] Error", err);
+        useConnectionStore.getState().setIsWsConnected(false);
+      },
     },
   }),
 );

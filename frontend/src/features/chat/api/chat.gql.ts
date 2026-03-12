@@ -86,13 +86,15 @@ export const GET_MY_CHATS = gql`
   }
 `;
 
-export const GET_CHAT_BY_ID = gql`
-  query GetChatById($id: ID!) {
-    chat(id: $id) {
+export const GET_CHAT_DETAILS = gql`
+  query GetChatDetails($id: ID, $slug: String) {
+    chat(id: $id, slug: $slug) {
       id
       title
       type
+      slug
       lastReadSequence
+      unreadCount
       members {
         lastReadSequence
         user {
@@ -326,7 +328,16 @@ export const LOGOUT = gql`
 `;
 
 export const DELETE_CHAT = gql`
-  mutation DeleteChat($id: ID!) {
-    deleteChat(id: $id)
+  mutation DeleteChat($id: ID!, $forEveryone: Boolean) {
+    deleteChat(id: $id, forEveryone: $forEveryone)
+  }
+`;
+
+export const CHAT_DELETED_SUBSCRIPTION = gql`
+  subscription OnChatDeleted($userId: ID!) {
+    chatDeleted(userId: $userId) {
+      chatId
+      forEveryone
+    }
   }
 `;
