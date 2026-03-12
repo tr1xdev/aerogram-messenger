@@ -100,6 +100,15 @@ func (r *DialogRepository) UpdateLastMessage(ctx context.Context, params dbgen.U
 	return r.db.Queries.UpdateDialogLastMessage(ctx, params)
 }
 
+func (r *DialogRepository) Delete(ctx context.Context, dialogID string) error {
+	did, err := uuid.Parse(dialogID)
+	if err != nil {
+		return fmt.Errorf("invalid dialog id: %w", err)
+	}
+
+	return r.db.Queries.DeleteDialog(ctx, did)
+}
+
 func (r *DialogRepository) Pin(ctx context.Context, dialogID, userID string, pinned bool) error {
 	did, err := uuid.Parse(dialogID)
 	if err != nil {
@@ -131,13 +140,4 @@ func (r *DialogRepository) Pin(ctx context.Context, dialogID, userID string, pin
 		UserID:   uid,
 		IsPinned: pinned,
 	})
-}
-
-func (r *DialogRepository) Delete(ctx context.Context, dialogID string) error {
-	did, err := uuid.Parse(dialogID)
-	if err != nil {
-		return fmt.Errorf("invalid dialog id: %w", err)
-	}
-
-	return r.db.Queries.DeleteDialog(ctx, did)
 }

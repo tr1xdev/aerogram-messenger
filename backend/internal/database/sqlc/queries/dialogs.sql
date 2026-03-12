@@ -68,8 +68,11 @@ LIMIT 1;
 
 -- name: CountPinnedDialogs :one
 SELECT COUNT(*)
-FROM dialog_members
-WHERE user_id = $1 AND is_pinned = true;
+FROM dialog_members dm
+JOIN dialogs d ON d.id = dm.dialog_id
+WHERE dm.user_id = $1
+  AND dm.is_pinned = true
+  AND d.deleted_at IS NULL;
 
 -- name: DeleteDialog :exec
 UPDATE dialogs
