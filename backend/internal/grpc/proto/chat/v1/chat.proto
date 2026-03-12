@@ -22,6 +22,7 @@ enum ChatType {
 message DeleteChatRequest {
   string chat_id = 1;
   string user_id = 2;
+  bool for_everyone = 3;
 }
 
 message DeleteChatResponse {

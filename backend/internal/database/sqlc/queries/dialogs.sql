@@ -42,23 +42,24 @@ SELECT
         WHERE m.dialog_id = d.id
           AND m.sequence > dm.last_read_sequence
           AND m.author_id != $1
+          AND m.is_deleted = false
     ) AS unread_count
 FROM dialogs d
 JOIN dialog_members dm ON dm.dialog_id = d.id
 WHERE dm.user_id = $1
-  AND d.deleted_at IS NULL
-  AND (
-    d.creator_id = $1
-    OR EXISTS (SELECT 1 FROM messages m WHERE m.dialog_id = d.id LIMIT 1)
-  )
+  AND d.is_active = true
 ORDER BY dm.is_pinned DESC, COALESCE(d.last_message_at, d.created_at) DESC;
+
+-- name: DeleteDialogMember :exec
+DELETE FROM dialog_members
+WHERE dialog_id = $1 AND user_id = $2;
+
+-- name: GetDialogMembers :many
+SELECT * FROM dialog_members WHERE dialog_id = $1;
 
 -- name: GetDialogMember :one
 SELECT * FROM dialog_members
 WHERE dialog_id = $1 AND user_id = $2 LIMIT 1;
-
--- name: GetDialogMembers :many
-SELECT * FROM dialog_members WHERE dialog_id = $1;
 
 -- name: GetDialogByUsername :one
 SELECT * FROM dialogs
@@ -78,3 +79,16 @@ WHERE dm.user_id = $1
 UPDATE dialogs
 SET deleted_at = NOW(), is_active = false
 WHERE id = $1;
+
+-- name: HardDeleteDialog :exec
+DELETE FROM dialogs WHERE id = $1;
+
+-- name: GetPrivateDialogByMembers :one
+SELECT d.*
+FROM dialogs d
+JOIN dialog_members dm1 ON d.id = dm1.dialog_id
+JOIN dialog_members dm2 ON d.id = dm2.dialog_id
+WHERE d.type = 'private'
+  AND dm1.user_id = $1
+  AND dm2.user_id = $2
+LIMIT 1;

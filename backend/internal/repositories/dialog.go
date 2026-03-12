@@ -96,8 +96,11 @@ func (r *DialogRepository) GetDialogByUsername(ctx context.Context, username str
 	return r.db.Queries.GetDialogByUsername(ctx, database.ToNullString(&username))
 }
 
-func (r *DialogRepository) UpdateLastMessage(ctx context.Context, params dbgen.UpdateDialogLastMessageParams) error {
-	return r.db.Queries.UpdateDialogLastMessage(ctx, params)
+func (r *DialogRepository) UpdateLastMessage(ctx context.Context, chatID uuid.UUID, messageID uuid.UUID) error {
+	return r.db.Queries.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
+		ID:            chatID,
+		LastMessageID: database.UUIDToNullUUID(messageID),
+	})
 }
 
 func (r *DialogRepository) Delete(ctx context.Context, dialogID string) error {
@@ -139,5 +142,21 @@ func (r *DialogRepository) Pin(ctx context.Context, dialogID, userID string, pin
 		DialogID: did,
 		UserID:   uid,
 		IsPinned: pinned,
+	})
+}
+
+func (r *DialogRepository) GetPrivateDialogByMembers(ctx context.Context, user1, user2 string) (dbgen.Dialog, error) {
+	u1, err := uuid.Parse(user1)
+	if err != nil {
+		return dbgen.Dialog{}, fmt.Errorf("invalid first user id: %w", err)
+	}
+	u2, err := uuid.Parse(user2)
+	if err != nil {
+		return dbgen.Dialog{}, fmt.Errorf("invalid second user id: %w", err)
+	}
+
+	return r.db.Queries.GetPrivateDialogByMembers(ctx, dbgen.GetPrivateDialogByMembersParams{
+		UserID:   u1,
+		UserID_2: u2,
 	})
 }
