@@ -1,4 +1,8 @@
-import { useSubscription, useApolloClient } from "@apollo/client/react";
+import {
+  useSubscription,
+  useApolloClient,
+} from "@apollo/client/react/index.js";
+import { type ApolloCache } from "@apollo/client/index.js";
 import {
   MESSAGE_SUBSCRIPTION,
   USER_PRESENCE_SUBSCRIPTION,
@@ -11,14 +15,16 @@ import type { Message, Chat } from "@/entities/chat/model/types";
 interface MessageAddedData {
   messageAdded: Message;
 }
+
 interface StatusChanged {
-  userStatusChanged: { userId: string; status: string };
+  userStatusChanged: { userId: string; status: string; lastSeen?: string };
 }
+
 interface DialogReadData {
   dialogRead: { chatID: string; userID: string; lastSequence: number };
 }
 
-export function useGlobalSubscriptions(chatId: string, myId?: string) {
+export function useGlobalSubscriptions(chatId: string, myId?: string): void {
   const client = useApolloClient();
 
   useSubscription<MessageAddedData>(MESSAGE_SUBSCRIPTION, {
@@ -26,6 +32,9 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
     onData({ data }) {
       const newMessage = data.data?.messageAdded;
       if (!newMessage) return;
+
+      const cache: ApolloCache = client.cache;
+      const isFromMe = myId && newMessage.sender.id === myId;
 
       const historyVars = { chatId, limit: 50, offset: 0 };
       const existingHistory = client.readQuery<{ messageHistory: Message[] }>({
@@ -53,10 +62,8 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       });
 
       if (chatsData) {
-        const isFromMe = myId && newMessage.sender.id === myId;
-
         const updatedChats = chatsData.myChats.map((c) => {
-          if (c.id === chatId) {
+          if (c.id === newMessage.chatId) {
             return {
               ...c,
               lastMessage: newMessage,
@@ -77,6 +84,20 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
           data: { myChats: sortedChats },
         });
       }
+
+      const chatCacheId = cache.identify({
+        __typename: "Chat",
+        id: newMessage.chatId,
+      });
+      if (chatCacheId) {
+        cache.modify({
+          id: chatCacheId,
+          fields: {
+            lastMessage: () => newMessage,
+            unreadCount: (prev: number) => (isFromMe ? 0 : (prev || 0) + 1),
+          },
+        });
+      }
     },
   });
 
@@ -86,21 +107,27 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       const payload = data.data?.dialogRead;
       if (!payload) return;
 
+      const cache: ApolloCache = client.cache;
       const isMe = myId && payload.userID === myId;
 
-      client.cache.modify({
-        id: client.cache.identify({ __typename: "Chat", id: payload.chatID }),
-        fields: {
-          lastReadSequence: (prev: number) =>
-            Math.max(prev || 0, payload.lastSequence),
-          unreadCount: (prev: number) => (isMe ? 0 : prev),
-        },
+      const chatRef = cache.identify({
+        __typename: "Chat",
+        id: payload.chatID,
       });
+      if (chatRef) {
+        cache.modify({
+          id: chatRef,
+          fields: {
+            lastReadSequence: (prev: number) =>
+              Math.max(prev || 0, payload.lastSequence),
+            unreadCount: (prev: number) => (isMe ? 0 : prev),
+          },
+        });
+      }
 
       const sidebar = client.readQuery<{ myChats: Chat[] }>({
         query: GET_MY_CHATS,
       });
-
       if (sidebar) {
         const updated = sidebar.myChats.map((c) =>
           c.id === payload.chatID
@@ -125,10 +152,21 @@ export function useGlobalSubscriptions(chatId: string, myId?: string) {
       const payload = data.data?.userStatusChanged;
       if (!payload) return;
 
-      client.cache.modify({
-        id: client.cache.identify({ __typename: "User", id: payload.userId }),
-        fields: { status: () => payload.status },
+      const cache: ApolloCache = client.cache;
+      const userRef = cache.identify({
+        __typename: "User",
+        id: payload.userId,
       });
+
+      if (userRef) {
+        cache.modify({
+          id: userRef,
+          fields: {
+            status: () => payload.status,
+            lastSeen: () => payload.lastSeen,
+          },
+        });
+      }
     },
   });
 }
