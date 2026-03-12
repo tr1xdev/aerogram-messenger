@@ -1,9 +1,16 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouterState, useNavigate } from "@tanstack/react-router";
 import { useApolloClient } from "@apollo/client/react";
-import { Loader2, Search, MoreVertical, Settings } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  MoreVertical,
+  Settings,
+  History,
+  X,
+} from "lucide-react";
 import { HiDownload } from "react-icons/hi";
-import { IoChatbubbles } from "react-icons/io5";
+
 import { BsFillPinFill } from "react-icons/bs";
 import {
   Sidebar,
@@ -35,6 +42,7 @@ import { GET_MY_CHATS } from "@/features/chat/api/chat.gql";
 import { useConnectionStore } from "@/store/connection";
 import { cn } from "@/lib/utils";
 import type { Chat, User } from "@/entities/chat/model/types";
+import { Button } from "@/components/ui/button";
 
 interface ChatFolder {
   id: string;
@@ -54,6 +62,7 @@ export function AppSidebar() {
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [isFocused, setIsFocused] = useState<boolean>(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   const foldersRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,6 +99,11 @@ export function AppSidebar() {
   }, [debouncedQuery, chats]);
 
   useEffect(() => {
+    const saved = localStorage.getItem("recent_searches");
+    if (saved) setRecentSearches(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
     const handler = setTimeout(() => setDebouncedQuery(searchQuery), 250);
     return () => clearTimeout(handler);
   }, [searchQuery]);
@@ -115,6 +129,31 @@ export function AppSidebar() {
     return () => window.removeEventListener("resize", updateIndicator);
   }, [updateIndicator, chats]);
 
+  const addToRecent = (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    const updated = [
+      trimmed,
+      ...recentSearches.filter((s) => s !== trimmed),
+    ].slice(0, 10);
+    setRecentSearches(updated);
+    localStorage.setItem("recent_searches", JSON.stringify(updated));
+  };
+
+  const removeFromRecent = (e: React.MouseEvent, query: string) => {
+    e.stopPropagation();
+    const updated = recentSearches.filter((s) => s !== query);
+    setRecentSearches(updated);
+    localStorage.setItem("recent_searches", JSON.stringify(updated));
+  };
+
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setRecentSearches([]);
+    localStorage.removeItem("recent_searches");
+  };
+
   const handleSelectUser = async (userId: string) => {
     if (isCreating) return;
     setIsCreating(true);
@@ -133,7 +172,9 @@ export function AppSidebar() {
             },
           });
         }
+        if (searchQuery) addToRecent(searchQuery);
         setSearchQuery("");
+        setIsFocused(false);
         navigate({ to: "/chat/$chatId", params: { chatId: newChat.id } });
       }
     } finally {
@@ -195,28 +236,67 @@ export function AppSidebar() {
         <SidebarContent className="flex-1 overflow-y-auto scrollbar-hide">
           <div className="flex flex-col min-h-full">
             <div className="px-4 py-2 sticky top-0 bg-background z-20">
-              <div className="relative flex items-center h-10">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={searchQuery}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-full pl-4 pr-10 rounded-xl text-[14px] bg-muted/60 border-none outline-none"
-                />
-                {!searchQuery && !isFocused && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none gap-2">
-                    <Search className="h-4 w-4 text-muted-foreground/40" />
-                    <span className="text-[14px] text-muted-foreground/70">
-                      Search
-                    </span>
-                  </div>
+              <div className="flex items-center gap-2 h-10">
+                <div className="relative flex-1 h-full">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={searchQuery}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => {
+                      if (!searchQuery) setIsFocused(false);
+                    }}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && searchQuery) {
+                        addToRecent(searchQuery);
+                        inputRef.current?.blur();
+                      }
+                    }}
+                    className="w-full h-full pl-4 pr-10 rounded-xl text-[14px] bg-muted/60 border-none outline-none focus-visible:ring-0 transition-all text-foreground"
+                  />
+
+                  {!searchQuery && !isFocused && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none gap-2">
+                      <Search className="h-4 w-4 text-muted-foreground/60" />
+                      <span className="text-[14px] text-muted-foreground/90 font-medium">
+                        Search messages or users
+                      </span>
+                    </div>
+                  )}
+
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setSearchQuery("");
+                        inputRef.current?.focus();
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+
+                {(searchQuery || isFocused) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setIsFocused(false);
+                      inputRef.current?.blur();
+                    }}
+                    className="flex items-center justify-center h-10 w-10 shrink-0 rounded-full bg-muted/60 hover:bg-muted/80 text-foreground transition-all active:scale-95 animate-in fade-in zoom-in duration-200"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
                 )}
               </div>
             </div>
 
-            {chats.length > 0 && (
+            {chats.length > 0 && !searchQuery && !isFocused && (
               <div className="sticky top-[56px] bg-background px-4 border-b border-border/5 z-20">
                 <div
                   className="relative flex items-center h-11"
@@ -252,22 +332,86 @@ export function AppSidebar() {
             )}
 
             <div className="flex-1">
-              {searchQuery ? (
-                <SearchResults
-                  query={debouncedQuery}
-                  localChats={filteredLocalChats}
-                  globalUsers={globalSearchData?.searchUsers || []}
-                  isLoading={
-                    searchQuery !== debouncedQuery ||
-                    isSearchingGlobal ||
-                    isCreating
-                  }
-                  onSelectChat={(id) => {
-                    setSearchQuery("");
-                    navigate({ to: "/chat/$chatId", params: { chatId: id } });
-                  }}
-                  onSelectUser={handleSelectUser}
-                />
+              {searchQuery || isFocused ? (
+                <div className="flex flex-col animate-in fade-in duration-200">
+                  {searchQuery ? (
+                    <SearchResults
+                      query={debouncedQuery}
+                      localChats={filteredLocalChats}
+                      globalUsers={globalSearchData?.searchUsers || []}
+                      isLoading={
+                        searchQuery !== debouncedQuery ||
+                        isSearchingGlobal ||
+                        isCreating
+                      }
+                      onSelectChat={(id) => {
+                        addToRecent(searchQuery);
+                        setSearchQuery("");
+                        setIsFocused(false);
+                        navigate({
+                          to: "/chat/$chatId",
+                          params: { chatId: id },
+                        });
+                      }}
+                      onSelectUser={handleSelectUser}
+                    />
+                  ) : (
+                    <div className="flex flex-col">
+                      {recentSearches.length > 0 && (
+                        <div className="px-4 pt-4 pb-2">
+                          <div className="flex items-center justify-between mb-2 px-1">
+                            <span className="text-[11px] font-bold text-muted-foreground/70 tracking-wider">
+                              RECENT SEARCHES
+                            </span>
+                            <button
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={handleClearAll}
+                              className="text-[11px] font-bold text-sky-500 hover:text-sky-400 transition-colors"
+                            >
+                              Clear all
+                            </button>
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            {recentSearches.map((s, i) => (
+                              <div
+                                key={i}
+                                onClick={() => setSearchQuery(s)}
+                                className="group flex items-center justify-between px-3 py-2 rounded-xl hover:bg-muted/60 transition-all cursor-pointer"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <History className="h-4 w-4 text-muted-foreground/60" />
+                                  <span className="text-[14px] text-foreground/90 font-medium">
+                                    {s}
+                                  </span>
+                                </div>
+                                <button
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={(e) => removeFromRecent(e, s)}
+                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded-full transition-all"
+                                >
+                                  <X className="h-3.5 w-3.5 text-muted-foreground" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col items-center justify-center py-24 px-12 text-center">
+                        <div className="w-14 h-14 bg-muted/40 rounded-2xl flex items-center justify-center mb-5">
+                          <Search className="h-7 w-7 text-muted-foreground/40" />
+                        </div>
+                        <h3 className="text-[15px] font-bold text-foreground mb-1.5">
+                          Search for chats or users
+                        </h3>
+                        <p className="text-[13px] text-muted-foreground/80 max-w-[220px] leading-relaxed font-medium">
+                          Find existing conversations or start new ones by
+                          typing a name.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : isLoadingChats && chats.length === 0 ? (
                 <div className="p-4 space-y-4">
                   {[...Array(6)].map((_, i) => (
@@ -275,9 +419,35 @@ export function AppSidebar() {
                   ))}
                 </div>
               ) : chats.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 opacity-30">
-                  <IoChatbubbles className="h-12 w-12 mb-2" />
-                  <p>No chats found</p>
+                <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-700">
+                  <div className="relative mb-6 select-none pointer-events-none">
+                    <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full" />
+                    <div className="relative w-20 h-20 bg-muted/30 rounded-[2rem] flex items-center justify-center rotate-3 border border-border/50 shadow-inner">
+                      <Search className="h-10 w-10 text-primary/30 -rotate-3" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-center max-w-[240px]">
+                    <h3 className="text-[16px] font-bold tracking-tight text-foreground">
+                      No conversations yet
+                    </h3>
+                    <p className="text-[13px] text-muted-foreground leading-relaxed">
+                      Search for your friends or colleagues to start messaging.
+                    </p>
+                  </div>
+
+                  <div className="mt-8">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        inputRef.current?.focus();
+                        setIsFocused(true);
+                      }}
+                      className="rounded-full px-6 h-10 font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-none transition-all"
+                    >
+                      Start searching
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col">

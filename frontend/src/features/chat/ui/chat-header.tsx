@@ -2,6 +2,7 @@ import { ChevronLeft, MoreVertical, Phone, Video } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import type { ChatMember } from "@/entities/chat/model/types";
@@ -14,6 +15,7 @@ interface ChatHeaderProps {
   totalUnread: number;
   members?: ChatMember[];
   meId?: string;
+  isLoading?: boolean;
 }
 
 export function ChatHeader({
@@ -22,6 +24,7 @@ export function ChatHeader({
   totalUnread,
   members,
   meId,
+  isLoading,
 }: ChatHeaderProps) {
   const navigate = useNavigate();
   const otherMember = members?.find((m) => m.user.id !== meId);
@@ -46,9 +49,43 @@ export function ChatHeader({
           )}
         </div>
 
-        {otherMember ? (
-          <ChatUserPopover userId={otherMember.user.id}>
-            <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
+        {isLoading ? (
+          <div className="flex items-center gap-3 ml-2 md:ml-0">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="flex flex-col gap-1.5">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          </div>
+        ) : title ? (
+          otherMember ? (
+            <ChatUserPopover userId={otherMember.user.id}>
+              <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
+                <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
+                  <AvatarImage src={photoUrl || ""} />
+                  <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
+                    {title?.[0].toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col min-w-0 text-left">
+                  <span className="text-[15px] font-bold truncate leading-none">
+                    {title}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[11px] mt-1 font-medium",
+                      status === "online"
+                        ? "text-primary"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {status ? formatLastSeen(status) : "Offline"}
+                  </span>
+                </div>
+              </div>
+            </ChatUserPopover>
+          ) : (
+            <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
               <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
                 <AvatarImage src={photoUrl || ""} />
                 <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
@@ -59,32 +96,13 @@ export function ChatHeader({
                 <span className="text-[15px] font-bold truncate leading-none">
                   {title}
                 </span>
-                <span
-                  className={cn(
-                    "text-[11px] mt-1 font-medium",
-                    status === "online"
-                      ? "text-primary"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {status ? formatLastSeen(status) : "Offline"}
-                </span>
               </div>
             </div>
-          </ChatUserPopover>
+          )
         ) : (
-          <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
-            <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
-              <AvatarImage src={photoUrl || ""} />
-              <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
-                {title?.[0].toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col min-w-0 text-left">
-              <span className="text-[15px] font-bold truncate leading-none">
-                {title}
-              </span>
-            </div>
+          <div className="flex items-center gap-3 ml-2 md:ml-0 opacity-40 grayscale">
+            <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+            <div className="h-4 w-24 bg-muted rounded animate-pulse" />
           </div>
         )}
       </div>
@@ -93,6 +111,7 @@ export function ChatHeader({
         <Button
           variant="ghost"
           size="icon"
+          disabled={isLoading || !title}
           className="hidden sm:flex text-muted-foreground hover:text-foreground"
         >
           <Phone className="h-5 w-5" />
@@ -100,6 +119,7 @@ export function ChatHeader({
         <Button
           variant="ghost"
           size="icon"
+          disabled={isLoading || !title}
           className="hidden sm:flex text-muted-foreground hover:text-foreground"
         >
           <Video className="h-5 w-5" />
@@ -107,6 +127,7 @@ export function ChatHeader({
         <Button
           variant="ghost"
           size="icon"
+          disabled={isLoading || !title}
           className="text-muted-foreground hover:text-foreground"
         >
           <MoreVertical className="h-5 w-5" />
