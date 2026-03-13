@@ -10,7 +10,6 @@ import {
   X,
 } from "lucide-react";
 import { HiDownload } from "react-icons/hi";
-
 import { BsFillPinFill } from "react-icons/bs";
 import {
   Sidebar,
@@ -72,49 +71,73 @@ export function AppSidebar() {
   const pathname = useRouterState().location.pathname;
   const isWsConnected = useConnectionStore((s) => s.isWsConnected);
 
-  const { data: userData } = useMe();
+  const { data: userData, loading: isLoadingMe } = useMe();
   const { data: chatsData, loading: isLoadingChats } = useMyChats();
   const { data: globalSearchData, loading: isSearchingGlobal } =
     useSearchUsers(debouncedQuery);
   const { createChat } = useChatActions("");
 
-  const user = useMemo(() => userData?.me as User | undefined, [userData]);
-  const chats = useMemo(() => chatsData?.myChats ?? [], [chatsData]);
+  const user = useMemo(
+    (): User | undefined => userData?.me as User | undefined,
+    [userData],
+  );
+  const chats = useMemo((): Chat[] => chatsData?.myChats ?? [], [chatsData]);
 
-  const pinnedChats = useMemo(() => chats.filter((c) => c.isPinned), [chats]);
-  const otherChats = useMemo(() => chats.filter((c) => !c.isPinned), [chats]);
+  const fullName = useMemo((): string => {
+    if (!user) return "";
+    const first = user.first_name?.trim() || "";
+    const last = user.last_name?.trim() || "";
+    if (!first && !last) return user.username || "";
+    return `${first} ${last}`.trim();
+  }, [user]);
 
-  const folders: ChatFolder[] = useMemo(() => {
-    const totalUnread = chats.reduce(
-      (acc, chat) => acc + (chat.unreadCount || 0),
+  const avatarFallback = useMemo((): string => {
+    if (!user) return "?";
+    return (user.first_name?.[0] || user.username?.[0] || "?").toUpperCase();
+  }, [user]);
+
+  const pinnedChats = useMemo(
+    (): Chat[] => chats.filter((c: Chat) => c.isPinned),
+    [chats],
+  );
+  const otherChats = useMemo(
+    (): Chat[] => chats.filter((c: Chat) => !c.isPinned),
+    [chats],
+  );
+
+  const folders: ChatFolder[] = useMemo((): ChatFolder[] => {
+    const totalUnread: number = chats.reduce(
+      (acc: number, chat: Chat) => acc + (chat.unreadCount || 0),
       0,
     );
     return [{ id: "all", label: "All chats", unread: totalUnread }];
   }, [chats]);
 
-  const filteredLocalChats = useMemo(() => {
+  const filteredLocalChats = useMemo((): Chat[] => {
     if (!debouncedQuery) return [];
-    const q = debouncedQuery.toLowerCase();
-    return chats.filter((c) => c.title.toLowerCase().includes(q));
+    const q: string = debouncedQuery.toLowerCase();
+    return chats.filter((c: Chat) => c.title.toLowerCase().includes(q));
   }, [debouncedQuery, chats]);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("recent_searches");
+  useEffect((): void => {
+    const saved: string | null = localStorage.getItem("recent_searches");
     if (saved) setRecentSearches(JSON.parse(saved));
   }, []);
 
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedQuery(searchQuery), 250);
-    return () => clearTimeout(handler);
+  useEffect((): (() => void) => {
+    const handler = setTimeout((): void => setDebouncedQuery(searchQuery), 250);
+    return (): void => clearTimeout(handler);
   }, [searchQuery]);
 
-  const updateIndicator = useCallback(() => {
-    const container = foldersRef.current;
+  const updateIndicator = useCallback((): void => {
+    const container: HTMLDivElement | null = foldersRef.current;
     if (!container) return;
-    const active = container.querySelector(
+    const active: HTMLButtonElement | null = container.querySelector(
       `[data-folder-id="${activeFolder}"]`,
     ) as HTMLButtonElement;
-    const label = active?.querySelector(".folder-label") as HTMLSpanElement;
+    const label: HTMLSpanElement | null = active?.querySelector(
+      ".folder-label",
+    ) as HTMLSpanElement;
     if (active && label) {
       setIndicatorStyle({
         left: active.offsetLeft + label.offsetLeft,
@@ -123,51 +146,53 @@ export function AppSidebar() {
     }
   }, [activeFolder]);
 
-  useEffect(() => {
+  useEffect((): (() => void) => {
     updateIndicator();
     window.addEventListener("resize", updateIndicator);
-    return () => window.removeEventListener("resize", updateIndicator);
+    return (): void => window.removeEventListener("resize", updateIndicator);
   }, [updateIndicator, chats]);
 
-  const addToRecent = (query: string) => {
-    const trimmed = query.trim();
+  const addToRecent = (query: string): void => {
+    const trimmed: string = query.trim();
     if (!trimmed) return;
-    const updated = [
+    const updated: string[] = [
       trimmed,
-      ...recentSearches.filter((s) => s !== trimmed),
+      ...recentSearches.filter((s: string) => s !== trimmed),
     ].slice(0, 10);
     setRecentSearches(updated);
     localStorage.setItem("recent_searches", JSON.stringify(updated));
   };
 
-  const removeFromRecent = (e: React.MouseEvent, query: string) => {
+  const removeFromRecent = (e: React.MouseEvent, query: string): void => {
     e.stopPropagation();
-    const updated = recentSearches.filter((s) => s !== query);
+    const updated: string[] = recentSearches.filter((s: string) => s !== query);
     setRecentSearches(updated);
     localStorage.setItem("recent_searches", JSON.stringify(updated));
   };
 
-  const handleClearAll = (e: React.MouseEvent) => {
+  const handleClearAll = (e: React.MouseEvent): void => {
     e.preventDefault();
     e.stopPropagation();
     setRecentSearches([]);
     localStorage.removeItem("recent_searches");
   };
 
-  const handleSelectUser = async (userId: string) => {
+  const handleSelectUser = async (userId: string): Promise<void> => {
     if (isCreating) return;
     setIsCreating(true);
     try {
-      const newChat = await createChat(userId);
+      const newChat: Chat | undefined = await createChat(userId);
       if (newChat) {
-        const existing = client.readQuery<MyChatsData>({ query: GET_MY_CHATS });
+        const existing: MyChatsData | null = client.readQuery<MyChatsData>({
+          query: GET_MY_CHATS,
+        });
         if (existing) {
           client.writeQuery<MyChatsData>({
             query: GET_MY_CHATS,
             data: {
               myChats: [
                 newChat,
-                ...existing.myChats.filter((c) => c.id !== newChat.id),
+                ...existing.myChats.filter((c: Chat) => c.id !== newChat.id),
               ],
             },
           });
@@ -192,14 +217,16 @@ export function AppSidebar() {
           <div className="flex items-center justify-between h-8 relative">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
               {!isWsConnected ? (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 animate-in fade-in duration-300">
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                   <span className="text-[13px] font-bold text-muted-foreground">
                     Connecting
                   </span>
                 </div>
               ) : (
-                <h1 className="text-[16px] font-bold tracking-tight">Chats</h1>
+                <h1 className="text-[16px] font-bold tracking-tight animate-in fade-in duration-300">
+                  Chats
+                </h1>
               )}
             </div>
             <div className="flex-1 flex justify-end items-center gap-1 z-10">
@@ -223,7 +250,7 @@ export function AppSidebar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="py-2.5"
-                    onClick={() => setSettingsOpen(true)}
+                    onClick={(): void => setSettingsOpen(true)}
                   >
                     Settings
                   </DropdownMenuItem>
@@ -242,12 +269,16 @@ export function AppSidebar() {
                     ref={inputRef}
                     type="text"
                     value={searchQuery}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => {
+                    onFocus={(): void => setIsFocused(true)}
+                    onBlur={(): void => {
                       if (!searchQuery) setIsFocused(false);
                     }}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>): void =>
+                      setSearchQuery(e.target.value)
+                    }
+                    onKeyDown={(
+                      e: React.KeyboardEvent<HTMLInputElement>,
+                    ): void => {
                       if (e.key === "Enter" && searchQuery) {
                         addToRecent(searchQuery);
                         inputRef.current?.blur();
@@ -255,7 +286,6 @@ export function AppSidebar() {
                     }}
                     className="w-full h-full pl-4 pr-10 rounded-xl text-[14px] bg-muted/60 border-none outline-none focus-visible:ring-0 transition-all text-foreground"
                   />
-
                   {!searchQuery && !isFocused && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none gap-2">
                       <Search className="h-4 w-4 text-muted-foreground/60" />
@@ -264,11 +294,10 @@ export function AppSidebar() {
                       </span>
                     </div>
                   )}
-
                   {searchQuery && (
                     <button
                       type="button"
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent): void => {
                         e.preventDefault();
                         setSearchQuery("");
                         inputRef.current?.focus();
@@ -279,11 +308,10 @@ export function AppSidebar() {
                     </button>
                   )}
                 </div>
-
                 {(searchQuery || isFocused) && (
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(): void => {
                       setSearchQuery("");
                       setIsFocused(false);
                       inputRef.current?.blur();
@@ -305,11 +333,11 @@ export function AppSidebar() {
                   <button className="shrink-0 pr-3 py-2 text-muted-foreground/30 hover:text-foreground">
                     <HiDownload className="h-5 w-5" />
                   </button>
-                  {folders.map((f) => (
+                  {folders.map((f: ChatFolder) => (
                     <button
                       key={f.id}
                       data-folder-id={f.id}
-                      onClick={() => setActiveFolder(f.id)}
+                      onClick={(): void => setActiveFolder(f.id)}
                       className={cn(
                         "px-4 h-9 flex items-center text-[13.5px] font-semibold transition-all relative",
                         f.id === activeFolder
@@ -344,7 +372,7 @@ export function AppSidebar() {
                         isSearchingGlobal ||
                         isCreating
                       }
-                      onSelectChat={(id) => {
+                      onSelectChat={(id: string): void => {
                         addToRecent(searchQuery);
                         setSearchQuery("");
                         setIsFocused(false);
@@ -364,7 +392,9 @@ export function AppSidebar() {
                               RECENT SEARCHES
                             </span>
                             <button
-                              onMouseDown={(e) => e.preventDefault()}
+                              onMouseDown={(e: React.MouseEvent): void =>
+                                e.preventDefault()
+                              }
                               onClick={handleClearAll}
                               className="text-[11px] font-bold text-sky-500 hover:text-sky-400 transition-colors"
                             >
@@ -372,10 +402,10 @@ export function AppSidebar() {
                             </button>
                           </div>
                           <div className="flex flex-col gap-0.5">
-                            {recentSearches.map((s, i) => (
+                            {recentSearches.map((s: string, i: number) => (
                               <div
                                 key={i}
-                                onClick={() => setSearchQuery(s)}
+                                onClick={(): void => setSearchQuery(s)}
                                 className="group flex items-center justify-between px-3 py-2 rounded-xl hover:bg-muted/60 transition-all cursor-pointer"
                               >
                                 <div className="flex items-center gap-3">
@@ -385,8 +415,12 @@ export function AppSidebar() {
                                   </span>
                                 </div>
                                 <button
-                                  onMouseDown={(e) => e.preventDefault()}
-                                  onClick={(e) => removeFromRecent(e, s)}
+                                  onMouseDown={(e: React.MouseEvent): void =>
+                                    e.preventDefault()
+                                  }
+                                  onClick={(e: React.MouseEvent): void =>
+                                    removeFromRecent(e, s)
+                                  }
                                   className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded-full transition-all"
                                 >
                                   <X className="h-3.5 w-3.5 text-muted-foreground" />
@@ -396,7 +430,6 @@ export function AppSidebar() {
                           </div>
                         </div>
                       )}
-
                       <div className="flex flex-col items-center justify-center py-24 px-12 text-center">
                         <div className="w-14 h-14 bg-muted/40 rounded-2xl flex items-center justify-center mb-5">
                           <Search className="h-7 w-7 text-muted-foreground/40" />
@@ -414,7 +447,7 @@ export function AppSidebar() {
                 </div>
               ) : isLoadingChats && chats.length === 0 ? (
                 <div className="p-4 space-y-4">
-                  {[...Array(6)].map((_, i) => (
+                  {[...Array(6)].map((_: unknown, i: number) => (
                     <Skeleton key={i} className="h-16 w-full rounded-xl" />
                   ))}
                 </div>
@@ -426,7 +459,6 @@ export function AppSidebar() {
                       <Search className="h-10 w-10 text-primary/30 -rotate-3" />
                     </div>
                   </div>
-
                   <div className="space-y-2 text-center max-w-[240px]">
                     <h3 className="text-[16px] font-bold tracking-tight text-foreground">
                       No conversations yet
@@ -435,11 +467,10 @@ export function AppSidebar() {
                       Search for your friends or colleagues to start messaging.
                     </p>
                   </div>
-
                   <div className="mt-8">
                     <Button
                       variant="secondary"
-                      onClick={() => {
+                      onClick={(): void => {
                         inputRef.current?.focus();
                         setIsFocused(true);
                       }}
@@ -450,14 +481,14 @@ export function AppSidebar() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col">
+                <div className="flex flex-col animate-in fade-in duration-300">
                   {pinnedChats.length > 0 && (
                     <div className="flex flex-col">
                       <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/50 flex items-center gap-2">
                         <BsFillPinFill className="h-3 w-3" /> PINNED CHATS
                       </div>
                       <SidebarMenu>
-                        {pinnedChats.map((chat) => (
+                        {pinnedChats.map((chat: Chat) => (
                           <ChatMenuItem
                             key={chat.id}
                             chat={chat}
@@ -468,14 +499,13 @@ export function AppSidebar() {
                       </SidebarMenu>
                     </div>
                   )}
-
                   {otherChats.length > 0 && (
                     <div className="flex flex-col">
                       <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/50">
                         ALL CHATS
                       </div>
                       <SidebarMenu>
-                        {otherChats.map((chat) => (
+                        {otherChats.map((chat: Chat) => (
                           <ChatMenuItem
                             key={chat.id}
                             chat={chat}
@@ -494,19 +524,27 @@ export function AppSidebar() {
 
         <SidebarFooter
           className="p-4 border-t border-border/5 bg-muted/5 hover:bg-muted/10 transition-all cursor-pointer"
-          onClick={() => setSettingsOpen(true)}
+          onClick={(): void => setSettingsOpen(true)}
         >
-          {user ? (
-            <div className="flex items-center justify-between w-full">
+          {isLoadingMe || !user ? (
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-9 rounded-full" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-2 w-16" />
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between w-full animate-in fade-in slide-in-from-bottom-1 duration-300">
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar className="h-9 w-9 border border-border/10">
                   <AvatarFallback className="font-bold text-[11px] bg-primary/10 text-primary uppercase">
-                    {user.first_name?.[0] || user.username?.[0] || "?"}
+                    {avatarFallback}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col min-w-0">
                   <span className="text-[13.5px] font-bold truncate text-foreground leading-tight">
-                    {user.first_name} {user.last_name}
+                    {fullName}
                   </span>
                   <span className="text-[11px] text-muted-foreground font-medium">
                     Settings
@@ -515,8 +553,6 @@ export function AppSidebar() {
               </div>
               <Settings className="h-4.5 w-4.5 text-muted-foreground" />
             </div>
-          ) : (
-            <Skeleton className="h-9 w-full rounded-xl" />
           )}
         </SidebarFooter>
       </Sidebar>

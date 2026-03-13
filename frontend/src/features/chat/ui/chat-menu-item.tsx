@@ -25,7 +25,7 @@ interface ChatMenuItemProps {
 }
 
 export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false);
   const { togglePin, markAsRead, deleteChat } = useChatActions(chat.id);
 
   const otherMember = useMemo(
@@ -35,16 +35,18 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
 
   const otherUser = otherMember?.user;
 
-  const displayName = useMemo(() => {
-    return otherUser
-      ? [otherUser.first_name, otherUser.last_name].filter(Boolean).join(" ") ||
-          otherUser.username ||
-          "Chat"
-      : chat.title || "Chat";
+  const displayName = useMemo((): string => {
+    if (otherUser) {
+      const first = otherUser.first_name?.trim() || "";
+      const last = otherUser.last_name?.trim() || "";
+      const full = `${first} ${last}`.trim();
+      return full || otherUser.username || "Chat";
+    }
+    return chat.title || "Chat";
   }, [otherUser, chat.title]);
 
   const initial = useMemo(
-    () => (displayName?.length > 0 ? displayName[0].toUpperCase() : "?"),
+    (): string => (displayName.length > 0 ? displayName[0].toUpperCase() : "?"),
     [displayName],
   );
 
@@ -56,22 +58,14 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
   const showSenderName =
     chat.type === "GROUP" || chat.type === "CHANNEL" || isMe;
 
-  const senderName = useMemo(() => {
+  const senderName = useMemo((): string | null => {
     if (!showSenderName || !sender) return null;
     if (isMe) return "You";
-    return (
-      [sender.first_name, sender.last_name].filter(Boolean).join(" ") ||
-      sender.username ||
-      null
-    );
+    const first = sender.first_name?.trim() || "";
+    const last = sender.last_name?.trim() || "";
+    const full = `${first} ${last}`.trim();
+    return full || sender.username || null;
   }, [showSenderName, sender, isMe]);
-
-  const chatLinkIdentifier = useMemo(() => {
-    if (chat.type === "PRIVATE" && otherUser?.username) {
-      return otherUser.username;
-    }
-    return chat.id;
-  }, [chat.type, chat.id, otherUser]);
 
   return (
     <>
@@ -85,7 +79,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
             >
               <Link
                 to="/chat/$chatId"
-                params={{ chatId: chatLinkIdentifier }}
+                params={{ chatId: chat.id }}
                 className="flex items-center gap-3 w-full"
               >
                 <div className="relative shrink-0">
@@ -165,7 +159,9 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
 
         <ContextMenuContent className="w-56 rounded-xl shadow-xl">
           <ContextMenuItem
-            onClick={() => togglePin(!chat.isPinned)}
+            onClick={(): void => {
+              togglePin(!chat.isPinned);
+            }}
             className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
           >
             {chat.isPinned ? (
@@ -183,7 +179,9 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
 
           {chat.unreadCount > 0 && lastMessage?.sequence !== undefined && (
             <ContextMenuItem
-              onClick={() => markAsRead(lastMessage.sequence!)}
+              onClick={(): void => {
+                markAsRead(lastMessage.sequence!);
+              }}
               className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
             >
               <CheckCircle2 className="h-4 w-4 text-muted-foreground/70" />
@@ -199,7 +197,9 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
           <ContextMenuSeparator />
 
           <ContextMenuItem
-            onClick={() => setIsDeleteOpen(true)}
+            onClick={(): void => {
+              setIsDeleteOpen(true);
+            }}
             className="gap-3 py-2.5 text-destructive focus:text-destructive cursor-pointer text-sm font-medium"
           >
             <Trash2 className="h-4 w-4" />
@@ -211,7 +211,9 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
       <DeleteChatDialog
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
-        onConfirm={(forEveryone) => deleteChat(forEveryone)}
+        onConfirm={(forEveryone: boolean): void => {
+          deleteChat(forEveryone);
+        }}
         displayName={displayName}
         isPrivate={chat.type === "PRIVATE"}
       />
