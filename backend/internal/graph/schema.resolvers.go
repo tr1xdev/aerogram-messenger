@@ -332,15 +332,8 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		msg.ReplyToID = &parsed
 	}
 
-	payload, err := json.Marshal(msg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal message payload: %w", err)
-	}
-
-	err = r.redisClient.Publish(ctx, "chat:"+chatID, payload).Err()
-	if err != nil {
-		return nil, fmt.Errorf("failed to publish message to redis: %w", err)
-	}
+	payload, _ := json.Marshal(msg)
+	r.redisClient.Publish(ctx, "chat:"+chatID, payload)
 
 	return msg, nil
 }

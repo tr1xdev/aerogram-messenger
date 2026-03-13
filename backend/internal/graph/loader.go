@@ -27,6 +27,7 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 			userBatchFn := func(ctx context.Context, keys []string) []*dataloader.Result[*models.User] {
 				res, err := client.GetUsers(ctx, &userpb.GetUsersRequest{Ids: keys})
 				output := make([]*dataloader.Result[*models.User], len(keys))
+
 				if err != nil {
 					for i := range output {
 						output[i] = &dataloader.Result[*models.User]{Error: err}
@@ -53,7 +54,16 @@ func LoaderMiddleware(client userpb.UserServiceClient, pRepo *repositories.Prese
 					if u, ok := userMap[id]; ok {
 						output[i] = &dataloader.Result[*models.User]{Data: u}
 					} else {
-						output[i] = &dataloader.Result[*models.User]{Error: fmt.Errorf("user %s not found", id)}
+						uid, _ := uuid.Parse(id)
+						output[i] = &dataloader.Result[*models.User]{
+							Data: &models.User{
+								ID:        uid,
+								FirstName: "Unknown",
+								LastName:  nil,
+								Username:  nil,
+								Email:     "",
+							},
+						}
 					}
 				}
 				return output

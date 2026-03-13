@@ -3,11 +3,13 @@ package chat_svc
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -88,7 +90,7 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 			return nil, status.Error(codes.PermissionDenied, "only owner can delete for everyone")
 		}
 	} else {
-		err = s.db.Queries.DeleteDialogMember(ctx, dbgen.DeleteDialogMemberParams{
+		err = s.db.Queries.HideDialogMember(ctx, dbgen.HideDialogMemberParams{
 			DialogID: did,
 			UserID:   uid,
 		})
@@ -306,6 +308,23 @@ func (s *Server) mapGetUserDialogsRowToProto(row dbgen.GetUserDialogsRow) *chatp
 	res.IsPinned = row.IsPinned
 	res.UnreadCount = int32(row.UnreadCount)
 	res.LastReadSequence = row.LastReadSequence
+
+	if row.LastMessageID.Valid {
+		res.LastMessage = &messagespb.Message{
+			Id:          row.LastMessageID.UUID.String(),
+			ChatId:      row.ID.String(),
+			Text:        row.MsgContent.String,
+			IsEncrypted: row.MsgIsEncrypted.Bool,
+			Sequence:    row.MsgSequence.Int64,
+			SenderId:    row.MsgAuthorID.UUID.String(),
+			SentAt:      row.MsgCreatedAt.Time.Format(time.RFC3339),
+		}
+
+		if row.MsgEncryptionIv.Valid && row.MsgEncryptionIv.String != "" {
+			iv := row.MsgEncryptionIv.String
+			res.LastMessage.EncryptionIv = &iv
+		}
+	}
 
 	return res
 }

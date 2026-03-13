@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
-	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/models"
@@ -38,16 +38,11 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 	}
 
 	idsMap := make(map[uuid.UUID]struct{}, len(dbMembers)+1)
-	var isPinned bool
-	var myReadSeq int64
 	var pReadSeq int64
 
 	for _, m := range dbMembers {
 		idsMap[m.UserID] = struct{}{}
-		if m.UserID == parsedAuthID {
-			isPinned = m.IsPinned
-			myReadSeq = m.LastReadSequence
-		} else {
+		if m.UserID != parsedAuthID {
 			if chatType == model.ChatTypePrivate {
 				pReadSeq = m.LastReadSequence
 			} else if m.LastReadSequence > pReadSeq {
@@ -56,51 +51,31 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		}
 	}
 
-	var lastMsg *models.Message
-	if pbChat.LastMessageId != "" {
-		if mID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
-			if m, err := r.db.Queries.GetMessageByID(ctx, mID); err == nil {
-				lastMsg = &models.Message{
-					ID:           m.ID,
-					DialogID:     m.DialogID,
-					AuthorID:     m.AuthorID,
-					Content:      m.Content,
-					CreatedAt:    m.CreatedAt,
-					Sequence:     m.Sequence,
-					IsEncrypted:  m.IsEncrypted,
-					EncryptionIv: toStringPtr(m.EncryptionIv),
-				}
-				idsMap[m.AuthorID] = struct{}{}
-			}
+	if pbChat.LastMessage != nil && pbChat.LastMessage.SenderId != "" {
+		if authorID, err := uuid.Parse(pbChat.LastMessage.SenderId); err == nil && authorID != uuid.Nil {
+			idsMap[authorID] = struct{}{}
 		}
 	}
 
-	userIDs := make([]uuid.UUID, 0, len(idsMap))
+	userMap := make(map[uuid.UUID]*models.User, len(idsMap))
 	for id := range idsMap {
-		userIDs = append(userIDs, id)
-	}
-
-	dbUsers, err := r.userRepo.GetByIDs(ctx, userIDs)
-	if err != nil {
-		return nil, fmt.Errorf("fetch users fail: %w", err)
-	}
-
-	userMap := make(map[uuid.UUID]*models.User, len(dbUsers))
-	for _, u := range dbUsers {
-		userMap[u.ID] = &models.User{
-			ID:               u.ID,
-			FirstName:        u.FirstName,
-			LastName:         toStringPtr(u.LastName),
-			Username:         toStringPtr(u.Username),
-			PublicKey:        toStringPtr(u.PublicKey),
-			EncryptedPrivKey: toStringPtr(u.EncryptedPrivKey),
-			EncryptionIv:     toStringPtr(u.EncryptionIv),
+		u, err := LoadUser(ctx, id.String())
+		if err != nil {
+			continue
+		}
+		if u != nil {
+			userMap[u.ID] = u
 		}
 	}
 
 	gqlMembers := make([]*model.ChatMember, 0, len(dbMembers))
 	for _, m := range dbMembers {
-		if u, ok := userMap[m.UserID]; ok {
+		u, ok := userMap[m.UserID]
+		if !ok {
+			tempU, _ := LoadUser(ctx, m.UserID.String())
+			u = tempU
+		}
+		if u != nil {
 			gqlMembers = append(gqlMembers, &model.ChatMember{
 				User:             u,
 				LastReadSequence: m.LastReadSequence,
@@ -108,8 +83,34 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		}
 	}
 
-	if lastMsg != nil {
-		lastMsg.Sender = userMap[lastMsg.AuthorID]
+	var lastMsg *models.Message
+	if m := pbChat.LastMessage; m != nil {
+		mID, _ := uuid.Parse(m.Id)
+		aID, _ := uuid.Parse(m.SenderId)
+
+		lastMsg = &models.Message{
+			ID:           mID,
+			DialogID:     chatID,
+			AuthorID:     aID,
+			Content:      m.Text,
+			Sequence:     m.Sequence,
+			IsEncrypted:  m.IsEncrypted,
+			EncryptionIv: m.EncryptionIv,
+		}
+
+		if aID != uuid.Nil {
+			if u, ok := userMap[aID]; ok {
+				lastMsg.Sender = u
+			} else {
+				lastMsg.Sender, _ = LoadUser(ctx, aID.String())
+			}
+		}
+
+		if m.SentAt != "" {
+			if t, err := time.Parse(time.RFC3339, m.SentAt); err == nil {
+				lastMsg.CreatedAt = t
+			}
+		}
 	}
 
 	displayTitle := pbChat.Title
@@ -125,12 +126,6 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		}
 	}
 
-	uCount, _ := r.db.Queries.CountUnreadMessages(ctx, dbgen.CountUnreadMessagesParams{
-		DialogID: chatID,
-		AuthorID: parsedAuthID,
-		Sequence: myReadSeq,
-	})
-
 	return &model.Chat{
 		ID:               pbChat.Id,
 		Type:             chatType,
@@ -139,8 +134,8 @@ func (r *Resolver) enrichChat(ctx context.Context, authID string, pbChat *chatpb
 		MembersCount:     int(pbChat.MembersCount),
 		Members:          gqlMembers,
 		LastMessage:      lastMsg,
-		UnreadCount:      int(uCount),
-		IsPinned:         isPinned,
+		UnreadCount:      int(pbChat.UnreadCount),
+		IsPinned:         pbChat.IsPinned,
 		LastReadSequence: pReadSeq,
 	}, nil
 }
@@ -149,7 +144,6 @@ func toStringPtr(val interface{}) *string {
 	if val == nil {
 		return nil
 	}
-
 	switch v := val.(type) {
 	case string:
 		return &v

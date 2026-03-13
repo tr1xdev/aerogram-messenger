@@ -2,7 +2,6 @@ package messages_svc
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,10 +41,6 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
 
-	if _, err := s.dialogRepo.GetMember(ctx, req.ChatId, req.SenderId); err != nil {
-		return nil, status.Error(codes.PermissionDenied, "you are not a member of this chat")
-	}
-
 	tx, err := s.db.Conn.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to start transaction")
@@ -53,6 +48,10 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	defer tx.Rollback()
 
 	qtx := s.db.Queries.WithTx(tx)
+
+	if err := qtx.UnhideDialogForMembers(ctx, chatID); err != nil {
+		return nil, status.Error(codes.Internal, "failed to restore dialog visibility")
+	}
 
 	msg, err := qtx.CreateMessage(ctx, dbgen.CreateMessageParams{
 		ID:           uuid.New(),
@@ -80,14 +79,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
-	pb := s.mapDBToProto(msg)
-	data, _ := json.Marshal(map[string]interface{}{
-		"type":    "new_message",
-		"payload": pb,
-	})
-	s.rdb.Publish(ctx, "chat:"+req.ChatId, data)
-
-	return &messagespb.SendMessageResponse{Message: pb}, nil
+	return &messagespb.SendMessageResponse{Message: s.mapDBToProto(msg)}, nil
 }
 
 func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
