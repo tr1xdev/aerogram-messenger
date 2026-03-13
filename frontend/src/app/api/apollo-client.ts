@@ -10,7 +10,7 @@ import {
 import type { Reference, FetchResult, Operation } from "@apollo/client";
 import { SetContextLink } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
-import { createClient } from "graphql-ws";
+import { createClient, type Message } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { REFRESH_TOKEN_MUTATION } from "@/features/auth/api/auth.gql";
 import { useConnectionStore } from "@/store/connection";
@@ -172,6 +172,10 @@ const interceptorLink: ApolloLink = new ApolloLink(
   },
 );
 
+const logStyle = (color: string) =>
+  `color: ${color}; font-weight: bold; font-family: "JetBrains Mono", monospace;`;
+const dimStyle = `color: #888; font-family: "JetBrains Mono", monospace;`;
+
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
     url: "ws://localhost:8080/query",
@@ -195,18 +199,47 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
       await new Promise((resolve) => setTimeout(resolve, delay + jitter));
     },
     on: {
-      opened: () => console.log("[WS] Socket opened"),
+      opened: () =>
+        console.log("%c[WS]%c socket opened", logStyle("#00d4ff"), dimStyle),
+
       connected: () => {
-        console.log("[WS] Connected to server");
+        console.log(
+          "%c[WS]%c connected to server",
+          logStyle("#00ff88"),
+          "color: inherit;",
+        );
         useConnectionStore.getState().setIsWsConnected(true);
       },
+
       closed: (event) => {
-        console.log("[WS] Connection closed", event);
+        console.log(
+          "%c[WS]%c connection closed",
+          logStyle("#ff4d4d"),
+          dimStyle,
+          event,
+        );
         useConnectionStore.getState().setIsWsConnected(false);
       },
+
       error: (err) => {
-        console.error("[WS] Error", err);
+        console.error(
+          "%c[WS]%c error occurred",
+          logStyle("#ff4d4d"),
+          "color: inherit;",
+          err,
+        );
         useConnectionStore.getState().setIsWsConnected(false);
+      },
+
+      message: (msg) => {
+        const type = (msg as Message).type || "data";
+        console.groupCollapsed(
+          `%c[WS]%c message: ${type}`,
+          logStyle("#ffca28"),
+          dimStyle,
+        );
+        console.log(msg);
+        console.groupEnd();
       },
     },
   }),

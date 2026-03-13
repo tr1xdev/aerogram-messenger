@@ -3,7 +3,6 @@ import {
   type MutationOptions,
   type ApolloCache,
   type Reference,
-  gql,
 } from "@apollo/client/index.js";
 import { useMemo } from "react";
 import { toast } from "sonner";
@@ -36,15 +35,10 @@ export function useMyChats() {
   return useQuery<{ myChats: Chat[] }>(GET_MY_CHATS);
 }
 
-export function useChatDetails(identifier: string) {
-  const isUuid = identifier.includes("-");
-
+export function useChatDetails(chatId: string) {
   return useQuery<{ chat: Chat }>(GET_CHAT_DETAILS, {
-    variables: {
-      id: isUuid ? identifier : null,
-      slug: isUuid ? null : identifier,
-    },
-    skip: !identifier,
+    variables: { id: chatId },
+    skip: !chatId,
     fetchPolicy: "cache-and-network",
   });
 }
@@ -59,7 +53,7 @@ export function useChatHistory(chatId: string) {
     },
   );
 
-  const sortedMessages = useMemo(() => {
+  const sortedMessages: Message[] = useMemo(() => {
     if (!data?.messageHistory) return [];
     return [...data.messageHistory].sort(
       (a: Message, b: Message) => (a.sequence ?? 0) - (b.sequence ?? 0),
@@ -97,14 +91,13 @@ export function useChatActions(chatId: string) {
     text: string,
     options?: MutationOptions<{ sendMessage: Message }>,
   ): Promise<void> => {
-    const me = meData?.me;
-    const chat = chatData?.chat;
+    const me: User | undefined = meData?.me;
+    const chat: Chat | undefined = chatData?.chat;
     if (!me || !chat) return;
 
-    const peerMember = chat.members?.find(
+    const peer: User | undefined = chat.members?.find(
       (m: ChatMember) => m.user.id !== me.id,
-    );
-    const peer = peerMember?.user;
+    )?.user;
 
     let finalVariables: {
       chatId: string;
@@ -115,7 +108,7 @@ export function useChatActions(chatId: string) {
 
     if (chat.type === "PRIVATE" && peer?.publicKey) {
       try {
-        const myPrivKeyObj = await getPrivateKey(me.id);
+        const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
         if (myPrivKeyObj) {
           const encrypted = await encryptText(
             text,
@@ -130,7 +123,7 @@ export function useChatActions(chatId: string) {
           };
         }
       } catch (err: unknown) {
-        console.error("[E2EE] Encryption failed", err);
+        console.error(err);
       }
     }
 
@@ -138,10 +131,13 @@ export function useChatActions(chatId: string) {
       variables: finalVariables,
       ...options,
       update: (cache: ApolloCache, { data }) => {
-        const newMessage = data?.sendMessage;
+        const newMessage: Message | undefined = data?.sendMessage;
         if (!newMessage) return;
 
-        const chatRef = cache.identify({ __typename: "Chat", id: chatId });
+        const chatRef: string | undefined = cache.identify({
+          __typename: "Chat",
+          id: chatId,
+        });
         if (!chatRef) return;
 
         cache.modify({
@@ -155,34 +151,10 @@ export function useChatActions(chatId: string) {
         cache.modify({
           fields: {
             myChats(existingRefs: readonly Reference[] = []) {
-              const filtered = existingRefs.filter(
+              const filtered: Reference[] = existingRefs.filter(
                 (ref: Reference) => ref.__ref !== chatRef,
               );
               return [{ __ref: chatRef } as Reference, ...filtered];
-            },
-            messageHistory(
-              existing: readonly Reference[] = [],
-              { storeFieldName, readField }: ModifierDetails,
-            ) {
-              if (!storeFieldName.includes(chatId)) return existing;
-
-              const alreadyExists = existing.some(
-                (ref: Reference) => readField("id", ref) === newMessage.id,
-              );
-              if (alreadyExists) return existing;
-
-              const newMessageRef = cache.writeFragment({
-                data: newMessage,
-                fragment: gql`
-                  fragment NewMessage on Message {
-                    id
-                    sequence
-                    text
-                    sentAt
-                  }
-                `,
-              });
-              return newMessageRef ? [...existing, newMessageRef] : existing;
             },
           },
         });
@@ -195,7 +167,10 @@ export function useChatActions(chatId: string) {
       variables: { chatID: chatId, lastSequence: Number(lastSequence) },
       optimisticResponse: { markDialogAsRead: true },
       update: (cache: ApolloCache) => {
-        const chatRef = cache.identify({ __typename: "Chat", id: chatId });
+        const chatRef: string | undefined = cache.identify({
+          __typename: "Chat",
+          id: chatId,
+        });
         if (chatRef) {
           cache.modify({
             id: chatRef,
@@ -215,20 +190,21 @@ export function useChatActions(chatId: string) {
       const result = await createDirect({
         variables: { userID },
         update: (cache: ApolloCache, { data }) => {
-          const newChat = data?.createDirectChat;
+          const newChat: Chat | undefined = data?.createDirectChat;
           if (!newChat) return;
           cache.modify({
             fields: {
               myChats(existing: readonly Reference[] = []) {
-                const newChatRef = cache.identify({
+                const newChatRef: string | undefined = cache.identify({
                   __typename: "Chat",
                   id: newChat.id,
                 });
                 if (
                   !newChatRef ||
                   existing.some((ref: Reference) => ref.__ref === newChatRef)
-                )
+                ) {
                   return existing;
+                }
                 return [{ __ref: newChatRef } as Reference, ...existing];
               },
             },
@@ -244,7 +220,7 @@ export function useChatActions(chatId: string) {
 
   const togglePin = async (pinned: boolean): Promise<void> => {
     if (pinned) {
-      const pinnedCount =
+      const pinnedCount: number =
         myChatsData?.myChats.filter((c: Chat) => c.isPinned).length ?? 0;
       if (pinnedCount >= 5) {
         toast.error("Limit reached", {
@@ -258,7 +234,10 @@ export function useChatActions(chatId: string) {
         variables: { id: chatId, pinned },
         optimisticResponse: { pinChat: true },
         update: (cache: ApolloCache) => {
-          const chatRef = cache.identify({ __typename: "Chat", id: chatId });
+          const chatRef: string | undefined = cache.identify({
+            __typename: "Chat",
+            id: chatId,
+          });
           if (chatRef) {
             cache.modify({
               id: chatRef,
@@ -275,10 +254,7 @@ export function useChatActions(chatId: string) {
   const deleteChat = async (forEveryone: boolean = false): Promise<boolean> => {
     try {
       const { data } = await remove({
-        variables: {
-          id: chatId,
-          forEveryone,
-        },
+        variables: { id: chatId, forEveryone },
         update: (cache: ApolloCache) => {
           cache.modify({
             fields: {
@@ -292,10 +268,14 @@ export function useChatActions(chatId: string) {
               },
             },
           });
-          cache.evict({
-            id: cache.identify({ __typename: "Chat", id: chatId }),
+          const chatRef: string | undefined = cache.identify({
+            __typename: "Chat",
+            id: chatId,
           });
-          cache.gc();
+          if (chatRef) {
+            cache.evict({ id: chatRef });
+            cache.gc();
+          }
         },
       });
       return !!data?.deleteChat;
