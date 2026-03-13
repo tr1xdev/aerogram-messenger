@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package chat.v1;
 
+import "messages/v1/messages.proto";
+
 option go_package = "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1;chatv1";
 
 service ChatService {
@@ -17,6 +19,24 @@ enum ChatType {
   CHAT_TYPE_PRIVATE = 1;
   CHAT_TYPE_GROUP = 2;
   CHAT_TYPE_CHANNEL = 3;
+}
+
+message Chat {
+  string id = 1;
+  ChatType type = 2;
+  string title = 3;
+  string slug = 4;
+  int32 members_count = 5;
+  string last_message_id = 6;
+  int64 last_read_sequence = 7;
+  string photo_url = 8;
+  optional string bio = 9;
+  optional string description = 10;
+  bool is_verified = 11;
+  optional string pinned_message_id = 12;
+  bool is_pinned = 13;
+  int32 unread_count = 14;
+  messages.v1.Message last_message = 15;
 }
 
 message DeleteChatRequest {
@@ -37,23 +57,6 @@ message GetChatRequest {
 
 message GetChatResponse {
   Chat chat = 1;
-}
-
-message Chat {
-  string id = 1;
-  ChatType type = 2;
-  string title = 3;
-  string slug = 4;
-  int32 members_count = 5;
-  string last_message_id = 6;
-  int64 last_read_sequence = 7;
-  string photo_url = 8;
-  optional string bio = 9;
-  optional string description = 10;
-  bool is_verified = 11;
-  optional string pinned_message_id = 12;
-  bool is_pinned = 13;
-  int32 unread_count = 14;
 }
 
 message CreateChatRequest {

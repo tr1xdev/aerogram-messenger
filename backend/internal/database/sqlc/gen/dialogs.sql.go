@@ -16,9 +16,9 @@ import (
 const addDialogMember = `-- name: AddDialogMember :exec
 INSERT INTO dialog_members (
     dialog_id, user_id, role, joined_at, notifications_on,
-    is_pinned, last_read_sequence, created_at, updated_at
+    is_pinned, last_read_sequence, is_hidden, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, NOW(), $4, $5, $6, NOW(), NOW()
+    $1, $2, $3, NOW(), $4, $5, $6, FALSE, NOW(), NOW()
 )
 `
 
@@ -159,21 +159,6 @@ WHERE id = $1
 
 func (q *Queries) DeleteDialog(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, deleteDialog, id)
-	return err
-}
-
-const deleteDialogMember = `-- name: DeleteDialogMember :exec
-DELETE FROM dialog_members
-WHERE dialog_id = $1 AND user_id = $2
-`
-
-type DeleteDialogMemberParams struct {
-	DialogID uuid.UUID `json:"dialog_id"`
-	UserID   uuid.UUID `json:"user_id"`
-}
-
-func (q *Queries) DeleteDialogMember(ctx context.Context, arg DeleteDialogMemberParams) error {
-	_, err := q.db.ExecContext(ctx, deleteDialogMember, arg.DialogID, arg.UserID)
 	return err
 }
 
@@ -318,6 +303,7 @@ JOIN dialog_members dm2 ON d.id = dm2.dialog_id
 WHERE d.type = 'private'
   AND dm1.user_id = $1
   AND dm2.user_id = $2
+  AND d.is_active = true
 LIMIT 1
 `
 
@@ -357,18 +343,26 @@ SELECT
     d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at, d.deleted_at,
     dm.is_pinned,
     dm.last_read_sequence,
+    m.content AS msg_content,
+    m.is_encrypted AS msg_is_encrypted,
+    m.encryption_iv AS msg_encryption_iv,
+    m.sequence AS msg_sequence,
+    m.author_id AS msg_author_id,
+    m.created_at AS msg_created_at,
     (
         SELECT count(*)
-        FROM messages m
-        WHERE m.dialog_id = d.id
-          AND m.sequence > dm.last_read_sequence
-          AND m.author_id != $1
-          AND m.is_deleted = false
+        FROM messages m2
+        WHERE m2.dialog_id = d.id
+          AND m2.sequence > dm.last_read_sequence
+          AND m2.author_id != $1
+          AND m2.is_deleted = false
     ) AS unread_count
 FROM dialogs d
 JOIN dialog_members dm ON dm.dialog_id = d.id
+LEFT JOIN messages m ON d.last_message_id = m.id
 WHERE dm.user_id = $1
   AND d.is_active = true
+  AND dm.is_hidden = false
 ORDER BY dm.is_pinned DESC, COALESCE(d.last_message_at, d.created_at) DESC
 `
 
@@ -393,6 +387,12 @@ type GetUserDialogsRow struct {
 	DeletedAt        sql.NullTime   `json:"deleted_at"`
 	IsPinned         bool           `json:"is_pinned"`
 	LastReadSequence int64          `json:"last_read_sequence"`
+	MsgContent       sql.NullString `json:"msg_content"`
+	MsgIsEncrypted   sql.NullBool   `json:"msg_is_encrypted"`
+	MsgEncryptionIv  sql.NullString `json:"msg_encryption_iv"`
+	MsgSequence      sql.NullInt64  `json:"msg_sequence"`
+	MsgAuthorID      uuid.NullUUID  `json:"msg_author_id"`
+	MsgCreatedAt     sql.NullTime   `json:"msg_created_at"`
 	UnreadCount      int64          `json:"unread_count"`
 }
 
@@ -426,6 +426,12 @@ func (q *Queries) GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]Get
 			&i.DeletedAt,
 			&i.IsPinned,
 			&i.LastReadSequence,
+			&i.MsgContent,
+			&i.MsgIsEncrypted,
+			&i.MsgEncryptionIv,
+			&i.MsgSequence,
+			&i.MsgAuthorID,
+			&i.MsgCreatedAt,
 			&i.UnreadCount,
 		); err != nil {
 			return nil, err
@@ -450,6 +456,22 @@ func (q *Queries) HardDeleteDialog(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const hideDialogMember = `-- name: HideDialogMember :exec
+UPDATE dialog_members
+SET is_hidden = true, updated_at = NOW()
+WHERE dialog_id = $1 AND user_id = $2
+`
+
+type HideDialogMemberParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) HideDialogMember(ctx context.Context, arg HideDialogMemberParams) error {
+	_, err := q.db.ExecContext(ctx, hideDialogMember, arg.DialogID, arg.UserID)
+	return err
+}
+
 const pinDialog = `-- name: PinDialog :exec
 UPDATE dialog_members
 SET is_pinned = $3, updated_at = NOW()
@@ -464,5 +486,16 @@ type PinDialogParams struct {
 
 func (q *Queries) PinDialog(ctx context.Context, arg PinDialogParams) error {
 	_, err := q.db.ExecContext(ctx, pinDialog, arg.DialogID, arg.UserID, arg.IsPinned)
+	return err
+}
+
+const unhideDialogForMembers = `-- name: UnhideDialogForMembers :exec
+UPDATE dialog_members
+SET is_hidden = false, updated_at = NOW()
+WHERE dialog_id = $1
+`
+
+func (q *Queries) UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, unhideDialogForMembers, dialogID)
 	return err
 }

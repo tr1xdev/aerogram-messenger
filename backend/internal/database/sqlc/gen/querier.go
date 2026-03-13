@@ -24,7 +24,6 @@ type Querier interface {
 	DeactivateAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	DeactivateSession(ctx context.Context, id uuid.UUID) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
-	DeleteDialogMember(ctx context.Context, arg DeleteDialogMemberParams) error
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]Message, error)
 	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)
@@ -42,12 +41,14 @@ type Querier interface {
 	GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]GetUserDialogsRow, error)
 	GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]User, error)
 	HardDeleteDialog(ctx context.Context, id uuid.UUID) error
+	HideDialogMember(ctx context.Context, arg HideDialogMemberParams) error
 	MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error
 	PinDialog(ctx context.Context, arg PinDialogParams) error
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
 	SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString) ([]User, error)
 	SoftDeleteMessage(ctx context.Context, arg SoftDeleteMessageParams) error
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
+	UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
 	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error
 	UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error)
