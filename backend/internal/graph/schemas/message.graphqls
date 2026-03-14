@@ -1,0 +1,59 @@
+type Message {
+   id: ID!
+   chatId: ID!
+   sender: User!
+   text: String!
+   sentAt: String!
+   sequence: Long!
+   isEdited: Boolean!
+   isEncrypted: Boolean!
+   encryptionIv: String
+   replyTo: Message
+   forwardedFrom: Message
+}
+
+type ReadPayload {
+   chatId: String!
+   userId: String!
+   lastSequence: Long!
+}
+
+type MessageConnection {
+   messages: [Message!]!
+   hasMore: Boolean!
+}
+
+union SendMessageResult =
+   | Message
+   | ForbiddenError
+   | ValidationError
+   | InternalError
+union MessageHistoryResult =
+   | MessageConnection
+   | ForbiddenError
+   | NotFoundError
+   | InternalError
+
+extend type Query {
+   messageHistory(chatId: ID!, limit: Int!, offset: Int!): MessageHistoryResult!
+   dialogRead(chatId: String!): ReadPayload!
+}
+
+extend type Mutation {
+   sendMessage(
+      chatId: ID!
+      text: String!
+      isEncrypted: Boolean!
+      encryptionIv: String
+      replyToId: ID
+   ): SendMessageResult!
+
+   updateMessage(id: ID!, text: String!): SendMessageResult!
+   deleteMessage(id: ID!): Boolean!
+   markDialogAsRead(chatId: String!, lastSequence: Long!): Boolean!
+}
+
+extend type Subscription {
+   messageAdded(chatId: ID!): Message!
+   dialogRead(chatId: String!): ReadPayload!
+}

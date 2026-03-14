@@ -48,11 +48,22 @@ func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chat
 		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
 	}
 
-	err := s.dialogRepo.Pin(ctx, req.ChatId, userID, req.Pinned)
+	uUUID, err := uuid.Parse(userID)
 	if err != nil {
-		if strings.Contains(err.Error(), "limit reached") {
-			return nil, status.Error(codes.FailedPrecondition, err.Error())
-		}
+		return nil, status.Error(codes.InvalidArgument, "invalid user id")
+	}
+
+	cUUID, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+
+	err = s.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
+		IsPinned: req.Pinned,
+		DialogID: cUUID,
+		UserID:   uUUID,
+	})
+	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to pin chat")
 	}
 
@@ -85,12 +96,12 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 		isPrivate := dialog.Type == "private"
 
 		if isPrivate || isOwner {
-			err = s.db.Queries.HardDeleteDialog(ctx, did)
+			err = s.db.Queries.DeleteDialog(ctx, did)
 		} else {
 			return nil, status.Error(codes.PermissionDenied, "only owner can delete for everyone")
 		}
 	} else {
-		err = s.db.Queries.HideDialogMember(ctx, dbgen.HideDialogMemberParams{
+		err = s.db.Queries.RemoveDialogMember(ctx, dbgen.RemoveDialogMemberParams{
 			DialogID: did,
 			UserID:   uid,
 		})
@@ -199,7 +210,6 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 		dialog, err = s.dialogRepo.GetDialogByID(ctx, *req.ChatId)
 	} else if req.Slug != nil && *req.Slug != "" {
 		slug, _ := strings.CutPrefix(*req.Slug, "@")
-
 		dialog, err = s.dialogRepo.GetDialogByUsername(ctx, slug)
 
 		if err != nil && userID != "" {
@@ -208,7 +218,6 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 
 			if userErr == nil {
 				targetUserID := targetUser.ID.String()
-
 				existingDialog, diagErr := s.dialogRepo.GetPrivateDialogByMembers(ctx, userID, targetUserID)
 				if diagErr == nil {
 					return &chatpb.GetChatResponse{

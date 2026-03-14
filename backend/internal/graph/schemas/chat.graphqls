@@ -1,0 +1,61 @@
+enum ChatType {
+   PRIVATE
+   GROUP
+   CHANNEL
+}
+
+type ChatMember {
+   user: User!
+   lastReadSequence: Long!
+}
+
+type Chat {
+   id: ID!
+   type: ChatType!
+   slug: String
+   title: String!
+   photoUrl: String
+   membersCount: Int!
+   unreadCount: Int!
+   isPinned: Boolean!
+   lastMessage: Message
+   lastReadSequence: Long!
+   members: [ChatMember!]
+   messages(limit: Int = 50, offset: Int = 0): [Message!]!
+   createdAt: String!
+}
+
+type ChatList {
+   chats: [Chat!]!
+}
+
+union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
+union MyChatsResult = ChatList | ForbiddenError | InternalError
+union CreateChatResult = Chat | ValidationError | ForbiddenError | InternalError
+union PinChatResult = SuccessResult | ForbiddenError | InternalError
+union DeleteChatResult = SuccessResult | ForbiddenError | InternalError
+
+extend type Query {
+   myChats: MyChatsResult!
+   chat(id: ID, slug: String): ChatResult!
+}
+
+extend type Mutation {
+   createChat(
+      type: ChatType!
+      participantIds: [ID!]
+      slug: String
+      title: String
+   ): CreateChatResult!
+
+   createDirectChat(userID: String!): CreateChatResult!
+
+   pinChat(id: ID!, pinned: Boolean!): PinChatResult!
+   deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
+   sendTypingEvent(chatID: String!): Boolean!
+}
+
+extend type Subscription {
+   chatCreated(userId: ID!): Chat!
+   chatDeleted(userId: ID!): ID!
+}

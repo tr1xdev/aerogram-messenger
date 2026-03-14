@@ -160,3 +160,35 @@ func (r *DialogRepository) GetPrivateDialogByMembers(ctx context.Context, user1,
 		UserID_2: u2,
 	})
 }
+
+func (r *DialogRepository) PinChat(ctx context.Context, dialogID, userID uuid.UUID, pinned bool) error {
+	return r.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
+		DialogID: dialogID,
+		UserID:   userID,
+		IsPinned: pinned,
+	})
+}
+
+func (r *DialogRepository) DeleteChat(ctx context.Context, dialogID, userID uuid.UUID, forEveryone bool) error {
+	if forEveryone {
+		return r.db.Queries.DeleteDialog(ctx, dialogID)
+	}
+
+	tx, err := r.db.Conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	qtx := r.db.Queries.WithTx(tx)
+
+	if err := qtx.RemoveDialogMember(ctx, dbgen.RemoveDialogMemberParams{DialogID: dialogID, UserID: userID}); err != nil {
+		return err
+	}
+
+	if err := qtx.DecrementMembersCount(ctx, dialogID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}

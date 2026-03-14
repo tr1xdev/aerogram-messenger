@@ -1,0 +1,50 @@
+type AuthPayload {
+   user_id: String
+}
+
+type VerifyEmailPayload {
+   access_token: String!
+   refresh_token: String!
+}
+
+type Session {
+   id: ID!
+   device: String
+   ipAddress: String
+   location: String
+   isActive: Boolean
+   isCurrent: Boolean!
+   createdAt: String!
+}
+
+input SignUpInput {
+   username: String
+   email: String!
+   password: String!
+   first_name: String!
+   last_name: String
+}
+
+input LoginInput {
+   email: String!
+   password: String!
+}
+
+input VerifyEmailInput {
+   userID: ID!
+   code: String!
+}
+
+extend type Query {
+   sessions(userId: ID!): [Session!]!
+}
+
+extend type Mutation {
+   signUp(input: SignUpInput!): AuthPayload!
+   login(input: LoginInput!): AuthPayload!
+   verifyEmail(input: VerifyEmailInput!): VerifyEmailPayload!
+   refreshToken(token: String!): VerifyEmailPayload!
+   terminateAllOtherSessions: Boolean!
+   terminateSession(id: ID!): Boolean!
+   logout: Boolean!
+}

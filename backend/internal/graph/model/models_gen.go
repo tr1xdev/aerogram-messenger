@@ -8,48 +8,167 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/tr1xdev/aerogram-messenger/internal/models"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 )
+
+type ChatResult interface {
+	IsChatResult()
+}
+
+type CreateChatResult interface {
+	IsCreateChatResult()
+}
+
+type DeleteChatResult interface {
+	IsDeleteChatResult()
+}
+
+type Error interface {
+	IsError()
+	GetMessage() string
+}
+
+type MessageHistoryResult interface {
+	IsMessageHistoryResult()
+}
+
+type MyChatsResult interface {
+	IsMyChatsResult()
+}
+
+type PinChatResult interface {
+	IsPinChatResult()
+}
+
+type SendMessageResult interface {
+	IsSendMessageResult()
+}
 
 type AuthPayload struct {
 	UserID *string `json:"user_id,omitempty"`
 }
 
 type Chat struct {
-	ID               string            `json:"id"`
-	Type             ChatType          `json:"type"`
-	Slug             *string           `json:"slug,omitempty"`
-	Title            string            `json:"title"`
-	PhotoURL         *string           `json:"photoUrl,omitempty"`
-	MembersCount     int               `json:"membersCount"`
-	UnreadCount      int               `json:"unreadCount"`
-	IsPinned         bool              `json:"isPinned"`
-	LastMessage      *models.Message   `json:"lastMessage,omitempty"`
-	LastReadSequence int64             `json:"lastReadSequence"`
-	Members          []*ChatMember     `json:"members,omitempty"`
-	Messages         []*models.Message `json:"messages"`
-	CreatedAt        string            `json:"createdAt"`
+	ID               string        `json:"id"`
+	Type             ChatType      `json:"type"`
+	Slug             *string       `json:"slug,omitempty"`
+	Title            string        `json:"title"`
+	PhotoURL         *string       `json:"photoUrl,omitempty"`
+	MembersCount     int           `json:"membersCount"`
+	UnreadCount      int           `json:"unreadCount"`
+	IsPinned         bool          `json:"isPinned"`
+	LastMessage      *Message      `json:"lastMessage,omitempty"`
+	LastReadSequence int64         `json:"lastReadSequence"`
+	Members          []*ChatMember `json:"members,omitempty"`
+	Messages         []*Message    `json:"messages"`
+	CreatedAt        string        `json:"createdAt"`
 }
 
-type ChatMember struct {
-	User             *models.User `json:"user"`
-	LastReadSequence int64        `json:"lastReadSequence"`
+func (Chat) IsChatResult() {}
+
+func (Chat) IsCreateChatResult() {}
+
+type ChatList struct {
+	Chats []*Chat `json:"chats"`
 }
+
+func (ChatList) IsMyChatsResult() {}
+
+type ChatMember struct {
+	User             *dbgen.User `json:"user"`
+	LastReadSequence int64       `json:"lastReadSequence"`
+}
+
+type ForbiddenError struct {
+	Message string `json:"message"`
+}
+
+func (ForbiddenError) IsChatResult() {}
+
+func (ForbiddenError) IsMyChatsResult() {}
+
+func (ForbiddenError) IsCreateChatResult() {}
+
+func (ForbiddenError) IsPinChatResult() {}
+
+func (ForbiddenError) IsDeleteChatResult() {}
+
+func (ForbiddenError) IsError()                {}
+func (this ForbiddenError) GetMessage() string { return this.Message }
+
+func (ForbiddenError) IsSendMessageResult() {}
+
+func (ForbiddenError) IsMessageHistoryResult() {}
+
+type InternalError struct {
+	Message string `json:"message"`
+}
+
+func (InternalError) IsChatResult() {}
+
+func (InternalError) IsMyChatsResult() {}
+
+func (InternalError) IsCreateChatResult() {}
+
+func (InternalError) IsPinChatResult() {}
+
+func (InternalError) IsDeleteChatResult() {}
+
+func (InternalError) IsError()                {}
+func (this InternalError) GetMessage() string { return this.Message }
+
+func (InternalError) IsSendMessageResult() {}
+
+func (InternalError) IsMessageHistoryResult() {}
 
 type LoginInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
+type Message struct {
+	ID            string      `json:"id"`
+	ChatID        string      `json:"chatId"`
+	Sender        *dbgen.User `json:"sender"`
+	Text          string      `json:"text"`
+	SentAt        string      `json:"sentAt"`
+	Sequence      int64       `json:"sequence"`
+	IsEdited      bool        `json:"isEdited"`
+	IsEncrypted   bool        `json:"isEncrypted"`
+	EncryptionIv  *string     `json:"encryptionIv,omitempty"`
+	ReplyTo       *Message    `json:"replyTo,omitempty"`
+	ForwardedFrom *Message    `json:"forwardedFrom,omitempty"`
+}
+
+func (Message) IsSendMessageResult() {}
+
+type MessageConnection struct {
+	Messages []*Message `json:"messages"`
+	HasMore  bool       `json:"hasMore"`
+}
+
+func (MessageConnection) IsMessageHistoryResult() {}
+
 type Mutation struct {
 }
+
+type NotFoundError struct {
+	Message string `json:"message"`
+}
+
+func (NotFoundError) IsChatResult() {}
+
+func (NotFoundError) IsError()                {}
+func (this NotFoundError) GetMessage() string { return this.Message }
+
+func (NotFoundError) IsMessageHistoryResult() {}
 
 type Query struct {
 }
 
 type ReadPayload struct {
-	ChatID       string `json:"chatID"`
-	UserID       string `json:"userID"`
+	ChatID       string `json:"chatId"`
+	UserID       string `json:"userId"`
 	LastSequence int64  `json:"lastSequence"`
 }
 
@@ -63,6 +182,14 @@ type SignUpInput struct {
 
 type Subscription struct {
 }
+
+type SuccessResult struct {
+	Success bool `json:"success"`
+}
+
+func (SuccessResult) IsPinChatResult() {}
+
+func (SuccessResult) IsDeleteChatResult() {}
 
 type UpdateUserInput struct {
 	FirstName        *string `json:"firstName,omitempty"`
@@ -78,6 +205,18 @@ type UserStatusPayload struct {
 	Status   string  `json:"status"`
 	LastSeen *string `json:"lastSeen,omitempty"`
 }
+
+type ValidationError struct {
+	Message string  `json:"message"`
+	Field   *string `json:"field,omitempty"`
+}
+
+func (ValidationError) IsCreateChatResult() {}
+
+func (ValidationError) IsError()                {}
+func (this ValidationError) GetMessage() string { return this.Message }
+
+func (ValidationError) IsSendMessageResult() {}
 
 type VerifyEmailInput struct {
 	UserID string `json:"userID"`

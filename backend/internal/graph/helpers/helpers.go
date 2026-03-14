@@ -1,0 +1,163 @@
+package helpers
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"reflect"
+
+	"github.com/google/uuid"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
+	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	"google.golang.org/grpc/status"
+)
+
+func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat *chatv1.Chat) (*model.Chat, error) {
+	parsedAuthID, _ := uuid.Parse(authID)
+	chatID, _ := uuid.Parse(pbChat.Id)
+
+	chatType := model.ChatTypePrivate
+	switch pbChat.Type {
+	case chatv1.ChatType_CHAT_TYPE_GROUP:
+		chatType = model.ChatTypeGroup
+	case chatv1.ChatType_CHAT_TYPE_CHANNEL:
+		chatType = model.ChatTypeChannel
+	}
+
+	dbMembers, _ := store.GetDialogMembers(ctx, chatID)
+
+	idsMap := make(map[uuid.UUID]bool)
+	var isPinned bool
+	var myReadSeq int64
+	var pReadSeq int64
+
+	for _, m := range dbMembers {
+		idsMap[m.UserID] = true
+		if m.UserID == parsedAuthID {
+			isPinned = m.IsPinned
+			myReadSeq = m.LastReadSequence
+		} else {
+			if m.LastReadSequence > pReadSeq {
+				pReadSeq = m.LastReadSequence
+			}
+		}
+	}
+
+	var lastMsg *model.Message
+	if pbChat.LastMessageId != "" {
+		if mID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
+			if m, err := store.GetMessageByID(ctx, mID); err == nil {
+				lastMsg = MapDBMessageToModel(&m)
+				idsMap[m.AuthorID] = true
+			}
+		}
+	}
+
+	userIDs := make([]uuid.UUID, 0, len(idsMap))
+	for id := range idsMap {
+		userIDs = append(userIDs, id)
+	}
+
+	dbUsers, _ := store.GetUsersByIDs(ctx, userIDs)
+
+	userMap := make(map[uuid.UUID]*dbgen.User)
+	for i := range dbUsers {
+		userMap[dbUsers[i].ID] = &dbUsers[i]
+	}
+
+	var gqlMembers []*model.ChatMember
+	for _, m := range dbMembers {
+		if u, ok := userMap[m.UserID]; ok {
+			gqlMembers = append(gqlMembers, &model.ChatMember{
+				User:             u,
+				LastReadSequence: m.LastReadSequence,
+			})
+		}
+	}
+
+	displayTitle := pbChat.Title
+	if chatType == model.ChatTypePrivate {
+		for id, u := range userMap {
+			if id.String() != authID {
+				displayTitle = u.FirstName
+				lastName := ToStringPtr(u.LastName)
+				if lastName != nil && *lastName != "" {
+					displayTitle += " " + *lastName
+				}
+				break
+			}
+		}
+	}
+
+	uCount, _ := store.CountUnreadMessages(ctx, dbgen.CountUnreadMessagesParams{
+		DialogID: chatID,
+		AuthorID: parsedAuthID,
+		Sequence: myReadSeq,
+	})
+
+	return &model.Chat{
+		ID:               pbChat.Id,
+		Type:             chatType,
+		Title:            displayTitle,
+		Slug:             &pbChat.Slug,
+		MembersCount:     int(pbChat.MembersCount),
+		Members:          gqlMembers,
+		LastMessage:      lastMsg,
+		UnreadCount:      int(uCount),
+		IsPinned:         isPinned,
+		LastReadSequence: pReadSeq,
+		CreatedAt:        "",
+	}, nil
+}
+
+func ToStringPtr(val interface{}) *string {
+	if val == nil {
+		return nil
+	}
+	if ns, ok := val.(sql.NullString); ok {
+		if !ns.Valid {
+			return nil
+		}
+		return &ns.String
+	}
+	rv := reflect.ValueOf(val)
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() == reflect.String {
+		s := rv.String()
+		return &s
+	}
+	return nil
+}
+
+func ToNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{String: "", Valid: false}
+	}
+	return sql.NullString{String: *s, Valid: true}
+}
+
+func MapGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if st, ok := status.FromError(err); ok {
+		return errors.New(st.Message())
+	}
+	return err
+}
+
+func MapDBMemberToModel(m *dbgen.DialogMember, u *dbgen.User) *model.ChatMember {
+	if m == nil {
+		return nil
+	}
+	return &model.ChatMember{
+		User:             u,
+		LastReadSequence: m.LastReadSequence,
+	}
+}

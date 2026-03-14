@@ -1,4 +1,4 @@
-package graph
+package graph_api
 
 import (
 	"context"
@@ -15,12 +15,13 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
-	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 )
 
-func NewGraphQLServer(res *Resolver, cfg *config.Config, db *database.DB, pRepo *repositories.PresenceRepository) *handler.Server {
-	schema := NewExecutableSchema(Config{Resolvers: res})
+func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.DB) *handler.Server {
+	schema := graph.NewExecutableSchema(graph.Config{Resolvers: res})
 	srv := handler.New(schema)
 
 	srv.AddTransport(transport.Websocket{
@@ -61,23 +62,6 @@ func NewGraphQLServer(res *Resolver, cfg *config.Config, db *database.DB, pRepo 
 
 			newCtx := context.WithValue(ctx, middleware.AuthUserIDKey, uid.String())
 			newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sid.String())
-
-			_ = pRepo.SetOnline(newCtx, uid, 40*time.Second)
-
-			go func(uID uuid.UUID, socketCtx context.Context) {
-				ticker := time.NewTicker(25 * time.Second)
-				defer ticker.Stop()
-
-				for {
-					select {
-					case <-ticker.C:
-						_ = pRepo.SetOnline(socketCtx, uID, 40*time.Second)
-					case <-socketCtx.Done():
-						_ = pRepo.SetOffline(context.Background(), uID)
-						return
-					}
-				}
-			}(uid, newCtx)
 
 			return newCtx, nil, nil
 		},

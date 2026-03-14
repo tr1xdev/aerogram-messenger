@@ -21,7 +21,9 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/api"
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
-	"github.com/tr1xdev/aerogram-messenger/internal/graph"
+	graph_api "github.com/tr1xdev/aerogram-messenger/internal/graph/api"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/loaders"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
@@ -55,7 +57,6 @@ func main() {
 	rdb := database.NewRedis(cfg.RedisAddr(), cfg.RedisPassword(), 0)
 	defer rdb.Close()
 
-	uRepo := repositories.NewUserRepository(db)
 	pRepo := repositories.NewPresenceRepository(rdb)
 
 	templatePath := "internal/templates/verification.html"
@@ -91,9 +92,9 @@ func main() {
 	defer conn.Close()
 
 	router := chi.NewRouter()
-	applyMiddleware(router, cfg, db, conn, pRepo)
+	applyMiddleware(router, cfg, db, conn)
 
-	gqlServer := initGraphQL(db, uRepo, rdb, pRepo, conn, cfg, geoSvc, uaSvc)
+	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc)
 	api.SetupRoutes(router, gqlServer)
 
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
@@ -133,7 +134,7 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
 }
 
-func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn, pRepo *repositories.PresenceRepository) {
+func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn) {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -142,32 +143,29 @@ func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc
 	}))
 
 	userClient := userv1.NewUserServiceClient(conn)
-	r.Use(graph.LoaderMiddleware(userClient, pRepo))
+	r.Use(loaders.LoaderMiddleware(userClient))
 	r.Use(middleware.AuthMiddleware(cfg, db))
 }
 
 func initGraphQL(
 	db *database.DB,
-	uRepo *repositories.UserRepository,
 	rdb *redis.Client,
-	pRepo *repositories.PresenceRepository,
 	conn *grpc.ClientConn,
 	cfg *config.Config,
 	geoSvc *geo_svc.Service,
 	uaSvc *ua_svc.Service,
 ) *handler.Server {
-	resolver := graph.NewResolver(
+	resolver := resolvers.NewResolver(
 		db,
-		uRepo,
+		db.Queries,
 		authv1.NewAuthServiceClient(conn),
 		chatv1.NewChatServiceClient(conn),
 		messagesv1.NewMessagesServiceClient(conn),
 		userv1.NewUserServiceClient(conn),
 		rdb,
-		pRepo,
 		geoSvc,
 		uaSvc,
 	)
 
-	return graph.NewGraphQLServer(resolver, cfg, db, pRepo)
+	return graph_api.NewGraphQLServer(resolver, cfg, db)
 }

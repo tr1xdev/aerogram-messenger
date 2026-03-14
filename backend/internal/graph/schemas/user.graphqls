@@ -1,0 +1,40 @@
+type User {
+   id: ID!
+   email: String!
+   first_name: String!
+   last_name: String
+   username: String
+   status: String!
+   publicKey: String
+   encryptedPrivKey: String
+   encryptionIv: String
+}
+
+input UpdateUserInput {
+   firstName: String
+   lastName: String
+   username: String
+   publicKey: String
+   encryptedPrivKey: String
+   encryptionIv: String
+}
+
+type UserStatusPayload {
+   userId: ID!
+   status: String!
+   lastSeen: String
+}
+
+extend type Query {
+   me: User!
+   getUser(id: ID!): User!
+   searchUsers(username: String!): [User!]!
+}
+
+extend type Mutation {
+   updateUser(input: UpdateUserInput!): User!
+}
+
+extend type Subscription {
+   userStatusChanged(chatId: ID!): UserStatusPayload!
+}
