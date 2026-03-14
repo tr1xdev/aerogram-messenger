@@ -33,7 +33,7 @@ dev-frontend:
 
 test:
 	@echo "$(GREEN)Running all tests...$(RESET)"
-	@cd backend && go test ./...
+	@cd backend && go test -p 1 -count=1 ./...
 
 test-services:
 	@echo "$(GREEN)Running service layer tests...$(RESET)"

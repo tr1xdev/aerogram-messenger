@@ -1,5 +1,5 @@
 schema:
-   - internal/graph/*.graphqls
+   - internal/graph/schemas/*.graphqls
 
 exec:
    package: graph
@@ -11,38 +11,42 @@ model:
    package: model
 
 resolver:
-   package: graph
    layout: follow-schema
-   dir: internal/graph
-   filename_template: "{name}.resolvers.go"
-
-autobind:
-   - "github.com/tr1xdev/aerogram-messenger/internal/models"
-   - "github.com/tr1xdev/aerogram-messenger/internal/schemas"
+   dir: internal/graph/resolvers
+   package: resolvers
+   filename_template: "{name}.go"
 
 models:
-   Session:
-      model: github.com/tr1xdev/aerogram-messenger/internal/models.Session
-      fields:
-         device:
-            resolver: true
-         location:
-            resolver: true
-         isCurrent:
-            resolver: true
+   ID:
+      model:
+         - github.com/99designs/gqlgen/graphql.ID
+   Long:
+      model:
+         - github.com/99designs/gqlgen/graphql.Int64
+
    User:
+      model: github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen.User
       fields:
-         status:
-            resolver: true
-         encryptedPrivKey:
-            resolver: true
-         encryptionIv:
-            resolver: true
+         status: { resolver: true }
+         encryptedPrivKey: { resolver: true }
+         encryptionIv: { resolver: true }
+
+   Session:
+      model: github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen.Session
+      fields:
+         device: { resolver: true }
+         location: { resolver: true }
+         isCurrent: { resolver: true }
+
    Message:
       fields:
-         sender:
-            resolver: true
-         sequence:
-            resolver: true
-   Long:
-      model: github.com/99designs/gqlgen/graphql.Int64
+         sender: { resolver: true }
+
+   Chat:
+      fields:
+         members: { resolver: false }
+         lastMessage: { resolver: false }
+
+   ChatMember:
+      fields:
+         user: { resolver: false }
