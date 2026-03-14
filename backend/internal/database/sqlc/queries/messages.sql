@@ -54,3 +54,9 @@ SET last_read_sequence = (
     WHERE m.dialog_id = dialog_members.dialog_id
 ), updated_at = NOW()
 WHERE dialog_members.dialog_id = $1 AND dialog_members.user_id = $2;
+
+-- name: GetLastChatMessage :one
+SELECT * FROM messages
+WHERE dialog_id = $1 AND is_deleted = false
+ORDER BY sequence DESC
+LIMIT 1;

@@ -151,9 +151,20 @@ func (q *Queries) CreateDialogSettings(ctx context.Context, arg CreateDialogSett
 	return err
 }
 
+const decrementMembersCount = `-- name: DecrementMembersCount :exec
+UPDATE dialogs
+SET members_count = members_count - 1, updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) DecrementMembersCount(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, decrementMembersCount, id)
+	return err
+}
+
 const deleteDialog = `-- name: DeleteDialog :exec
 UPDATE dialogs
-SET deleted_at = NOW(), is_active = false
+SET deleted_at = NOW(), is_active = false, updated_at = NOW()
 WHERE id = $1
 `
 
@@ -472,6 +483,35 @@ func (q *Queries) HideDialogMember(ctx context.Context, arg HideDialogMemberPara
 	return err
 }
 
+const incrementMembersCount = `-- name: IncrementMembersCount :exec
+UPDATE dialogs
+SET members_count = members_count + 1, updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) IncrementMembersCount(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, incrementMembersCount, id)
+	return err
+}
+
+const isDialogCreator = `-- name: IsDialogCreator :one
+SELECT EXISTS (
+    SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2
+)
+`
+
+type IsDialogCreatorParams struct {
+	ID        uuid.UUID     `json:"id"`
+	CreatorID uuid.NullUUID `json:"creator_id"`
+}
+
+func (q *Queries) IsDialogCreator(ctx context.Context, arg IsDialogCreatorParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, isDialogCreator, arg.ID, arg.CreatorID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const pinDialog = `-- name: PinDialog :exec
 UPDATE dialog_members
 SET is_pinned = $3, updated_at = NOW()
@@ -489,6 +529,21 @@ func (q *Queries) PinDialog(ctx context.Context, arg PinDialogParams) error {
 	return err
 }
 
+const removeDialogMember = `-- name: RemoveDialogMember :exec
+DELETE FROM dialog_members
+WHERE dialog_id = $1 AND user_id = $2
+`
+
+type RemoveDialogMemberParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) RemoveDialogMember(ctx context.Context, arg RemoveDialogMemberParams) error {
+	_, err := q.db.ExecContext(ctx, removeDialogMember, arg.DialogID, arg.UserID)
+	return err
+}
+
 const unhideDialogForMembers = `-- name: UnhideDialogForMembers :exec
 UPDATE dialog_members
 SET is_hidden = false, updated_at = NOW()
@@ -497,5 +552,22 @@ WHERE dialog_id = $1
 
 func (q *Queries) UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, unhideDialogForMembers, dialogID)
+	return err
+}
+
+const updateMemberPinStatus = `-- name: UpdateMemberPinStatus :exec
+UPDATE dialog_members
+SET is_pinned = $3, updated_at = NOW()
+WHERE dialog_id = $1 AND user_id = $2
+`
+
+type UpdateMemberPinStatusParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+	IsPinned bool      `json:"is_pinned"`
+}
+
+func (q *Queries) UpdateMemberPinStatus(ctx context.Context, arg UpdateMemberPinStatusParams) error {
+	_, err := q.db.ExecContext(ctx, updateMemberPinStatus, arg.DialogID, arg.UserID, arg.IsPinned)
 	return err
 }

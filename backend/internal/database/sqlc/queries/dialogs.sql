@@ -89,13 +89,37 @@ WHERE dm.user_id = $1
   AND dm.is_pinned = true
   AND d.deleted_at IS NULL;
 
+-- name: UpdateMemberPinStatus :exec
+UPDATE dialog_members
+SET is_pinned = $3, updated_at = NOW()
+WHERE dialog_id = $1 AND user_id = $2;
+
 -- name: DeleteDialog :exec
 UPDATE dialogs
-SET deleted_at = NOW(), is_active = false
+SET deleted_at = NOW(), is_active = false, updated_at = NOW()
 WHERE id = $1;
 
 -- name: HardDeleteDialog :exec
 DELETE FROM dialogs WHERE id = $1;
+
+-- name: RemoveDialogMember :exec
+DELETE FROM dialog_members
+WHERE dialog_id = $1 AND user_id = $2;
+
+-- name: IncrementMembersCount :exec
+UPDATE dialogs
+SET members_count = members_count + 1, updated_at = NOW()
+WHERE id = $1;
+
+-- name: DecrementMembersCount :exec
+UPDATE dialogs
+SET members_count = members_count - 1, updated_at = NOW()
+WHERE id = $1;
+
+-- name: IsDialogCreator :one
+SELECT EXISTS (
+    SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2
+);
 
 -- name: GetPrivateDialogByMembers :one
 SELECT d.*

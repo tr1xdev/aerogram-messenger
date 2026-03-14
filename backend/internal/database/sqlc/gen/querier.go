@@ -23,6 +23,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeactivateAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	DeactivateSession(ctx context.Context, id uuid.UUID) error
+	DecrementMembersCount(ctx context.Context, id uuid.UUID) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]Message, error)
@@ -30,6 +31,7 @@ type Querier interface {
 	GetDialogByUsername(ctx context.Context, username sql.NullString) (Dialog, error)
 	GetDialogMember(ctx context.Context, arg GetDialogMemberParams) (DialogMember, error)
 	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]DialogMember, error)
+	GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (Message, error)
 	GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int64, error)
 	GetMessageByID(ctx context.Context, id uuid.UUID) (Message, error)
 	GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateDialogByMembersParams) (Dialog, error)
@@ -42,14 +44,18 @@ type Querier interface {
 	GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]User, error)
 	HardDeleteDialog(ctx context.Context, id uuid.UUID) error
 	HideDialogMember(ctx context.Context, arg HideDialogMemberParams) error
+	IncrementMembersCount(ctx context.Context, id uuid.UUID) error
+	IsDialogCreator(ctx context.Context, arg IsDialogCreatorParams) (bool, error)
 	MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error
 	PinDialog(ctx context.Context, arg PinDialogParams) error
+	RemoveDialogMember(ctx context.Context, arg RemoveDialogMemberParams) error
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
 	SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString) ([]User, error)
 	SoftDeleteMessage(ctx context.Context, arg SoftDeleteMessageParams) error
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
+	UpdateMemberPinStatus(ctx context.Context, arg UpdateMemberPinStatusParams) error
 	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error
 	UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error)
 	UpdateSessionActivity(ctx context.Context, id uuid.UUID) error

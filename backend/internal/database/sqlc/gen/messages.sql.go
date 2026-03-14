@@ -138,6 +138,38 @@ func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) 
 	return items, nil
 }
 
+const getLastChatMessage = `-- name: GetLastChatMessage :one
+SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, media_url, media_type, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages
+WHERE dialog_id = $1 AND is_deleted = false
+ORDER BY sequence DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (Message, error) {
+	row := q.db.QueryRowContext(ctx, getLastChatMessage, dialogID)
+	var i Message
+	err := row.Scan(
+		&i.ID,
+		&i.DialogID,
+		&i.AuthorID,
+		&i.Content,
+		&i.IsEncrypted,
+		&i.EncryptionIv,
+		&i.Sequence,
+		&i.ReplyToID,
+		&i.ForwardFromID,
+		&i.MediaUrl,
+		&i.MediaType,
+		&i.IsEdited,
+		&i.IsDeleted,
+		&i.IsSystem,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const getLastSequence = `-- name: GetLastSequence :one
 SELECT COALESCE(MAX(sequence), 0)::BIGINT FROM messages
 WHERE dialog_id = $1
