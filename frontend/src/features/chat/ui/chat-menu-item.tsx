@@ -16,7 +16,12 @@ import { BsFillPinFill } from "react-icons/bs";
 import { Trash2, CheckCircle2, BellOff, PinOff } from "lucide-react";
 import { useChatActions } from "../lib/use-messages";
 import { DeleteChatDialog } from "./delete-chat-dialog";
-import type { Chat } from "@/entities/chat/model/types";
+import type {
+  Chat,
+  ChatMember,
+  Message,
+  User,
+} from "@/entities/chat/model/types";
 
 interface ChatMenuItemProps {
   chat: Chat;
@@ -28,42 +33,43 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false);
   const { togglePin, markAsRead, deleteChat } = useChatActions(chat.id);
 
-  const otherMember = useMemo(
-    () => chat.members?.find((m) => m.user.id !== myId),
+  const otherMember: ChatMember | undefined = useMemo(
+    (): ChatMember | undefined =>
+      chat.members?.find((m: ChatMember): boolean => m.user.id !== myId),
     [chat.members, myId],
   );
 
-  const otherUser = otherMember?.user;
+  const otherUser: User | undefined = otherMember?.user;
 
-  const displayName = useMemo((): string => {
+  const displayName: string = useMemo((): string => {
     if (otherUser) {
-      const first = otherUser.first_name?.trim() || "";
-      const last = otherUser.last_name?.trim() || "";
-      const full = `${first} ${last}`.trim();
+      const first: string = otherUser.first_name?.trim() || "";
+      const last: string = otherUser.last_name?.trim() || "";
+      const full: string = `${first} ${last}`.trim();
       return full || otherUser.username || "Chat";
     }
     return chat.title || "Chat";
   }, [otherUser, chat.title]);
 
-  const initial = useMemo(
+  const initial: string = useMemo(
     (): string => (displayName.length > 0 ? displayName[0].toUpperCase() : "?"),
     [displayName],
   );
 
-  const lastMessage = chat.lastMessage;
-  const isMe = lastMessage?.sender.id === myId;
-  const sender = lastMessage?.sender;
-  const isOnline = otherUser?.status === "online";
+  const lastMessage: Message | undefined = chat.lastMessage ?? undefined;
+  const isMe: boolean = lastMessage?.sender.id === myId;
+  const sender: User | undefined = lastMessage?.sender;
+  const isOnline: boolean = otherUser?.status === "online";
 
-  const showSenderName =
+  const showSenderName: boolean =
     chat.type === "GROUP" || chat.type === "CHANNEL" || isMe;
 
-  const senderName = useMemo((): string | null => {
+  const senderName: string | null = useMemo((): string | null => {
     if (!showSenderName || !sender) return null;
     if (isMe) return "You";
-    const first = sender.first_name?.trim() || "";
-    const last = sender.last_name?.trim() || "";
-    const full = `${first} ${last}`.trim();
+    const first: string = sender.first_name?.trim() || "";
+    const last: string = sender.last_name?.trim() || "";
+    const full: string = `${first} ${last}`.trim();
     return full || sender.username || null;
   }, [showSenderName, sender, isMe]);
 

@@ -28,6 +28,7 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
   });
 
   const user = data?.getUser;
+
   const handleBack = (): void => {
     router.history.back();
   };
@@ -80,7 +81,7 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
             <div className="flex flex-col items-center py-8">
               <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
                 <AvatarImage
-                  src={user.photoUrl || ""}
+                  src={user.photoUrl ?? undefined}
                   className="object-cover"
                 />
                 <AvatarFallback className="text-4xl bg-primary/10 text-primary font-bold uppercase">
@@ -106,11 +107,13 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
             </div>
 
             <div className="rounded-2xl border border-border/40 bg-muted/5 overflow-hidden">
-              <InfoItem label="Bio" value={user.bio || "None"} isBio />
+              <InfoItem label="Bio" value={user.bio ?? "None"} isBio />
               <InfoItem
                 label="Username"
-                value={`@${user.username}`}
-                onClick={() => handleCopy(user.username, "Username")}
+                value={user.username ? `@${user.username}` : "None"}
+                onClick={() =>
+                  handleCopy(user.username ?? undefined, "Username")
+                }
               />
               <InfoItem
                 label="Email"

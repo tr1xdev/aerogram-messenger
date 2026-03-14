@@ -50,7 +50,9 @@ interface ChatFolder {
 }
 
 interface MyChatsData {
-  myChats: Chat[];
+  myChats: {
+    chats: Chat[];
+  };
 }
 
 export function AppSidebar() {
@@ -81,7 +83,13 @@ export function AppSidebar() {
     (): User | undefined => userData?.me as User | undefined,
     [userData],
   );
-  const chats = useMemo((): Chat[] => chatsData?.myChats ?? [], [chatsData]);
+
+  const chats = useMemo((): Chat[] => {
+    if (Array.isArray(chatsData?.myChats?.chats)) {
+      return chatsData.myChats.chats;
+    }
+    return [];
+  }, [chatsData]);
 
   const fullName = useMemo((): string => {
     if (!user) return "";
@@ -183,17 +191,21 @@ export function AppSidebar() {
     try {
       const newChat: Chat | undefined = await createChat(userId);
       if (newChat) {
-        const existing: MyChatsData | null = client.readQuery<MyChatsData>({
+        const existing = client.readQuery<MyChatsData>({
           query: GET_MY_CHATS,
         });
-        if (existing) {
+        if (existing?.myChats) {
           client.writeQuery<MyChatsData>({
             query: GET_MY_CHATS,
             data: {
-              myChats: [
-                newChat,
-                ...existing.myChats.filter((c: Chat) => c.id !== newChat.id),
-              ],
+              myChats: {
+                chats: [
+                  newChat,
+                  ...existing.myChats.chats.filter(
+                    (c: Chat) => c.id !== newChat.id,
+                  ),
+                ],
+              },
             },
           });
         }

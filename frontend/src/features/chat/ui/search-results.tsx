@@ -24,9 +24,10 @@ export function SearchResults({
 
   const localUserIds: Set<string> = new Set(
     localChats.flatMap((c: Chat) =>
-      c.members.map((m: ChatMember) => m.user.id),
+      (c.members ?? []).map((m: ChatMember) => m.user.id),
     ),
   );
+
   const uniqueGlobalUsers: User[] = globalUsers.filter(
     (u: User) => !localUserIds.has(u.id),
   );
@@ -37,7 +38,6 @@ export function SearchResults({
   const displayQuery: string =
     query.length > 128 ? `${query.substring(0, 128)}...` : query;
 
-  // Если не грузимся и результатов НЕТ
   if (!isLoading && !hasLocal && !hasGlobal) {
     return (
       <div className="relative w-full h-full">
@@ -87,12 +87,12 @@ export function SearchResults({
                 {localChats.map((chat: Chat) => (
                   <button
                     key={chat.id}
-                    onClick={() => onSelectChat(chat.id)}
+                    onClick={(): void => onSelectChat(chat.id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
                   >
                     <Avatar className="h-12 w-12 border border-border/40">
                       <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                        {chat.title[0]}
+                        {chat.title?.[0]?.toUpperCase() || "?"}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -119,7 +119,7 @@ export function SearchResults({
                 {uniqueGlobalUsers.map((user: User) => (
                   <button
                     key={user.id}
-                    onClick={() => onSelectUser(user.id)}
+                    onClick={(): void => onSelectUser(user.id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
                   >
                     <Avatar className="h-12 w-12 border border-border/40">

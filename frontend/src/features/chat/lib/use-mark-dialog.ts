@@ -5,10 +5,21 @@ import type { Chat, Message } from "@/entities/chat/model/types";
 import { GET_MY_CHATS } from "../api/chat.gql";
 
 const MARK_DIALOG_AS_READ = gql`
-  mutation MarkDialogAsRead($chatID: String!, $lastSequence: Long!) {
-    markDialogAsRead(chatID: $chatID, lastSequence: $lastSequence)
+  mutation MarkDialogAsRead($chatId: String!, $lastSequence: Long!) {
+    markDialogAsRead(chatId: $chatId, lastSequence: $lastSequence)
   }
 `;
+
+interface MyChatsData {
+  myChats: {
+    __typename: string;
+    chats: Chat[];
+  };
+}
+
+interface MarkReadResponse {
+  markDialogAsRead: boolean;
+}
 
 export function useMarkDialog(
   chatId: string,
@@ -18,7 +29,7 @@ export function useMarkDialog(
 ) {
   const client = useApolloClient();
   const lastMarkedSeqRef = useRef<number | null>(null);
-  const [markDialog] = useMutation(MARK_DIALOG_AS_READ);
+  const [markDialog] = useMutation<MarkReadResponse>(MARK_DIALOG_AS_READ);
 
   const checkAndMarkRead = useCallback(() => {
     if (
@@ -50,21 +61,25 @@ export function useMarkDialog(
     lastMarkedSeqRef.current = seq;
 
     markDialog({
-      variables: { chatID: chatId, lastSequence: seq },
-      onCompleted: () => {
+      variables: { chatId: chatId, lastSequence: seq },
+      onCompleted: (data: MarkReadResponse) => {
+        if (!data.markDialogAsRead) return;
+
         client.cache.modify({
           id: client.cache.identify({ __typename: "Chat", id: chatId }),
           fields: {
-            unreadCount: () => 0,
-            lastReadSequence: (prev: number) => Math.max(prev || 0, seq),
+            unreadCount: (): number => 0,
+            lastReadSequence: (prev: number): number =>
+              Math.max(prev || 0, seq),
           },
         });
 
-        const sidebar = client.readQuery<{ myChats: Chat[] }>({
+        const sidebar = client.readQuery<MyChatsData>({
           query: GET_MY_CHATS,
         });
-        if (sidebar) {
-          const updated = sidebar.myChats.map((c) =>
+
+        if (sidebar?.myChats?.__typename === "ChatList") {
+          const updated = sidebar.myChats.chats.map((c: Chat) =>
             c.id === chatId
               ? {
                   ...c,
@@ -73,9 +88,14 @@ export function useMarkDialog(
                 }
               : c,
           );
-          client.writeQuery({
+          client.writeQuery<MyChatsData>({
             query: GET_MY_CHATS,
-            data: { myChats: updated },
+            data: {
+              myChats: {
+                ...sidebar.myChats,
+                chats: updated,
+              },
+            },
           });
         }
       },

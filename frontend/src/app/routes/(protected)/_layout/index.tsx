@@ -1,7 +1,13 @@
+import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
 import { ChatMenuItem } from "@/features/chat/ui/chat-menu-item";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Chat } from "@/entities/chat/model/types";
+
+interface MyChatsResponse {
+  chats: Chat[];
+}
 
 export const Route = createFileRoute("/(protected)/_layout/")({
   component: IndexComponent,
@@ -10,7 +16,20 @@ export const Route = createFileRoute("/(protected)/_layout/")({
 function IndexComponent() {
   const { data: chatsData, loading } = useMyChats();
   const { data: userData } = useMe();
-  const chats = chatsData?.myChats ?? [];
+
+  const chats: Chat[] = useMemo((): Chat[] => {
+    const rawData: MyChatsResponse | Chat[] | undefined = chatsData?.myChats as
+      | MyChatsResponse
+      | Chat[]
+      | undefined;
+
+    if (!rawData) return [];
+    if (Array.isArray(rawData)) return rawData;
+    if ("chats" in rawData && Array.isArray(rawData.chats))
+      return rawData.chats;
+
+    return [];
+  }, [chatsData]);
 
   return (
     <div className="h-full w-full">
@@ -22,7 +41,7 @@ function IndexComponent() {
           {loading
             ? Array(6)
                 .fill(0)
-                .map((_, i) => (
+                .map((_, i: number) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-4">
                     <Skeleton className="h-12 w-12 rounded-full" />
                     <div className="flex-1 space-y-2">
@@ -31,7 +50,7 @@ function IndexComponent() {
                     </div>
                   </div>
                 ))
-            : chats.map((chat) => (
+            : chats.map((chat: Chat) => (
                 <ChatMenuItem
                   key={chat.id}
                   chat={chat}

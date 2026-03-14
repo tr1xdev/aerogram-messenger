@@ -11,46 +11,77 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Loader2 } from "lucide-react";
-import { GET_MY_CHATS } from "../api/chat.gql";
-import type { User, Chat } from "@/entities/chat/model/types";
 import { FiEdit2 } from "react-icons/fi";
+import { GET_MY_CHATS } from "../api/chat.gql";
+import type { User, Chat, ChatMember } from "@/entities/chat/model/types";
+
+interface MyChatsResponse {
+  myChats: {
+    __typename: string;
+    chats: Chat[];
+  };
+}
 
 export function NewChatDialog() {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+  const [open, setOpen] = useState<boolean>(false);
+  const [search, setSearch] = useState<string>("");
+  const [isCreating, setIsCreating] = useState<boolean>(false);
   const { data, loading: isSearching } = useSearchUsers(search);
   const { createChat } = useChatActions("");
   const navigate = useNavigate();
   const client = useApolloClient();
 
-  const users = data?.searchUsers || [];
+  const users: User[] = data?.searchUsers || [];
 
-  const handleCreate = async (userID: string) => {
+  const handleCreate = async (userID: string): Promise<void> => {
     if (isCreating) return;
     setIsCreating(true);
 
     try {
-      const newChat = await createChat(userID);
+      const newChat: Chat | undefined = await createChat(userID);
       if (newChat) {
-        const existingData = client.readQuery<{ myChats: Chat[] }>({
+        const existingData: MyChatsResponse | null = client.readQuery({
           query: GET_MY_CHATS,
         });
 
-        if (existingData) {
-          const alreadyExists = existingData.myChats.some(
-            (c) => c.id === newChat.id,
+        const completeChat: Chat = {
+          ...newChat,
+          isPinned: false,
+          photoUrl: newChat.photoUrl ?? null,
+          lastMessage: newChat.lastMessage ?? null,
+          members:
+            newChat.members?.map(
+              (m: ChatMember): ChatMember => ({
+                ...m,
+                user: {
+                  ...m.user,
+                  email: m.user.email ?? "",
+                  status: m.user.status ?? "OFFLINE",
+                },
+              }),
+            ) || [],
+        };
+
+        if (existingData?.myChats?.chats) {
+          const chatsArray: Chat[] = existingData.myChats.chats;
+          const alreadyExists: boolean = chatsArray.some(
+            (c: Chat): boolean => c.id === completeChat.id,
           );
+
           if (!alreadyExists) {
             client.writeQuery({
               query: GET_MY_CHATS,
               data: {
-                myChats: [newChat, ...existingData.myChats],
+                myChats: {
+                  ...existingData.myChats,
+                  chats: [completeChat, ...chatsArray],
+                },
               },
             });
           }
@@ -58,7 +89,7 @@ export function NewChatDialog() {
 
         setOpen(false);
         setSearch("");
-        navigate({ to: "/chat/$chatId", params: { chatId: newChat.id } });
+        navigate({ to: "/chat/$chatId", params: { chatId: completeChat.id } });
       }
     } catch (error: unknown) {
       console.error("Failed to create chat:", error);
@@ -71,7 +102,7 @@ export function NewChatDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="icon" variant="ghost" className="h-9 w-9 rounded-full">
-          <FiEdit2 className="h-6 w-6" />
+          <FiEdit2 className="h-5 w-5" />
         </Button>
       </DialogTrigger>
 
@@ -80,6 +111,9 @@ export function NewChatDialog() {
           <DialogTitle className="text-base font-semibold">
             New chat
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Search for users to start a new conversation.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="px-4 py-3 border-b">
@@ -87,7 +121,9 @@ export function NewChatDialog() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>): void =>
+                setSearch(e.target.value)
+              }
               placeholder="Search users"
               className="pl-9 h-9"
               disabled={isCreating}
@@ -109,7 +145,8 @@ export function NewChatDialog() {
             users.map((user: User) => (
               <button
                 key={user.id}
-                onClick={() => handleCreate(user.id)}
+                type="button"
+                onClick={(): Promise<void> => handleCreate(user.id)}
                 disabled={isCreating}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/70 transition text-left disabled:opacity-50"
               >
