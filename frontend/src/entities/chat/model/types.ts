@@ -6,11 +6,11 @@ export interface User {
   username?: string;
   photoUrl?: string;
   status: string;
-  bio?: string;
+  bio?: string | null;
   publicKey?: string;
   encryptedPrivKey?: string;
   encryptionIv?: string;
-  lastSeen?: string;
+  lastSeen?: string | null;
 }
 
 export interface Message {
@@ -39,14 +39,14 @@ export interface Chat {
   id: string;
   type: ChatType;
   title: string;
-  photoUrl?: string;
+  photoUrl?: string | null;
   members: ChatMember[];
-  lastMessage?: Message;
+  lastMessage?: Message | null;
   unreadCount: number;
   lastReadSequence: number;
+  isPinned: boolean;
   messages?: Message[];
   createdAt: string;
-  isPinned: boolean;
 }
 
 export interface Session {
