@@ -10,7 +10,7 @@ import {
 import type { Reference, FetchResult, Operation } from "@apollo/client";
 import { SetContextLink } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
-import { createClient, type Message } from "graphql-ws";
+import { createClient, type Message as WsMessage } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { REFRESH_TOKEN_MUTATION } from "@/features/auth/api/auth.gql";
 import { useConnectionStore } from "@/store/connection";
@@ -241,7 +241,7 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
       },
 
       message: (msg: unknown) => {
-        const type: string = (msg as Message).type || "data";
+        const type: string = (msg as WsMessage).type || "data";
         console.groupCollapsed(
           `%c[WS]%c message: ${type}`,
           logStyle("#ffca28"),
@@ -278,26 +278,25 @@ export const client: ApolloClient = new ApolloClient({
               incoming: MessageConnection,
               { readField },
             ): MessageConnection {
-              const existingMessages: Reference[] = existing?.messages || [];
-              const incomingMessages: Reference[] = incoming.messages || [];
+              const mergedMap = new Map<string, Reference>();
 
-              const mergedMessages: Reference[] = [...existingMessages];
-              const existingIds: Set<string> = new Set(
-                mergedMessages.map(
-                  (r: Reference) => readField<string>("id", r) as string,
-                ),
-              );
+              if (existing?.messages) {
+                existing.messages.forEach((ref: Reference) => {
+                  const id: string | undefined = readField<string>("id", ref);
+                  if (id) mergedMap.set(id, ref);
+                });
+              }
 
-              incomingMessages.forEach((r: Reference) => {
-                const id: string | undefined = readField<string>("id", r);
-                if (id && !existingIds.has(id)) {
-                  mergedMessages.push(r);
-                }
-              });
+              if (incoming.messages) {
+                incoming.messages.forEach((ref: Reference) => {
+                  const id: string | undefined = readField<string>("id", ref);
+                  if (id) mergedMap.set(id, ref);
+                });
+              }
 
               return {
                 ...incoming,
-                messages: mergedMessages,
+                messages: Array.from(mergedMap.values()),
               };
             },
           },
