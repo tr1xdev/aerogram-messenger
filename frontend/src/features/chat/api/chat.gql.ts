@@ -1,8 +1,57 @@
 import { gql } from "@apollo/client";
 
-/**
- * Message operations
- */
+// --- Fragments ---
+
+const USER_FIELDS = gql`
+  fragment UserFields on User {
+    id
+    username
+    firstName
+    lastName
+    email
+    status
+    publicKey
+    photoUrl
+  }
+`;
+
+const MESSAGE_FIELDS = gql`
+  fragment MessageFields on Message {
+    id
+    chatId
+    text
+    sentAt
+    sequence
+    isEdited
+    isEncrypted
+    encryptionIv
+    sender {
+      id
+      username
+      firstName
+      lastName
+    }
+    replyTo {
+      id
+      text
+      isEncrypted
+      sender {
+        id
+        firstName
+      }
+    }
+    forwardedFrom {
+      id
+      text
+      sender {
+        id
+        firstName
+      }
+    }
+  }
+`;
+
+// --- Message Operations ---
 
 export const SEND_MESSAGE = gql`
   mutation SendMessage(
@@ -41,16 +90,11 @@ export const SEND_MESSAGE = gql`
           isEncrypted
           sender {
             id
-            firstName
+            firstName # Добавлено, чтобы не было Missing field 'sender'
           }
         }
         forwardedFrom {
           id
-          text
-          sender {
-            id
-            firstName
-          }
         }
       }
       ... on ForbiddenError {
@@ -86,15 +130,7 @@ export const UPDATE_MESSAGE = gql`
   }
 `;
 
-export const EDIT_MESSAGE = gql`
-  mutation EditMessage($id: ID!, $text: String!) {
-    editMessage(id: $id, text: $text) {
-      id
-      text
-      isEdited
-    }
-  }
-`;
+export const EDIT_MESSAGE = UPDATE_MESSAGE;
 
 export const DELETE_MESSAGE = gql`
   mutation DeleteMessage($id: ID!) {
@@ -102,9 +138,7 @@ export const DELETE_MESSAGE = gql`
   }
 `;
 
-/**
- * Chat and Dialog operations
- */
+// --- Chat Operations ---
 
 export const GET_MY_CHATS = gql`
   query GetMyChats {
@@ -128,10 +162,8 @@ export const GET_MY_CHATS = gql`
             sequence
             isEdited
             isEncrypted
-            encryptionIv
             sender {
               id
-              firstName
               username
             }
           }
@@ -164,13 +196,7 @@ export const GET_CHAT_BY_ID = gql`
         members {
           lastReadSequence
           user {
-            id
-            email
-            firstName
-            lastName
-            username
-            status
-            publicKey
+            ...UserFields
           }
         }
       }
@@ -185,6 +211,7 @@ export const GET_CHAT_BY_ID = gql`
       }
     }
   }
+  ${USER_FIELDS}
 `;
 
 export const GET_CHAT_DETAILS = gql`
@@ -251,7 +278,7 @@ export const DELETE_CHAT = gql`
 `;
 
 export const MARK_DIALOG_AS_READ = gql`
-  mutation MarkDialogAsRead($chatId: String!, $lastSequence: Int!) {
+  mutation MarkDialogAsRead($chatId: String!, $lastSequence: Long!) {
     markDialogAsRead(chatId: $chatId, lastSequence: $lastSequence)
   }
 `;
@@ -287,9 +314,7 @@ export const CREATE_DIRECT_CHAT = gql`
   }
 `;
 
-/**
- * History and Search
- */
+// --- History and Search ---
 
 export const GET_MESSAGE_HISTORY = gql`
   query GetMessageHistory($chatId: ID!, $limit: Int!, $offset: Int!) {
@@ -297,40 +322,7 @@ export const GET_MESSAGE_HISTORY = gql`
       __typename
       ... on MessageConnection {
         messages {
-          id
-          chatId
-          text
-          sentAt
-          sequence
-          isEdited
-          isEncrypted
-          encryptionIv
-          replyTo {
-            id
-            text
-            isEncrypted
-            sender {
-              id
-              firstName
-            }
-          }
-          forwardedFrom {
-            id
-            text
-            sender {
-              id
-              firstName
-            }
-          }
-          sender {
-            id
-            email
-            firstName
-            lastName
-            username
-            status
-            publicKey
-          }
+          ...MessageFields
         }
         hasMore
       }
@@ -345,40 +337,29 @@ export const GET_MESSAGE_HISTORY = gql`
       }
     }
   }
+  ${MESSAGE_FIELDS}
 `;
 
 export const SEARCH_USERS = gql`
   query SearchUsers($username: String!) {
     searchUsers(username: $username) {
-      id
-      email
-      username
-      firstName
-      lastName
-      status
-      publicKey
+      ...UserFields
     }
   }
+  ${USER_FIELDS}
 `;
 
-/**
- * User and Profile
- */
+// --- User and Profile ---
 
 export const GET_ME = gql`
   query GetMe {
     me {
-      id
-      email
-      firstName
-      lastName
-      username
-      status
-      publicKey
+      ...UserFields
       encryptedPrivKey
       encryptionIv
     }
   }
+  ${USER_FIELDS}
 `;
 
 export const GET_USER_BY_ID = gql`
@@ -401,20 +382,15 @@ export const GET_USER_BY_ID = gql`
 export const UPDATE_PROFILE = gql`
   mutation UpdateUser($input: UpdateUserInput!) {
     updateUser(input: $input) {
-      id
-      firstName
-      lastName
-      username
-      publicKey
+      ...UserFields
       encryptedPrivKey
       encryptionIv
     }
   }
+  ${USER_FIELDS}
 `;
 
-/**
- * Session management
- */
+// --- Session Management ---
 
 export const GET_SESSIONS = gql`
   query GetSessions($userId: ID!) {
@@ -448,9 +424,7 @@ export const LOGOUT = gql`
   }
 `;
 
-/**
- * Events and Subscriptions
- */
+// --- Events and Subscriptions ---
 
 export const SEND_TYPING_EVENT = gql`
   mutation SendTypingEvent($chatID: String!) {
@@ -469,31 +443,23 @@ export const MESSAGE_SUBSCRIPTION = gql`
       isEdited
       isEncrypted
       encryptionIv
+      sender {
+        id
+        username
+        firstName
+        lastName
+      }
       replyTo {
         id
         text
         isEncrypted
         sender {
           id
-          firstName
+          firstName # Добавлено
         }
       }
       forwardedFrom {
         id
-        text
-        sender {
-          id
-          firstName
-        }
-      }
-      sender {
-        id
-        email
-        username
-        firstName
-        lastName
-        status
-        publicKey
       }
     }
   }
@@ -546,9 +512,6 @@ export const CHAT_CREATED_SUBSCRIPTION = gql`
 
 export const CHAT_DELETED_SUBSCRIPTION = gql`
   subscription OnChatDeleted($userId: ID!) {
-    chatDeleted(userId: $userId) {
-      chatId
-      forEveryone
-    }
+    chatDeleted(userId: $userId)
   }
 `;
