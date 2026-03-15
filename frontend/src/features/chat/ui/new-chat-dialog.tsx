@@ -152,12 +152,12 @@ export function NewChatDialog() {
               >
                 <Avatar className="h-9 w-9 border border-border/50">
                   <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
-                    {user.first_name?.[0].toUpperCase()}
+                    {user.firstName?.[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate text-foreground">
-                    {user.first_name} {user.last_name}
+                    {user.firstName} {user.lastName}
                   </p>
                   <p className="text-[12px] text-muted-foreground truncate">
                     @{user.username}

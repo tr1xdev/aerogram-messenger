@@ -102,7 +102,7 @@ export const MessageComposer = memo(function MessageComposer({
                   <span className="text-[11px] font-semibold text-primary truncate block">
                     {editingMessage
                       ? "Edit Message"
-                      : replyingTo?.sender.first_name || "User"}
+                      : replyingTo?.sender.firstName || "User"}
                   </span>
                   <span className="text-[12px] text-muted-foreground truncate block leading-tight">
                     {activeAction.text}

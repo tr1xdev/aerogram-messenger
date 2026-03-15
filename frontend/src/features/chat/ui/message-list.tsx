@@ -48,11 +48,9 @@ export const MessageList = memo(function MessageList({
 
   useEffect((): (() => void) => {
     let isMounted: boolean = true;
-
     const fetchDecrypted = async (): Promise<void> => {
       let hasChanges: boolean = false;
       const newEntries: Record<string, string> = {};
-
       for (const m of messages) {
         if (
           m.replyTo &&
@@ -69,7 +67,6 @@ export const MessageList = memo(function MessageList({
           }
         }
       }
-
       if (isMounted && hasChanges) {
         setDecryptedMap(
           (prev: Record<string, string>): Record<string, string> => ({
@@ -79,9 +76,7 @@ export const MessageList = memo(function MessageList({
         );
       }
     };
-
     fetchDecrypted();
-
     return (): void => {
       isMounted = false;
     };
@@ -143,15 +138,10 @@ export const MessageList = memo(function MessageList({
                         key={m.id}
                         message={m}
                         myId={myId ?? ""}
+                        lastReadSequence={lastReadSequence}
                         peerPublicKey={peerPublicKey}
                         isMe={m.sender.id === myId}
-                        isRead={
-                          m.sender.id === myId &&
-                          !m.id.startsWith("temp-") &&
-                          m.sequence !== undefined &&
-                          lastReadSequence !== undefined &&
-                          lastReadSequence >= m.sequence
-                        }
+                        isRead={m.isRead}
                         onReply={onReply}
                         onEdit={onEdit}
                       />
@@ -163,7 +153,6 @@ export const MessageList = memo(function MessageList({
           )}
         </div>
       </ScrollArea>
-
       <AnimatePresence>
         {showScrollBtn && (
           <motion.div

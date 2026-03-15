@@ -43,8 +43,8 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
 
   const displayName: string = useMemo((): string => {
     if (otherUser) {
-      const first: string = otherUser.first_name?.trim() || "";
-      const last: string = otherUser.last_name?.trim() || "";
+      const first: string = otherUser.firstName?.trim() || "";
+      const last: string = otherUser.lastName?.trim() || "";
       const full: string = `${first} ${last}`.trim();
       return full || otherUser.username || "Chat";
     }
@@ -67,8 +67,8 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
   const senderName: string | null = useMemo((): string | null => {
     if (!showSenderName || !sender) return null;
     if (isMe) return "You";
-    const first: string = sender.first_name?.trim() || "";
-    const last: string = sender.last_name?.trim() || "";
+    const first: string = sender.firstName?.trim() || "";
+    const last: string = sender.lastName?.trim() || "";
     const full: string = `${first} ${last}`.trim();
     return full || sender.username || null;
   }, [showSenderName, sender, isMe]);

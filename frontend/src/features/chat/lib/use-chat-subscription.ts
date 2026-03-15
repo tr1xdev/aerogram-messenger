@@ -2,15 +2,15 @@ import {
   useSubscription,
   useApolloClient,
 } from "@apollo/client/react/index.js";
-import { type ApolloCache } from "@apollo/client/index.js";
+import { type Reference, type ApolloCache } from "@apollo/client/index.js";
 import {
   MESSAGE_SUBSCRIPTION,
-  USER_PRESENCE_SUBSCRIPTION,
   DIALOG_READ_SUBSCRIPTION,
+  CHAT_DELETED_SUBSCRIPTION,
+  USER_PRESENCE_SUBSCRIPTION,
   GET_MESSAGE_HISTORY,
-  GET_MY_CHATS,
 } from "../api/chat.gql";
-import type { Message, Chat } from "@/entities/chat/model/types";
+import type { Message } from "@/entities/chat/model/types";
 
 interface MessageAddedData {
   messageAdded: Message;
@@ -24,23 +24,31 @@ interface DialogReadData {
   dialogRead: { chatId: string; userId: string; lastSequence: number };
 }
 
-export function useGlobalSubscriptions(chatId: string, myId?: string): void {
+interface ChatDeletedData {
+  chatDeleted: { chatId: string; forEveryone: boolean };
+}
+
+interface MyChatsData {
+  chats: Reference[];
+  __typename?: string;
+}
+
+export function useGlobalSubscriptions(
+  chatId: string | undefined,
+  myId: string | undefined,
+): void {
   const client = useApolloClient();
 
   useSubscription<MessageAddedData>(MESSAGE_SUBSCRIPTION, {
-    variables: { chatId },
+    variables: { chatId: chatId ?? "" },
+    skip: !chatId || !myId,
     onData({ data }): void {
       const newMessage: Message | undefined = data.data?.messageAdded;
-      if (!newMessage) return;
+      if (!newMessage || !myId || !chatId) return;
 
       const cache: ApolloCache = client.cache;
-      const isFromMe: boolean = !!(myId && newMessage.sender.id === myId);
-
-      const historyVars: { chatId: string; limit: number; offset: number } = {
-        chatId,
-        limit: 50,
-        offset: 0,
-      };
+      const isFromMe: boolean = newMessage.sender.id === myId;
+      const historyVars = { chatId, limit: 50, offset: 0 };
 
       const existingHistory = client.readQuery<{
         messageHistory: { messages: Message[] };
@@ -70,49 +78,6 @@ export function useGlobalSubscriptions(chatId: string, myId?: string): void {
         });
       }
 
-      const chatsData = client.readQuery<{ myChats: { chats: Chat[] } }>({
-        query: GET_MY_CHATS,
-      });
-
-      if (chatsData?.myChats?.chats) {
-        const updatedChats: Chat[] = chatsData.myChats.chats.map(
-          (c: Chat): Chat => {
-            if (c.id === newMessage.chatId) {
-              return {
-                ...c,
-                lastMessage: newMessage,
-                unreadCount: isFromMe
-                  ? c.unreadCount
-                  : (c.unreadCount || 0) + 1,
-              };
-            }
-            return c;
-          },
-        );
-
-        const sortedChats: Chat[] = [...updatedChats].sort(
-          (a: Chat, b: Chat): number => {
-            const timeA: number = new Date(
-              a.lastMessage?.sentAt || 0,
-            ).getTime();
-            const timeB: number = new Date(
-              b.lastMessage?.sentAt || 0,
-            ).getTime();
-            return timeB - timeA;
-          },
-        );
-
-        client.writeQuery({
-          query: GET_MY_CHATS,
-          data: {
-            myChats: {
-              ...chatsData.myChats,
-              chats: sortedChats,
-            },
-          },
-        });
-      }
-
       const chatCacheId: string | undefined = cache.identify({
         __typename: "Chat",
         id: newMessage.chatId,
@@ -127,21 +92,37 @@ export function useGlobalSubscriptions(chatId: string, myId?: string): void {
               isFromMe ? 0 : (prev || 0) + 1,
           },
         });
+
+        cache.modify({
+          fields: {
+            myChats(
+              existingData: MyChatsData | Reference,
+            ): MyChatsData | Reference {
+              if (!existingData || !("chats" in existingData))
+                return existingData;
+              const chatRef: Reference = { __ref: chatCacheId };
+              const filteredChats = existingData.chats.filter(
+                (ref: Reference): boolean => ref.__ref !== chatCacheId,
+              );
+              return { ...existingData, chats: [chatRef, ...filteredChats] };
+            },
+          },
+        });
       }
     },
   });
 
   useSubscription<DialogReadData>(DIALOG_READ_SUBSCRIPTION, {
-    variables: { chatId },
+    variables: { chatId: chatId ?? "" },
+    skip: !chatId,
     onData({ data }): void {
-      const payload: DialogReadData["dialogRead"] | undefined =
-        data.data?.dialogRead;
+      const payload = data.data?.dialogRead;
       if (!payload) return;
 
-      const cache: ApolloCache = client.cache;
-      const isMe: boolean = !!(myId && payload.userId === myId);
+      const cache = client.cache;
+      const isMe = myId && payload.userId === myId;
 
-      const chatRef: string | undefined = cache.identify({
+      const chatRef = cache.identify({
         __typename: "Chat",
         id: payload.chatId,
       });
@@ -157,31 +138,29 @@ export function useGlobalSubscriptions(chatId: string, myId?: string): void {
         });
       }
 
-      const sidebar = client.readQuery<{ myChats: { chats: Chat[] } }>({
-        query: GET_MY_CHATS,
+      const historyVars = { chatId: payload.chatId, limit: 50, offset: 0 };
+      const historyData = cache.readQuery<{
+        messageHistory: { messages: Message[] };
+      }>({
+        query: GET_MESSAGE_HISTORY,
+        variables: historyVars,
       });
 
-      if (sidebar?.myChats?.chats) {
-        const updated: Chat[] = sidebar.myChats.chats.map(
-          (c: Chat): Chat =>
-            c.id === payload.chatId
-              ? {
-                  ...c,
-                  lastReadSequence: Math.max(
-                    c.lastReadSequence || 0,
-                    payload.lastSequence,
-                  ),
-                  unreadCount: isMe ? 0 : c.unreadCount,
-                }
-              : c,
-        );
+      if (historyData?.messageHistory?.messages) {
+        const updatedMessages = historyData.messageHistory.messages.map((m) => {
+          if ((m.sequence ?? 0) <= payload.lastSequence && !m.isRead) {
+            return { ...m, isRead: true };
+          }
+          return m;
+        });
 
-        client.writeQuery({
-          query: GET_MY_CHATS,
+        cache.writeQuery({
+          query: GET_MESSAGE_HISTORY,
+          variables: historyVars,
           data: {
-            myChats: {
-              ...sidebar.myChats,
-              chats: updated,
+            messageHistory: {
+              ...historyData.messageHistory,
+              messages: updatedMessages,
             },
           },
         });
@@ -190,26 +169,61 @@ export function useGlobalSubscriptions(chatId: string, myId?: string): void {
   });
 
   useSubscription<StatusChanged>(USER_PRESENCE_SUBSCRIPTION, {
-    variables: { chatId },
+    variables: { chatId: chatId ?? "" },
+    skip: !chatId,
     onData({ data }): void {
-      const payload: StatusChanged["userStatusChanged"] | undefined =
-        data.data?.userStatusChanged;
+      const payload = data.data?.userStatusChanged;
       if (!payload) return;
 
-      const cache: ApolloCache = client.cache;
-      const userRef: string | undefined = cache.identify({
+      const userRef = client.cache.identify({
         __typename: "User",
         id: payload.userId,
       });
 
       if (userRef) {
-        cache.modify({
+        client.cache.modify({
           id: userRef,
           fields: {
             status: (): string => payload.status,
             lastSeen: (): string | undefined => payload.lastSeen,
           },
         });
+      }
+    },
+  });
+
+  useSubscription<ChatDeletedData>(CHAT_DELETED_SUBSCRIPTION, {
+    variables: { userId: myId ?? "" },
+    skip: !myId,
+    onData({ data }): void {
+      const deletedInfo = data.data?.chatDeleted;
+      if (!deletedInfo) return;
+
+      const chatCacheId = client.cache.identify({
+        __typename: "Chat",
+        id: deletedInfo.chatId,
+      });
+
+      if (chatCacheId) {
+        client.cache.modify({
+          fields: {
+            myChats(
+              existingData: MyChatsData | Reference,
+              { readField },
+            ): MyChatsData | Reference {
+              if (!existingData || !("chats" in existingData))
+                return existingData;
+              return {
+                ...existingData,
+                chats: existingData.chats.filter(
+                  (ref) => readField("id", ref) !== deletedInfo.chatId,
+                ),
+              };
+            },
+          },
+        });
+        client.cache.evict({ id: chatCacheId });
+        client.cache.gc();
       }
     },
   });

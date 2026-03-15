@@ -93,15 +93,15 @@ export function AppSidebar() {
 
   const fullName = useMemo((): string => {
     if (!user) return "";
-    const first = user.first_name?.trim() || "";
-    const last = user.last_name?.trim() || "";
+    const first = user.firstName?.trim() || "";
+    const last = user.lastName?.trim() || "";
     if (!first && !last) return user.username || "";
     return `${first} ${last}`.trim();
   }, [user]);
 
   const avatarFallback = useMemo((): string => {
     if (!user) return "?";
-    return (user.first_name?.[0] || user.username?.[0] || "?").toUpperCase();
+    return (user.firstName?.[0] || user.username?.[0] || "?").toUpperCase();
   }, [user]);
 
   const pinnedChats = useMemo(
