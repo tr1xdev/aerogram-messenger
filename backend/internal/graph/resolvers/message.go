@@ -109,10 +109,25 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, 
 		return false, nil
 	}
 
+	chatUUID, _ := uuid.Parse(chatID)
+	lastMsg, err := r.Store.GetLastChatMessage(ctx, chatUUID)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = r.MessagesClient.MarkAsRead(ctx, &messagesv1.MarkAsReadRequest{
+		ChatId:        chatID,
+		UserId:        authID,
+		LastMessageId: lastMsg.ID.String(),
+	})
+	if err != nil {
+		return false, err
+	}
+
 	payload := model.ReadPayload{
 		ChatID:       chatID,
 		UserID:       authID,
-		LastSequence: lastSequence,
+		LastSequence: lastMsg.Sequence,
 	}
 	data, _ := json.Marshal(payload)
 	r.RedisClient.Publish(ctx, "chat:"+chatID+":read", data)
@@ -145,10 +160,29 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 // DialogRead is the resolver for the dialogRead field.
 func (r *queryResolver) DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error) {
 	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, nil
+	}
+
+	chatUUID, _ := uuid.Parse(chatID)
+	userUUID, _ := uuid.Parse(authID)
+
+	member, err := r.Store.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: chatUUID,
+		UserID:   userUUID,
+	})
+	if err != nil {
+		return &model.ReadPayload{
+			ChatID:       chatID,
+			UserID:       authID,
+			LastSequence: 0,
+		}, nil
+	}
+
 	return &model.ReadPayload{
 		ChatID:       chatID,
 		UserID:       authID,
-		LastSequence: 0,
+		LastSequence: member.LastReadSequence,
 	}, nil
 }
 
@@ -172,20 +206,42 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 
 // DialogRead is the resolver for the dialogRead field.
 func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error) {
-	out := make(chan *model.ReadPayload, 1)
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	readChan := make(chan *model.ReadPayload, 1)
 	pubsub := r.RedisClient.Subscribe(ctx, "chat:"+chatID+":read")
 
 	go func() {
 		defer pubsub.Close()
-		defer close(out)
-		for msg := range pubsub.Channel() {
-			var p model.ReadPayload
-			if err := json.Unmarshal([]byte(msg.Payload), &p); err == nil {
-				out <- &p
+		defer close(readChan)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-pubsub.Channel():
+				if !ok {
+					return
+				}
+
+				var payload model.ReadPayload
+				if err := json.Unmarshal([]byte(msg.Payload), &payload); err != nil {
+					continue
+				}
+
+				select {
+				case readChan <- &payload:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()
-	return out, nil
+
+	return readChan, nil
 }
 
 // Message returns graph.MessageResolver implementation.
