@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@apollo/client/react";
 import { motion } from "framer-motion";
-import { GET_USER_BY_ID } from "@/features/chat/api/chat.gql";
+import { GET_USER_BY_ID } from "@/features/chat/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -9,7 +9,7 @@ import {
   CHAT_DELETED_SUBSCRIPTION,
   USER_PRESENCE_SUBSCRIPTION,
   GET_MESSAGE_HISTORY,
-} from "../api/chat.gql";
+} from "../api";
 import type { Message } from "@/entities/chat/model/types";
 
 interface MessageAddedData {

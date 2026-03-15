@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import { useNavigate } from "@tanstack/react-router";
-import { GET_USER_BY_ID } from "@/features/chat/api/chat.gql";
+import { GET_USER_BY_ID } from "@/features/chat/api";
 import {
   Popover,
   PopoverContent,

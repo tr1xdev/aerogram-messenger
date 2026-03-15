@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Loader2 } from "lucide-react";
 import { FiEdit2 } from "react-icons/fi";
-import { GET_MY_CHATS } from "../api/chat.gql";
+import { GET_MY_CHATS } from "../api";
 import type { User, Chat, ChatMember } from "@/entities/chat/model/types";
 
 interface MyChatsResponse {

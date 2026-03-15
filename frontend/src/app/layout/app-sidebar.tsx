@@ -37,7 +37,7 @@ import {
   useSearchUsers,
   useChatActions,
 } from "@/features/chat/lib/use-messages";
-import { GET_MY_CHATS } from "@/features/chat/api/chat.gql";
+import { GET_MY_CHATS } from "@/features/chat/api";
 import { useConnectionStore } from "@/store/connection";
 import { cn } from "@/lib/utils";
 import type { Chat, User } from "@/entities/chat/model/types";

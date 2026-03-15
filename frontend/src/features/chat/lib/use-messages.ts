@@ -14,7 +14,7 @@ import {
   PIN_CHAT,
   DELETE_CHAT,
   GET_CHAT_DETAILS,
-} from "../api/chat.gql";
+} from "../api";
 import { encryptText, decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type {
   Message,

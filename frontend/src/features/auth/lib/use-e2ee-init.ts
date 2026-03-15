@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useMutation } from "@apollo/client/react/index.js";
-import { UPDATE_PROFILE } from "@/features/chat/api/chat.gql";
+import { UPDATE_PROFILE } from "@/features/chat/api";
 import {
   generateE2EEKeys,
   savePrivateKey,
