@@ -1,10 +1,10 @@
 type AuthPayload {
-   user_id: String
+   userId: String
 }
 
 type VerifyEmailPayload {
-   access_token: String!
-   refresh_token: String!
+   accessToken: String!
+   refreshToken: String!
 }
 
 type Session {
@@ -21,8 +21,8 @@ input SignUpInput {
    username: String
    email: String!
    password: String!
-   first_name: String!
-   last_name: String
+   firstName: String!
+   lastName: String
 }
 
 input LoginInput {

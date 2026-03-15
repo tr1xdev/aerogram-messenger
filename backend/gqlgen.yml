@@ -27,6 +27,13 @@ models:
    User:
       model: github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen.User
       fields:
+         firstName: { resolver: true }
+         lastName: { resolver: true }
+         displayName: { resolver: true }
+         photoUrl: { resolver: true }
+         bio: { resolver: true }
+         isVerified: { resolver: true }
+         email: { resolver: true }
          status: { resolver: true }
          encryptedPrivKey: { resolver: true }
          encryptionIv: { resolver: true }

@@ -1,10 +1,14 @@
 type User {
    id: ID!
    email: String!
-   first_name: String!
-   last_name: String
+   firstName: String!
+   lastName: String
+   displayName: String
    username: String
+   photoUrl: String
+   bio: String
    status: String!
+   isVerified: Boolean!
    publicKey: String
    encryptedPrivKey: String
    encryptionIv: String
@@ -27,6 +31,7 @@ type UserStatusPayload {
 
 extend type Query {
    me: User!
+   user(id: ID!): User!
    getUser(id: ID!): User!
    searchUsers(username: String!): [User!]!
 }

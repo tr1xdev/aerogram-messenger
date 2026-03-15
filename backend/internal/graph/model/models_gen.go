@@ -45,7 +45,7 @@ type SendMessageResult interface {
 }
 
 type AuthPayload struct {
-	UserID *string `json:"user_id,omitempty"`
+	UserID *string `json:"userId,omitempty"`
 }
 
 type Chat struct {
@@ -176,8 +176,8 @@ type SignUpInput struct {
 	Username  *string `json:"username,omitempty"`
 	Email     string  `json:"email"`
 	Password  string  `json:"password"`
-	FirstName string  `json:"first_name"`
-	LastName  *string `json:"last_name,omitempty"`
+	FirstName string  `json:"firstName"`
+	LastName  *string `json:"lastName,omitempty"`
 }
 
 type Subscription struct {
@@ -224,8 +224,8 @@ type VerifyEmailInput struct {
 }
 
 type VerifyEmailPayload struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 type ChatType string
