@@ -1,16 +1,18 @@
 export interface User {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
+  displayName?: string | null;
   username?: string;
-  photoUrl?: string;
+  photoUrl?: string | null;
   status: string;
   bio?: string | null;
   publicKey?: string;
   encryptedPrivKey?: string;
   encryptionIv?: string;
   lastSeen?: string | null;
+  isVerified?: boolean;
 }
 
 export interface Message {

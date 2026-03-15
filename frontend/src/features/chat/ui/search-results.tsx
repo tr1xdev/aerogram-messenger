@@ -124,12 +124,12 @@ export function SearchResults({
                   >
                     <Avatar className="h-12 w-12 border border-border/40">
                       <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
-                        {user.first_name?.[0] || user.username?.[0] || "?"}
+                        {user.firstName?.[0] || user.username?.[0] || "?"}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14.5px] font-medium truncate text-foreground">
-                        {user.first_name} {user.last_name || ""}
+                        {user.firstName} {user.lastName || ""}
                       </p>
                       {user.username && (
                         <p className="text-[12px] text-muted-foreground/80">

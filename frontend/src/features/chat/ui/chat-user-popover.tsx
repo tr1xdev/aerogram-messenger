@@ -28,9 +28,9 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const { data, loading, error } = useQuery<{ getUser: User }>(GET_USER_BY_ID, {
+  const { data, loading, error } = useQuery<{ user: User }>(GET_USER_BY_ID, {
     variables: { id: userId },
-    skip: !open || isMobile,
+    skip: !open,
   });
 
   const handleTriggerClick = (e: React.MouseEvent): void => {
@@ -59,7 +59,7 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
               <Skeleton className="h-3 w-3/4" />
             </div>
           </div>
-        ) : error || !data?.getUser ? (
+        ) : error || !data?.user ? (
           <div className="p-4 text-xs text-center text-muted-foreground">
             User information unavailable
           </div>
@@ -69,19 +69,21 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
             <div className="px-4 pb-4">
               <div className="relative -mt-8 mb-3">
                 <Avatar className="h-20 w-20 border-4 border-background shadow-sm">
-                  <AvatarImage src={data.getUser.photoUrl || ""} />
+                  <AvatarImage src={data.user.photoUrl || ""} />
                   <AvatarFallback className="text-2xl font-bold bg-muted">
-                    {data.getUser.first_name?.[0].toUpperCase()}
+                    {(data.user.firstName ||
+                      data.user.displayName)?.[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </div>
 
               <div className="space-y-1">
                 <h3 className="text-lg font-bold leading-none">
-                  {data.getUser.first_name} {data.getUser.last_name}
+                  {data.user.displayName ||
+                    `${data.user.firstName} ${data.user.lastName}`}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  @{data.getUser.username}
+                  @{data.user.username}
                 </p>
               </div>
 
@@ -91,7 +93,7 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
                     Bio
                   </p>
                   <p className="text-sm leading-relaxed text-foreground/90">
-                    {data.getUser.bio || "No bio provided yet."}
+                    {data.user.bio || "No bio provided yet."}
                   </p>
                 </div>
 
@@ -100,20 +102,22 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
                     <span className="text-muted-foreground">Status</span>
                     <span
                       className={
-                        data.getUser.status === "online"
+                        data.user.status === "online"
                           ? "text-primary font-medium"
                           : "text-foreground"
                       }
                     >
-                      {data.getUser.status}
+                      {data.user.status || "offline"}
                     </span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Email</span>
-                    <span className="text-foreground truncate ml-4">
-                      {data.getUser.email}
-                    </span>
-                  </div>
+                  {data.user.email && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Email</span>
+                      <span className="text-foreground truncate ml-4">
+                        {data.user.email}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
