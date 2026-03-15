@@ -258,16 +258,33 @@ export const SEND_MESSAGE = gql`
         text
         sentAt
         sequence
+        isEdited
         isEncrypted
         encryptionIv
         replyTo {
           id
           text
+          isEncrypted
+          sender {
+            id
+            first_name
+          }
+        }
+        forwardedFrom {
+          id
+          text
+          sender {
+            id
+            first_name
+          }
         }
         sender {
           id
+          email
           first_name
           last_name
+          username
+          status
           publicKey
         }
       }
@@ -381,6 +398,19 @@ export const MESSAGE_SUBSCRIPTION = gql`
       replyTo {
         id
         text
+        isEncrypted
+        sender {
+          id
+          first_name
+        }
+      }
+      forwardedFrom {
+        id
+        text
+        sender {
+          id
+          first_name
+        }
       }
       sender {
         id
