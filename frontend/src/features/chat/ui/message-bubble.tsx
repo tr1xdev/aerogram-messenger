@@ -24,8 +24,9 @@ import {
 interface MessageBubbleProps {
   message: Message;
   isMe: boolean;
-  isRead: boolean;
   myId: string;
+  isRead?: boolean;
+  lastReadSequence?: number;
   peerPublicKey?: string;
   onDelete?: (id: string) => void;
   onEdit?: (message: Message) => void;
@@ -52,8 +53,9 @@ const isLikelyEncrypted = (str: string): boolean => {
 export const MessageBubble = memo(function MessageBubble({
   message,
   isMe,
-  isRead,
   myId,
+  isRead,
+  lastReadSequence,
   peerPublicKey,
   onDelete,
   onEdit,
@@ -69,6 +71,13 @@ export const MessageBubble = memo(function MessageBubble({
 
   const isTemp: boolean =
     message.id.startsWith("temp-") || message.id.length < 10;
+
+  const isActuallyRead: boolean = useMemo((): boolean => {
+    if (isRead || message.isRead) return true;
+    if (message.sequence === undefined || lastReadSequence === undefined)
+      return false;
+    return message.sequence <= lastReadSequence;
+  }, [isRead, message.isRead, message.sequence, lastReadSequence]);
 
   useEffect(() => {
     let isMounted: boolean = true;
@@ -146,9 +155,7 @@ export const MessageBubble = memo(function MessageBubble({
           `msg-${message.id}`,
         );
         if (!element) return;
-
         if (observer) observer.disconnect();
-
         observer = new IntersectionObserver(
           (entries: IntersectionObserverEntry[]): void => {
             if (entries[0].isIntersecting) {
@@ -164,7 +171,6 @@ export const MessageBubble = memo(function MessageBubble({
           },
           { threshold: 0.1 },
         );
-
         observer.observe(element);
         setTimeout((): void => observer?.disconnect(), 3000);
       }
@@ -235,19 +241,17 @@ export const MessageBubble = memo(function MessageBubble({
                     isMe ? "text-primary-foreground" : "text-primary",
                   )}
                 >
-                  {message.replyTo.sender.first_name}
+                  {message.replyTo.sender.firstName}
                 </span>
                 <span className="text-[12px] truncate opacity-90 leading-tight ml-1">
                   {displayReplyText}
                 </span>
               </div>
             )}
-
             <div className="grid grid-cols-1 min-w-0">
               <span className="block whitespace-pre-wrap break-all overflow-hidden [word-break:break-word] [overflow-wrap:anywhere]">
                 {displayText}
               </span>
-
               <div
                 className={cn(
                   "flex items-center justify-end gap-1 mt-1 -mr-1 select-none pointer-events-none shrink-0",
@@ -267,7 +271,7 @@ export const MessageBubble = memo(function MessageBubble({
                   <span className="flex items-center justify-center w-3.5 h-3.5 shrink-0">
                     {isTemp ? (
                       <Clock className="h-3 w-3 animate-pulse" />
-                    ) : isRead ? (
+                    ) : isActuallyRead ? (
                       <CheckCheck className="h-3.5 w-3.5" />
                     ) : (
                       <Check className="h-3.5 w-3.5" />
@@ -279,7 +283,6 @@ export const MessageBubble = memo(function MessageBubble({
           </div>
         </div>
       </ContextMenuTrigger>
-
       <ContextMenuContent className="w-48">
         <ContextMenuItem onClick={(): void => onReply?.(message)}>
           <Reply className="mr-2 h-4 w-4" /> Reply
@@ -290,7 +293,6 @@ export const MessageBubble = memo(function MessageBubble({
         <ContextMenuItem onClick={(): void => onForward?.(message)}>
           <Forward className="mr-2 h-4 w-4" /> Forward
         </ContextMenuItem>
-
         {isMe && !isTemp && (
           <>
             <ContextMenuSeparator />
@@ -305,7 +307,6 @@ export const MessageBubble = memo(function MessageBubble({
             </ContextMenuItem>
           </>
         )}
-
         <ContextMenuSeparator />
         <ContextMenuItem>
           <Info className="mr-2 h-4 w-4" /> Message Info

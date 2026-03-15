@@ -30,7 +30,7 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const displayName =
-    [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
     user?.username ||
     "User";
 
@@ -56,9 +56,9 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
       >
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user?.photoUrl} />
+            <AvatarImage src={user?.photoUrl ?? undefined} />
             <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
-              {displayName[0]}
+              {displayName[0]?.toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <span className="font-semibold text-sm tracking-tight">
@@ -82,9 +82,12 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
 
           <div className="relative">
             <Avatar className="h-32 w-32 ring-4 ring-background shadow-2xl">
-              <AvatarImage src={user?.photoUrl} className="object-cover" />
+              <AvatarImage
+                src={user?.photoUrl ?? undefined}
+                className="object-cover"
+              />
               <AvatarFallback className="text-4xl font-bold text-white bg-gradient-to-tr from-primary to-primary/60">
-                {displayName[0]}
+                {displayName[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <button className="absolute bottom-1 right-1 p-2 bg-primary text-primary-foreground rounded-full shadow-lg border-2 border-background">
@@ -124,7 +127,7 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
                 icon={ShieldCheck}
                 label="Public Key"
                 type="copy"
-                value={user?.publicKey}
+                value={user?.publicKey ?? undefined}
               />
               <SettingsButton icon={Plus} label="Add Account" type="action" />
             </div>

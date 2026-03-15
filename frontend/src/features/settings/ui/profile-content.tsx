@@ -41,7 +41,7 @@ export function ProfileContent({
     }
   };
 
-  const initial = (user?.first_name || user?.username || "?")[0].toUpperCase();
+  const initial = (user?.firstName || user?.username || "?")[0].toUpperCase();
 
   return (
     <div className="space-y-6 py-6 outline-none">
@@ -53,7 +53,7 @@ export function ProfileContent({
         </Avatar>
         <div className="min-w-0">
           <h3 className="font-bold text-lg leading-tight truncate">
-            {user?.first_name} {user?.last_name}
+            {user?.firstName} {user?.lastName}
           </h3>
           <p className="text-sm text-muted-foreground font-medium truncate">
             @{user?.username}
