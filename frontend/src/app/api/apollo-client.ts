@@ -22,20 +22,26 @@ interface RefreshTokenResponse {
   };
 }
 
+interface MessageConnection {
+  messages: Reference[];
+  hasMore: boolean;
+  __typename: string;
+}
+
 type PendingRequestCallback = () => void;
 
 let isRefreshing: boolean = false;
 let isLoggingOut: boolean = false;
 let pendingRequests: PendingRequestCallback[] = [];
 
-const authChannel = new BroadcastChannel("auth_sync");
+const authChannel: BroadcastChannel = new BroadcastChannel("auth_sync");
 
 const resolvePendingRequests = (): void => {
   pendingRequests.forEach((callback) => callback());
   pendingRequests = [];
 };
 
-authChannel.onmessage = (event) => {
+authChannel.onmessage = (event: MessageEvent): void => {
   if (event.data.type === "REFRESH_SUCCESS") {
     resolvePendingRequests();
   }
@@ -80,13 +86,16 @@ const interceptorLink: ApolloLink = new ApolloLink(
 
       const subscription = forward(operation).subscribe({
         next: (response: FetchResult) => {
-          const stringified: string = JSON.stringify(response).toLowerCase();
-          const isUnauthorized: boolean =
-            stringified.includes("unauthorized") ||
-            stringified.includes("unauthenticated") ||
-            stringified.includes("session terminated");
+          const hasAuthError: boolean = !!response.errors?.some((err) => {
+            const msg: string = err.message.toLowerCase();
+            return (
+              msg.includes("unauthorized") ||
+              msg.includes("unauthenticated") ||
+              msg.includes("session terminated")
+            );
+          });
 
-          if (isUnauthorized) {
+          if (hasAuthError) {
             if (operation.operationName === "RefreshToken") {
               logoutAll();
               observer.next(response);
@@ -172,9 +181,9 @@ const interceptorLink: ApolloLink = new ApolloLink(
   },
 );
 
-const logStyle = (color: string) =>
+const logStyle = (color: string): string =>
   `color: ${color}; font-weight: bold; font-family: "JetBrains Mono", monospace;`;
-const dimStyle = `color: #888; font-family: "JetBrains Mono", monospace;`;
+const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;`;
 
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
@@ -184,18 +193,18 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
       if (isRefreshing) {
         await new Promise<void>((resolve) => pendingRequests.push(resolve));
       }
-      const token = localStorage.getItem("access_token");
+      const token: string | null = localStorage.getItem("access_token");
       return { Authorization: token ? `Bearer ${token}` : "" };
     },
     keepAlive: 10000,
     connectionAckWaitTimeout: 15000,
     shouldRetry: () => true,
     retryAttempts: Infinity,
-    retryWait: async (retries) => {
-      const delay =
+    retryWait: async (retries: number) => {
+      const delay: number =
         retries < 5 ? 1000 : Math.min(1000 * Math.pow(2, retries - 5), 30000);
 
-      const jitter = Math.random() * 0.2 * delay;
+      const jitter: number = Math.random() * 0.2 * delay;
       await new Promise((resolve) => setTimeout(resolve, delay + jitter));
     },
     on: {
@@ -211,7 +220,7 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
         useConnectionStore.getState().setIsWsConnected(true);
       },
 
-      closed: (event) => {
+      closed: (event: unknown) => {
         console.log(
           "%c[WS]%c connection closed",
           logStyle("#ff4d4d"),
@@ -221,7 +230,7 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
         useConnectionStore.getState().setIsWsConnected(false);
       },
 
-      error: (err) => {
+      error: (err: unknown) => {
         console.error(
           "%c[WS]%c error occurred",
           logStyle("#ff4d4d"),
@@ -231,8 +240,8 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
         useConnectionStore.getState().setIsWsConnected(false);
       },
 
-      message: (msg) => {
-        const type = (msg as Message).type || "data";
+      message: (msg: unknown) => {
+        const type: string = (msg as Message).type || "data";
         console.groupCollapsed(
           `%c[WS]%c message: ${type}`,
           logStyle("#ffca28"),
@@ -265,19 +274,31 @@ export const client: ApolloClient = new ApolloClient({
           messageHistory: {
             keyArgs: ["chatId"],
             merge(
-              existing: Reference[] = [],
-              incoming: Reference[],
+              existing: MessageConnection | undefined,
+              incoming: MessageConnection,
               { readField },
-            ): Reference[] {
-              const merged: Reference[] = [...existing];
+            ): MessageConnection {
+              const existingMessages: Reference[] = existing?.messages || [];
+              const incomingMessages: Reference[] = incoming.messages || [];
+
+              const mergedMessages: Reference[] = [...existingMessages];
               const existingIds: Set<string> = new Set(
-                merged.map((r) => readField<string>("id", r) as string),
+                mergedMessages.map(
+                  (r: Reference) => readField<string>("id", r) as string,
+                ),
               );
-              incoming.forEach((r: Reference) => {
+
+              incomingMessages.forEach((r: Reference) => {
                 const id: string | undefined = readField<string>("id", r);
-                if (id && !existingIds.has(id)) merged.push(r);
+                if (id && !existingIds.has(id)) {
+                  mergedMessages.push(r);
+                }
               });
-              return merged;
+
+              return {
+                ...incoming,
+                messages: mergedMessages,
+              };
             },
           },
         },
