@@ -12,7 +12,8 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 	if m == nil {
 		return nil
 	}
-	return &model.Message{
+
+	msg := &model.Message{
 		ID:           m.Id,
 		ChatID:       m.ChatId,
 		Text:         m.Text,
@@ -22,13 +23,22 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 		IsEncrypted:  m.IsEncrypted,
 		EncryptionIv: m.EncryptionIv,
 	}
+
+	if m.ReplyToId != nil && *m.ReplyToId != "" {
+		msg.ReplyTo = &model.Message{
+			ID: *m.ReplyToId,
+		}
+	}
+
+	return msg
 }
 
 func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 	if m == nil {
 		return nil
 	}
-	return &model.Message{
+
+	msg := &model.Message{
 		ID:           m.ID.String(),
 		ChatID:       m.DialogID.String(),
 		Text:         m.Content,
@@ -38,4 +48,12 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 		IsEncrypted:  m.IsEncrypted,
 		EncryptionIv: ToStringPtr(m.EncryptionIv),
 	}
+
+	if m.ReplyToID.Valid {
+		msg.ReplyTo = &model.Message{
+			ID: m.ReplyToID.UUID.String(),
+		}
+	}
+
+	return msg
 }
