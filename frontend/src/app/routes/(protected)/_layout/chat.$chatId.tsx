@@ -34,7 +34,7 @@ const MATCH_THRESHOLD_MS: number = 5000;
 const log = {
   info: (msg: string, data?: unknown): void => {
     console.log(
-      `%c info %c ${msg}`,
+      "%c info %c " + msg,
       "background: #3b82f6; color: white; border-radius: 4px; padding: 2px 6px; font-weight: bold;",
       "color: #3b82f6; font-weight: 500;",
       data ?? "",
@@ -42,7 +42,7 @@ const log = {
   },
   error: (msg: string, err: unknown): void => {
     console.log(
-      `%c error %c ${msg}`,
+      "%c error %c " + msg,
       "background: #ef4444; color: white; border-radius: 4px; padding: 2px 6px; font-weight: bold;",
       "color: #ef4444;",
       err,
@@ -68,7 +68,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
-  const inputRef: React.MutableRefObject<string> = useRef<string>(input);
+  const inputRef = useRef<string>(input);
 
   useEffect((): void => {
     inputRef.current = input;
@@ -84,8 +84,11 @@ export function ChatPage({ chatId }: { chatId: string }) {
   const me: User | undefined = meData?.me;
   const chat: Chat | undefined = chatData?.chat;
 
-  const { messages: historyMessages, isLoading: historyLoading } =
-    useChatHistory(chatId);
+  const {
+    messages: messagesFromHistory,
+    isLoading: historyLoading,
+    lastReadSequence,
+  } = useChatHistory(chatId);
 
   const { sendMessage, editMessage, decryptMessage, isSending } =
     useChatActions(chatId);
@@ -136,21 +139,20 @@ export function ChatPage({ chatId }: { chatId: string }) {
 
   const totalUnread = useMemo((): number => {
     const chats: Chat[] = chatsData?.myChats?.chats || [];
-
     return chats.reduce((acc: number, c: Chat): number => {
       return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
     }, 0);
   }, [chatsData, chatId]);
 
   const allMessages = useMemo((): Message[] => {
-    if (!me || !chatId) return historyMessages;
+    if (!me || !chatId) return messagesFromHistory;
 
     const serverIds: Set<string> = new Set<string>(
-      historyMessages.map((m: Message): string => m.id),
+      messagesFromHistory.map((m: Message): string => m.id),
     );
     const usedCacheIds: Set<string> = new Set<string>();
 
-    const patchedServerMessages: Message[] = historyMessages.map(
+    const patchedServerMessages: Message[] = messagesFromHistory.map(
       (m: Message): Message => {
         if (m.sender.id === me.id && m.isEncrypted) {
           const msgTime: number = new Date(m.sentAt).getTime();
@@ -172,7 +174,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
       (om: Message): boolean => {
         if (serverIds.has(om.id)) return false;
         const omTime: number = new Date(om.sentAt).getTime();
-        return !historyMessages.some(
+        return !messagesFromHistory.some(
           (m: Message): boolean =>
             m.sender.id === me.id &&
             Math.abs(new Date(m.sentAt).getTime() - omTime) < 2000,
@@ -194,13 +196,13 @@ export function ChatPage({ chatId }: { chatId: string }) {
     });
 
     return combined;
-  }, [historyMessages, optimisticMsgs, me, sentCache, chatId]);
+  }, [messagesFromHistory, optimisticMsgs, me, sentCache, chatId]);
 
   const { checkAndMarkRead } = useMarkDialog(
     chatId,
     allMessages,
     me,
-    chat?.lastReadSequence ?? 0,
+    lastReadSequence ?? 0,
   );
 
   useEffect((): void => {
@@ -343,7 +345,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
             messages={allMessages}
             members={chat?.members}
             myId={me?.id}
-            lastReadSequence={chat?.lastReadSequence ?? 0}
+            lastReadSequence={lastReadSequence ?? 0}
             onMarkRead={checkAndMarkRead}
             onReply={handleReplyInitiate}
             onEdit={handleEditInitiate}

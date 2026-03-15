@@ -22,12 +22,12 @@ export const Route = createFileRoute("/(protected)/_layout/user/$userId")({
 
 export function UserProfileOverlay({ userId }: { userId: string }) {
   const router = useRouter();
-  const { data, loading } = useQuery<{ getUser: User }>(GET_USER_BY_ID, {
+  const { data, loading } = useQuery<{ user: User }>(GET_USER_BY_ID, {
     variables: { id: userId },
     fetchPolicy: "cache-and-network",
   });
 
-  const user = data?.getUser;
+  const user = data?.user;
 
   const handleBack = (): void => {
     router.history.back();
@@ -85,12 +85,12 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
                   className="object-cover"
                 />
                 <AvatarFallback className="text-4xl bg-primary/10 text-primary font-bold uppercase">
-                  {user.first_name[0]}
+                  {(user.firstName || user.displayName)?.[0] || "?"}
                 </AvatarFallback>
               </Avatar>
               <div className="mt-4 text-center">
                 <h2 className="text-2xl font-bold tracking-tight">
-                  {user.first_name} {user.last_name}
+                  {user.displayName || `${user.firstName} ${user.lastName}`}
                 </h2>
                 <div className="flex items-center justify-center gap-1.5 mt-1">
                   <div
@@ -100,7 +100,7 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
                     )}
                   />
                   <p className="text-[14px] text-muted-foreground font-medium">
-                    {user.status === "online" ? "online" : "offline"}
+                    {user.status || "offline"}
                   </p>
                 </div>
               </div>
