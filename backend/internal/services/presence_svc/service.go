@@ -2,6 +2,7 @@ package presence_svc
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,12 +58,17 @@ func (s *Server) IsOnline(ctx context.Context, req *presencepb.IsOnlineRequest) 
 		return nil, status.Error(codes.Internal, "failed to get status")
 	}
 
-	return &presencepb.IsOnlineResponse{Online: statuses[uid] == "online"}, nil
+	val := "offline"
+	if sVal, ok := statuses[uid]; ok {
+		val = sVal
+	}
+
+	return &presencepb.IsOnlineResponse{Status: val}, nil
 }
 
 func (s *Server) GetBulk(ctx context.Context, req *presencepb.GetBulkRequest) (*presencepb.GetBulkResponse, error) {
 	if len(req.UserIds) == 0 {
-		return &presencepb.GetBulkResponse{Online: make(map[string]bool)}, nil
+		return &presencepb.GetBulkResponse{Statuses: make(map[string]string)}, nil
 	}
 
 	uids := make([]uuid.UUID, len(req.UserIds))
@@ -79,10 +85,14 @@ func (s *Server) GetBulk(ctx context.Context, req *presencepb.GetBulkRequest) (*
 		return nil, status.Error(codes.Internal, "failed to get bulk statuses")
 	}
 
-	res := make(map[string]bool, len(uids))
+	res := make(map[string]string, len(uids))
 	for _, uid := range uids {
-		res[uid.String()] = statuses[uid] == "online"
+		val := "offline"
+		if sVal, ok := statuses[uid]; ok {
+			val = sVal
+		}
+		res[strings.ToLower(uid.String())] = val
 	}
 
-	return &presencepb.GetBulkResponse{Online: res}, nil
+	return &presencepb.GetBulkResponse{Statuses: res}, nil
 }

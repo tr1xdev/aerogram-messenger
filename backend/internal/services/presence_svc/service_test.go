@@ -56,7 +56,7 @@ func TestPresenceServer(t *testing.T) {
 		res, err := server.IsOnline(ctx, req)
 
 		require.NoError(t, err)
-		assert.True(t, res.Online)
+		assert.Equal(t, "online", res.Status)
 	})
 
 	t.Run("SetOffline", func(t *testing.T) {
@@ -72,6 +72,7 @@ func TestPresenceServer(t *testing.T) {
 
 		val, _ := mr.Get("presence:" + userID)
 		assert.NotEqual(t, "online", val)
+		assert.NotEmpty(t, val)
 	})
 
 	t.Run("GetBulk", func(t *testing.T) {
@@ -80,8 +81,9 @@ func TestPresenceServer(t *testing.T) {
 		u2 := uuid.New().String()
 		u3 := uuid.New().String()
 
+		lastSeen := "2026-03-07T12:00:00Z"
 		mr.Set("presence:"+u1, "online")
-		mr.Set("presence:"+u2, "offline")
+		mr.Set("presence:"+u2, lastSeen)
 
 		req := &presencepb.GetBulkRequest{
 			UserIds: []string{u1, u2, u3},
@@ -89,8 +91,8 @@ func TestPresenceServer(t *testing.T) {
 		res, err := server.GetBulk(ctx, req)
 
 		require.NoError(t, err)
-		assert.True(t, res.Online[u1])
-		assert.False(t, res.Online[u2])
-		assert.False(t, res.Online[u3])
+		assert.Equal(t, "online", res.Statuses[u1])
+		assert.Equal(t, lastSeen, res.Statuses[u2])
+		assert.Equal(t, "offline", res.Statuses[u3])
 	})
 }

@@ -243,7 +243,7 @@ func (x *IsOnlineRequest) GetUserId() string {
 
 type IsOnlineResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Online        bool                   `protobuf:"varint,1,opt,name=online,proto3" json:"online,omitempty"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -278,11 +278,11 @@ func (*IsOnlineResponse) Descriptor() ([]byte, []int) {
 	return file_presence_v1_presence_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *IsOnlineResponse) GetOnline() bool {
+func (x *IsOnlineResponse) GetStatus() string {
 	if x != nil {
-		return x.Online
+		return x.Status
 	}
-	return false
+	return ""
 }
 
 type GetBulkRequest struct {
@@ -331,7 +331,7 @@ func (x *GetBulkRequest) GetUserIds() []string {
 
 type GetBulkResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Online        map[string]bool        `protobuf:"bytes,1,rep,name=online,proto3" json:"online,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Statuses      map[string]string      `protobuf:"bytes,1,rep,name=statuses,proto3" json:"statuses,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -366,9 +366,9 @@ func (*GetBulkResponse) Descriptor() ([]byte, []int) {
 	return file_presence_v1_presence_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *GetBulkResponse) GetOnline() map[string]bool {
+func (x *GetBulkResponse) GetStatuses() map[string]string {
 	if x != nil {
-		return x.Online
+		return x.Statuses
 	}
 	return nil
 }
@@ -389,14 +389,14 @@ const file_presence_v1_presence_proto_rawDesc = "" +
 	"\x0fIsOnlineRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"*\n" +
 	"\x10IsOnlineResponse\x12\x16\n" +
-	"\x06online\x18\x01 \x01(\bR\x06online\"+\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\"+\n" +
 	"\x0eGetBulkRequest\x12\x19\n" +
-	"\buser_ids\x18\x01 \x03(\tR\auserIds\"\x8e\x01\n" +
-	"\x0fGetBulkResponse\x12@\n" +
-	"\x06online\x18\x01 \x03(\v2(.presence.v1.GetBulkResponse.OnlineEntryR\x06online\x1a9\n" +
-	"\vOnlineEntry\x12\x10\n" +
+	"\buser_ids\x18\x01 \x03(\tR\auserIds\"\x96\x01\n" +
+	"\x0fGetBulkResponse\x12F\n" +
+	"\bstatuses\x18\x01 \x03(\v2*.presence.v1.GetBulkResponse.StatusesEntryR\bstatuses\x1a;\n" +
+	"\rStatusesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x012\xbb\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xbb\x02\n" +
 	"\x0fPresenceService\x12J\n" +
 	"\tSetOnline\x12\x1d.presence.v1.SetOnlineRequest\x1a\x1e.presence.v1.SetOnlineResponse\x12M\n" +
 	"\n" +
@@ -426,10 +426,10 @@ var file_presence_v1_presence_proto_goTypes = []any{
 	(*IsOnlineResponse)(nil),   // 5: presence.v1.IsOnlineResponse
 	(*GetBulkRequest)(nil),     // 6: presence.v1.GetBulkRequest
 	(*GetBulkResponse)(nil),    // 7: presence.v1.GetBulkResponse
-	nil,                        // 8: presence.v1.GetBulkResponse.OnlineEntry
+	nil,                        // 8: presence.v1.GetBulkResponse.StatusesEntry
 }
 var file_presence_v1_presence_proto_depIdxs = []int32{
-	8, // 0: presence.v1.GetBulkResponse.online:type_name -> presence.v1.GetBulkResponse.OnlineEntry
+	8, // 0: presence.v1.GetBulkResponse.statuses:type_name -> presence.v1.GetBulkResponse.StatusesEntry
 	0, // 1: presence.v1.PresenceService.SetOnline:input_type -> presence.v1.SetOnlineRequest
 	2, // 2: presence.v1.PresenceService.SetOffline:input_type -> presence.v1.SetOfflineRequest
 	4, // 3: presence.v1.PresenceService.IsOnline:input_type -> presence.v1.IsOnlineRequest

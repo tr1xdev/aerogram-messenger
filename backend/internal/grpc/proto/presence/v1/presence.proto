@@ -32,7 +32,7 @@ message IsOnlineRequest {
 }
 
 message IsOnlineResponse {
-  bool online = 1;
+  string status = 1;
 }
 
 message GetBulkRequest {
@@ -40,5 +40,5 @@ message GetBulkRequest {
 }
 
 message GetBulkResponse {
-  map<string, bool> online = 1;
+  map<string, string> statuses = 1;
 }
