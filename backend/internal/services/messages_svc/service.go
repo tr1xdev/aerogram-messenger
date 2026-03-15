@@ -157,9 +157,15 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 		return nil, status.Error(codes.NotFound, "message not found")
 	}
 
-	if err := s.messageRepo.MarkRead(ctx, chatID, userID, msg.Sequence); err != nil {
-		return nil, status.Error(codes.Internal, "failed to mark as read")
+	err = s.db.Queries.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
+		DialogID:         chatID,
+		UserID:           userID,
+		LastReadSequence: msg.Sequence,
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to update read sequence")
 	}
+
 	return &messagespb.MarkAsReadResponse{Success: true}, nil
 }
 

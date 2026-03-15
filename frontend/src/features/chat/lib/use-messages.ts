@@ -83,6 +83,7 @@ export function useChatHistory(chatId: string): {
   messages: Message[];
   isLoading: boolean;
   hasMore: boolean;
+  lastReadSequence?: number;
 } {
   const { data, loading, error } = useQuery<ChatHistoryData>(
     GET_MESSAGE_HISTORY,
@@ -93,27 +94,20 @@ export function useChatHistory(chatId: string): {
     },
   );
 
+  const { data: chatDetails } = useChatDetails(chatId);
+
   if (error) {
     console.error("[Apollo Error] GET_MESSAGE_HISTORY:", error);
   }
 
   const messages: Message[] = useMemo((): Message[] => {
-    console.log("[Raw Data] data:", data);
-
     const history = data?.messageHistory;
 
-    if (!history) {
-      console.warn("[History] messageHistory is undefined");
-      return [];
-    }
-
-    if (!("messages" in history)) {
-      console.warn("[History] No 'messages' key in history object", history);
+    if (!history || !("messages" in history)) {
       return [];
     }
 
     const list: Message[] = history.messages;
-    console.log("[History] Received messages:", list);
 
     return [...list].sort(
       (a: Message, b: Message): number => (a.sequence ?? 0) - (b.sequence ?? 0),
@@ -132,6 +126,7 @@ export function useChatHistory(chatId: string): {
     messages,
     isLoading: loading,
     hasMore,
+    lastReadSequence: chatDetails?.chat?.lastReadSequence,
   };
 }
 
