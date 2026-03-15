@@ -92,7 +92,7 @@ func main() {
 	defer conn.Close()
 
 	router := chi.NewRouter()
-	applyMiddleware(router, cfg, db, conn)
+	applyMiddleware(router, cfg, db, conn, rdb)
 
 	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc)
 	api.SetupRoutes(router, gqlServer)
@@ -134,7 +134,7 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
 }
 
-func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn) {
+func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn, rdb *redis.Client) {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -143,7 +143,8 @@ func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc
 	}))
 
 	userClient := userv1.NewUserServiceClient(conn)
-	r.Use(loaders.LoaderMiddleware(userClient))
+	presenceClient := presencev1.NewPresenceServiceClient(conn)
+	r.Use(loaders.LoaderMiddleware(userClient, presenceClient))
 	r.Use(middleware.AuthMiddleware(cfg, db))
 }
 
@@ -162,6 +163,7 @@ func initGraphQL(
 		chatv1.NewChatServiceClient(conn),
 		messagesv1.NewMessagesServiceClient(conn),
 		userv1.NewUserServiceClient(conn),
+		presencev1.NewPresenceServiceClient(conn),
 		rdb,
 		geoSvc,
 		uaSvc,

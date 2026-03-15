@@ -14,7 +14,10 @@ import (
 )
 
 func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat *chatv1.Chat) (*model.Chat, error) {
-	parsedAuthID, _ := uuid.Parse(authID)
+	parsedAuthID, err := uuid.Parse(authID)
+	if err != nil {
+		return nil, err
+	}
 	chatID, _ := uuid.Parse(pbChat.Id)
 
 	chatType := model.ChatTypePrivate
@@ -25,7 +28,10 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		chatType = model.ChatTypeChannel
 	}
 
-	dbMembers, _ := store.GetDialogMembers(ctx, chatID)
+	dbMembers, err := store.GetDialogMembers(ctx, chatID)
+	if err != nil {
+		dbMembers = []dbgen.DialogMember{}
+	}
 
 	idsMap := make(map[uuid.UUID]bool)
 	var isPinned bool
@@ -37,6 +43,8 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		if m.UserID == parsedAuthID {
 			isPinned = m.IsPinned
 			myReadSeq = m.LastReadSequence
+		} else if chatType == model.ChatTypePrivate {
+			pReadSeq = m.LastReadSequence
 		} else {
 			if m.LastReadSequence > pReadSeq {
 				pReadSeq = m.LastReadSequence
@@ -60,7 +68,6 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 	}
 
 	dbUsers, _ := store.GetUsersByIDs(ctx, userIDs)
-
 	userMap := make(map[uuid.UUID]*dbgen.User)
 	for i := range dbUsers {
 		userMap[dbUsers[i].ID] = &dbUsers[i]
@@ -79,12 +86,8 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 	displayTitle := pbChat.Title
 	if chatType == model.ChatTypePrivate {
 		for id, u := range userMap {
-			if id.String() != authID {
-				displayTitle = u.FirstName
-				lastName := ToStringPtr(u.LastName)
-				if lastName != nil && *lastName != "" {
-					displayTitle += " " + *lastName
-				}
+			if id != parsedAuthID {
+				displayTitle = FormatFullName(u.FirstName, u.LastName)
 				break
 			}
 		}
@@ -160,4 +163,13 @@ func MapDBMemberToModel(m *dbgen.DialogMember, u *dbgen.User) *model.ChatMember 
 		User:             u,
 		LastReadSequence: m.LastReadSequence,
 	}
+}
+
+func FormatFullName(firstName string, lastName sql.NullString) string {
+	name := firstName
+	lName := ToStringPtr(lastName)
+	if lName != nil && *lName != "" {
+		name += " " + *lName
+	}
+	return name
 }
