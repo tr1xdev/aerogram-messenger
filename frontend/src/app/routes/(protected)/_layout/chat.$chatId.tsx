@@ -18,13 +18,6 @@ import { MessageComposer } from "@/features/chat/ui/message-composer";
 import { MessageSquare, AlertCircle, ArrowLeft } from "lucide-react";
 import type { Message, Chat, User } from "@/entities/chat/model/types";
 
-interface MyChatsResponse {
-  myChats: {
-    chats: Chat[];
-    __typename?: string;
-  };
-}
-
 interface SentCacheEntry {
   id: string;
   time: number;
@@ -38,6 +31,25 @@ const PAGE_VARIANTS: Variants = {
 
 const MATCH_THRESHOLD_MS: number = 5000;
 
+const log = {
+  info: (msg: string, data?: unknown): void => {
+    console.log(
+      `%c info %c ${msg}`,
+      "background: #3b82f6; color: white; border-radius: 4px; padding: 2px 6px; font-weight: bold;",
+      "color: #3b82f6; font-weight: 500;",
+      data ?? "",
+    );
+  },
+  error: (msg: string, err: unknown): void => {
+    console.log(
+      `%c error %c ${msg}`,
+      "background: #ef4444; color: white; border-radius: 4px; padding: 2px 6px; font-weight: bold;",
+      "color: #ef4444;",
+      err,
+    );
+  },
+};
+
 export const Route = createFileRoute("/(protected)/_layout/chat/$chatId")({
   component: ChatRoute,
 });
@@ -48,7 +60,7 @@ function ChatRoute() {
 }
 
 export function ChatPage({ chatId }: { chatId: string }) {
-  const navigate: ReturnType<typeof useNavigate> = useNavigate();
+  const navigate = useNavigate();
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
   const [sentCache, setSentCache] = useState<SentCacheEntry[]>([]);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -72,8 +84,9 @@ export function ChatPage({ chatId }: { chatId: string }) {
   const me: User | undefined = meData?.me;
   const chat: Chat | undefined = chatData?.chat;
 
-  const { data: messages = [], isLoading: historyLoading } =
+  const { messages: historyMessages, isLoading: historyLoading } =
     useChatHistory(chatId);
+
   const { sendMessage, editMessage, decryptMessage, isSending } =
     useChatActions(chatId);
   const { data: chatsData } = useMyChats();
@@ -85,6 +98,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
 
   useEffect((): (() => void) => {
     setActiveChatId(chatId);
+    log.info(`Switched context to chat: ${chatId}`);
     return (): void => {
       setActiveChatId(null);
     };
@@ -121,8 +135,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
   }, []);
 
   const totalUnread = useMemo((): number => {
-    const typedData = chatsData as MyChatsResponse | undefined;
-    const chats: Chat[] = typedData?.myChats?.chats || [];
+    const chats: Chat[] = chatsData?.myChats?.chats || [];
 
     return chats.reduce((acc: number, c: Chat): number => {
       return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
@@ -130,14 +143,14 @@ export function ChatPage({ chatId }: { chatId: string }) {
   }, [chatsData, chatId]);
 
   const allMessages = useMemo((): Message[] => {
-    if (!me || !chatId) return messages;
+    if (!me || !chatId) return historyMessages;
 
     const serverIds: Set<string> = new Set<string>(
-      messages.map((m: Message): string => m.id),
+      historyMessages.map((m: Message): string => m.id),
     );
     const usedCacheIds: Set<string> = new Set<string>();
 
-    const patchedServerMessages: Message[] = messages.map(
+    const patchedServerMessages: Message[] = historyMessages.map(
       (m: Message): Message => {
         if (m.sender.id === me.id && m.isEncrypted) {
           const msgTime: number = new Date(m.sentAt).getTime();
@@ -159,7 +172,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
       (om: Message): boolean => {
         if (serverIds.has(om.id)) return false;
         const omTime: number = new Date(om.sentAt).getTime();
-        return !messages.some(
+        return !historyMessages.some(
           (m: Message): boolean =>
             m.sender.id === me.id &&
             Math.abs(new Date(m.sentAt).getTime() - omTime) < 2000,
@@ -167,18 +180,21 @@ export function ChatPage({ chatId }: { chatId: string }) {
       },
     );
 
-    return [...patchedServerMessages, ...filteredOptimistic].sort(
-      (a: Message, b: Message): number => {
-        const timeA: number = new Date(a.sentAt).getTime();
-        const timeB: number = new Date(b.sentAt).getTime();
-        if (Math.abs(timeA - timeB) > 2000) return timeA - timeB;
-        if (a.sequence !== undefined && b.sequence !== undefined) {
-          return a.sequence - b.sequence;
-        }
-        return timeA - timeB;
-      },
-    );
-  }, [messages, optimisticMsgs, me, sentCache, chatId]);
+    const combined: Message[] = [
+      ...patchedServerMessages,
+      ...filteredOptimistic,
+    ].sort((a: Message, b: Message): number => {
+      const timeA: number = new Date(a.sentAt).getTime();
+      const timeB: number = new Date(b.sentAt).getTime();
+      if (Math.abs(timeA - timeB) > 2000) return timeA - timeB;
+      if (a.sequence !== undefined && b.sequence !== undefined) {
+        return a.sequence - b.sequence;
+      }
+      return timeA - timeB;
+    });
+
+    return combined;
+  }, [historyMessages, optimisticMsgs, me, sentCache, chatId]);
 
   const { checkAndMarkRead } = useMarkDialog(
     chatId,
@@ -199,10 +215,11 @@ export function ChatPage({ chatId }: { chatId: string }) {
 
     if (editingMessage) {
       try {
+        log.info(`Editing message: ${editingMessage.id}`);
         await editMessage(editingMessage.id, currentInput);
         cancelAction();
       } catch (err: unknown) {
-        console.error(err);
+        log.error("Failed to edit message", err);
       }
       return;
     }
@@ -232,12 +249,14 @@ export function ChatPage({ chatId }: { chatId: string }) {
       replyTo: replyingTo || undefined,
     };
 
+    log.info(`Sending message (optimistic): ${tempId}`);
     setOptimisticMsgs((prev: Message[]): Message[] => [...prev, newMsg]);
     cancelAction();
 
     try {
       await sendMessage(val, { variables: { replyToId: currentReplyId } });
-    } catch {
+    } catch (err: unknown) {
+      log.error("Send failed, rolling back", err);
       setInput(val);
       setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] =>
         prev.filter((c: SentCacheEntry): boolean => c.id !== tempId),

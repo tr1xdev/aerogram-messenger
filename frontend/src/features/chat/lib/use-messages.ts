@@ -23,6 +23,14 @@ import type {
   ChatMember,
 } from "@/entities/chat/model/types";
 
+export interface ChatHistoryData {
+  messageHistory: {
+    messages: Message[];
+    hasMore: boolean;
+    __typename?: string;
+  };
+}
+
 export interface MyChatsResponse {
   myChats: {
     chats: Chat[];
@@ -72,27 +80,59 @@ export function useChatDetails(
 }
 
 export function useChatHistory(chatId: string): {
-  data: Message[];
+  messages: Message[];
   isLoading: boolean;
-  [key: string]: unknown;
+  hasMore: boolean;
 } {
-  const { data, loading, ...rest } = useQuery<{
-    messageHistory: { messages: Message[] };
-  }>(GET_MESSAGE_HISTORY, {
-    variables: { chatId, limit: 50, offset: 0 },
-    skip: !chatId,
-    fetchPolicy: "cache-and-network",
-  });
+  const { data, loading, error } = useQuery<ChatHistoryData>(
+    GET_MESSAGE_HISTORY,
+    {
+      variables: { chatId, limit: 50, offset: 0 },
+      skip: !chatId,
+      fetchPolicy: "cache-and-network",
+    },
+  );
 
-  const sortedMessages: Message[] = useMemo((): Message[] => {
-    const history: { messages: Message[] } | undefined = data?.messageHistory;
-    if (!history?.messages) return [];
-    return [...history.messages].sort(
+  if (error) {
+    console.error("[Apollo Error] GET_MESSAGE_HISTORY:", error);
+  }
+
+  const messages: Message[] = useMemo((): Message[] => {
+    console.log("[Raw Data] data:", data);
+
+    const history = data?.messageHistory;
+
+    if (!history) {
+      console.warn("[History] messageHistory is undefined");
+      return [];
+    }
+
+    if (!("messages" in history)) {
+      console.warn("[History] No 'messages' key in history object", history);
+      return [];
+    }
+
+    const list: Message[] = history.messages;
+    console.log("[History] Received messages:", list);
+
+    return [...list].sort(
       (a: Message, b: Message): number => (a.sequence ?? 0) - (b.sequence ?? 0),
     );
   }, [data]);
 
-  return { data: sortedMessages, isLoading: loading, ...rest };
+  const hasMore: boolean = useMemo((): boolean => {
+    const history = data?.messageHistory;
+    if (history && "hasMore" in history) {
+      return history.hasMore;
+    }
+    return false;
+  }, [data]);
+
+  return {
+    messages,
+    isLoading: loading,
+    hasMore,
+  };
 }
 
 export function useSearchUsers(
