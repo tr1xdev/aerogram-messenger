@@ -70,6 +70,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	err = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
 		ID:            chatID,
 		LastMessageID: database.UUIDToNullUUID(msg.ID),
+		LastMessageAt: database.TimeToNullTime(msg.CreatedAt),
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update dialog")

@@ -101,7 +101,7 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 			return nil, status.Error(codes.PermissionDenied, "only owner can delete for everyone")
 		}
 	} else {
-		err = s.db.Queries.RemoveDialogMember(ctx, dbgen.RemoveDialogMemberParams{
+		err = s.db.Queries.HideDialogMember(ctx, dbgen.HideDialogMemberParams{
 			DialogID: did,
 			UserID:   uid,
 		})
@@ -118,6 +118,19 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	creatorIDStr := s.getUserID(ctx, req.CreatorId)
 	if creatorIDStr == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+	}
+
+	if req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
+		if len(req.ParticipantIds) != 2 {
+			return nil, status.Error(codes.InvalidArgument, "private chat must have 2 participants")
+		}
+
+		existingDialog, err := s.dialogRepo.GetPrivateDialogByMembers(ctx, req.ParticipantIds[0], req.ParticipantIds[1])
+		if err == nil {
+			return &chatpb.CreateChatResponse{
+				Chat: s.mapDBDialogToProto(existingDialog),
+			}, nil
+		}
 	}
 
 	creatorUUID, err := uuid.Parse(creatorIDStr)

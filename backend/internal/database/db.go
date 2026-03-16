@@ -82,6 +82,16 @@ func ToNullTime(t *time.Time) sql.NullTime {
 	return sql.NullTime{Time: *t, Valid: true}
 }
 
+func TimeToNullTime(t time.Time) sql.NullTime {
+	if t.IsZero() {
+		return sql.NullTime{Valid: false}
+	}
+	return sql.NullTime{
+		Time:  t,
+		Valid: true,
+	}
+}
+
 func SetupTestDB(t *testing.T) *DB {
 	dsn := "postgres://postgres:postgres@localhost:5432/aerogram_test?sslmode=disable"
 
