@@ -90,10 +90,19 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 	}
 
 	displayTitle := pbChat.Title
+	var displayPhoto *string
+
+	if pbChat.PhotoUrl != "" {
+		displayPhoto = &pbChat.PhotoUrl
+	}
+
 	if chatType == model.ChatTypePrivate {
 		for id, u := range userMap {
 			if id != parsedAuthID {
 				displayTitle = FormatFullName(u.FirstName, u.LastName)
+				if displayPhoto == nil {
+					displayPhoto = NullStringToStringPtr(u.PhotoUrl)
+				}
 				break
 			}
 		}
@@ -109,6 +118,7 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		ID:               pbChat.Id,
 		Type:             chatType,
 		Title:            displayTitle,
+		PhotoURL:         displayPhoto,
 		Slug:             &pbChat.Slug,
 		MembersCount:     int(pbChat.MembersCount),
 		Members:          gqlMembers,

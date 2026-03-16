@@ -179,9 +179,8 @@ func (r *userResolver) Username(ctx context.Context, obj *dbgen.User) (*string, 
 	return helpers.ToStringPtr(obj.Username), nil
 }
 
-// PhotoURL is the resolver for the photoUrl field.
 func (r *userResolver) PhotoURL(ctx context.Context, obj *dbgen.User) (*string, error) {
-	return nil, nil
+	return helpers.ToStringPtr(obj.PhotoUrl), nil
 }
 
 // Bio is the resolver for the bio field.
