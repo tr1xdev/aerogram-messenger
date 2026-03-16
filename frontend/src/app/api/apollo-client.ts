@@ -271,6 +271,11 @@ export const client: ApolloClient = new ApolloClient({
     typePolicies: {
       Query: {
         fields: {
+          myChats: {
+            merge(_, incoming) {
+              return incoming;
+            },
+          },
           messageHistory: {
             keyArgs: ["chatId"],
             merge(
@@ -301,6 +306,12 @@ export const client: ApolloClient = new ApolloClient({
             },
           },
         },
+      },
+      ChatList: {
+        keyFields: false,
+      },
+      Chat: {
+        keyFields: ["id"],
       },
     },
   }),

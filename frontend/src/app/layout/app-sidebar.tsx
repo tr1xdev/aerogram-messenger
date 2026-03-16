@@ -43,16 +43,23 @@ import { cn } from "@/lib/utils";
 import type { Chat, User } from "@/entities/chat/model/types";
 import { Button } from "@/components/ui/button";
 
+interface ApolloChat extends Chat {
+  __typename: "Chat";
+}
+
+interface ApolloChatList {
+  __typename: "ChatList";
+  chats: ApolloChat[];
+}
+
+interface MyChatsData {
+  myChats: ApolloChatList;
+}
+
 interface ChatFolder {
   id: string;
   label: string;
   unread: number;
-}
-
-interface MyChatsData {
-  myChats: {
-    chats: Chat[];
-  };
 }
 
 export function AppSidebar() {
@@ -61,7 +68,10 @@ export function AppSidebar() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedQuery, setDebouncedQuery] = useState<string>("");
   const [isCreating, setIsCreating] = useState<boolean>(false);
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+  const [indicatorStyle, setIndicatorStyle] = useState<{
+    left: number;
+    width: number;
+  }>({ left: 0, width: 0 });
   const [isFocused, setIsFocused] = useState<boolean>(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
@@ -70,8 +80,8 @@ export function AppSidebar() {
 
   const client = useApolloClient();
   const navigate = useNavigate();
-  const pathname = useRouterState().location.pathname;
-  const isWsConnected = useConnectionStore((s) => s.isWsConnected);
+  const pathname: string = useRouterState().location.pathname;
+  const isWsConnected: boolean = useConnectionStore((s) => s.isWsConnected);
 
   const { data: userData, loading: isLoadingMe } = useMe();
   const { data: chatsData, loading: isLoadingChats } = useMyChats();
@@ -84,17 +94,18 @@ export function AppSidebar() {
     [userData],
   );
 
-  const chats = useMemo((): Chat[] => {
-    if (Array.isArray(chatsData?.myChats?.chats)) {
-      return chatsData.myChats.chats;
+  const chats = useMemo((): ApolloChat[] => {
+    const rawChats = chatsData?.myChats?.chats;
+    if (Array.isArray(rawChats)) {
+      return rawChats as ApolloChat[];
     }
     return [];
   }, [chatsData]);
 
   const fullName = useMemo((): string => {
     if (!user) return "";
-    const first = user.firstName?.trim() || "";
-    const last = user.lastName?.trim() || "";
+    const first: string = user.firstName?.trim() || "";
+    const last: string = user.lastName?.trim() || "";
     if (!first && !last) return user.username || "";
     return `${first} ${last}`.trim();
   }, [user]);
@@ -105,31 +116,31 @@ export function AppSidebar() {
   }, [user]);
 
   const pinnedChats = useMemo(
-    (): Chat[] => chats.filter((c: Chat) => c.isPinned),
+    (): ApolloChat[] => chats.filter((c: ApolloChat) => c.isPinned),
     [chats],
   );
   const otherChats = useMemo(
-    (): Chat[] => chats.filter((c: Chat) => !c.isPinned),
+    (): ApolloChat[] => chats.filter((c: ApolloChat) => !c.isPinned),
     [chats],
   );
 
   const folders: ChatFolder[] = useMemo((): ChatFolder[] => {
     const totalUnread: number = chats.reduce(
-      (acc: number, chat: Chat) => acc + (chat.unreadCount || 0),
+      (acc: number, chat: ApolloChat) => acc + (chat.unreadCount || 0),
       0,
     );
     return [{ id: "all", label: "All chats", unread: totalUnread }];
   }, [chats]);
 
-  const filteredLocalChats = useMemo((): Chat[] => {
+  const filteredLocalChats = useMemo((): ApolloChat[] => {
     if (!debouncedQuery) return [];
     const q: string = debouncedQuery.toLowerCase();
-    return chats.filter((c: Chat) => c.title.toLowerCase().includes(q));
+    return chats.filter((c: ApolloChat) => c.title.toLowerCase().includes(q));
   }, [debouncedQuery, chats]);
 
   useEffect((): void => {
     const saved: string | null = localStorage.getItem("recent_searches");
-    if (saved) setRecentSearches(JSON.parse(saved));
+    if (saved) setRecentSearches(JSON.parse(saved) as string[]);
   }, []);
 
   useEffect((): (() => void) => {
@@ -160,16 +171,18 @@ export function AppSidebar() {
     return (): void => window.removeEventListener("resize", updateIndicator);
   }, [updateIndicator, chats]);
 
-  const addToRecent = (query: string): void => {
+  const addToRecent = useCallback((query: string): void => {
     const trimmed: string = query.trim();
     if (!trimmed) return;
-    const updated: string[] = [
-      trimmed,
-      ...recentSearches.filter((s: string) => s !== trimmed),
-    ].slice(0, 10);
-    setRecentSearches(updated);
-    localStorage.setItem("recent_searches", JSON.stringify(updated));
-  };
+    setRecentSearches((prev: string[]) => {
+      const updated: string[] = [
+        trimmed,
+        ...prev.filter((s: string) => s !== trimmed),
+      ].slice(0, 10);
+      localStorage.setItem("recent_searches", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const removeFromRecent = (e: React.MouseEvent, query: string): void => {
     e.stopPropagation();
@@ -194,21 +207,29 @@ export function AppSidebar() {
         const existing = client.readQuery<MyChatsData>({
           query: GET_MY_CHATS,
         });
+
         if (existing?.myChats) {
+          const apolloNewChat: ApolloChat = {
+            ...newChat,
+            __typename: "Chat",
+          };
+
           client.writeQuery<MyChatsData>({
             query: GET_MY_CHATS,
             data: {
               myChats: {
+                __typename: "ChatList",
                 chats: [
-                  newChat,
+                  apolloNewChat,
                   ...existing.myChats.chats.filter(
-                    (c: Chat) => c.id !== newChat.id,
+                    (c: ApolloChat) => c.id !== newChat.id,
                   ),
                 ],
               },
             },
           });
         }
+
         if (searchQuery) addToRecent(searchQuery);
         setSearchQuery("");
         setIsFocused(false);
@@ -337,7 +358,7 @@ export function AppSidebar() {
             </div>
 
             {chats.length > 0 && !searchQuery && !isFocused && (
-              <div className="sticky top-[56px] bg-background px-4 border-b border-border/5 z-20">
+              <div className="sticky top-14 bg-background px-4 border-b border-border/5 z-20">
                 <div
                   className="relative flex items-center h-11"
                   ref={foldersRef}
@@ -449,7 +470,7 @@ export function AppSidebar() {
                         <h3 className="text-[15px] font-bold text-foreground mb-1.5">
                           Search for chats or users
                         </h3>
-                        <p className="text-[13px] text-muted-foreground/80 max-w-[220px] leading-relaxed font-medium">
+                        <p className="text-[13px] text-muted-foreground/80 max-w-55 leading-relaxed font-medium">
                           Find existing conversations or start new ones by
                           typing a name.
                         </p>
@@ -471,7 +492,7 @@ export function AppSidebar() {
                       <Search className="h-10 w-10 text-primary/30 -rotate-3" />
                     </div>
                   </div>
-                  <div className="space-y-2 text-center max-w-[240px]">
+                  <div className="space-y-2 text-center max-w-60">
                     <h3 className="text-[16px] font-bold tracking-tight text-foreground">
                       No conversations yet
                     </h3>
@@ -500,7 +521,7 @@ export function AppSidebar() {
                         <BsFillPinFill className="h-3 w-3" /> PINNED CHATS
                       </div>
                       <SidebarMenu>
-                        {pinnedChats.map((chat: Chat) => (
+                        {pinnedChats.map((chat: ApolloChat) => (
                           <ChatMenuItem
                             key={chat.id}
                             chat={chat}
@@ -517,7 +538,7 @@ export function AppSidebar() {
                         ALL CHATS
                       </div>
                       <SidebarMenu>
-                        {otherChats.map((chat: Chat) => (
+                        {otherChats.map((chat: ApolloChat) => (
                           <ChatMenuItem
                             key={chat.id}
                             chat={chat}

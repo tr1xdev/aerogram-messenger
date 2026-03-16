@@ -1,6 +1,6 @@
 import { gql } from "@apollo/client";
 import { CHAT_BASE_FIELDS } from "../fragments/chat.fragments";
-import { USER_FIELDS } from "../fragments/message.fragments";
+import { MESSAGE_FIELDS, USER_FIELDS } from "../fragments/message.fragments";
 
 export const PIN_CHAT = gql`
   mutation PinChat($id: ID!, $pinned: Boolean!) {
@@ -46,6 +46,10 @@ export const CREATE_DIRECT_CHAT = gql`
       __typename
       ... on Chat {
         ...ChatBaseFields
+        membersCount
+        lastMessage {
+          ...MessageFields
+        }
         members {
           user {
             ...UserFields
@@ -66,4 +70,5 @@ export const CREATE_DIRECT_CHAT = gql`
   }
   ${CHAT_BASE_FIELDS}
   ${USER_FIELDS}
+  ${MESSAGE_FIELDS}
 `;
