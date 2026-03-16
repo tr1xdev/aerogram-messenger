@@ -15,7 +15,7 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 
 	msg := &model.Message{
 		ID:           m.Id,
-		ChatID:       m.ChatId,
+		ChatID:       m.Id,
 		Text:         m.Text,
 		SentAt:       m.SentAt,
 		Sequence:     m.Sequence,
