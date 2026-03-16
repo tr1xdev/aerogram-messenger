@@ -1,5 +1,5 @@
 import { LogOut, ChevronDown } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -46,8 +46,13 @@ export function ProfileContent({
   return (
     <div className="space-y-6 py-6 outline-none">
       <div className="flex items-center gap-5">
-        <Avatar className="h-20 w-20 border border-border shadow-sm shrink-0">
-          <AvatarFallback className="text-2xl bg-primary/5 text-primary font-bold">
+        <Avatar className="h-20 w-20 border border-border shadow-sm shrink-0 rounded-full overflow-hidden">
+          <AvatarImage
+            src={user?.photoUrl || undefined}
+            alt={`${user?.firstName} ${user?.lastName}`}
+            className="aspect-square h-full w-full object-cover"
+          />
+          <AvatarFallback className="text-2xl bg-primary/5 text-primary font-bold h-full w-full flex items-center justify-center uppercase">
             {initial}
           </AvatarFallback>
         </Avatar>
@@ -60,7 +65,6 @@ export function ProfileContent({
           </p>
         </div>
       </div>
-
       <div className="space-y-2">
         <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
           Bio

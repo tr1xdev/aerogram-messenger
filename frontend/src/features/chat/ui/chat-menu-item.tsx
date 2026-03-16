@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   ContextMenu,
@@ -51,6 +51,13 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
     return chat.title || "Chat";
   }, [otherUser, chat.title]);
 
+  const avatarUrl: string | undefined = useMemo((): string | undefined => {
+    if (chat.type === "PRIVATE") {
+      return otherUser?.photoUrl || undefined;
+    }
+    return chat.photoUrl || undefined;
+  }, [chat.type, chat.photoUrl, otherUser?.photoUrl]);
+
   const initial: string = useMemo(
     (): string => (displayName.length > 0 ? displayName[0].toUpperCase() : "?"),
     [displayName],
@@ -81,7 +88,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
             <SidebarMenuButton
               asChild
               isActive={isActive}
-              className="h-auto p-4 transition-all duration-200 hover:bg-muted/50 data-[active=true]:bg-primary/[0.04]"
+              className="h-auto p-4 transition-all duration-200 hover:bg-muted/50 data-[active=true]:bg-primary/4"
             >
               <Link
                 to="/chat/$chatId"
@@ -89,13 +96,18 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                 className="flex items-center gap-3 w-full"
               >
                 <div className="relative shrink-0">
-                  <Avatar className="h-14 w-14 border border-border/40 overflow-visible">
-                    <AvatarFallback className="bg-primary/5 text-primary font-bold text-lg">
+                  <Avatar className="h-14 w-14 border border-border/40 rounded-full overflow-hidden shrink-0">
+                    <AvatarImage
+                      src={avatarUrl}
+                      alt={displayName}
+                      className="aspect-square h-full w-full object-cover"
+                    />
+                    <AvatarFallback className="text-primary font-bold text-lg h-full w-full flex items-center justify-center uppercase">
                       {initial}
                     </AvatarFallback>
                   </Avatar>
                   {isOnline && (
-                    <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background z-10 bg-green-500" />
+                    <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background z-10 bg-green-500" />
                   )}
                 </div>
 
@@ -151,7 +163,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                       )}
 
                       {chat.unreadCount > 0 && (
-                        <Badge className="h-5 min-w-[20px] px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shrink-0 shadow-sm">
+                        <Badge className="h-5 min-w-5 px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shrink-0 shadow-sm">
                           {chat.unreadCount}
                         </Badge>
                       )}

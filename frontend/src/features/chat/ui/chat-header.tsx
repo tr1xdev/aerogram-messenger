@@ -33,6 +33,26 @@ export function ChatHeader({
 
   const status: string | undefined = otherMember?.user.status;
 
+  const renderAvatar = () => {
+    const effectivePhotoUrl: string | undefined =
+      photoUrl ?? otherMember?.user.photoUrl ?? undefined;
+
+    return (
+      <Avatar className="h-10 w-10 border border-border/50 shadow-sm rounded-full overflow-hidden shrink-0">
+        {effectivePhotoUrl && (
+          <AvatarImage
+            src={effectivePhotoUrl}
+            alt={title || "Chat"}
+            className="aspect-square h-full w-full object-cover"
+          />
+        )}
+        <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs h-full w-full flex items-center justify-center uppercase">
+          {title?.[0] || "?"}
+        </AvatarFallback>
+      </Avatar>
+    );
+  };
+
   return (
     <header className="flex h-16 items-center justify-between px-4 border-b shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-50">
       <div className="flex items-center gap-2 min-w-0 h-full">
@@ -46,7 +66,7 @@ export function ChatHeader({
             <ChevronLeft className="h-6 w-6" />
           </Button>
           {totalUnread > 0 && (
-            <span className="absolute top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold border-2 border-background px-1 shadow-sm z-[60]">
+            <span className="absolute top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold border-2 border-background px-1 shadow-sm z-60">
               {totalUnread}
             </span>
           )}
@@ -63,12 +83,7 @@ export function ChatHeader({
         ) : otherMember ? (
           <ChatUserPopover userId={otherMember.user.id}>
             <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
-              <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
-                <AvatarImage src={photoUrl || ""} />
-                <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
-                  {title?.[0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              {renderAvatar()}
               <div className="flex flex-col min-w-0 text-left">
                 <span className="text-[15px] font-bold truncate leading-none">
                   {title}
@@ -88,12 +103,7 @@ export function ChatHeader({
           </ChatUserPopover>
         ) : title ? (
           <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
-            <Avatar className="h-10 w-10 border border-border/50 shadow-sm">
-              <AvatarImage src={photoUrl || ""} />
-              <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs">
-                {title?.[0].toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            {renderAvatar()}
             <div className="flex flex-col min-w-0 text-left">
               <span className="text-[15px] font-bold truncate leading-none">
                 {title}

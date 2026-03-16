@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NewChatDialog } from "@/features/chat/ui/new-chat-dialog";
 import { ChatMenuItem } from "@/features/chat/ui/chat-menu-item";
 import { SettingsDialog } from "@/features/settings/ui/settings-dialog";
@@ -570,8 +570,13 @@ export function AppSidebar() {
           ) : (
             <div className="flex items-center justify-between w-full animate-in fade-in slide-in-from-bottom-1 duration-300">
               <div className="flex items-center gap-3 min-w-0">
-                <Avatar className="h-9 w-9 border border-border/10">
-                  <AvatarFallback className="font-bold text-[11px] bg-primary/10 text-primary uppercase">
+                <Avatar className="h-9 w-9 border border-border/10 rounded-full overflow-hidden shrink-0">
+                  <AvatarImage
+                    src={user.photoUrl || undefined}
+                    alt={fullName}
+                    className="aspect-square h-full w-full object-cover"
+                  />
+                  <AvatarFallback className="font-bold text-[11px] bg-primary/10 text-primary uppercase h-full w-full flex items-center justify-center">
                     {avatarFallback}
                   </AvatarFallback>
                 </Avatar>

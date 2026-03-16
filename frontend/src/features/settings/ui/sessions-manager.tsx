@@ -136,7 +136,7 @@ export function SessionsManager({ userId }: { userId?: string }) {
                 key={session.id}
                 className={`group flex items-center justify-between p-3.5 rounded-xl border ${
                   session.isCurrent
-                    ? "bg-primary/[0.02] border-primary/20"
+                    ? "bg-primary/2 border-primary/20"
                     : "bg-card/50 border-border/50"
                 }`}
               >
@@ -184,7 +184,7 @@ export function SessionsManager({ userId }: { userId?: string }) {
         )}
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.03] border border-primary/10 dark:bg-muted/20 dark:border-border/40">
+      <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/3 border border-primary/10 dark:bg-muted/20 dark:border-border/40">
         <div className="p-1.5 rounded-lg bg-primary/10 text-primary shrink-0">
           <ShieldAlert className="h-4 w-4" />
         </div>
