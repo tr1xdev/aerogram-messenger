@@ -22,12 +22,12 @@ export const parseApiError = (error: unknown): string => {
 };
 
 interface AuthPayload {
-  user_id: string;
+  userId: string;
 }
 
 interface VerifyPayload {
-  access_token: string;
-  refresh_token: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 interface LoginInput {
@@ -39,8 +39,8 @@ interface SignUpInput {
   username?: string;
   email: string;
   password: string;
-  first_name: string;
-  last_name?: string;
+  firstName: string;
+  lastName?: string;
 }
 
 interface VerifyEmailInput {
@@ -61,7 +61,7 @@ export const useLogin = () => {
     onSuccess: (data) => {
       navigate({
         to: "/otp",
-        search: { userId: data.user_id || "" },
+        search: { userId: data.userId },
       });
     },
   });
@@ -80,7 +80,7 @@ export const useSignUp = () => {
     onSuccess: (data) => {
       navigate({
         to: "/otp",
-        search: { userId: data.user_id || "" },
+        search: { userId: data.userId },
       });
     },
   });
@@ -99,8 +99,8 @@ export const useVerifyEmail = () => {
       return response.verifyEmail;
     },
     onSuccess: (data) => {
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
+      localStorage.setItem("access_token", data.accessToken);
+      localStorage.setItem("refresh_token", data.refreshToken);
       setAuth(true);
       navigate({ to: "/" });
     },

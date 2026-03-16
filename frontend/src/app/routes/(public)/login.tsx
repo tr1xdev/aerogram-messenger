@@ -103,15 +103,7 @@ export function LoginPage() {
                 <Button type="submit" className="w-full" disabled={isPending}>
                   {isPending ? "Logging in..." : "Login"}
                 </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  type="button"
-                  disabled={isPending}
-                >
-                  Login with Google
-                </Button>
-                <FieldDescription className="text-center">
+                <FieldDescription className="text-center mt-4">
                   Don&apos;t have an account?{" "}
                   <a
                     onClick={() => navigate({ to: "/signup" })}

@@ -20,8 +20,8 @@ import {
 } from "@/components/ui/card";
 
 const signupSchema = z.object({
-  first_name: z.string().min(2, { message: "First name is required" }),
-  last_name: z.string().optional(),
+  firstName: z.string().min(2, { message: "First name is required" }),
+  lastName: z.string().optional(),
   email: z.string().email({ message: "Please enter a valid email" }),
   password: z
     .string()
@@ -40,11 +40,16 @@ export function SignupPage() {
 
   const form = useForm<SignupInputs>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { first_name: "", last_name: "", email: "", password: "" },
+    defaultValues: { firstName: "", lastName: "", email: "", password: "" },
   });
 
   const onSubmit = (data: SignupInputs) => {
-    mutate({ input: { ...data, username: data.email.split("@")[0] } });
+    mutate({
+      input: {
+        ...data,
+        username: data.email.split("@")[0],
+      },
+    });
   };
 
   return (
@@ -69,23 +74,23 @@ export function SignupPage() {
             <FieldGroup>
               <div className="grid grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel htmlFor="first_name">First Name</FieldLabel>
+                  <FieldLabel htmlFor="firstName">First Name</FieldLabel>
                   <Input
-                    {...form.register("first_name")}
-                    id="first_name"
+                    {...form.register("firstName")}
+                    id="firstName"
                     disabled={isPending}
                   />
-                  {form.formState.errors.first_name && (
+                  {form.formState.errors.firstName && (
                     <FieldDescription className="text-destructive">
-                      {form.formState.errors.first_name.message}
+                      {form.formState.errors.firstName.message}
                     </FieldDescription>
                   )}
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="last_name">Last Name</FieldLabel>
+                  <FieldLabel htmlFor="lastName">Last Name</FieldLabel>
                   <Input
-                    {...form.register("last_name")}
-                    id="last_name"
+                    {...form.register("lastName")}
+                    id="lastName"
                     disabled={isPending}
                   />
                 </Field>
