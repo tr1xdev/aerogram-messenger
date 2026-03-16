@@ -34,24 +34,34 @@ func newUserBatchFn(client userpb.UserServiceClient) dataloader.BatchFunc[string
 
 		userMap := make(map[string]*dbgen.User)
 		for _, u := range res.Users {
-			uid, _ := uuid.Parse(u.Id)
-			userMap[strings.ToLower(u.Id)] = &dbgen.User{
-				ID:               uid,
-				FirstName:        u.FirstName,
-				LastName:         toNullString(u.LastName),
-				Username:         toNullString(u.Username),
-				PublicKey:        toNullString(u.PublicKey),
-				EncryptedPrivKey: toNullString(u.EncryptedPrivKey),
-				EncryptionIv:     toNullString(u.EncryptionIv),
+			if uid, err := uuid.Parse(u.Id); err == nil {
+				normalizedID := uid.String()
+				userMap[normalizedID] = &dbgen.User{
+					ID:               uid,
+					FirstName:        u.FirstName,
+					LastName:         toNullString(u.LastName),
+					Username:         toNullString(u.Username),
+					PublicKey:        toNullString(u.PublicKey),
+					PhotoUrl:         toNullString(u.PhotoUrl),
+					EncryptedPrivKey: toNullString(u.EncryptedPrivKey),
+					EncryptionIv:     toNullString(u.EncryptionIv),
+				}
 			}
 		}
 
 		for i, id := range keys {
-			lowerID := strings.ToLower(id)
-			if u, ok := userMap[lowerID]; ok {
+			parsedID, err := uuid.Parse(id)
+			if err != nil {
+				output[i] = &dataloader.Result[*dbgen.User]{Error: err}
+				continue
+			}
+
+			if u, ok := userMap[parsedID.String()]; ok {
 				output[i] = &dataloader.Result[*dbgen.User]{Data: u}
 			} else {
-				output[i] = &dataloader.Result[*dbgen.User]{Error: fmt.Errorf("user %s not found", id)}
+				output[i] = &dataloader.Result[*dbgen.User]{
+					Error: fmt.Errorf("user %s not found in user_svc response", id),
+				}
 			}
 		}
 		return output

@@ -43,6 +43,7 @@ message User {
   optional string public_key = 9;
   optional string encrypted_priv_key = 10;
   optional string encryption_iv = 11;
+  optional string photo_url = 12;
 }
 
 message UserInfoRequest {
@@ -67,6 +68,7 @@ message UpdateUserRequest {
   optional string public_key = 5;
   optional string encrypted_priv_key = 6;
   optional string encryption_iv = 7;
+  optional string photo_url = 8;
 }
 
 message UpdateUserResponse {

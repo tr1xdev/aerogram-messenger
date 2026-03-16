@@ -26,7 +26,7 @@ type Querier interface {
 	DecrementMembersCount(ctx context.Context, id uuid.UUID) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
-	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]Message, error)
+	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error)
 	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)
 	GetDialogByUsername(ctx context.Context, username sql.NullString) (Dialog, error)
 	GetDialogMember(ctx context.Context, arg GetDialogMemberParams) (DialogMember, error)
@@ -60,6 +60,7 @@ type Querier interface {
 	UpdateMemberPinStatus(ctx context.Context, arg UpdateMemberPinStatusParams) error
 	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error
 	UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error)
+	UpdateMessageExtended(ctx context.Context, arg UpdateMessageExtendedParams) (Message, error)
 	UpdateSessionActivity(ctx context.Context, id uuid.UUID) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error

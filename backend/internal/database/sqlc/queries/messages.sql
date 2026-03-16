@@ -10,9 +10,18 @@ INSERT INTO messages (
 SELECT * FROM messages WHERE id = $1 LIMIT 1;
 
 -- name: GetChatHistory :many
-SELECT * FROM messages
-WHERE dialog_id = $1 AND is_deleted = false
-ORDER BY sequence DESC
+SELECT
+    m.*,
+    u.id as author_id,
+    u.username as author_username,
+    u.first_name as author_first_name,
+    u.last_name as author_last_name,
+    u.public_key as author_public_key,
+    u.photo_url as author_photo_url -- This will now work
+FROM messages m
+JOIN users u ON m.author_id = u.id
+WHERE m.dialog_id = $1 AND m.is_deleted = false
+ORDER BY m.sequence DESC
 LIMIT $2 OFFSET $3;
 
 -- name: UpdateMessageContent :one
@@ -67,3 +76,12 @@ LIMIT 1;
 
 -- name: GetMessagesByIDs :many
 SELECT * FROM messages WHERE id = ANY($1::uuid[]);
+
+-- name: UpdateMessageExtended :one
+UPDATE messages
+SET content = $2,
+    encryption_iv = $3,
+    is_edited = true,
+    updated_at = NOW()
+WHERE id = $1 AND author_id = $4
+RETURNING *;

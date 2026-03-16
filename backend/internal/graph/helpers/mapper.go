@@ -3,6 +3,7 @@ package helpers
 import (
 	"time"
 
+	"github.com/google/uuid"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
@@ -13,15 +14,20 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 		return nil
 	}
 
+	senderID, _ := uuid.Parse(m.SenderId)
+
 	msg := &model.Message{
 		ID:           m.Id,
-		ChatID:       m.Id,
+		ChatID:       m.ChatId,
 		Text:         m.Text,
 		SentAt:       m.SentAt,
 		Sequence:     m.Sequence,
 		IsEdited:     m.IsEdited,
 		IsEncrypted:  m.IsEncrypted,
 		EncryptionIv: m.EncryptionIv,
+		Sender: &dbgen.User{
+			ID: senderID,
+		},
 	}
 
 	if m.ReplyToId != nil && *m.ReplyToId != "" {
@@ -38,6 +44,13 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 		return nil
 	}
 
+	var sender *dbgen.User
+	if m.AuthorID != uuid.Nil {
+		sender = &dbgen.User{
+			ID: m.AuthorID,
+		}
+	}
+
 	msg := &model.Message{
 		ID:           m.ID.String(),
 		ChatID:       m.DialogID.String(),
@@ -47,6 +60,7 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 		IsEdited:     m.IsEdited,
 		IsEncrypted:  m.IsEncrypted,
 		EncryptionIv: NullStringToStringPtr(m.EncryptionIv),
+		Sender:       sender,
 	}
 
 	if m.ReplyToID.Valid {

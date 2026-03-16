@@ -28,12 +28,14 @@ const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     id, username, first_name, last_name, email, password,
     status, public_key, encrypted_priv_key, encryption_iv,
+    photo_url, -- ДОБАВЛЕНО
     created_at, updated_at, is_premium, is_email_verified
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+    $11, -- photo_url
     NOW(), NOW(), DEFAULT, DEFAULT
 )
-RETURNING id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at
+RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at
 `
 
 type CreateUserParams struct {
@@ -47,6 +49,7 @@ type CreateUserParams struct {
 	PublicKey        sql.NullString `json:"public_key"`
 	EncryptedPrivKey sql.NullString `json:"encrypted_priv_key"`
 	EncryptionIv     sql.NullString `json:"encryption_iv"`
+	PhotoUrl         sql.NullString `json:"photo_url"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -61,6 +64,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.PublicKey,
 		arg.EncryptedPrivKey,
 		arg.EncryptionIv,
+		arg.PhotoUrl,
 	)
 	var i User
 	err := row.Scan(
@@ -71,6 +75,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.Password,
 		&i.Status,
+		&i.PhotoUrl,
 		&i.IsPremium,
 		&i.IsEmailVerified,
 		&i.VerificationToken,
@@ -86,7 +91,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at from users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at from users
 WHERE email = $1 AND deleted_at IS NULL LIMIT 1
 `
 
@@ -101,6 +106,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.Password,
 		&i.Status,
+		&i.PhotoUrl,
 		&i.IsPremium,
 		&i.IsEmailVerified,
 		&i.VerificationToken,
@@ -116,7 +122,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
 WHERE id = $1 AND deleted_at IS NULL LIMIT 1
 `
 
@@ -131,6 +137,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Email,
 		&i.Password,
 		&i.Status,
+		&i.PhotoUrl,
 		&i.IsPremium,
 		&i.IsEmailVerified,
 		&i.VerificationToken,
@@ -146,7 +153,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
 WHERE username = $1 AND deleted_at IS NULL LIMIT 1
 `
 
@@ -161,6 +168,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 		&i.Email,
 		&i.Password,
 		&i.Status,
+		&i.PhotoUrl,
 		&i.IsPremium,
 		&i.IsEmailVerified,
 		&i.VerificationToken,
@@ -176,7 +184,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
 WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL
 `
 
@@ -197,6 +205,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Us
 			&i.Email,
 			&i.Password,
 			&i.Status,
+			&i.PhotoUrl,
 			&i.IsPremium,
 			&i.IsEmailVerified,
 			&i.VerificationToken,
@@ -222,7 +231,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Us
 }
 
 const searchUsersByUsername = `-- name: SearchUsersByUsername :many
-SELECT id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
 WHERE username ILIKE $1::text || '%' AND username != '' AND deleted_at IS NULL
 LIMIT 20
 `
@@ -244,6 +253,7 @@ func (q *Queries) SearchUsersByUsername(ctx context.Context, dollar_1 string) ([
 			&i.Email,
 			&i.Password,
 			&i.Status,
+			&i.PhotoUrl,
 			&i.IsPremium,
 			&i.IsEmailVerified,
 			&i.VerificationToken,
@@ -269,7 +279,7 @@ func (q *Queries) SearchUsersByUsername(ctx context.Context, dollar_1 string) ([
 }
 
 const searchUsersGlobal = `-- name: SearchUsersGlobal :many
-SELECT id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
 WHERE (username ILIKE '%' || $1 || '%' OR first_name ILIKE '%' || $1 || '%')
 AND deleted_at IS NULL
 LIMIT 20
@@ -292,6 +302,7 @@ func (q *Queries) SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString
 			&i.Email,
 			&i.Password,
 			&i.Status,
+			&i.PhotoUrl,
 			&i.IsPremium,
 			&i.IsEmailVerified,
 			&i.VerificationToken,
@@ -336,9 +347,10 @@ SET
     public_key = COALESCE($4, public_key),
     encrypted_priv_key = COALESCE($5, encrypted_priv_key),
     encryption_iv = COALESCE($6, encryption_iv),
+    photo_url = COALESCE($7, photo_url), -- ДОБАВЛЕНО
     updated_at = NOW()
-WHERE id = $7
-RETURNING id, username, first_name, last_name, email, password, status, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at
+WHERE id = $8
+RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at
 `
 
 type UpdateUserParams struct {
@@ -348,6 +360,7 @@ type UpdateUserParams struct {
 	PublicKey        sql.NullString `json:"public_key"`
 	EncryptedPrivKey sql.NullString `json:"encrypted_priv_key"`
 	EncryptionIv     sql.NullString `json:"encryption_iv"`
+	PhotoUrl         sql.NullString `json:"photo_url"`
 	ID               uuid.UUID      `json:"id"`
 }
 
@@ -359,6 +372,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		arg.PublicKey,
 		arg.EncryptedPrivKey,
 		arg.EncryptionIv,
+		arg.PhotoUrl,
 		arg.ID,
 	)
 	var i User
@@ -370,6 +384,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Email,
 		&i.Password,
 		&i.Status,
+		&i.PhotoUrl,
 		&i.IsPremium,
 		&i.IsEmailVerified,
 		&i.VerificationToken,

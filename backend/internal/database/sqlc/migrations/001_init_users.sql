@@ -6,6 +6,7 @@ CREATE TABLE users (
     email               VARCHAR(255) NOT NULL UNIQUE,
     password            TEXT NOT NULL,
     status              VARCHAR(20) NOT NULL DEFAULT 'OFFLINE',
+    photo_url           TEXT,
     is_premium          BOOLEAN NOT NULL DEFAULT FALSE,
     is_email_verified   BOOLEAN NOT NULL DEFAULT FALSE,
     verification_token  TEXT,

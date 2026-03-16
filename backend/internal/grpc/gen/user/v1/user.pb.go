@@ -220,6 +220,7 @@ type User struct {
 	PublicKey        *string                `protobuf:"bytes,9,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
 	EncryptedPrivKey *string                `protobuf:"bytes,10,opt,name=encrypted_priv_key,json=encryptedPrivKey,proto3,oneof" json:"encrypted_priv_key,omitempty"`
 	EncryptionIv     *string                `protobuf:"bytes,11,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
+	PhotoUrl         *string                `protobuf:"bytes,12,opt,name=photo_url,json=photoUrl,proto3,oneof" json:"photo_url,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -327,6 +328,13 @@ func (x *User) GetEncryptedPrivKey() string {
 func (x *User) GetEncryptionIv() string {
 	if x != nil && x.EncryptionIv != nil {
 		return *x.EncryptionIv
+	}
+	return ""
+}
+
+func (x *User) GetPhotoUrl() string {
+	if x != nil && x.PhotoUrl != nil {
+		return *x.PhotoUrl
 	}
 	return ""
 }
@@ -504,6 +512,7 @@ type UpdateUserRequest struct {
 	PublicKey        *string                `protobuf:"bytes,5,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
 	EncryptedPrivKey *string                `protobuf:"bytes,6,opt,name=encrypted_priv_key,json=encryptedPrivKey,proto3,oneof" json:"encrypted_priv_key,omitempty"`
 	EncryptionIv     *string                `protobuf:"bytes,7,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
+	PhotoUrl         *string                `protobuf:"bytes,8,opt,name=photo_url,json=photoUrl,proto3,oneof" json:"photo_url,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -583,6 +592,13 @@ func (x *UpdateUserRequest) GetEncryptedPrivKey() string {
 func (x *UpdateUserRequest) GetEncryptionIv() string {
 	if x != nil && x.EncryptionIv != nil {
 		return *x.EncryptionIv
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetPhotoUrl() string {
+	if x != nil && x.PhotoUrl != nil {
+		return *x.PhotoUrl
 	}
 	return ""
 }
@@ -682,7 +698,7 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x16\n" +
 	"\x06global\x18\x02 \x01(\bR\x06global\":\n" +
 	"\x13SearchUsersResponse\x12#\n" +
-	"\x05users\x18\x01 \x03(\v2\r.user.v1.UserR\x05users\"\x92\x04\n" +
+	"\x05users\x18\x01 \x03(\v2\r.user.v1.UserR\x05users\"\xc2\x04\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -699,7 +715,8 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"public_key\x18\t \x01(\tH\x06R\tpublicKey\x88\x01\x01\x121\n" +
 	"\x12encrypted_priv_key\x18\n" +
 	" \x01(\tH\aR\x10encryptedPrivKey\x88\x01\x01\x12(\n" +
-	"\rencryption_iv\x18\v \x01(\tH\bR\fencryptionIv\x88\x01\x01B\b\n" +
+	"\rencryption_iv\x18\v \x01(\tH\bR\fencryptionIv\x88\x01\x01\x12 \n" +
+	"\tphoto_url\x18\f \x01(\tH\tR\bphotoUrl\x88\x01\x01B\b\n" +
 	"\x06_emailB\f\n" +
 	"\n" +
 	"_last_nameB\x06\n" +
@@ -709,7 +726,9 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\v_created_atB\r\n" +
 	"\v_public_keyB\x15\n" +
 	"\x13_encrypted_priv_keyB\x10\n" +
-	"\x0e_encryption_iv\"O\n" +
+	"\x0e_encryption_ivB\f\n" +
+	"\n" +
+	"_photo_url\"O\n" +
 	"\x0fUserInfoRequest\x12\x1c\n" +
 	"\busername\x18\x01 \x01(\tH\x00R\busername\x12\x10\n" +
 	"\x02id\x18\x02 \x01(\tH\x00R\x02idB\f\n" +
@@ -719,7 +738,7 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
 	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
 	"\n" +
-	"\bresponse\"\xed\x02\n" +
+	"\bresponse\"\x9d\x03\n" +
 	"\x11UpdateUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
 	"\n" +
@@ -729,14 +748,17 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"public_key\x18\x05 \x01(\tH\x03R\tpublicKey\x88\x01\x01\x121\n" +
 	"\x12encrypted_priv_key\x18\x06 \x01(\tH\x04R\x10encryptedPrivKey\x88\x01\x01\x12(\n" +
-	"\rencryption_iv\x18\a \x01(\tH\x05R\fencryptionIv\x88\x01\x01B\r\n" +
+	"\rencryption_iv\x18\a \x01(\tH\x05R\fencryptionIv\x88\x01\x01\x12 \n" +
+	"\tphoto_url\x18\b \x01(\tH\x06R\bphotoUrl\x88\x01\x01B\r\n" +
 	"\v_first_nameB\f\n" +
 	"\n" +
 	"_last_nameB\v\n" +
 	"\t_usernameB\r\n" +
 	"\v_public_keyB\x15\n" +
 	"\x13_encrypted_priv_keyB\x10\n" +
-	"\x0e_encryption_iv\"u\n" +
+	"\x0e_encryption_ivB\f\n" +
+	"\n" +
+	"_photo_url\"u\n" +
 	"\x12UpdateUserResponse\x12.\n" +
 	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
 	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +

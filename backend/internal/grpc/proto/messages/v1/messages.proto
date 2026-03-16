@@ -12,6 +12,15 @@ service MessagesService {
   rpc MarkAsRead(MarkAsReadRequest) returns (MarkAsReadResponse);
 }
 
+message User {
+  string id = 1;
+  string username = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string public_key = 5;
+  string photo_url = 6;
+}
+
 message Message {
   string id = 1;
   string chat_id = 2;
@@ -27,6 +36,7 @@ message Message {
   optional string media_url = 12;
   optional string media_type = 13;
   bool is_system = 14;
+  User sender = 15;
 }
 
 message SendMessageRequest {
@@ -48,6 +58,7 @@ message UpdateMessageRequest {
   string id = 1;
   string sender_id = 2;
   string text = 3;
+  optional string encryption_iv = 4;
 }
 
 message UpdateMessageResponse {

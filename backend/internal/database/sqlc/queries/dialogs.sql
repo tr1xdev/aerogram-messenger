@@ -49,6 +49,9 @@ SELECT
     m.encryption_iv AS msg_encryption_iv,
     m.sequence AS msg_sequence,
     m.author_id AS msg_author_id,
+    u.username AS msg_author_username,
+    u.first_name AS msg_author_first_name,
+    u.public_key AS msg_author_public_key,
     m.created_at AS msg_created_at,
     m.reply_to_id AS msg_reply_to_id,
     (
@@ -62,6 +65,7 @@ SELECT
 FROM dialogs d
 JOIN dialog_members dm ON dm.dialog_id = d.id
 LEFT JOIN messages m ON d.last_message_id = m.id
+LEFT JOIN users u ON m.author_id = u.id
 WHERE dm.user_id = $1
   AND d.is_active = true
   AND dm.is_hidden = false

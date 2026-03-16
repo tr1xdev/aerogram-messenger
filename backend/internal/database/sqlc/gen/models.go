@@ -119,6 +119,7 @@ type User struct {
 	Email              string         `json:"email"`
 	Password           string         `json:"password"`
 	Status             string         `json:"status"`
+	PhotoUrl           sql.NullString `json:"photo_url"`
 	IsPremium          bool           `json:"is_premium"`
 	IsEmailVerified    bool           `json:"is_email_verified"`
 	VerificationToken  sql.NullString `json:"verification_token"`

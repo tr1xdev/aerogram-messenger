@@ -8,6 +8,7 @@ package dbgen
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -86,9 +87,18 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 }
 
 const getChatHistory = `-- name: GetChatHistory :many
-SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, media_url, media_type, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages
-WHERE dialog_id = $1 AND is_deleted = false
-ORDER BY sequence DESC
+SELECT
+    m.id, m.dialog_id, m.author_id, m.content, m.is_encrypted, m.encryption_iv, m.sequence, m.reply_to_id, m.forward_from_id, m.media_url, m.media_type, m.is_edited, m.is_deleted, m.is_system, m.created_at, m.updated_at, m.deleted_at,
+    u.id as author_id,
+    u.username as author_username,
+    u.first_name as author_first_name,
+    u.last_name as author_last_name,
+    u.public_key as author_public_key,
+    u.photo_url as author_photo_url -- This will now work
+FROM messages m
+JOIN users u ON m.author_id = u.id
+WHERE m.dialog_id = $1 AND m.is_deleted = false
+ORDER BY m.sequence DESC
 LIMIT $2 OFFSET $3
 `
 
@@ -98,15 +108,41 @@ type GetChatHistoryParams struct {
 	Offset   int32     `json:"offset"`
 }
 
-func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]Message, error) {
+type GetChatHistoryRow struct {
+	ID              uuid.UUID      `json:"id"`
+	DialogID        uuid.UUID      `json:"dialog_id"`
+	AuthorID        uuid.UUID      `json:"author_id"`
+	Content         string         `json:"content"`
+	IsEncrypted     bool           `json:"is_encrypted"`
+	EncryptionIv    sql.NullString `json:"encryption_iv"`
+	Sequence        int64          `json:"sequence"`
+	ReplyToID       uuid.NullUUID  `json:"reply_to_id"`
+	ForwardFromID   uuid.NullUUID  `json:"forward_from_id"`
+	MediaUrl        sql.NullString `json:"media_url"`
+	MediaType       sql.NullString `json:"media_type"`
+	IsEdited        bool           `json:"is_edited"`
+	IsDeleted       bool           `json:"is_deleted"`
+	IsSystem        bool           `json:"is_system"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       sql.NullTime   `json:"deleted_at"`
+	AuthorID_2      uuid.UUID      `json:"author_id_2"`
+	AuthorUsername  sql.NullString `json:"author_username"`
+	AuthorFirstName string         `json:"author_first_name"`
+	AuthorLastName  sql.NullString `json:"author_last_name"`
+	AuthorPublicKey sql.NullString `json:"author_public_key"`
+	AuthorPhotoUrl  sql.NullString `json:"author_photo_url"`
+}
+
+func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error) {
 	rows, err := q.db.QueryContext(ctx, getChatHistory, arg.DialogID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Message
+	var items []GetChatHistoryRow
 	for rows.Next() {
-		var i Message
+		var i GetChatHistoryRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.DialogID,
@@ -125,6 +161,12 @@ func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) 
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.AuthorID_2,
+			&i.AuthorUsername,
+			&i.AuthorFirstName,
+			&i.AuthorLastName,
+			&i.AuthorPublicKey,
+			&i.AuthorPhotoUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -379,6 +421,53 @@ type UpdateMessageContentParams struct {
 
 func (q *Queries) UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error) {
 	row := q.db.QueryRowContext(ctx, updateMessageContent, arg.ID, arg.Content, arg.AuthorID)
+	var i Message
+	err := row.Scan(
+		&i.ID,
+		&i.DialogID,
+		&i.AuthorID,
+		&i.Content,
+		&i.IsEncrypted,
+		&i.EncryptionIv,
+		&i.Sequence,
+		&i.ReplyToID,
+		&i.ForwardFromID,
+		&i.MediaUrl,
+		&i.MediaType,
+		&i.IsEdited,
+		&i.IsDeleted,
+		&i.IsSystem,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateMessageExtended = `-- name: UpdateMessageExtended :one
+UPDATE messages
+SET content = $2,
+    encryption_iv = $3,
+    is_edited = true,
+    updated_at = NOW()
+WHERE id = $1 AND author_id = $4
+RETURNING id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, media_url, media_type, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at
+`
+
+type UpdateMessageExtendedParams struct {
+	ID           uuid.UUID      `json:"id"`
+	Content      string         `json:"content"`
+	EncryptionIv sql.NullString `json:"encryption_iv"`
+	AuthorID     uuid.UUID      `json:"author_id"`
+}
+
+func (q *Queries) UpdateMessageExtended(ctx context.Context, arg UpdateMessageExtendedParams) (Message, error) {
+	row := q.db.QueryRowContext(ctx, updateMessageExtended,
+		arg.ID,
+		arg.Content,
+		arg.EncryptionIv,
+		arg.AuthorID,
+	)
 	var i Message
 	err := row.Scan(
 		&i.ID,

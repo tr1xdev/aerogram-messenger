@@ -1,7 +1,7 @@
 type Message {
    id: ID!
    chatId: ID!
-   sender: User!
+   sender: User
    text: String!
    sentAt: String!
    sequence: Long!
@@ -48,7 +48,11 @@ extend type Mutation {
       replyToId: ID
    ): SendMessageResult!
 
-   updateMessage(id: ID!, text: String!): SendMessageResult!
+   updateMessage(
+      id: ID!
+      text: String!
+      encryptionIv: String
+   ): SendMessageResult!
    deleteMessage(id: ID!): Boolean!
    markDialogAsRead(chatId: String!, lastSequence: Long!): Boolean!
 }

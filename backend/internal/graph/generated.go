@@ -123,7 +123,7 @@ type ComplexityRoot struct {
 		SignUp                    func(childComplexity int, input model.SignUpInput) int
 		TerminateAllOtherSessions func(childComplexity int) int
 		TerminateSession          func(childComplexity int, id string) int
-		UpdateMessage             func(childComplexity int, id string, text string) int
+		UpdateMessage             func(childComplexity int, id string, text string, encryptionIv *string) int
 		UpdateUser                func(childComplexity int, input model.UpdateUserInput) int
 		VerifyEmail               func(childComplexity int, input model.VerifyEmailInput) int
 	}
@@ -222,7 +222,7 @@ type MutationResolver interface {
 	DeleteChat(ctx context.Context, id string, forEveryone *bool) (model.DeleteChatResult, error)
 	SendTypingEvent(ctx context.Context, chatID string) (bool, error)
 	SendMessage(ctx context.Context, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) (model.SendMessageResult, error)
-	UpdateMessage(ctx context.Context, id string, text string) (model.SendMessageResult, error)
+	UpdateMessage(ctx context.Context, id string, text string, encryptionIv *string) (model.SendMessageResult, error)
 	DeleteMessage(ctx context.Context, id string) (bool, error)
 	MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error)
 	UpdateUser(ctx context.Context, input model.UpdateUserInput) (*dbgen.User, error)
@@ -648,7 +648,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateMessage(childComplexity, args["id"].(string), args["text"].(string)), true
+		return e.complexity.Mutation.UpdateMessage(childComplexity, args["id"].(string), args["text"].(string), args["encryptionIv"].(*string)), true
 	case "Mutation.updateUser":
 		if e.complexity.Mutation.UpdateUser == nil {
 			break
@@ -1379,6 +1379,11 @@ func (ec *executionContext) field_Mutation_updateMessage_args(ctx context.Contex
 		return nil, err
 	}
 	args["text"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "encryptionIv", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["encryptionIv"] = arg2
 	return args, nil
 }
 
@@ -2354,9 +2359,9 @@ func (ec *executionContext) _Message_sender(ctx context.Context, field graphql.C
 			return ec.resolvers.Message().Sender(ctx, obj)
 		},
 		nil,
-		ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUser,
+		ec.marshalOUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUser,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -3300,7 +3305,7 @@ func (ec *executionContext) _Mutation_updateMessage(ctx context.Context, field g
 		ec.fieldContext_Mutation_updateMessage,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdateMessage(ctx, fc.Args["id"].(string), fc.Args["text"].(string))
+			return ec.resolvers.Mutation().UpdateMessage(ctx, fc.Args["id"].(string), fc.Args["text"].(string), fc.Args["encryptionIv"].(*string))
 		},
 		nil,
 		ec.marshalNSendMessageResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐSendMessageResult,
@@ -7528,16 +7533,13 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 		case "sender":
 			field := field
 
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
 				res = ec._Message_sender(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
 				return res
 			}
 
@@ -10290,6 +10292,13 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUser(ctx context.Context, sel ast.SelectionSet, v *dbgen.User) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._User(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

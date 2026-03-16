@@ -83,6 +83,30 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	return &messagespb.SendMessageResponse{Message: s.mapDBToProto(msg)}, nil
 }
 
+func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
+	cid, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+
+	msgs, err := s.messageRepo.GetHistory(ctx, cid, limit, req.Offset)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to fetch history")
+	}
+
+	res := make([]*messagespb.Message, len(msgs))
+	for i, m := range msgs {
+		res[i] = s.mapHistoryRowToProto(m)
+	}
+
+	return &messagespb.GetHistoryResponse{Messages: res}, nil
+}
+
 func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadRequest) (*messagespb.MarkAsReadResponse, error) {
 	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
@@ -114,30 +138,6 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 	return &messagespb.MarkAsReadResponse{Success: true}, nil
 }
 
-func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
-	cid, err := uuid.Parse(req.ChatId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
-	}
-
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 50
-	}
-
-	msgs, err := s.messageRepo.GetHistory(ctx, cid, limit, req.Offset)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch history")
-	}
-
-	res := make([]*messagespb.Message, len(msgs))
-	for i, m := range msgs {
-		res[i] = s.mapDBToProto(m)
-	}
-
-	return &messagespb.GetHistoryResponse{Messages: res}, nil
-}
-
 func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessageRequest) (*messagespb.UpdateMessageResponse, error) {
 	id, err := uuid.Parse(req.Id)
 	if err != nil {
@@ -148,7 +148,12 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
 
-	msg, err := s.messageRepo.Update(ctx, id, sid, req.Text)
+	msg, err := s.messageRepo.UpdateExtended(ctx, dbgen.UpdateMessageExtendedParams{
+		ID:           id,
+		AuthorID:     sid,
+		Content:      req.Text,
+		EncryptionIv: database.ToNullString(req.EncryptionIv),
+	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update message")
 	}
@@ -184,6 +189,40 @@ func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 		IsEdited:    m.IsEdited,
 		IsEncrypted: m.IsEncrypted,
 		IsSystem:    m.IsSystem,
+	}
+
+	if m.EncryptionIv.Valid {
+		iv := m.EncryptionIv.String
+		pb.EncryptionIv = &iv
+	}
+
+	if m.ReplyToID.Valid {
+		rid := m.ReplyToID.UUID.String()
+		pb.ReplyToId = &rid
+	}
+
+	return pb
+}
+
+func (s *Server) mapHistoryRowToProto(m dbgen.GetChatHistoryRow) *messagespb.Message {
+	pb := &messagespb.Message{
+		Id:          m.ID.String(),
+		ChatId:      m.DialogID.String(),
+		SenderId:    m.AuthorID.String(),
+		Text:        m.Content,
+		SentAt:      m.CreatedAt.Format(time.RFC3339),
+		Sequence:    m.Sequence,
+		IsEdited:    m.IsEdited,
+		IsEncrypted: m.IsEncrypted,
+		IsSystem:    m.IsSystem,
+		Sender: &messagespb.User{
+			Id:        m.AuthorID.String(),
+			Username:  m.AuthorUsername.String,
+			FirstName: m.AuthorFirstName,
+			LastName:  m.AuthorLastName.String,
+			PublicKey: m.AuthorPublicKey.String,
+			PhotoUrl:  m.AuthorPhotoUrl.String,
+		},
 	}
 
 	if m.EncryptionIv.Valid {

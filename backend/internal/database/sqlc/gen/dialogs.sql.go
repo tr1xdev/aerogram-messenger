@@ -366,6 +366,9 @@ SELECT
     m.encryption_iv AS msg_encryption_iv,
     m.sequence AS msg_sequence,
     m.author_id AS msg_author_id,
+    u.username AS msg_author_username,
+    u.first_name AS msg_author_first_name,
+    u.public_key AS msg_author_public_key,
     m.created_at AS msg_created_at,
     m.reply_to_id AS msg_reply_to_id,
     (
@@ -379,6 +382,7 @@ SELECT
 FROM dialogs d
 JOIN dialog_members dm ON dm.dialog_id = d.id
 LEFT JOIN messages m ON d.last_message_id = m.id
+LEFT JOIN users u ON m.author_id = u.id
 WHERE dm.user_id = $1
   AND d.is_active = true
   AND dm.is_hidden = false
@@ -386,25 +390,28 @@ ORDER BY dm.is_pinned DESC, COALESCE(d.last_message_at, d.created_at) DESC
 `
 
 type GetUserDialogsRow struct {
-	ID               uuid.UUID      `json:"id"`
-	Type             string         `json:"type"`
-	Name             sql.NullString `json:"name"`
-	Username         sql.NullString `json:"username"`
-	PhotoUrl         sql.NullString `json:"photo_url"`
-	MembersCount     int32          `json:"members_count"`
-	IsVerified       bool           `json:"is_verified"`
-	LastMessageID    uuid.NullUUID  `json:"last_message_id"`
-	LastMessageAt    sql.NullTime   `json:"last_message_at"`
-	IsPinned         bool           `json:"is_pinned"`
-	LastReadSequence int64          `json:"last_read_sequence"`
-	MsgContent       sql.NullString `json:"msg_content"`
-	MsgIsEncrypted   sql.NullBool   `json:"msg_is_encrypted"`
-	MsgEncryptionIv  sql.NullString `json:"msg_encryption_iv"`
-	MsgSequence      sql.NullInt64  `json:"msg_sequence"`
-	MsgAuthorID      uuid.NullUUID  `json:"msg_author_id"`
-	MsgCreatedAt     sql.NullTime   `json:"msg_created_at"`
-	MsgReplyToID     uuid.NullUUID  `json:"msg_reply_to_id"`
-	UnreadCount      int64          `json:"unread_count"`
+	ID                 uuid.UUID      `json:"id"`
+	Type               string         `json:"type"`
+	Name               sql.NullString `json:"name"`
+	Username           sql.NullString `json:"username"`
+	PhotoUrl           sql.NullString `json:"photo_url"`
+	MembersCount       int32          `json:"members_count"`
+	IsVerified         bool           `json:"is_verified"`
+	LastMessageID      uuid.NullUUID  `json:"last_message_id"`
+	LastMessageAt      sql.NullTime   `json:"last_message_at"`
+	IsPinned           bool           `json:"is_pinned"`
+	LastReadSequence   int64          `json:"last_read_sequence"`
+	MsgContent         sql.NullString `json:"msg_content"`
+	MsgIsEncrypted     sql.NullBool   `json:"msg_is_encrypted"`
+	MsgEncryptionIv    sql.NullString `json:"msg_encryption_iv"`
+	MsgSequence        sql.NullInt64  `json:"msg_sequence"`
+	MsgAuthorID        uuid.NullUUID  `json:"msg_author_id"`
+	MsgAuthorUsername  sql.NullString `json:"msg_author_username"`
+	MsgAuthorFirstName sql.NullString `json:"msg_author_first_name"`
+	MsgAuthorPublicKey sql.NullString `json:"msg_author_public_key"`
+	MsgCreatedAt       sql.NullTime   `json:"msg_created_at"`
+	MsgReplyToID       uuid.NullUUID  `json:"msg_reply_to_id"`
+	UnreadCount        int64          `json:"unread_count"`
 }
 
 func (q *Queries) GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]GetUserDialogsRow, error) {
@@ -433,6 +440,9 @@ func (q *Queries) GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]Get
 			&i.MsgEncryptionIv,
 			&i.MsgSequence,
 			&i.MsgAuthorID,
+			&i.MsgAuthorUsername,
+			&i.MsgAuthorFirstName,
+			&i.MsgAuthorPublicKey,
 			&i.MsgCreatedAt,
 			&i.MsgReplyToID,
 			&i.UnreadCount,

@@ -76,7 +76,7 @@ func (s *Server) GetUsers(ctx context.Context, req *userpb.GetUsersRequest) (*us
 
 	users, err := s.userRepo.GetByIDs(ctx, uids)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch users")
+		return nil, status.Error(codes.Internal, "failed to fetch users from database")
 	}
 
 	pbUsers := make([]*userpb.User, len(users))
@@ -123,6 +123,7 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 		PublicKey:        database.ToNullString(req.PublicKey),
 		EncryptedPrivKey: database.ToNullString(req.EncryptedPrivKey),
 		EncryptionIv:     database.ToNullString(req.EncryptionIv),
+		PhotoUrl:         database.ToNullString(req.PhotoUrl),
 	}
 
 	updatedUser, err := s.userRepo.Update(ctx, params)
@@ -159,6 +160,9 @@ func (s *Server) mapDBToProto(u dbgen.User) *userpb.User {
 	}
 	if u.EncryptionIv.Valid {
 		res.EncryptionIv = &u.EncryptionIv.String
+	}
+	if u.PhotoUrl.Valid {
+		res.PhotoUrl = &u.PhotoUrl.String
 	}
 
 	return res

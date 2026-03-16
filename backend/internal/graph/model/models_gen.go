@@ -129,7 +129,7 @@ type LoginInput struct {
 type Message struct {
 	ID            string      `json:"id"`
 	ChatID        string      `json:"chatId"`
-	Sender        *dbgen.User `json:"sender"`
+	Sender        *dbgen.User `json:"sender,omitempty"`
 	Text          string      `json:"text"`
 	SentAt        string      `json:"sentAt"`
 	Sequence      int64       `json:"sequence"`

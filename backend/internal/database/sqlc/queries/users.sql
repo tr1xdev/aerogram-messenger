@@ -10,9 +10,11 @@ WHERE email = $1 AND deleted_at IS NULL LIMIT 1;
 INSERT INTO users (
     id, username, first_name, last_name, email, password,
     status, public_key, encrypted_priv_key, encryption_iv,
+    photo_url, -- ДОБАВЛЕНО
     created_at, updated_at, is_premium, is_email_verified
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+    $11, -- photo_url
     NOW(), NOW(), DEFAULT, DEFAULT
 )
 RETURNING *;
@@ -54,6 +56,7 @@ SET
     public_key = COALESCE(sqlc.narg('public_key'), public_key),
     encrypted_priv_key = COALESCE(sqlc.narg('encrypted_priv_key'), encrypted_priv_key),
     encryption_iv = COALESCE(sqlc.narg('encryption_iv'), encryption_iv),
+    photo_url = COALESCE(sqlc.narg('photo_url'), photo_url), -- ДОБАВЛЕНО
     updated_at = NOW()
 WHERE id = sqlc.arg('id')
 RETURNING *;
