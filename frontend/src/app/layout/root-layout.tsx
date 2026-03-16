@@ -11,14 +11,19 @@ import { useAuthStore } from "@/store/auth";
 import { SubscriptionManager } from "@/features/chat/ui/subscription-manager";
 import { useMe } from "@/features/chat/lib/use-messages";
 import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
+import { useAppTitle } from "@/features/chat/lib/use-app-title";
 
 export default function RootLayout() {
   const navigate = useNavigate();
-  const isAuth = useAuthStore((s: { isAuth: boolean }) => s.isAuth);
-  const pathname = useRouterState().location.pathname;
+  const isAuth: boolean = useAuthStore(
+    (s: { isAuth: boolean }): boolean => s.isAuth,
+  );
+  const pathname: string = useRouterState().location.pathname;
 
   const { data: meData } = useMe();
   useE2EEInit(meData?.me);
+
+  useAppTitle();
 
   if (!isAuth && !["/login", "/signup", "/otp"].includes(pathname)) {
     return (
@@ -30,13 +35,13 @@ export default function RootLayout() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <Button
-              onClick={() => navigate({ to: "/login" })}
+              onClick={(): Promise<void> => navigate({ to: "/login" })}
               className="w-full"
             >
               Login
             </Button>
             <Button
-              onClick={() => navigate({ to: "/signup" })}
+              onClick={(): Promise<void> => navigate({ to: "/signup" })}
               variant="outline"
               className="w-full"
             >
