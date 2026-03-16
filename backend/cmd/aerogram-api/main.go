@@ -144,7 +144,7 @@ func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc
 
 	userClient := userv1.NewUserServiceClient(conn)
 	presenceClient := presencev1.NewPresenceServiceClient(conn)
-	r.Use(loaders.LoaderMiddleware(userClient, presenceClient))
+	r.Use(loaders.LoaderMiddleware(userClient, presenceClient, db.Queries))
 	r.Use(middleware.AuthMiddleware(cfg, db))
 }
 

@@ -46,7 +46,7 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 		Sequence:     m.Sequence,
 		IsEdited:     m.IsEdited,
 		IsEncrypted:  m.IsEncrypted,
-		EncryptionIv: ToStringPtr(m.EncryptionIv),
+		EncryptionIv: NullStringToStringPtr(m.EncryptionIv),
 	}
 
 	if m.ReplyToID.Valid {

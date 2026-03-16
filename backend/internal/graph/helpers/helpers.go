@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"reflect"
+	"time"
 
 	"github.com/google/uuid"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
@@ -18,7 +18,11 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 	if err != nil {
 		return nil, err
 	}
-	chatID, _ := uuid.Parse(pbChat.Id)
+
+	chatID, err := uuid.Parse(pbChat.Id)
+	if err != nil {
+		return nil, err
+	}
 
 	chatType := model.ChatTypePrivate
 	switch pbChat.Type {
@@ -57,7 +61,9 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		if mID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
 			if m, err := store.GetMessageByID(ctx, mID); err == nil {
 				lastMsg = MapDBMessageToModel(&m)
-				idsMap[m.AuthorID] = true
+				if m.AuthorID != uuid.Nil {
+					idsMap[m.AuthorID] = true
+				}
 			}
 		}
 	}
@@ -110,39 +116,15 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		UnreadCount:      int(uCount),
 		IsPinned:         isPinned,
 		LastReadSequence: pReadSeq,
-		CreatedAt:        "",
+		CreatedAt:        time.Now().Format(time.RFC3339),
 	}, nil
 }
 
-func ToStringPtr(val interface{}) *string {
-	if val == nil {
+func NullStringToStringPtr(ns sql.NullString) *string {
+	if !ns.Valid {
 		return nil
 	}
-	if ns, ok := val.(sql.NullString); ok {
-		if !ns.Valid {
-			return nil
-		}
-		return &ns.String
-	}
-	rv := reflect.ValueOf(val)
-	if rv.Kind() == reflect.Ptr {
-		if rv.IsNil() {
-			return nil
-		}
-		rv = rv.Elem()
-	}
-	if rv.Kind() == reflect.String {
-		s := rv.String()
-		return &s
-	}
-	return nil
-}
-
-func ToNullString(s *string) sql.NullString {
-	if s == nil {
-		return sql.NullString{String: "", Valid: false}
-	}
-	return sql.NullString{String: *s, Valid: true}
+	return &ns.String
 }
 
 func MapGRPCError(err error) error {
@@ -167,9 +149,22 @@ func MapDBMemberToModel(m *dbgen.DialogMember, u *dbgen.User) *model.ChatMember 
 
 func FormatFullName(firstName string, lastName sql.NullString) string {
 	name := firstName
-	lName := ToStringPtr(lastName)
-	if lName != nil && *lName != "" {
-		name += " " + *lName
+	if lastName.Valid && lastName.String != "" {
+		name += " " + lastName.String
 	}
 	return name
+}
+
+func ToStringPtr(ns sql.NullString) *string {
+	if !ns.Valid {
+		return nil
+	}
+	return &ns.String
+}
+
+func ToNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{String: "", Valid: false}
+	}
+	return sql.NullString{String: *s, Valid: true}
 }

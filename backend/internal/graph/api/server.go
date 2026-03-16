@@ -73,7 +73,7 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 			newCtx := context.WithValue(ctx, middleware.AuthUserIDKey, uidStr)
 			newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sidStr)
 
-			l := loaders.NewLoaders(res.UserClient, res.PresenceClient)
+			l := loaders.NewLoaders(res.UserClient, res.PresenceClient, db.Queries)
 			newCtx = loaders.AttachToContext(newCtx, l)
 
 			go func(userID string, socketCtx context.Context) {
