@@ -33,7 +33,15 @@ SELECT * FROM dialogs WHERE id = $1 LIMIT 1;
 
 -- name: GetUserDialogs :many
 SELECT
-    d.*,
+    d.id,
+    d.type,
+    d.name,
+    d.username,
+    d.photo_url,
+    d.members_count,
+    d.is_verified,
+    d.last_message_id,
+    d.last_message_at,
     dm.is_pinned,
     dm.last_read_sequence,
     m.content AS msg_content,
@@ -42,6 +50,7 @@ SELECT
     m.sequence AS msg_sequence,
     m.author_id AS msg_author_id,
     m.created_at AS msg_created_at,
+    m.reply_to_id AS msg_reply_to_id,
     (
         SELECT count(*)
         FROM messages m2

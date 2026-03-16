@@ -10,6 +10,7 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const countUnreadMessages = `-- name: CountUnreadMessages :one
@@ -211,6 +212,86 @@ func (q *Queries) GetMessageByID(ctx context.Context, id uuid.UUID) (Message, er
 	return i, err
 }
 
+const getMessageBySequence = `-- name: GetMessageBySequence :one
+SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, media_url, media_type, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages
+WHERE dialog_id = $1 AND sequence = $2 LIMIT 1
+`
+
+type GetMessageBySequenceParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	Sequence int64     `json:"sequence"`
+}
+
+func (q *Queries) GetMessageBySequence(ctx context.Context, arg GetMessageBySequenceParams) (Message, error) {
+	row := q.db.QueryRowContext(ctx, getMessageBySequence, arg.DialogID, arg.Sequence)
+	var i Message
+	err := row.Scan(
+		&i.ID,
+		&i.DialogID,
+		&i.AuthorID,
+		&i.Content,
+		&i.IsEncrypted,
+		&i.EncryptionIv,
+		&i.Sequence,
+		&i.ReplyToID,
+		&i.ForwardFromID,
+		&i.MediaUrl,
+		&i.MediaType,
+		&i.IsEdited,
+		&i.IsDeleted,
+		&i.IsSystem,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getMessagesByIDs = `-- name: GetMessagesByIDs :many
+SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, media_url, media_type, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) GetMessagesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Message, error) {
+	rows, err := q.db.QueryContext(ctx, getMessagesByIDs, pq.Array(dollar_1))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Message
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ID,
+			&i.DialogID,
+			&i.AuthorID,
+			&i.Content,
+			&i.IsEncrypted,
+			&i.EncryptionIv,
+			&i.Sequence,
+			&i.ReplyToID,
+			&i.ForwardFromID,
+			&i.MediaUrl,
+			&i.MediaType,
+			&i.IsEdited,
+			&i.IsDeleted,
+			&i.IsSystem,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markAllAsRead = `-- name: MarkAllAsRead :exec
 UPDATE dialog_members
 SET last_read_sequence = (
@@ -269,7 +350,7 @@ func (q *Queries) UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogL
 const updateMemberReadSequence = `-- name: UpdateMemberReadSequence :exec
 UPDATE dialog_members
 SET last_read_sequence = $3, updated_at = NOW()
-WHERE dialog_id = $1 AND user_id = $2
+WHERE dialog_id = $1 AND user_id = $2 AND last_read_sequence < $3
 `
 
 type UpdateMemberReadSequenceParams struct {

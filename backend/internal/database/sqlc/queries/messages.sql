@@ -36,7 +36,7 @@ WHERE id = $1;
 -- name: UpdateMemberReadSequence :exec
 UPDATE dialog_members
 SET last_read_sequence = $3, updated_at = NOW()
-WHERE dialog_id = $1 AND user_id = $2;
+WHERE dialog_id = $1 AND user_id = $2 AND last_read_sequence < $3;
 
 -- name: CountUnreadMessages :one
 SELECT count(*) FROM messages
@@ -55,8 +55,15 @@ SET last_read_sequence = (
 ), updated_at = NOW()
 WHERE dialog_members.dialog_id = $1 AND dialog_members.user_id = $2;
 
+-- name: GetMessageBySequence :one
+SELECT * FROM messages
+WHERE dialog_id = $1 AND sequence = $2 LIMIT 1;
+
 -- name: GetLastChatMessage :one
 SELECT * FROM messages
 WHERE dialog_id = $1 AND is_deleted = false
 ORDER BY sequence DESC
 LIMIT 1;
+
+-- name: GetMessagesByIDs :many
+SELECT * FROM messages WHERE id = ANY($1::uuid[]);

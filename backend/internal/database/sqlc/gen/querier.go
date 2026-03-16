@@ -34,6 +34,8 @@ type Querier interface {
 	GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (Message, error)
 	GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int64, error)
 	GetMessageByID(ctx context.Context, id uuid.UUID) (Message, error)
+	GetMessageBySequence(ctx context.Context, arg GetMessageBySequenceParams) (Message, error)
+	GetMessagesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Message, error)
 	GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateDialogByMembersParams) (Dialog, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)

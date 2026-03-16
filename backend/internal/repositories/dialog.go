@@ -192,3 +192,10 @@ func (r *DialogRepository) DeleteChat(ctx context.Context, dialogID, userID uuid
 
 	return tx.Commit()
 }
+
+func (r *MessageRepository) GetMessageBySequence(ctx context.Context, dialogID uuid.UUID, sequence int64) (dbgen.Message, error) {
+	return r.db.Queries.GetMessageBySequence(ctx, dbgen.GetMessageBySequenceParams{
+		DialogID: dialogID,
+		Sequence: sequence,
+	})
+}

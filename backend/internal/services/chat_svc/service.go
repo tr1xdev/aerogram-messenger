@@ -48,17 +48,10 @@ func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chat
 		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
 	}
 
-	uUUID, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid user id")
-	}
+	uUUID, _ := uuid.Parse(userID)
+	cUUID, _ := uuid.Parse(req.ChatId)
 
-	cUUID, err := uuid.Parse(req.ChatId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
-	}
-
-	err = s.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
+	err := s.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
 		IsPinned: req.Pinned,
 		DialogID: cUUID,
 		UserID:   uUUID,
@@ -76,15 +69,8 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
 	}
 
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid user id")
-	}
-
-	did, err := uuid.Parse(req.ChatId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
-	}
+	uid, _ := uuid.Parse(userID)
+	did, _ := uuid.Parse(req.ChatId)
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
 	if err != nil {
@@ -133,11 +119,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		}
 	}
 
-	creatorUUID, err := uuid.Parse(creatorIDStr)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid creator id")
-	}
-
+	creatorUUID, _ := uuid.Parse(creatorIDStr)
 	newID := uuid.New()
 
 	dParams := dbgen.CreateDialogParams{
@@ -152,11 +134,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 
 	mParams := make([]dbgen.AddDialogMemberParams, len(req.ParticipantIds))
 	for i, pID := range req.ParticipantIds {
-		pUUID, err := uuid.Parse(pID)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, "invalid participant id")
-		}
-
+		pUUID, _ := uuid.Parse(pID)
 		role := "member"
 		if pID == creatorIDStr {
 			role = "owner"
@@ -254,9 +232,7 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 					chatRes.Slug = targetUser.Username.String
 				}
 
-				return &chatpb.GetChatResponse{
-					Chat: chatRes,
-				}, nil
+				return &chatpb.GetChatResponse{Chat: chatRes}, nil
 			}
 		}
 	} else {
@@ -332,7 +308,7 @@ func (s *Server) mapGetUserDialogsRowToProto(row dbgen.GetUserDialogsRow) *chatp
 	res.LastReadSequence = row.LastReadSequence
 
 	if row.LastMessageID.Valid {
-		res.LastMessage = &messagespb.Message{
+		msgPb := &messagespb.Message{
 			Id:          row.LastMessageID.UUID.String(),
 			ChatId:      row.ID.String(),
 			Text:        row.MsgContent.String,
@@ -342,10 +318,17 @@ func (s *Server) mapGetUserDialogsRowToProto(row dbgen.GetUserDialogsRow) *chatp
 			SentAt:      row.MsgCreatedAt.Time.Format(time.RFC3339),
 		}
 
-		if row.MsgEncryptionIv.Valid && row.MsgEncryptionIv.String != "" {
+		if row.MsgEncryptionIv.Valid {
 			iv := row.MsgEncryptionIv.String
-			res.LastMessage.EncryptionIv = &iv
+			msgPb.EncryptionIv = &iv
 		}
+
+		if row.MsgReplyToID.Valid {
+			rid := row.MsgReplyToID.UUID.String()
+			msgPb.ReplyToId = &rid
+		}
+
+		res.LastMessage = msgPb
 	}
 
 	return res

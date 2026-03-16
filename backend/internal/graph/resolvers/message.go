@@ -53,10 +53,8 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 
 	msg := helpers.MapMessageToModel(resp.Message)
 
-	if resp.Message.ReplyToId != nil && *resp.Message.ReplyToId != "" {
-		mr := &messageResolver{r.Resolver}
-		replyMsg, err := mr.ReplyTo(ctx, msg)
-		if err == nil {
+	if replyToID != nil && *replyToID != "" {
+		if replyMsg, err := loaders.LoadMessage(ctx, *replyToID); err == nil {
 			msg.ReplyTo = replyMsg
 		}
 	}
@@ -108,8 +106,15 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, 
 		return false, nil
 	}
 
-	chatUUID, _ := uuid.Parse(chatID)
-	lastMsg, err := r.Store.GetLastChatMessage(ctx, chatUUID)
+	chatUUID, err := uuid.Parse(chatID)
+	if err != nil {
+		return false, err
+	}
+
+	msg, err := r.Store.GetMessageBySequence(ctx, dbgen.GetMessageBySequenceParams{
+		DialogID: chatUUID,
+		Sequence: lastSequence,
+	})
 	if err != nil {
 		return false, err
 	}
@@ -117,7 +122,7 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, 
 	_, err = r.MessagesClient.MarkAsRead(ctx, &messagesv1.MarkAsReadRequest{
 		ChatId:        chatID,
 		UserId:        authID,
-		LastMessageId: lastMsg.ID.String(),
+		LastMessageId: msg.ID.String(),
 	})
 	if err != nil {
 		return false, err
@@ -126,7 +131,7 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, 
 	payload := model.ReadPayload{
 		ChatID:       chatID,
 		UserID:       authID,
-		LastSequence: lastMsg.Sequence,
+		LastSequence: msg.Sequence,
 	}
 	data, _ := json.Marshal(payload)
 	r.RedisClient.Publish(ctx, "chat:"+chatID+":read", data)
@@ -161,8 +166,14 @@ func (r *queryResolver) DialogRead(ctx context.Context, chatID string) (*model.R
 		return nil, nil
 	}
 
-	chatUUID, _ := uuid.Parse(chatID)
-	userUUID, _ := uuid.Parse(authID)
+	chatUUID, err := uuid.Parse(chatID)
+	if err != nil {
+		return nil, err
+	}
+	userUUID, err := uuid.Parse(authID)
+	if err != nil {
+		return nil, err
+	}
 
 	member, err := r.Store.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
 		DialogID: chatUUID,
@@ -190,10 +201,22 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 	go func() {
 		defer pubsub.Close()
 		defer close(out)
-		for msg := range pubsub.Channel() {
-			var m model.Message
-			if err := json.Unmarshal([]byte(msg.Payload), &m); err == nil {
-				out <- &m
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-pubsub.Channel():
+				if !ok {
+					return
+				}
+				var m model.Message
+				if err := json.Unmarshal([]byte(msg.Payload), &m); err == nil {
+					select {
+					case out <- &m:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}
 	}()
@@ -248,17 +271,7 @@ func (r *messageResolver) ReplyTo(ctx context.Context, obj *model.Message) (*mod
 		return obj.ReplyTo, nil
 	}
 
-	msgUUID, err := uuid.Parse(obj.ReplyTo.ID)
-	if err != nil {
-		return nil, nil
-	}
-
-	dbMsg, err := r.Store.GetMessageByID(ctx, msgUUID)
-	if err != nil {
-		return nil, nil
-	}
-
-	return helpers.MapDBMessageToModel(&dbMsg), nil
+	return loaders.LoadMessage(ctx, obj.ReplyTo.ID)
 }
 
 func (r *Resolver) Message() graph.MessageResolver { return &messageResolver{r} }

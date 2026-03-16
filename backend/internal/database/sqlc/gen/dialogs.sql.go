@@ -8,7 +8,6 @@ package dbgen
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -351,7 +350,15 @@ func (q *Queries) GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateD
 
 const getUserDialogs = `-- name: GetUserDialogs :many
 SELECT
-    d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at, d.deleted_at,
+    d.id,
+    d.type,
+    d.name,
+    d.username,
+    d.photo_url,
+    d.members_count,
+    d.is_verified,
+    d.last_message_id,
+    d.last_message_at,
     dm.is_pinned,
     dm.last_read_sequence,
     m.content AS msg_content,
@@ -360,6 +367,7 @@ SELECT
     m.sequence AS msg_sequence,
     m.author_id AS msg_author_id,
     m.created_at AS msg_created_at,
+    m.reply_to_id AS msg_reply_to_id,
     (
         SELECT count(*)
         FROM messages m2
@@ -383,19 +391,10 @@ type GetUserDialogsRow struct {
 	Name             sql.NullString `json:"name"`
 	Username         sql.NullString `json:"username"`
 	PhotoUrl         sql.NullString `json:"photo_url"`
-	Bio              sql.NullString `json:"bio"`
-	Description      sql.NullString `json:"description"`
-	InviteLink       sql.NullString `json:"invite_link"`
-	PinnedMessageID  uuid.NullUUID  `json:"pinned_message_id"`
-	CreatorID        uuid.NullUUID  `json:"creator_id"`
-	LastMessageID    uuid.NullUUID  `json:"last_message_id"`
-	LastMessageAt    sql.NullTime   `json:"last_message_at"`
 	MembersCount     int32          `json:"members_count"`
 	IsVerified       bool           `json:"is_verified"`
-	IsActive         bool           `json:"is_active"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
-	DeletedAt        sql.NullTime   `json:"deleted_at"`
+	LastMessageID    uuid.NullUUID  `json:"last_message_id"`
+	LastMessageAt    sql.NullTime   `json:"last_message_at"`
 	IsPinned         bool           `json:"is_pinned"`
 	LastReadSequence int64          `json:"last_read_sequence"`
 	MsgContent       sql.NullString `json:"msg_content"`
@@ -404,6 +403,7 @@ type GetUserDialogsRow struct {
 	MsgSequence      sql.NullInt64  `json:"msg_sequence"`
 	MsgAuthorID      uuid.NullUUID  `json:"msg_author_id"`
 	MsgCreatedAt     sql.NullTime   `json:"msg_created_at"`
+	MsgReplyToID     uuid.NullUUID  `json:"msg_reply_to_id"`
 	UnreadCount      int64          `json:"unread_count"`
 }
 
@@ -422,19 +422,10 @@ func (q *Queries) GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]Get
 			&i.Name,
 			&i.Username,
 			&i.PhotoUrl,
-			&i.Bio,
-			&i.Description,
-			&i.InviteLink,
-			&i.PinnedMessageID,
-			&i.CreatorID,
-			&i.LastMessageID,
-			&i.LastMessageAt,
 			&i.MembersCount,
 			&i.IsVerified,
-			&i.IsActive,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
+			&i.LastMessageID,
+			&i.LastMessageAt,
 			&i.IsPinned,
 			&i.LastReadSequence,
 			&i.MsgContent,
@@ -443,6 +434,7 @@ func (q *Queries) GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]Get
 			&i.MsgSequence,
 			&i.MsgAuthorID,
 			&i.MsgCreatedAt,
+			&i.MsgReplyToID,
 			&i.UnreadCount,
 		); err != nil {
 			return nil, err

@@ -43,15 +43,11 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 
 	tx, err := s.db.Conn.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to start transaction")
+		return nil, status.Error(codes.Internal, "failed to begin transaction")
 	}
 	defer tx.Rollback()
 
 	qtx := s.db.Queries.WithTx(tx)
-
-	if err := qtx.UnhideDialogForMembers(ctx, chatID); err != nil {
-		return nil, status.Error(codes.Internal, "failed to restore dialog visibility")
-	}
 
 	msg, err := qtx.CreateMessage(ctx, dbgen.CreateMessageParams{
 		ID:           uuid.New(),
@@ -73,7 +69,11 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		LastMessageAt: database.TimeToNullTime(msg.CreatedAt),
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to update dialog")
+		return nil, status.Error(codes.Internal, "failed to update dialog metadata")
+	}
+
+	if err := qtx.UnhideDialogForMembers(ctx, chatID); err != nil {
+		return nil, status.Error(codes.Internal, "failed to restore dialog visibility")
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -81,62 +81,6 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	}
 
 	return &messagespb.SendMessageResponse{Message: s.mapDBToProto(msg)}, nil
-}
-
-func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
-	chatID, err := uuid.Parse(req.ChatId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
-	}
-
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 50
-	}
-
-	msgs, err := s.messageRepo.GetHistory(ctx, chatID, limit, req.Offset)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch history")
-	}
-
-	res := make([]*messagespb.Message, 0, len(msgs))
-	for _, m := range msgs {
-		res = append(res, s.mapDBToProto(m))
-	}
-	return &messagespb.GetHistoryResponse{Messages: res}, nil
-}
-
-func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessageRequest) (*messagespb.UpdateMessageResponse, error) {
-	id, err := uuid.Parse(req.Id)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid message id")
-	}
-	senderID, err := uuid.Parse(req.SenderId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
-	}
-
-	msg, err := s.messageRepo.Update(ctx, id, senderID, req.Text)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to update (check if you are the author)")
-	}
-	return &messagespb.UpdateMessageResponse{Message: s.mapDBToProto(msg)}, nil
-}
-
-func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessageRequest) (*messagespb.DeleteMessageResponse, error) {
-	id, err := uuid.Parse(req.Id)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid message id")
-	}
-	senderID, err := uuid.Parse(req.SenderId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
-	}
-
-	if err := s.messageRepo.Delete(ctx, id, senderID); err != nil {
-		return nil, status.Error(codes.Internal, "failed to delete")
-	}
-	return &messagespb.DeleteMessageResponse{Success: true}, nil
 }
 
 func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadRequest) (*messagespb.MarkAsReadResponse, error) {
@@ -170,6 +114,65 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 	return &messagespb.MarkAsReadResponse{Success: true}, nil
 }
 
+func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
+	cid, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+
+	msgs, err := s.messageRepo.GetHistory(ctx, cid, limit, req.Offset)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to fetch history")
+	}
+
+	res := make([]*messagespb.Message, len(msgs))
+	for i, m := range msgs {
+		res[i] = s.mapDBToProto(m)
+	}
+
+	return &messagespb.GetHistoryResponse{Messages: res}, nil
+}
+
+func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessageRequest) (*messagespb.UpdateMessageResponse, error) {
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid message id")
+	}
+	sid, err := uuid.Parse(req.SenderId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
+	}
+
+	msg, err := s.messageRepo.Update(ctx, id, sid, req.Text)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to update message")
+	}
+
+	return &messagespb.UpdateMessageResponse{Message: s.mapDBToProto(msg)}, nil
+}
+
+func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessageRequest) (*messagespb.DeleteMessageResponse, error) {
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid message id")
+	}
+	sid, err := uuid.Parse(req.SenderId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
+	}
+
+	if err := s.messageRepo.Delete(ctx, id, sid); err != nil {
+		return nil, status.Error(codes.Internal, "failed to delete message")
+	}
+
+	return &messagespb.DeleteMessageResponse{Success: true}, nil
+}
+
 func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 	pb := &messagespb.Message{
 		Id:          m.ID.String(),
@@ -182,12 +185,16 @@ func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 		IsEncrypted: m.IsEncrypted,
 		IsSystem:    m.IsSystem,
 	}
+
 	if m.EncryptionIv.Valid {
-		pb.EncryptionIv = &m.EncryptionIv.String
+		iv := m.EncryptionIv.String
+		pb.EncryptionIv = &iv
 	}
+
 	if m.ReplyToID.Valid {
-		id := m.ReplyToID.UUID.String()
-		pb.ReplyToId = &id
+		rid := m.ReplyToID.UUID.String()
+		pb.ReplyToId = &rid
 	}
+
 	return pb
 }
