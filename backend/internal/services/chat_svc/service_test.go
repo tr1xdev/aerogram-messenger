@@ -5,7 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
@@ -18,9 +20,16 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-func setupTest(t *testing.T) *Server {
+func setupTest(t *testing.T) (*Server, *miniredis.Miniredis) {
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+
 	db := database.SetupTestDB(t)
-	return NewServer(db)
+	return NewServer(db, rdb), mr
 }
 
 func createUser(t *testing.T, s *Server, id string) {
@@ -44,7 +53,8 @@ func createUser(t *testing.T, s *Server, id string) {
 }
 
 func TestChatServer(t *testing.T) {
-	server := setupTest(t)
+	server, mr := setupTest(t)
+	defer mr.Close()
 	ctx := context.Background()
 
 	t.Run("CreateChat_Success", func(t *testing.T) {

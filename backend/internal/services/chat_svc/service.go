@@ -2,10 +2,12 @@ package chat_svc
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
@@ -19,12 +21,14 @@ import (
 type Server struct {
 	chatpb.UnimplementedChatServiceServer
 	db         *database.DB
+	rdb        *redis.Client
 	dialogRepo *repositories.DialogRepository
 }
 
-func NewServer(db *database.DB) *Server {
+func NewServer(db *database.DB, rdb *redis.Client) *Server {
 	return &Server{
 		db:         db,
+		rdb:        rdb,
 		dialogRepo: repositories.NewDialogRepository(db),
 	}
 }
@@ -83,6 +87,9 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 
 		if isPrivate || isOwner {
 			err = s.db.Queries.DeleteDialog(ctx, did)
+			if err == nil {
+				s.rdb.Publish(ctx, "user_chats_deleted:"+req.ChatId, req.ChatId)
+			}
 		} else {
 			return nil, status.Error(codes.PermissionDenied, "only owner can delete for everyone")
 		}
@@ -91,6 +98,9 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 			DialogID: did,
 			UserID:   uid,
 		})
+		if err == nil {
+			s.rdb.Publish(ctx, "user_chats_deleted:"+userID, req.ChatId)
+		}
 	}
 
 	if err != nil {
@@ -167,8 +177,15 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		return nil, status.Error(codes.Internal, "failed to fetch chat")
 	}
 
+	protoChat := s.mapDBDialogToProto(dialog)
+	payload, _ := json.Marshal(protoChat)
+
+	for _, pID := range req.ParticipantIds {
+		s.rdb.Publish(ctx, "user_chats:"+pID, payload)
+	}
+
 	return &chatpb.CreateChatResponse{
-		Chat: s.mapDBDialogToProto(dialog),
+		Chat: protoChat,
 	}, nil
 }
 
