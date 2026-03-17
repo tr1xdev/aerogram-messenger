@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import { useNavigate } from "@tanstack/react-router";
+import { MdVerified } from "react-icons/md";
 import { GET_USER_BY_ID } from "@/features/chat/api";
 import {
   Popover,
@@ -10,6 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { User } from "@/entities/chat/model/types";
+import { formatLastSeen } from "@/shared/lib/date";
 
 interface ChatUserPopoverProps {
   userId: string;
@@ -67,10 +69,16 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
           <div className="flex flex-col">
             <div className="h-16 bg-muted/30 w-full" />
             <div className="px-4 pb-4">
-              <div className="relative -mt-8 mb-3">
-                <Avatar className="h-20 w-20 border-4 border-background shadow-sm">
-                  <AvatarImage src={data.user.photoUrl || ""} />
-                  <AvatarFallback className="text-2xl font-bold bg-muted">
+              <div className="relative -mt-10 mb-3">
+                {/* Fix: Added aspect-square and overflow-hidden to Avatar.
+                  Used object-cover on AvatarImage to prevent shrinking/stretching.
+                */}
+                <Avatar className="h-20 w-20 border-4 border-background shadow-md rounded-full overflow-hidden aspect-square">
+                  <AvatarImage
+                    src={data.user.photoUrl || ""}
+                    className="aspect-square object-cover w-full h-full"
+                  />
+                  <AvatarFallback className="text-2xl font-bold bg-muted h-full w-full flex items-center justify-center">
                     {(data.user.firstName ||
                       data.user.displayName)?.[0].toUpperCase()}
                   </AvatarFallback>
@@ -78,10 +86,18 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
               </div>
 
               <div className="space-y-1">
-                <h3 className="text-lg font-bold leading-none">
-                  {data.user.displayName ||
-                    `${data.user.firstName} ${data.user.lastName}`}
-                </h3>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h3 className="text-lg font-bold leading-none truncate">
+                    {data.user.displayName ||
+                      `${data.user.firstName} ${data.user.lastName}`}
+                  </h3>
+                  {data.user.isVerified && (
+                    <MdVerified
+                      className="text-[#2196f3] shrink-0 text-[18px]"
+                      title="Verified User"
+                    />
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   @{data.user.username}
                 </p>
@@ -107,7 +123,7 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
                           : "text-foreground"
                       }
                     >
-                      {data.user.status || "offline"}
+                      {formatLastSeen(data.user.status)}
                     </span>
                   </div>
                   {data.user.email && (

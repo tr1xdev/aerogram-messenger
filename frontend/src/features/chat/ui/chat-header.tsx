@@ -85,12 +85,14 @@ export function ChatHeader({
             <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
               {renderAvatar()}
               <div className="flex flex-col min-w-0 text-left">
-                <span className="text-[15px] font-bold truncate leading-none">
-                  {title}
-                </span>
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="text-[15px] font-bold truncate leading-none">
+                    {title}
+                  </span>
+                </div>
                 <span
                   className={cn(
-                    "text-[11px] mt-1 font-medium",
+                    "text-[11px] mt-1 font-medium leading-none",
                     status === "online"
                       ? "text-primary"
                       : "text-muted-foreground",

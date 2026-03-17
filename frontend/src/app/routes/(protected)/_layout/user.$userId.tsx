@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@/entities/chat/model/types";
+import { MdVerified } from "react-icons/md";
 
 export const Route = createFileRoute("/(protected)/_layout/user/$userId")({
   component: () => null,
@@ -79,19 +80,26 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
         ) : (
           <div className="pb-10 px-4 space-y-5 overflow-y-auto h-[calc(100vh-64px)] scrollbar-none">
             <div className="flex flex-col items-center py-8">
-              <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
+              {/* Fix: Added aspect-square and forced object-cover to prevent shrinking */}
+              <Avatar className="h-32 w-32 border-4 border-background shadow-xl rounded-full aspect-square overflow-hidden">
                 <AvatarImage
                   src={user.photoUrl ?? undefined}
-                  className="object-cover"
+                  className="object-cover h-full w-full"
                 />
-                <AvatarFallback className="text-4xl bg-primary/10 text-primary font-bold uppercase">
+                <AvatarFallback className="text-4xl bg-primary/10 text-primary font-bold uppercase h-full w-full flex items-center justify-center">
                   {(user.firstName || user.displayName)?.[0] || "?"}
                 </AvatarFallback>
               </Avatar>
-              <div className="mt-4 text-center">
-                <h2 className="text-2xl font-bold tracking-tight">
-                  {user.displayName || `${user.firstName} ${user.lastName}`}
-                </h2>
+
+              <div className="mt-4 text-center w-full px-4">
+                <div className="flex items-center justify-center gap-1.5">
+                  <h2 className="text-2xl font-bold tracking-tight truncate">
+                    {user.displayName || `${user.firstName} ${user.lastName}`}
+                  </h2>
+                  {user.isVerified && (
+                    <MdVerified className="text-[#2196f3] shrink-0 text-[24px]" />
+                  )}
+                </div>
                 <div className="flex items-center justify-center gap-1.5 mt-1">
                   <div
                     className={cn(

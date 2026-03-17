@@ -10,6 +10,7 @@ export const USER_FIELDS = gql`
     status
     publicKey
     photoUrl
+    isVerified
   }
 `;
 

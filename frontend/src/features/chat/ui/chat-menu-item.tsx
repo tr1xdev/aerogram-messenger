@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { MdVerified } from "react-icons/md";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -96,7 +97,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                 className="flex items-center gap-3 w-full"
               >
                 <div className="relative shrink-0">
-                  <Avatar className="h-14 w-14 border border-border/40 rounded-full overflow-hidden shrink-0">
+                  <Avatar className="h-14 w-14 border border-border/40 rounded-full overflow-hidden shrink-0 aspect-square">
                     <AvatarImage
                       src={avatarUrl}
                       alt={displayName}
@@ -107,15 +108,20 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                     </AvatarFallback>
                   </Avatar>
                   {isOnline && (
-                    <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background z-10 bg-green-500" />
+                    <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background z-10 bg-green-500" />
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                   <div className="flex justify-between items-baseline">
-                    <span className="text-[15px] font-bold truncate leading-tight">
-                      {displayName}
-                    </span>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[15px] font-bold truncate leading-tight">
+                        {displayName}
+                      </span>
+                      {chat.type === "PRIVATE" && otherUser?.isVerified && (
+                        <MdVerified className="text-[#2196f3] shrink-0 text-[14px]" />
+                      )}
+                    </div>
 
                     {lastMessage && (
                       <div className="flex items-center gap-1.5 shrink-0 ml-2">

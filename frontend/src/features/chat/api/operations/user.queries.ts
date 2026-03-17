@@ -7,6 +7,7 @@ export const GET_ME = gql`
       ...UserFields
       encryptedPrivKey
       encryptionIv
+      isVerified
     }
   }
   ${USER_FIELDS}
