@@ -128,7 +128,7 @@ func main() {
 
 func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pRepo *repositories.PresenceRepository) {
 	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, rdb, mailer, cfg))
-	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(db))
+	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(db, rdb))
 	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
 	presencev1.RegisterPresenceServiceServer(s, presence_svc.NewServer(pRepo))
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
