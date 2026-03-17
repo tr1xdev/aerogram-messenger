@@ -164,7 +164,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {chat.isPinned && (
+                      {chat.isPinned && chat.unreadCount === 0 && (
                         <BsFillPinFill className="h-3.5 w-3.5 text-muted-foreground/50" />
                       )}
 
@@ -180,7 +180,6 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </ContextMenuTrigger>
-
         <ContextMenuContent className="w-56 rounded-xl shadow-xl">
           <ContextMenuItem
             onClick={(): void => {
