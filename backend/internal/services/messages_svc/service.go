@@ -2,6 +2,7 @@ package messages_svc
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -80,7 +81,11 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
-	return &messagespb.SendMessageResponse{Message: s.mapDBToProto(msg)}, nil
+	protoMsg := s.mapDBToProto(msg)
+	payload, _ := json.Marshal(protoMsg)
+	s.rdb.Publish(ctx, "chat:"+req.ChatId, payload)
+
+	return &messagespb.SendMessageResponse{Message: protoMsg}, nil
 }
 
 func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
