@@ -198,6 +198,7 @@ type UpdateUserInput struct {
 	PublicKey        *string `json:"publicKey,omitempty"`
 	EncryptedPrivKey *string `json:"encryptedPrivKey,omitempty"`
 	EncryptionIv     *string `json:"encryptionIv,omitempty"`
+	PhotoURL         *string `json:"photoUrl,omitempty"`
 }
 
 type UserStatusPayload struct {

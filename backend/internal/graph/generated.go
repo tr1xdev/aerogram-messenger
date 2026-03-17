@@ -6821,7 +6821,7 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"firstName", "lastName", "username", "publicKey", "encryptedPrivKey", "encryptionIv"}
+	fieldsInOrder := [...]string{"firstName", "lastName", "username", "publicKey", "encryptedPrivKey", "encryptionIv", "photoUrl"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -6870,6 +6870,13 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.EncryptionIv = data
+		case "photoUrl":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photoUrl"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PhotoURL = data
 		}
 	}
 

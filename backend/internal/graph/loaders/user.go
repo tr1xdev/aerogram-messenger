@@ -35,32 +35,31 @@ func newUserBatchFn(client userpb.UserServiceClient) dataloader.BatchFunc[string
 		userMap := make(map[string]*dbgen.User)
 		for _, u := range res.Users {
 			if uid, err := uuid.Parse(u.Id); err == nil {
-				normalizedID := uid.String()
+				normalizedID := strings.ToLower(uid.String())
 				userMap[normalizedID] = &dbgen.User{
 					ID:               uid,
 					FirstName:        u.FirstName,
+					Email:            u.GetEmail(),
 					LastName:         toNullString(u.LastName),
 					Username:         toNullString(u.Username),
 					PublicKey:        toNullString(u.PublicKey),
 					PhotoUrl:         toNullString(u.PhotoUrl),
 					EncryptedPrivKey: toNullString(u.EncryptedPrivKey),
 					EncryptionIv:     toNullString(u.EncryptionIv),
+					IsVerified:       u.IsVerified,
+					IsPremium:        u.IsPremium,
+					IsEmailVerified:  u.IsEmailVerified,
 				}
 			}
 		}
 
 		for i, id := range keys {
-			parsedID, err := uuid.Parse(id)
-			if err != nil {
-				output[i] = &dataloader.Result[*dbgen.User]{Error: err}
-				continue
-			}
-
-			if u, ok := userMap[parsedID.String()]; ok {
+			searchKey := strings.ToLower(id)
+			if u, ok := userMap[searchKey]; ok {
 				output[i] = &dataloader.Result[*dbgen.User]{Data: u}
 			} else {
 				output[i] = &dataloader.Result[*dbgen.User]{
-					Error: fmt.Errorf("user %s not found in user_svc response", id),
+					Error: fmt.Errorf("user %s not found in user_svc", id),
 				}
 			}
 		}

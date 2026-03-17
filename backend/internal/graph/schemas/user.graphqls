@@ -21,6 +21,7 @@ input UpdateUserInput {
    publicKey: String
    encryptedPrivKey: String
    encryptionIv: String
+   photoUrl: String
 }
 
 type UserStatusPayload {
