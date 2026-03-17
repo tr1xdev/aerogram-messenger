@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MdVerified } from "react-icons/md";
 import {
   Camera,
   AtSign,
@@ -54,16 +55,21 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
             : "bg-transparent border-transparent -translate-y-2 opacity-0 pointer-events-none",
         )}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Avatar className="h-8 w-8">
             <AvatarImage src={user?.photoUrl ?? undefined} />
             <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
               {displayName[0]?.toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className="font-semibold text-sm tracking-tight">
-            {displayName}
-          </span>
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="font-semibold text-sm tracking-tight truncate">
+              {displayName}
+            </span>
+            {user?.isVerified && (
+              <MdVerified className="text-[#2196f3] shrink-0 text-[14px]" />
+            )}
+          </div>
         </div>
         <button className="p-2 hover:bg-accent rounded-full transition-colors">
           <Pencil className="h-4 w-4 text-primary" />
@@ -95,10 +101,15 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
             </button>
           </div>
 
-          <div className="mt-5 text-center px-4">
-            <h2 className="text-2xl font-bold tracking-tight leading-tight">
-              {displayName}
-            </h2>
+          <div className="mt-5 text-center px-4 w-full">
+            <div className="flex items-center justify-center gap-1.5 px-2">
+              <h2 className="text-2xl font-bold tracking-tight leading-tight truncate">
+                {displayName}
+              </h2>
+              {user?.isVerified && (
+                <MdVerified className="text-[#2196f3] shrink-0 text-[22px] mt-0.5" />
+              )}
+            </div>
             <p className="text-muted-foreground text-sm font-medium mt-0.5">
               {user?.username ? `@${user.username}` : "No username set"}
             </p>

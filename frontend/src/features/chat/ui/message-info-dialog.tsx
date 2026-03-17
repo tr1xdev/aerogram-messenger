@@ -107,7 +107,7 @@ export const MessageInfoDialog = memo(function MessageInfoDialog({
           "p-0 gap-0 bg-zinc-950 border-zinc-800 overflow-hidden animate-in fade-in zoom-in-95 duration-200",
           isMobile
             ? "w-[95vw] max-w-none rounded-lg"
-            : "sm:max-w-[450px] sm:rounded-xl",
+            : "sm:max-w-112.5 sm:rounded-xl",
         )}
       >
         <DialogHeader className="p-3 pr-12 border-b border-zinc-800 bg-zinc-900/50 flex flex-row items-center justify-between space-y-0">

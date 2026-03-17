@@ -9,6 +9,7 @@ import {
   History,
   X,
 } from "lucide-react";
+import { MdVerified } from "react-icons/md";
 import { HiDownload } from "react-icons/hi";
 import { BsFillPinFill } from "react-icons/bs";
 import {
@@ -556,7 +557,7 @@ export function AppSidebar() {
         </SidebarContent>
 
         <SidebarFooter
-          className="p-4 border-t border-border/5 bg-muted/5 hover:bg-muted/10 transition-all cursor-pointer"
+          className="p-4 border-t border-border/5 bg-muted/2 hover:bg-muted/10 transition-colors cursor-pointer group"
           onClick={(): void => setSettingsOpen(true)}
         >
           {isLoadingMe || !user ? (
@@ -568,28 +569,38 @@ export function AppSidebar() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between w-full animate-in fade-in slide-in-from-bottom-1 duration-300">
+            <div className="flex items-center justify-between w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex items-center gap-3 min-w-0">
-                <Avatar className="h-9 w-9 border border-border/10 rounded-full overflow-hidden shrink-0">
+                <Avatar className="h-9 w-9 border border-border/10 rounded-full shrink-0">
                   <AvatarImage
                     src={user.photoUrl || undefined}
                     alt={fullName}
-                    className="aspect-square h-full w-full object-cover"
+                    className="aspect-square object-cover"
                   />
-                  <AvatarFallback className="font-bold text-[11px] bg-primary/10 text-primary uppercase h-full w-full flex items-center justify-center">
+                  <AvatarFallback className="font-bold text-[10px] bg-primary/10 text-primary uppercase">
                     {avatarFallback}
                   </AvatarFallback>
                 </Avatar>
+
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[13.5px] font-bold truncate text-foreground leading-tight">
-                    {fullName}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground font-medium">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-[13px] font-semibold truncate text-foreground leading-none">
+                      {fullName}
+                    </span>
+                    {user.isVerified && (
+                      <MdVerified
+                        className="text-[#2196f3] shrink-0 text-[14px]"
+                        title="Verified"
+                      />
+                    )}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-medium leading-none mt-1">
                     Settings
                   </span>
                 </div>
               </div>
-              <Settings className="h-4.5 w-4.5 text-muted-foreground" />
+
+              <Settings className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
           )}
         </SidebarFooter>

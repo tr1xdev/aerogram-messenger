@@ -1,4 +1,5 @@
 import { LogOut, ChevronDown } from "lucide-react";
+import { MdVerified } from "react-icons/md";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,14 +58,23 @@ export function ProfileContent({
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <h3 className="font-bold text-lg leading-tight truncate">
-            {user?.firstName} {user?.lastName}
-          </h3>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="font-bold text-lg leading-tight truncate">
+              {user?.firstName} {user?.lastName}
+            </h3>
+            {user?.isVerified && (
+              <MdVerified
+                className="text-[#2196f3] shrink-0 text-[20px]"
+                title="Verified Account"
+              />
+            )}
+          </div>
           <p className="text-sm text-muted-foreground font-medium truncate">
             @{user?.username}
           </p>
         </div>
       </div>
+
       <div className="space-y-2">
         <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
           Bio
