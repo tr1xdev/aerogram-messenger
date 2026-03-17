@@ -41,6 +41,7 @@ type DialogMember struct {
 	LastReadSequence  int64          `json:"last_read_sequence"`
 	MutedUntil        sql.NullTime   `json:"muted_until"`
 	IsPinned          bool           `json:"is_pinned"`
+	IsHidden          bool           `json:"is_hidden"`
 	CustomTitle       sql.NullString `json:"custom_title"`
 	NotificationsOn   bool           `json:"notifications_on"`
 	CreatedAt         time.Time      `json:"created_at"`

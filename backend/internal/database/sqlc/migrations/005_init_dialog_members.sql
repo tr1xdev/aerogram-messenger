@@ -7,6 +7,7 @@ CREATE TABLE dialog_members (
     last_read_sequence    BIGINT NOT NULL DEFAULT 0,
     muted_until           TIMESTAMPTZ,
     is_pinned             BOOLEAN NOT NULL DEFAULT FALSE,
+    is_hidden             BOOLEAN NOT NULL DEFAULT FALSE,
     custom_title          VARCHAR(100),
     notifications_on      BOOLEAN NOT NULL DEFAULT TRUE,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),

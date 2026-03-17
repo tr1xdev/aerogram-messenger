@@ -144,7 +144,32 @@ func SetupTestDB(t *testing.T) *DB {
 	}
 }
 
-func getProjectRoot() string {
-	_, filename, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(filename), "../..")
+func (db *DB) TruncateTables(t *testing.T) {
+	_, err := db.Conn.Exec(`
+		DO $$
+		DECLARE
+			r RECORD;
+		BEGIN
+			FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename != 'schema_migrations') LOOP
+				EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' CASCADE';
+			END LOOP;
+		END $$;
+	`)
+	if err != nil {
+		t.Fatalf("failed to truncate tables: %v", err)
+	}
+}
+
+func ToNullTimePtr(t *time.Time) sql.NullTime {
+	if t == nil {
+		return sql.NullTime{Valid: false}
+	}
+	return sql.NullTime{Time: *t, Valid: true}
+}
+
+func UUIDToNullUUIDPtr(id *uuid.UUID) uuid.NullUUID {
+	if id == nil {
+		return uuid.NullUUID{Valid: false}
+	}
+	return uuid.NullUUID{UUID: *id, Valid: true}
 }

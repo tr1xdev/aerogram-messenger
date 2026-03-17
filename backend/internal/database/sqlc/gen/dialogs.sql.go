@@ -236,7 +236,7 @@ func (q *Queries) GetDialogByUsername(ctx context.Context, username sql.NullStri
 }
 
 const getDialogMember = `-- name: GetDialogMember :one
-SELECT dialog_id, user_id, role, joined_at, last_read_message_id, last_read_sequence, muted_until, is_pinned, custom_title, notifications_on, created_at, updated_at FROM dialog_members
+SELECT dialog_id, user_id, role, joined_at, last_read_message_id, last_read_sequence, muted_until, is_pinned, is_hidden, custom_title, notifications_on, created_at, updated_at FROM dialog_members
 WHERE dialog_id = $1 AND user_id = $2 LIMIT 1
 `
 
@@ -257,6 +257,7 @@ func (q *Queries) GetDialogMember(ctx context.Context, arg GetDialogMemberParams
 		&i.LastReadSequence,
 		&i.MutedUntil,
 		&i.IsPinned,
+		&i.IsHidden,
 		&i.CustomTitle,
 		&i.NotificationsOn,
 		&i.CreatedAt,
@@ -266,7 +267,7 @@ func (q *Queries) GetDialogMember(ctx context.Context, arg GetDialogMemberParams
 }
 
 const getDialogMembers = `-- name: GetDialogMembers :many
-SELECT dialog_id, user_id, role, joined_at, last_read_message_id, last_read_sequence, muted_until, is_pinned, custom_title, notifications_on, created_at, updated_at FROM dialog_members WHERE dialog_id = $1
+SELECT dialog_id, user_id, role, joined_at, last_read_message_id, last_read_sequence, muted_until, is_pinned, is_hidden, custom_title, notifications_on, created_at, updated_at FROM dialog_members WHERE dialog_id = $1
 `
 
 func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]DialogMember, error) {
@@ -287,6 +288,7 @@ func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]D
 			&i.LastReadSequence,
 			&i.MutedUntil,
 			&i.IsPinned,
+			&i.IsHidden,
 			&i.CustomTitle,
 			&i.NotificationsOn,
 			&i.CreatedAt,
