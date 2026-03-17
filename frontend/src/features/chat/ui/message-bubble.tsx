@@ -234,7 +234,7 @@ export const MessageBubble = memo(function MessageBubble({
                 >
                   <div
                     className={cn(
-                      "absolute left-0 top-0 bottom-0 w-[3px]",
+                      "absolute left-0 top-0 bottom-0 w-0.75",
                       isMe ? "bg-primary-foreground/80" : "bg-primary/80",
                     )}
                   />
@@ -252,7 +252,7 @@ export const MessageBubble = memo(function MessageBubble({
                 </div>
               )}
               <div className="grid grid-cols-1 min-w-0">
-                <span className="block whitespace-pre-wrap break-all overflow-hidden [word-break:break-word] [overflow-wrap:anywhere]">
+                <span className="block whitespace-pre-wrap break-all overflow-hidden wrap-anywhere">
                   {displayText}
                 </span>
                 <div

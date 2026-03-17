@@ -78,7 +78,7 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
 
       <ScrollArea ref={scrollRef} className="h-full w-full">
         <div className="relative flex flex-col items-center pt-16 pb-10">
-          <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-primary/5 to-transparent -z-10" />
+          <div className="absolute top-0 inset-x-0 h-40 bg-linear-to-b from-primary/5 to-transparent -z-10" />
 
           <div className="absolute top-4 right-4 z-20">
             <button className="flex items-center justify-center h-10 w-10 rounded-full bg-background/50 backdrop-blur-md border border-border/40 shadow-sm active:scale-95 transition-all hover:bg-background/80">
@@ -92,7 +92,7 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
                 src={user?.photoUrl ?? undefined}
                 className="object-cover"
               />
-              <AvatarFallback className="text-4xl font-bold text-white bg-gradient-to-tr from-primary to-primary/60">
+              <AvatarFallback className="text-4xl font-bold text-white bg-linear-to-tr from-primary to-primary/60">
                 {displayName[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>

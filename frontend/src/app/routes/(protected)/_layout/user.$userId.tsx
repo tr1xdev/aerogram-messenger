@@ -47,7 +47,7 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={handleBack}
-        className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[90] md:hidden"
+        className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-90 md:hidden"
       />
 
       <motion.div
@@ -61,7 +61,7 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
         onDragEnd={(_, info) => {
           if (info.offset.x > 80) handleBack();
         }}
-        className="fixed inset-y-0 right-0 z-[100] w-full bg-background shadow-2xl md:hidden"
+        className="fixed inset-y-0 right-0 z-100 w-full bg-background shadow-2xl md:hidden"
       >
         <header className="flex items-center p-4 sticky top-0 bg-background/90 backdrop-blur-md z-10 border-b">
           <Button
