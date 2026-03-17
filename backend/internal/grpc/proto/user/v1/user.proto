@@ -14,6 +14,23 @@ service UserService {
   rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
 }
 
+message User {
+  string id = 1;
+  string first_name = 2;
+  optional string email = 3;
+  optional string last_name = 4;
+  optional string bio = 5;
+  optional string username = 6;
+  bool is_premium = 7;
+  bool is_verified = 8;
+  bool is_email_verified = 9;
+  optional google.protobuf.Timestamp created_at = 10;
+  optional string public_key = 11;
+  optional string encrypted_priv_key = 12;
+  optional string encryption_iv = 13;
+  optional string photo_url = 14;
+}
+
 message GetUsersRequest {
   repeated string ids = 1;
 }
@@ -29,21 +46,6 @@ message SearchUsersRequest {
 
 message SearchUsersResponse {
   repeated User users = 1;
-}
-
-message User {
-  string id = 1;
-  string first_name = 2;
-  optional string email = 3;
-  optional string last_name = 4;
-  optional string bio = 5;
-  optional string username = 6;
-  optional string is_premium = 7;
-  optional google.protobuf.Timestamp created_at = 8;
-  optional string public_key = 9;
-  optional string encrypted_priv_key = 10;
-  optional string encryption_iv = 11;
-  optional string photo_url = 12;
 }
 
 message UserInfoRequest {

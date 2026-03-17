@@ -9,6 +9,7 @@ CREATE TABLE users (
     photo_url           TEXT,
     is_premium          BOOLEAN NOT NULL DEFAULT FALSE,
     is_email_verified   BOOLEAN NOT NULL DEFAULT FALSE,
+    is_verified         BOOLEAN NOT NULL DEFAULT FALSE,
     verification_token  TEXT,
     verification_expiry TIMESTAMPTZ,
     public_key          TEXT,

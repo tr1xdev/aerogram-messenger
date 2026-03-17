@@ -76,7 +76,7 @@ func (s *Server) GetUsers(ctx context.Context, req *userpb.GetUsersRequest) (*us
 
 	users, err := s.userRepo.GetByIDs(ctx, uids)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch users from database")
+		return nil, status.Error(codes.Internal, "failed to fetch users")
 	}
 
 	pbUsers := make([]*userpb.User, len(users))
@@ -124,11 +124,12 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 		EncryptedPrivKey: database.ToNullString(req.EncryptedPrivKey),
 		EncryptionIv:     database.ToNullString(req.EncryptionIv),
 		PhotoUrl:         database.ToNullString(req.PhotoUrl),
+		IsVerified:       sql.NullBool{Valid: false},
 	}
 
 	updatedUser, err := s.userRepo.Update(ctx, params)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to update user")
+		return nil, status.Error(codes.Internal, "update failed")
 	}
 
 	return &userpb.UpdateUserResponse{
@@ -140,10 +141,13 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 
 func (s *Server) mapDBToProto(u dbgen.User) *userpb.User {
 	res := &userpb.User{
-		Id:        u.ID.String(),
-		FirstName: u.FirstName,
-		Email:     &u.Email,
-		CreatedAt: timestamppb.New(u.CreatedAt),
+		Id:              u.ID.String(),
+		FirstName:       u.FirstName,
+		Email:           &u.Email,
+		CreatedAt:       timestamppb.New(u.CreatedAt),
+		IsVerified:      u.IsVerified,
+		IsPremium:       u.IsPremium,
+		IsEmailVerified: u.IsEmailVerified,
 	}
 
 	if u.Username.Valid {
