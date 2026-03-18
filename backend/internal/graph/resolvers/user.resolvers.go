@@ -14,11 +14,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"
+	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/loaders"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
+	authv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 )
 
@@ -62,7 +64,61 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input model.UpdateUse
 
 // CreateBot is the resolver for the createBot field.
 func (r *mutationResolver) CreateBot(ctx context.Context, username string, firstName string, lastName *string, ownerID string, description *string, commands *string) (model.CreateBotResult, error) {
-	return &model.InternalError{Message: "Not implemented yet"}, nil
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "Unauthorized"}, nil
+	}
+
+	trimmedUsername := strings.TrimSpace(username)
+	if !strings.HasSuffix(strings.ToLower(trimmedUsername), "bot") {
+		field := "username"
+		return &model.ValidationError{
+			Field:   &field,
+			Message: "Username must end with 'bot'",
+		}, nil
+	}
+
+	botID := uuid.New()
+	params := dbgen.CreateUserParams{
+		ID:             botID,
+		Username:       database.ToNullString(&trimmedUsername),
+		FirstName:      strings.TrimSpace(firstName),
+		LastName:       database.ToNullString(lastName),
+		Status:         "OFFLINE",
+		IsBot:          true,
+		BotDescription: database.ToNullString(description),
+	}
+
+	if commands != nil && *commands != "" {
+		params.BotCommands = pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(*commands),
+			Valid:      true,
+		}
+	}
+
+	botUser, err := r.Store.CreateUser(ctx, params)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique") {
+			field := "username"
+			return &model.ValidationError{
+				Field:   &field,
+				Message: "Username already taken",
+			}, nil
+		}
+		return &model.InternalError{Message: "Failed to create bot entry"}, nil
+	}
+
+	resp, err := r.AuthClient.CreateBotToken(ctx, &authv1.CreateBotTokenRequest{
+		BotId: botID.String(),
+	})
+	if err != nil {
+		return &model.InternalError{Message: "Failed to generate bot token"}, nil
+	}
+
+	return &model.CreateBotPayload{
+		BotToken: resp.AccessToken,
+		User:     &botUser,
+	}, nil
 }
 
 // Me is the resolver for the me field.
@@ -257,10 +313,57 @@ type userResolver struct{ *Resolver }
 //    it when you're done.
 //  - You have helper methods in this file. Move them out to keep these resolver files clean.
 /*
-	func (r *userResolver) IsPremium(ctx context.Context, obj *dbgen.User) (bool, error) {
-	return obj.IsPremium, nil
-}
-func (r *userResolver) IsBot(ctx context.Context, obj *dbgen.User) (bool, error) {
-	return obj.IsBot, nil
+	func (r *mutationResolver) CreateBot(ctx context.Context, username string, firstName string, lastName *string, ownerID string, description *string, commands *string) (model.CreateBotResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "Unauthorized"}, nil
+	}
+
+	if !strings.HasSuffix(strings.ToLower(username), "bot") {
+		return &model.ValidationError{
+			Field:   "username",
+			Message: "Username must end with 'bot'",
+		}, nil
+	}
+
+	botID := uuid.New()
+	params := dbgen.CreateUserParams{
+		ID:             botID,
+		Username:       database.ToNullString(&username),
+		FirstName:      firstName,
+		LastName:       database.ToNullString(lastName),
+		Status:         "OFFLINE",
+		IsBot:          true,
+		IsVerified:     true,
+		BotDescription: database.ToNullString(description),
+	}
+
+	if commands != nil {
+		params.BotCommands = pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(*commands),
+			Valid:      true,
+		}
+	}
+
+	botUser, err := r.Store.CreateUser(ctx, params)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique_username") {
+			return &model.ValidationError{
+				Field:   "username",
+				Message: "Username already taken",
+			}, nil
+		}
+		return &model.InternalError{Message: "Failed to create bot"}, nil
+	}
+
+	token, err := r.AuthServer.CreateAccessToken(botID.String(), "", true, true)
+	if err != nil {
+		return &model.InternalError{Message: "Failed to generate bot token"}, nil
+	}
+
+	return &model.CreateBotPayload{
+		BotToken: token,
+		User:     &botUser,
+	}, nil
 }
 */

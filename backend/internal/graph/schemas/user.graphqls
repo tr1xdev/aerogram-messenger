@@ -37,6 +37,17 @@ type UserStatusPayload {
    lastSeen: String
 }
 
+type CreateBotPayload {
+   botToken: String!
+   user: User!
+}
+
+union CreateBotResult =
+   | CreateBotPayload
+   | ValidationError
+   | ForbiddenError
+   | InternalError
+
 extend type Query {
    me: User!
    user(id: ID!): User!
@@ -54,17 +65,6 @@ extend type Mutation {
       description: String
       commands: String
    ): CreateBotResult!
-}
-
-union CreateBotResult =
-   | CreateBotPayload
-   | ValidationError
-   | ForbiddenError
-   | InternalError
-
-type CreateBotPayload {
-   botToken: String!
-   user: User!
 }
 
 extend type Subscription {
