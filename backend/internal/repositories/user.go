@@ -21,20 +21,32 @@ func (r *UserRepository) CreateUser(ctx context.Context, arg dbgen.CreateUserPar
 	return r.db.Queries.CreateUser(ctx, arg)
 }
 
+func (r *UserRepository) CreateBot(ctx context.Context, arg dbgen.CreateBotParams) (dbgen.User, error) {
+	return r.db.Queries.CreateBot(ctx, arg)
+}
+
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (dbgen.User, error) {
 	return r.db.Queries.GetUserByID(ctx, id)
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (dbgen.User, error) {
-	return r.db.Queries.GetUserByEmail(ctx, email)
+	return r.db.Queries.GetUserByEmail(ctx, sql.NullString{String: email, Valid: email != ""})
+}
+
+func (r *UserRepository) GetByBotToken(ctx context.Context, tokenHash string) (dbgen.User, error) {
+	return r.db.Queries.GetUserByBotToken(ctx, sql.NullString{String: tokenHash, Valid: true})
 }
 
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (dbgen.User, error) {
-	return r.db.Queries.GetUserByUsername(ctx, database.StringToNullString(username))
+	return r.db.Queries.GetUserByUsername(ctx, sql.NullString{String: username, Valid: true})
 }
 
 func (r *UserRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]dbgen.User, error) {
 	return r.db.Queries.GetUsersByIDs(ctx, ids)
+}
+
+func (r *UserRepository) GetBotsByOwner(ctx context.Context, ownerID uuid.UUID) ([]dbgen.User, error) {
+	return r.db.Queries.GetBotsByOwnerID(ctx, uuid.NullUUID{UUID: ownerID, Valid: true})
 }
 
 func (r *UserRepository) SearchByUsername(ctx context.Context, query string) ([]dbgen.User, error) {
