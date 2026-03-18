@@ -10,6 +10,15 @@ service AuthService {
   rpc VerifyEmail(VerifyEmailRequest) returns (VerifyEmailResponse);
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc CreateBotToken(CreateBotTokenRequest) returns (CreateBotTokenResponse);
+}
+
+message CreateBotTokenRequest {
+  string bot_id = 1;
+}
+
+message CreateBotTokenResponse {
+  string access_token = 1;
 }
 
 message GetUserRequest {
