@@ -30,8 +30,8 @@ func TestUserInfo(t *testing.T) {
 		ID:        userID,
 		Username:  sql.NullString{String: username, Valid: true},
 		FirstName: "Alice",
-		Email:     "alice@test.com",
-		Password:  "hash",
+		Email:     sql.NullString{String: "alice@test.com", Valid: true},
+		Password:  sql.NullString{String: "hash", Valid: true},
 		Status:    "online",
 	})
 	require.NoError(t, err)
@@ -69,8 +69,8 @@ func TestUpdateUser(t *testing.T) {
 	_, err := server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
 		ID:        userID,
 		FirstName: "OldName",
-		Email:     "update@test.com",
-		Password:  "hash",
+		Email:     sql.NullString{String: "update@test.com", Valid: true},
+		Password:  sql.NullString{String: "hash", Valid: true},
 		Status:    "online",
 	})
 	require.NoError(t, err)
@@ -102,10 +102,18 @@ func TestGetUsers(t *testing.T) {
 	u2 := uuid.New()
 
 	_, _ = server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
-		ID: u1, FirstName: "User1", Email: "u1@test.com", Password: "p", Status: "s",
+		ID:        u1,
+		FirstName: "User1",
+		Email:     sql.NullString{String: "u1@test.com", Valid: true},
+		Password:  sql.NullString{String: "p", Valid: true},
+		Status:    "s",
 	})
 	_, _ = server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
-		ID: u2, FirstName: "User2", Email: "u2@test.com", Password: "p", Status: "s",
+		ID:        u2,
+		FirstName: "User2",
+		Email:     sql.NullString{String: "u2@test.com", Valid: true},
+		Password:  sql.NullString{String: "p", Valid: true},
+		Status:    "s",
 	})
 
 	req := &userpb.GetUsersRequest{Ids: []string{u1.String(), u2.String()}}
@@ -125,8 +133,8 @@ func TestSearchUsers(t *testing.T) {
 		ID:        searchID,
 		Username:  sql.NullString{String: "search_me", Valid: true},
 		FirstName: "Search",
-		Email:     "search@test.com",
-		Password:  "p",
+		Email:     sql.NullString{String: "search@test.com", Valid: true},
+		Password:  sql.NullString{String: "p", Valid: true},
 		Status:    "s",
 	})
 	require.NoError(t, err)

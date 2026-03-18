@@ -41,6 +41,8 @@ func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*us
 		u, err = s.userRepo.GetByID(ctx, uid)
 	case *userpb.UserInfoRequest_Username:
 		u, err = s.userRepo.GetByUsername(ctx, v.Username)
+	case *userpb.UserInfoRequest_BotTokenHash:
+		u, err = s.userRepo.GetByBotToken(ctx, v.BotTokenHash)
 	default:
 		return nil, status.Error(codes.InvalidArgument, "identifier required")
 	}
@@ -139,17 +141,50 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 	}, nil
 }
 
+func (s *Server) CreateBot(ctx context.Context, req *userpb.CreateBotRequest) (*userpb.CreateBotResponse, error) {
+	ownerID, err := uuid.Parse(req.OwnerId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid owner id")
+	}
+
+	botToken := uuid.NewString()
+	botID := uuid.New()
+
+	params := dbgen.CreateBotParams{
+		ID:           botID,
+		Username:     sql.NullString{String: req.Username, Valid: true},
+		FirstName:    req.FirstName,
+		LastName:     database.ToNullString(req.LastName),
+		BotTokenHash: sql.NullString{String: botToken, Valid: true},
+		BotOwnerID:   uuid.NullUUID{UUID: ownerID, Valid: true},
+	}
+
+	bot, err := s.userRepo.CreateBot(ctx, params)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to create bot")
+	}
+
+	return &userpb.CreateBotResponse{
+		Response: &userpb.CreateBotResponse_User{
+			User: s.mapDBToProto(bot),
+		},
+	}, nil
+}
+
 func (s *Server) mapDBToProto(u dbgen.User) *userpb.User {
 	res := &userpb.User{
 		Id:              u.ID.String(),
 		FirstName:       u.FirstName,
-		Email:           &u.Email,
 		CreatedAt:       timestamppb.New(u.CreatedAt),
 		IsVerified:      u.IsVerified,
 		IsPremium:       u.IsPremium,
 		IsEmailVerified: u.IsEmailVerified,
+		IsBot:           u.IsBot,
 	}
 
+	if u.Email.Valid {
+		res.Email = &u.Email.String
+	}
 	if u.Username.Valid {
 		res.Username = &u.Username.String
 	}
@@ -167,6 +202,13 @@ func (s *Server) mapDBToProto(u dbgen.User) *userpb.User {
 	}
 	if u.PhotoUrl.Valid {
 		res.PhotoUrl = &u.PhotoUrl.String
+	}
+	if u.BotTokenHash.Valid {
+		res.BotTokenHash = &u.BotTokenHash.String
+	}
+	if u.BotOwnerID.Valid {
+		ownerID := u.BotOwnerID.UUID.String()
+		res.BotOwnerId = &ownerID
 	}
 
 	return res

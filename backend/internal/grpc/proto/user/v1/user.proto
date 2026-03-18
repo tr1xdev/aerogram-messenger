@@ -12,6 +12,7 @@ service UserService {
   rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
   rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
+  rpc CreateBot(CreateBotRequest) returns (CreateBotResponse);
 }
 
 message User {
@@ -29,6 +30,11 @@ message User {
   optional string encrypted_priv_key = 12;
   optional string encryption_iv = 13;
   optional string photo_url = 14;
+  bool is_bot = 15;
+  optional string bot_token_hash = 16;
+  optional string bot_owner_id = 17;
+  optional string bot_description = 18;
+  optional string bot_commands = 19;
 }
 
 message GetUsersRequest {
@@ -52,6 +58,7 @@ message UserInfoRequest {
   oneof identifier {
     string username = 1;
     string id = 2;
+    string bot_token_hash = 3;
   }
 }
 
@@ -71,11 +78,30 @@ message UpdateUserRequest {
   optional string encrypted_priv_key = 6;
   optional string encryption_iv = 7;
   optional string photo_url = 8;
+  optional string bot_description = 9;
+  optional string bot_commands = 10;
 }
 
 message UpdateUserResponse {
   oneof response {
     errors.v1.CommonError error = 1;
     User user = 2;
+  }
+}
+
+message CreateBotRequest {
+  string username = 1;
+  string first_name = 2;
+  optional string last_name = 3;
+  string owner_id = 4;
+  optional string description = 5;
+  optional string commands = 6;
+}
+
+message CreateBotResponse {
+  oneof response {
+    errors.v1.CommonError error = 1;
+    string bot_token = 2;
+    User user = 3;
   }
 }

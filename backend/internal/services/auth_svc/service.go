@@ -2,6 +2,7 @@ package auth_svc
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"strings"
@@ -86,9 +87,9 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 	newID := uuid.New()
 	params := dbgen.CreateUserParams{
 		ID:        newID,
-		Email:     req.Email,
+		Email:     sql.NullString{String: req.Email, Valid: true},
 		FirstName: req.FirstName,
-		Password:  string(pwHash),
+		Password:  sql.NullString{String: string(pwHash), Valid: true},
 		Status:    "OFFLINE",
 		LastName:  database.ToNullString(req.LastName),
 		Username:  database.ToNullString(req.Username),
@@ -134,12 +135,12 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password.String), []byte(req.Password)); err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
 	verID := uuid.NewString()
-	if err := s.authRepo.StoreAndSendCode(ctx, verID, user.ID.String(), user.Email, user.FirstName); err != nil {
+	if err := s.authRepo.StoreAndSendCode(ctx, verID, user.ID.String(), user.Email.String, user.FirstName); err != nil {
 		if os.Getenv("APP_ENV") != "development" {
 			return nil, status.Error(codes.Internal, "email delivery failed")
 		}

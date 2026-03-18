@@ -2,6 +2,7 @@ package messages_svc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"testing"
 
@@ -39,17 +40,23 @@ func TestMessagesServer(t *testing.T) {
 		ID:        userID,
 		Username:  database.ToNullString(ptrStr("testuser")),
 		FirstName: "Test",
-		Email:     "test@aerogram.com",
-		Password:  "hash",
+		Email:     sql.NullString{String: "test@aerogram.com", Valid: true},
+		Password:  sql.NullString{String: "hash", Valid: true},
 		Status:    "online",
 	})
 	require.NoError(t, err)
 
 	_, err = server.db.Queries.CreateDialog(ctx, dbgen.CreateDialogParams{
-		ID:           chatID,
-		Type:         "private",
-		IsActive:     true,
-		MembersCount: 1,
+		ID:          chatID,
+		Type:        "private",
+		IsActive:    true,
+		Name:        sql.NullString{String: "Test Chat", Valid: true},
+		Username:    sql.NullString{Valid: false},
+		PhotoUrl:    sql.NullString{Valid: false},
+		Bio:         sql.NullString{Valid: false},
+		Description: sql.NullString{Valid: false},
+		InviteLink:  sql.NullString{Valid: false},
+		CreatorID:   uuid.NullUUID{UUID: userID, Valid: true},
 	})
 	require.NoError(t, err)
 

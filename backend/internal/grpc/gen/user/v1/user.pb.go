@@ -39,6 +39,11 @@ type User struct {
 	EncryptedPrivKey *string                `protobuf:"bytes,12,opt,name=encrypted_priv_key,json=encryptedPrivKey,proto3,oneof" json:"encrypted_priv_key,omitempty"`
 	EncryptionIv     *string                `protobuf:"bytes,13,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
 	PhotoUrl         *string                `protobuf:"bytes,14,opt,name=photo_url,json=photoUrl,proto3,oneof" json:"photo_url,omitempty"`
+	IsBot            bool                   `protobuf:"varint,15,opt,name=is_bot,json=isBot,proto3" json:"is_bot,omitempty"`
+	BotTokenHash     *string                `protobuf:"bytes,16,opt,name=bot_token_hash,json=botTokenHash,proto3,oneof" json:"bot_token_hash,omitempty"`
+	BotOwnerId       *string                `protobuf:"bytes,17,opt,name=bot_owner_id,json=botOwnerId,proto3,oneof" json:"bot_owner_id,omitempty"`
+	BotDescription   *string                `protobuf:"bytes,18,opt,name=bot_description,json=botDescription,proto3,oneof" json:"bot_description,omitempty"`
+	BotCommands      *string                `protobuf:"bytes,19,opt,name=bot_commands,json=botCommands,proto3,oneof" json:"bot_commands,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -167,6 +172,41 @@ func (x *User) GetEncryptionIv() string {
 func (x *User) GetPhotoUrl() string {
 	if x != nil && x.PhotoUrl != nil {
 		return *x.PhotoUrl
+	}
+	return ""
+}
+
+func (x *User) GetIsBot() bool {
+	if x != nil {
+		return x.IsBot
+	}
+	return false
+}
+
+func (x *User) GetBotTokenHash() string {
+	if x != nil && x.BotTokenHash != nil {
+		return *x.BotTokenHash
+	}
+	return ""
+}
+
+func (x *User) GetBotOwnerId() string {
+	if x != nil && x.BotOwnerId != nil {
+		return *x.BotOwnerId
+	}
+	return ""
+}
+
+func (x *User) GetBotDescription() string {
+	if x != nil && x.BotDescription != nil {
+		return *x.BotDescription
+	}
+	return ""
+}
+
+func (x *User) GetBotCommands() string {
+	if x != nil && x.BotCommands != nil {
+		return *x.BotCommands
 	}
 	return ""
 }
@@ -361,6 +401,7 @@ type UserInfoRequest struct {
 	//
 	//	*UserInfoRequest_Username
 	//	*UserInfoRequest_Id
+	//	*UserInfoRequest_BotTokenHash
 	Identifier    isUserInfoRequest_Identifier `protobuf_oneof:"identifier"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -421,6 +462,15 @@ func (x *UserInfoRequest) GetId() string {
 	return ""
 }
 
+func (x *UserInfoRequest) GetBotTokenHash() string {
+	if x != nil {
+		if x, ok := x.Identifier.(*UserInfoRequest_BotTokenHash); ok {
+			return x.BotTokenHash
+		}
+	}
+	return ""
+}
+
 type isUserInfoRequest_Identifier interface {
 	isUserInfoRequest_Identifier()
 }
@@ -433,9 +483,15 @@ type UserInfoRequest_Id struct {
 	Id string `protobuf:"bytes,2,opt,name=id,proto3,oneof"`
 }
 
+type UserInfoRequest_BotTokenHash struct {
+	BotTokenHash string `protobuf:"bytes,3,opt,name=bot_token_hash,json=botTokenHash,proto3,oneof"`
+}
+
 func (*UserInfoRequest_Username) isUserInfoRequest_Identifier() {}
 
 func (*UserInfoRequest_Id) isUserInfoRequest_Identifier() {}
+
+func (*UserInfoRequest_BotTokenHash) isUserInfoRequest_Identifier() {}
 
 type UserInfoResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -529,6 +585,8 @@ type UpdateUserRequest struct {
 	EncryptedPrivKey *string                `protobuf:"bytes,6,opt,name=encrypted_priv_key,json=encryptedPrivKey,proto3,oneof" json:"encrypted_priv_key,omitempty"`
 	EncryptionIv     *string                `protobuf:"bytes,7,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
 	PhotoUrl         *string                `protobuf:"bytes,8,opt,name=photo_url,json=photoUrl,proto3,oneof" json:"photo_url,omitempty"`
+	BotDescription   *string                `protobuf:"bytes,9,opt,name=bot_description,json=botDescription,proto3,oneof" json:"bot_description,omitempty"`
+	BotCommands      *string                `protobuf:"bytes,10,opt,name=bot_commands,json=botCommands,proto3,oneof" json:"bot_commands,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -619,6 +677,20 @@ func (x *UpdateUserRequest) GetPhotoUrl() string {
 	return ""
 }
 
+func (x *UpdateUserRequest) GetBotDescription() string {
+	if x != nil && x.BotDescription != nil {
+		return *x.BotDescription
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetBotCommands() string {
+	if x != nil && x.BotCommands != nil {
+		return *x.BotCommands
+	}
+	return ""
+}
+
 type UpdateUserResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Response:
@@ -701,11 +773,193 @@ func (*UpdateUserResponse_Error) isUpdateUserResponse_Response() {}
 
 func (*UpdateUserResponse_User) isUpdateUserResponse_Response() {}
 
+type CreateBotRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	FirstName     string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName      *string                `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
+	OwnerId       string                 `protobuf:"bytes,4,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	Description   *string                `protobuf:"bytes,5,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	Commands      *string                `protobuf:"bytes,6,opt,name=commands,proto3,oneof" json:"commands,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateBotRequest) Reset() {
+	*x = CreateBotRequest{}
+	mi := &file_user_v1_user_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBotRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBotRequest) ProtoMessage() {}
+
+func (x *CreateBotRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_user_v1_user_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBotRequest.ProtoReflect.Descriptor instead.
+func (*CreateBotRequest) Descriptor() ([]byte, []int) {
+	return file_user_v1_user_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *CreateBotRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *CreateBotRequest) GetFirstName() string {
+	if x != nil {
+		return x.FirstName
+	}
+	return ""
+}
+
+func (x *CreateBotRequest) GetLastName() string {
+	if x != nil && x.LastName != nil {
+		return *x.LastName
+	}
+	return ""
+}
+
+func (x *CreateBotRequest) GetOwnerId() string {
+	if x != nil {
+		return x.OwnerId
+	}
+	return ""
+}
+
+func (x *CreateBotRequest) GetDescription() string {
+	if x != nil && x.Description != nil {
+		return *x.Description
+	}
+	return ""
+}
+
+func (x *CreateBotRequest) GetCommands() string {
+	if x != nil && x.Commands != nil {
+		return *x.Commands
+	}
+	return ""
+}
+
+type CreateBotResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Response:
+	//
+	//	*CreateBotResponse_Error
+	//	*CreateBotResponse_BotToken
+	//	*CreateBotResponse_User
+	Response      isCreateBotResponse_Response `protobuf_oneof:"response"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateBotResponse) Reset() {
+	*x = CreateBotResponse{}
+	mi := &file_user_v1_user_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBotResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBotResponse) ProtoMessage() {}
+
+func (x *CreateBotResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_user_v1_user_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBotResponse.ProtoReflect.Descriptor instead.
+func (*CreateBotResponse) Descriptor() ([]byte, []int) {
+	return file_user_v1_user_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CreateBotResponse) GetResponse() isCreateBotResponse_Response {
+	if x != nil {
+		return x.Response
+	}
+	return nil
+}
+
+func (x *CreateBotResponse) GetError() *v1.CommonError {
+	if x != nil {
+		if x, ok := x.Response.(*CreateBotResponse_Error); ok {
+			return x.Error
+		}
+	}
+	return nil
+}
+
+func (x *CreateBotResponse) GetBotToken() string {
+	if x != nil {
+		if x, ok := x.Response.(*CreateBotResponse_BotToken); ok {
+			return x.BotToken
+		}
+	}
+	return ""
+}
+
+func (x *CreateBotResponse) GetUser() *User {
+	if x != nil {
+		if x, ok := x.Response.(*CreateBotResponse_User); ok {
+			return x.User
+		}
+	}
+	return nil
+}
+
+type isCreateBotResponse_Response interface {
+	isCreateBotResponse_Response()
+}
+
+type CreateBotResponse_Error struct {
+	Error *v1.CommonError `protobuf:"bytes,1,opt,name=error,proto3,oneof"`
+}
+
+type CreateBotResponse_BotToken struct {
+	BotToken string `protobuf:"bytes,2,opt,name=bot_token,json=botToken,proto3,oneof"`
+}
+
+type CreateBotResponse_User struct {
+	User *User `protobuf:"bytes,3,opt,name=user,proto3,oneof"`
+}
+
+func (*CreateBotResponse_Error) isCreateBotResponse_Response() {}
+
+func (*CreateBotResponse_BotToken) isCreateBotResponse_Response() {}
+
+func (*CreateBotResponse_User) isCreateBotResponse_Response() {}
+
 var File_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_user_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x12user/v1/user.proto\x12\auser.v1\x1a\x16errors/v1/errors.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfb\x04\n" +
+	"\x12user/v1/user.proto\x12\auser.v1\x1a\x16errors/v1/errors.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x83\a\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -726,7 +980,14 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"public_key\x18\v \x01(\tH\x05R\tpublicKey\x88\x01\x01\x121\n" +
 	"\x12encrypted_priv_key\x18\f \x01(\tH\x06R\x10encryptedPrivKey\x88\x01\x01\x12(\n" +
 	"\rencryption_iv\x18\r \x01(\tH\aR\fencryptionIv\x88\x01\x01\x12 \n" +
-	"\tphoto_url\x18\x0e \x01(\tH\bR\bphotoUrl\x88\x01\x01B\b\n" +
+	"\tphoto_url\x18\x0e \x01(\tH\bR\bphotoUrl\x88\x01\x01\x12\x15\n" +
+	"\x06is_bot\x18\x0f \x01(\bR\x05isBot\x12)\n" +
+	"\x0ebot_token_hash\x18\x10 \x01(\tH\tR\fbotTokenHash\x88\x01\x01\x12%\n" +
+	"\fbot_owner_id\x18\x11 \x01(\tH\n" +
+	"R\n" +
+	"botOwnerId\x88\x01\x01\x12,\n" +
+	"\x0fbot_description\x18\x12 \x01(\tH\vR\x0ebotDescription\x88\x01\x01\x12&\n" +
+	"\fbot_commands\x18\x13 \x01(\tH\fR\vbotCommands\x88\x01\x01B\b\n" +
 	"\x06_emailB\f\n" +
 	"\n" +
 	"_last_nameB\x06\n" +
@@ -737,7 +998,11 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x13_encrypted_priv_keyB\x10\n" +
 	"\x0e_encryption_ivB\f\n" +
 	"\n" +
-	"_photo_url\"#\n" +
+	"_photo_urlB\x11\n" +
+	"\x0f_bot_token_hashB\x0f\n" +
+	"\r_bot_owner_idB\x12\n" +
+	"\x10_bot_descriptionB\x0f\n" +
+	"\r_bot_commands\"#\n" +
 	"\x0fGetUsersRequest\x12\x10\n" +
 	"\x03ids\x18\x01 \x03(\tR\x03ids\"7\n" +
 	"\x10GetUsersResponse\x12#\n" +
@@ -746,17 +1011,18 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x16\n" +
 	"\x06global\x18\x02 \x01(\bR\x06global\":\n" +
 	"\x13SearchUsersResponse\x12#\n" +
-	"\x05users\x18\x01 \x03(\v2\r.user.v1.UserR\x05users\"O\n" +
+	"\x05users\x18\x01 \x03(\v2\r.user.v1.UserR\x05users\"w\n" +
 	"\x0fUserInfoRequest\x12\x1c\n" +
 	"\busername\x18\x01 \x01(\tH\x00R\busername\x12\x10\n" +
-	"\x02id\x18\x02 \x01(\tH\x00R\x02idB\f\n" +
+	"\x02id\x18\x02 \x01(\tH\x00R\x02id\x12&\n" +
+	"\x0ebot_token_hash\x18\x03 \x01(\tH\x00R\fbotTokenHashB\f\n" +
 	"\n" +
 	"identifier\"s\n" +
 	"\x10UserInfoResponse\x12.\n" +
 	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
 	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
 	"\n" +
-	"\bresponse\"\x9d\x03\n" +
+	"\bresponse\"\x98\x04\n" +
 	"\x11UpdateUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
 	"\n" +
@@ -767,7 +1033,10 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"public_key\x18\x05 \x01(\tH\x03R\tpublicKey\x88\x01\x01\x121\n" +
 	"\x12encrypted_priv_key\x18\x06 \x01(\tH\x04R\x10encryptedPrivKey\x88\x01\x01\x12(\n" +
 	"\rencryption_iv\x18\a \x01(\tH\x05R\fencryptionIv\x88\x01\x01\x12 \n" +
-	"\tphoto_url\x18\b \x01(\tH\x06R\bphotoUrl\x88\x01\x01B\r\n" +
+	"\tphoto_url\x18\b \x01(\tH\x06R\bphotoUrl\x88\x01\x01\x12,\n" +
+	"\x0fbot_description\x18\t \x01(\tH\aR\x0ebotDescription\x88\x01\x01\x12&\n" +
+	"\fbot_commands\x18\n" +
+	" \x01(\tH\bR\vbotCommands\x88\x01\x01B\r\n" +
 	"\v_first_nameB\f\n" +
 	"\n" +
 	"_last_nameB\v\n" +
@@ -776,18 +1045,39 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x13_encrypted_priv_keyB\x10\n" +
 	"\x0e_encryption_ivB\f\n" +
 	"\n" +
-	"_photo_url\"u\n" +
+	"_photo_urlB\x12\n" +
+	"\x10_bot_descriptionB\x0f\n" +
+	"\r_bot_commands\"u\n" +
 	"\x12UpdateUserResponse\x12.\n" +
 	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
 	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
 	"\n" +
-	"\bresponse2\xa0\x02\n" +
+	"\bresponse\"\xfd\x01\n" +
+	"\x10CreateBotRequest\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x1d\n" +
+	"\n" +
+	"first_name\x18\x02 \x01(\tR\tfirstName\x12 \n" +
+	"\tlast_name\x18\x03 \x01(\tH\x00R\blastName\x88\x01\x01\x12\x19\n" +
+	"\bowner_id\x18\x04 \x01(\tR\aownerId\x12%\n" +
+	"\vdescription\x18\x05 \x01(\tH\x01R\vdescription\x88\x01\x01\x12\x1f\n" +
+	"\bcommands\x18\x06 \x01(\tH\x02R\bcommands\x88\x01\x01B\f\n" +
+	"\n" +
+	"_last_nameB\x0e\n" +
+	"\f_descriptionB\v\n" +
+	"\t_commands\"\x93\x01\n" +
+	"\x11CreateBotResponse\x12.\n" +
+	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12\x1d\n" +
+	"\tbot_token\x18\x02 \x01(\tH\x00R\bbotToken\x12#\n" +
+	"\x04user\x18\x03 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
+	"\n" +
+	"\bresponse2\xe4\x02\n" +
 	"\vUserService\x12?\n" +
 	"\bUserInfo\x12\x18.user.v1.UserInfoRequest\x1a\x19.user.v1.UserInfoResponse\x12?\n" +
 	"\bGetUsers\x12\x18.user.v1.GetUsersRequest\x1a\x19.user.v1.GetUsersResponse\x12E\n" +
 	"\n" +
 	"UpdateUser\x12\x1a.user.v1.UpdateUserRequest\x1a\x1b.user.v1.UpdateUserResponse\x12H\n" +
-	"\vSearchUsers\x12\x1b.user.v1.SearchUsersRequest\x1a\x1c.user.v1.SearchUsersResponseBHZFgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1;userv1b\x06proto3"
+	"\vSearchUsers\x12\x1b.user.v1.SearchUsersRequest\x1a\x1c.user.v1.SearchUsersResponse\x12B\n" +
+	"\tCreateBot\x12\x19.user.v1.CreateBotRequest\x1a\x1a.user.v1.CreateBotResponseBHZFgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1;userv1b\x06proto3"
 
 var (
 	file_user_v1_user_proto_rawDescOnce sync.Once
@@ -801,7 +1091,7 @@ func file_user_v1_user_proto_rawDescGZIP() []byte {
 	return file_user_v1_user_proto_rawDescData
 }
 
-var file_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_user_v1_user_proto_goTypes = []any{
 	(*User)(nil),                  // 0: user.v1.User
 	(*GetUsersRequest)(nil),       // 1: user.v1.GetUsersRequest
@@ -812,30 +1102,36 @@ var file_user_v1_user_proto_goTypes = []any{
 	(*UserInfoResponse)(nil),      // 6: user.v1.UserInfoResponse
 	(*UpdateUserRequest)(nil),     // 7: user.v1.UpdateUserRequest
 	(*UpdateUserResponse)(nil),    // 8: user.v1.UpdateUserResponse
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
-	(*v1.CommonError)(nil),        // 10: errors.v1.CommonError
+	(*CreateBotRequest)(nil),      // 9: user.v1.CreateBotRequest
+	(*CreateBotResponse)(nil),     // 10: user.v1.CreateBotResponse
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
+	(*v1.CommonError)(nil),        // 12: errors.v1.CommonError
 }
 var file_user_v1_user_proto_depIdxs = []int32{
-	9,  // 0: user.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	11, // 0: user.v1.User.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 1: user.v1.GetUsersResponse.users:type_name -> user.v1.User
 	0,  // 2: user.v1.SearchUsersResponse.users:type_name -> user.v1.User
-	10, // 3: user.v1.UserInfoResponse.error:type_name -> errors.v1.CommonError
+	12, // 3: user.v1.UserInfoResponse.error:type_name -> errors.v1.CommonError
 	0,  // 4: user.v1.UserInfoResponse.user:type_name -> user.v1.User
-	10, // 5: user.v1.UpdateUserResponse.error:type_name -> errors.v1.CommonError
+	12, // 5: user.v1.UpdateUserResponse.error:type_name -> errors.v1.CommonError
 	0,  // 6: user.v1.UpdateUserResponse.user:type_name -> user.v1.User
-	5,  // 7: user.v1.UserService.UserInfo:input_type -> user.v1.UserInfoRequest
-	1,  // 8: user.v1.UserService.GetUsers:input_type -> user.v1.GetUsersRequest
-	7,  // 9: user.v1.UserService.UpdateUser:input_type -> user.v1.UpdateUserRequest
-	3,  // 10: user.v1.UserService.SearchUsers:input_type -> user.v1.SearchUsersRequest
-	6,  // 11: user.v1.UserService.UserInfo:output_type -> user.v1.UserInfoResponse
-	2,  // 12: user.v1.UserService.GetUsers:output_type -> user.v1.GetUsersResponse
-	8,  // 13: user.v1.UserService.UpdateUser:output_type -> user.v1.UpdateUserResponse
-	4,  // 14: user.v1.UserService.SearchUsers:output_type -> user.v1.SearchUsersResponse
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	12, // 7: user.v1.CreateBotResponse.error:type_name -> errors.v1.CommonError
+	0,  // 8: user.v1.CreateBotResponse.user:type_name -> user.v1.User
+	5,  // 9: user.v1.UserService.UserInfo:input_type -> user.v1.UserInfoRequest
+	1,  // 10: user.v1.UserService.GetUsers:input_type -> user.v1.GetUsersRequest
+	7,  // 11: user.v1.UserService.UpdateUser:input_type -> user.v1.UpdateUserRequest
+	3,  // 12: user.v1.UserService.SearchUsers:input_type -> user.v1.SearchUsersRequest
+	9,  // 13: user.v1.UserService.CreateBot:input_type -> user.v1.CreateBotRequest
+	6,  // 14: user.v1.UserService.UserInfo:output_type -> user.v1.UserInfoResponse
+	2,  // 15: user.v1.UserService.GetUsers:output_type -> user.v1.GetUsersResponse
+	8,  // 16: user.v1.UserService.UpdateUser:output_type -> user.v1.UpdateUserResponse
+	4,  // 17: user.v1.UserService.SearchUsers:output_type -> user.v1.SearchUsersResponse
+	10, // 18: user.v1.UserService.CreateBot:output_type -> user.v1.CreateBotResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_user_v1_user_proto_init() }
@@ -847,6 +1143,7 @@ func file_user_v1_user_proto_init() {
 	file_user_v1_user_proto_msgTypes[5].OneofWrappers = []any{
 		(*UserInfoRequest_Username)(nil),
 		(*UserInfoRequest_Id)(nil),
+		(*UserInfoRequest_BotTokenHash)(nil),
 	}
 	file_user_v1_user_proto_msgTypes[6].OneofWrappers = []any{
 		(*UserInfoResponse_Error)(nil),
@@ -857,13 +1154,19 @@ func file_user_v1_user_proto_init() {
 		(*UpdateUserResponse_Error)(nil),
 		(*UpdateUserResponse_User)(nil),
 	}
+	file_user_v1_user_proto_msgTypes[9].OneofWrappers = []any{}
+	file_user_v1_user_proto_msgTypes[10].OneofWrappers = []any{
+		(*CreateBotResponse_Error)(nil),
+		(*CreateBotResponse_BotToken)(nil),
+		(*CreateBotResponse_User)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_v1_user_proto_rawDesc), len(file_user_v1_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
