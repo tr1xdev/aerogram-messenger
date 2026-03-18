@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"github.com/sqlc-dev/pqtype"
 )
 
 const checkUserExists = `-- name: CheckUserExists :one
@@ -24,47 +25,39 @@ func (q *Queries) CheckUserExists(ctx context.Context, id uuid.UUID) (bool, erro
 	return exists, err
 }
 
-const createUser = `-- name: CreateUser :one
+const createBot = `-- name: CreateBot :one
 INSERT INTO users (
-    id, username, first_name, last_name, email, password,
-    status, public_key, encrypted_priv_key, encryption_iv,
-    photo_url,
-    created_at, updated_at, is_premium, is_email_verified, is_verified
+    id, username, first_name, last_name, is_bot, bot_token_hash,
+    bot_owner_id, bot_description, bot_commands, status,
+    created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-    $11,
-    NOW(), NOW(), DEFAULT, DEFAULT, DEFAULT
+    $1, $2, $3, $4, TRUE, $5, $6, $7, $8, 'ONLINE',
+    NOW(), NOW()
 )
-RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at
+RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at
 `
 
-type CreateUserParams struct {
-	ID               uuid.UUID      `json:"id"`
-	Username         sql.NullString `json:"username"`
-	FirstName        string         `json:"first_name"`
-	LastName         sql.NullString `json:"last_name"`
-	Email            string         `json:"email"`
-	Password         string         `json:"password"`
-	Status           string         `json:"status"`
-	PublicKey        sql.NullString `json:"public_key"`
-	EncryptedPrivKey sql.NullString `json:"encrypted_priv_key"`
-	EncryptionIv     sql.NullString `json:"encryption_iv"`
-	PhotoUrl         sql.NullString `json:"photo_url"`
+type CreateBotParams struct {
+	ID             uuid.UUID             `json:"id"`
+	Username       sql.NullString        `json:"username"`
+	FirstName      string                `json:"first_name"`
+	LastName       sql.NullString        `json:"last_name"`
+	BotTokenHash   sql.NullString        `json:"bot_token_hash"`
+	BotOwnerID     uuid.NullUUID         `json:"bot_owner_id"`
+	BotDescription sql.NullString        `json:"bot_description"`
+	BotCommands    pqtype.NullRawMessage `json:"bot_commands"`
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser,
+func (q *Queries) CreateBot(ctx context.Context, arg CreateBotParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createBot,
 		arg.ID,
 		arg.Username,
 		arg.FirstName,
 		arg.LastName,
-		arg.Email,
-		arg.Password,
-		arg.Status,
-		arg.PublicKey,
-		arg.EncryptedPrivKey,
-		arg.EncryptionIv,
-		arg.PhotoUrl,
+		arg.BotTokenHash,
+		arg.BotOwnerID,
+		arg.BotDescription,
+		arg.BotCommands,
 	)
 	var i User
 	err := row.Scan(
@@ -84,6 +77,183 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PublicKey,
 		&i.EncryptedPrivKey,
 		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (
+    id, username, first_name, last_name, email, password,
+    status, public_key, encrypted_priv_key, encryption_iv,
+    photo_url, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands,
+    created_at, updated_at, is_premium, is_email_verified, is_verified
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+    $11, $12, $13, $14, $15, $16,
+    NOW(), NOW(), DEFAULT, DEFAULT, DEFAULT
+)
+RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at
+`
+
+type CreateUserParams struct {
+	ID               uuid.UUID             `json:"id"`
+	Username         sql.NullString        `json:"username"`
+	FirstName        string                `json:"first_name"`
+	LastName         sql.NullString        `json:"last_name"`
+	Email            sql.NullString        `json:"email"`
+	Password         sql.NullString        `json:"password"`
+	Status           string                `json:"status"`
+	PublicKey        sql.NullString        `json:"public_key"`
+	EncryptedPrivKey sql.NullString        `json:"encrypted_priv_key"`
+	EncryptionIv     sql.NullString        `json:"encryption_iv"`
+	PhotoUrl         sql.NullString        `json:"photo_url"`
+	IsBot            bool                  `json:"is_bot"`
+	BotTokenHash     sql.NullString        `json:"bot_token_hash"`
+	BotOwnerID       uuid.NullUUID         `json:"bot_owner_id"`
+	BotDescription   sql.NullString        `json:"bot_description"`
+	BotCommands      pqtype.NullRawMessage `json:"bot_commands"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createUser,
+		arg.ID,
+		arg.Username,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.Password,
+		arg.Status,
+		arg.PublicKey,
+		arg.EncryptedPrivKey,
+		arg.EncryptionIv,
+		arg.PhotoUrl,
+		arg.IsBot,
+		arg.BotTokenHash,
+		arg.BotOwnerID,
+		arg.BotDescription,
+		arg.BotCommands,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.Password,
+		&i.Status,
+		&i.PhotoUrl,
+		&i.IsPremium,
+		&i.IsEmailVerified,
+		&i.IsVerified,
+		&i.VerificationToken,
+		&i.VerificationExpiry,
+		&i.PublicKey,
+		&i.EncryptedPrivKey,
+		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getBotsByOwnerID = `-- name: GetBotsByOwnerID :many
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
+WHERE bot_owner_id = $1 AND is_bot = TRUE AND deleted_at IS NULL
+`
+
+func (q *Queries) GetBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getBotsByOwnerID, botOwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.Password,
+			&i.Status,
+			&i.PhotoUrl,
+			&i.IsPremium,
+			&i.IsEmailVerified,
+			&i.IsVerified,
+			&i.VerificationToken,
+			&i.VerificationExpiry,
+			&i.PublicKey,
+			&i.EncryptedPrivKey,
+			&i.EncryptionIv,
+			&i.IsBot,
+			&i.BotTokenHash,
+			&i.BotOwnerID,
+			&i.BotDescription,
+			&i.BotCommands,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUserByBotToken = `-- name: GetUserByBotToken :one
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
+WHERE bot_token_hash = $1 AND is_bot = TRUE AND deleted_at IS NULL LIMIT 1
+`
+
+func (q *Queries) GetUserByBotToken(ctx context.Context, botTokenHash sql.NullString) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByBotToken, botTokenHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.Password,
+		&i.Status,
+		&i.PhotoUrl,
+		&i.IsPremium,
+		&i.IsEmailVerified,
+		&i.IsVerified,
+		&i.VerificationToken,
+		&i.VerificationExpiry,
+		&i.PublicKey,
+		&i.EncryptedPrivKey,
+		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -92,11 +262,11 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
 WHERE email = $1 AND deleted_at IS NULL LIMIT 1
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, email sql.NullString) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
@@ -116,6 +286,11 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PublicKey,
 		&i.EncryptedPrivKey,
 		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -124,7 +299,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
 WHERE id = $1 AND deleted_at IS NULL LIMIT 1
 `
 
@@ -148,6 +323,11 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.PublicKey,
 		&i.EncryptedPrivKey,
 		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -156,7 +336,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
 WHERE username = $1 AND deleted_at IS NULL LIMIT 1
 `
 
@@ -180,6 +360,11 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 		&i.PublicKey,
 		&i.EncryptedPrivKey,
 		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -188,7 +373,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
 WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL
 `
 
@@ -218,6 +403,11 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Us
 			&i.PublicKey,
 			&i.EncryptedPrivKey,
 			&i.EncryptionIv,
+			&i.IsBot,
+			&i.BotTokenHash,
+			&i.BotOwnerID,
+			&i.BotDescription,
+			&i.BotCommands,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -236,7 +426,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Us
 }
 
 const searchUsersByUsername = `-- name: SearchUsersByUsername :many
-SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
 WHERE username ILIKE $1::text || '%' AND username != '' AND deleted_at IS NULL
 LIMIT 20
 `
@@ -267,6 +457,11 @@ func (q *Queries) SearchUsersByUsername(ctx context.Context, dollar_1 string) ([
 			&i.PublicKey,
 			&i.EncryptedPrivKey,
 			&i.EncryptionIv,
+			&i.IsBot,
+			&i.BotTokenHash,
+			&i.BotOwnerID,
+			&i.BotDescription,
+			&i.BotCommands,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -285,7 +480,7 @@ func (q *Queries) SearchUsersByUsername(ctx context.Context, dollar_1 string) ([
 }
 
 const searchUsersGlobal = `-- name: SearchUsersGlobal :many
-SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at FROM users
+SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
 WHERE (username ILIKE '%' || $1 || '%' OR first_name ILIKE '%' || $1 || '%')
 AND deleted_at IS NULL
 LIMIT 20
@@ -317,6 +512,11 @@ func (q *Queries) SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString
 			&i.PublicKey,
 			&i.EncryptedPrivKey,
 			&i.EncryptionIv,
+			&i.IsBot,
+			&i.BotTokenHash,
+			&i.BotOwnerID,
+			&i.BotDescription,
+			&i.BotCommands,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -356,21 +556,25 @@ SET
     encryption_iv = COALESCE($6, encryption_iv),
     photo_url = COALESCE($7, photo_url),
     is_verified = COALESCE($8, is_verified),
+    bot_description = COALESCE($9, bot_description),
+    bot_commands = COALESCE($10, bot_commands),
     updated_at = NOW()
-WHERE id = $9
-RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, created_at, updated_at, deleted_at
+WHERE id = $11
+RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at
 `
 
 type UpdateUserParams struct {
-	FirstName        sql.NullString `json:"first_name"`
-	LastName         sql.NullString `json:"last_name"`
-	Username         sql.NullString `json:"username"`
-	PublicKey        sql.NullString `json:"public_key"`
-	EncryptedPrivKey sql.NullString `json:"encrypted_priv_key"`
-	EncryptionIv     sql.NullString `json:"encryption_iv"`
-	PhotoUrl         sql.NullString `json:"photo_url"`
-	IsVerified       sql.NullBool   `json:"is_verified"`
-	ID               uuid.UUID      `json:"id"`
+	FirstName        sql.NullString        `json:"first_name"`
+	LastName         sql.NullString        `json:"last_name"`
+	Username         sql.NullString        `json:"username"`
+	PublicKey        sql.NullString        `json:"public_key"`
+	EncryptedPrivKey sql.NullString        `json:"encrypted_priv_key"`
+	EncryptionIv     sql.NullString        `json:"encryption_iv"`
+	PhotoUrl         sql.NullString        `json:"photo_url"`
+	IsVerified       sql.NullBool          `json:"is_verified"`
+	BotDescription   sql.NullString        `json:"bot_description"`
+	BotCommands      pqtype.NullRawMessage `json:"bot_commands"`
+	ID               uuid.UUID             `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
@@ -383,6 +587,8 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		arg.EncryptionIv,
 		arg.PhotoUrl,
 		arg.IsVerified,
+		arg.BotDescription,
+		arg.BotCommands,
 		arg.ID,
 	)
 	var i User
@@ -403,6 +609,11 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.PublicKey,
 		&i.EncryptedPrivKey,
 		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,

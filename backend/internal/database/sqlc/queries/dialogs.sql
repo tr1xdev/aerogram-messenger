@@ -52,6 +52,7 @@ SELECT
     u.username AS msg_author_username,
     u.first_name AS msg_author_first_name,
     u.public_key AS msg_author_public_key,
+    u.is_bot AS msg_author_is_bot,
     m.created_at AS msg_created_at,
     m.reply_to_id AS msg_reply_to_id,
     (
@@ -82,7 +83,10 @@ SET is_hidden = false, updated_at = NOW()
 WHERE dialog_id = $1;
 
 -- name: GetDialogMembers :many
-SELECT * FROM dialog_members WHERE dialog_id = $1;
+SELECT dm.*, u.is_bot
+FROM dialog_members dm
+JOIN users u ON dm.user_id = u.id
+WHERE dm.dialog_id = $1;
 
 -- name: GetDialogMember :one
 SELECT * FROM dialog_members

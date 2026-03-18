@@ -6,16 +6,31 @@ WHERE id = $1 AND deleted_at IS NULL LIMIT 1;
 SELECT * FROM users
 WHERE email = $1 AND deleted_at IS NULL LIMIT 1;
 
+-- name: GetUserByBotToken :one
+SELECT * FROM users
+WHERE bot_token_hash = $1 AND is_bot = TRUE AND deleted_at IS NULL LIMIT 1;
+
 -- name: CreateUser :one
 INSERT INTO users (
     id, username, first_name, last_name, email, password,
     status, public_key, encrypted_priv_key, encryption_iv,
-    photo_url,
+    photo_url, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands,
     created_at, updated_at, is_premium, is_email_verified, is_verified
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-    $11,
+    $11, $12, $13, $14, $15, $16,
     NOW(), NOW(), DEFAULT, DEFAULT, DEFAULT
+)
+RETURNING *;
+
+-- name: CreateBot :one
+INSERT INTO users (
+    id, username, first_name, last_name, is_bot, bot_token_hash,
+    bot_owner_id, bot_description, bot_commands, status,
+    created_at, updated_at
+) VALUES (
+    $1, $2, $3, $4, TRUE, $5, $6, $7, $8, 'ONLINE',
+    NOW(), NOW()
 )
 RETURNING *;
 
@@ -32,6 +47,10 @@ WHERE id = $1;
 -- name: GetUsersByIDs :many
 SELECT * FROM users
 WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL;
+
+-- name: GetBotsByOwnerID :many
+SELECT * FROM users
+WHERE bot_owner_id = $1 AND is_bot = TRUE AND deleted_at IS NULL;
 
 -- name: SearchUsersByUsername :many
 SELECT * FROM users
@@ -58,6 +77,8 @@ SET
     encryption_iv = COALESCE(sqlc.narg('encryption_iv'), encryption_iv),
     photo_url = COALESCE(sqlc.narg('photo_url'), photo_url),
     is_verified = COALESCE(sqlc.narg('is_verified'), is_verified),
+    bot_description = COALESCE(sqlc.narg('bot_description'), bot_description),
+    bot_commands = COALESCE(sqlc.narg('bot_commands'), bot_commands),
     updated_at = NOW()
 WHERE id = sqlc.arg('id')
 RETURNING *;

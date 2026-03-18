@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 )
 
 type Dialog struct {
@@ -113,23 +114,28 @@ type Session struct {
 }
 
 type User struct {
-	ID                 uuid.UUID      `json:"id"`
-	Username           sql.NullString `json:"username"`
-	FirstName          string         `json:"first_name"`
-	LastName           sql.NullString `json:"last_name"`
-	Email              string         `json:"email"`
-	Password           string         `json:"password"`
-	Status             string         `json:"status"`
-	PhotoUrl           sql.NullString `json:"photo_url"`
-	IsPremium          bool           `json:"is_premium"`
-	IsEmailVerified    bool           `json:"is_email_verified"`
-	IsVerified         bool           `json:"is_verified"`
-	VerificationToken  sql.NullString `json:"verification_token"`
-	VerificationExpiry sql.NullTime   `json:"verification_expiry"`
-	PublicKey          sql.NullString `json:"public_key"`
-	EncryptedPrivKey   sql.NullString `json:"encrypted_priv_key"`
-	EncryptionIv       sql.NullString `json:"encryption_iv"`
-	CreatedAt          time.Time      `json:"created_at"`
-	UpdatedAt          time.Time      `json:"updated_at"`
-	DeletedAt          sql.NullTime   `json:"deleted_at"`
+	ID                 uuid.UUID             `json:"id"`
+	Username           sql.NullString        `json:"username"`
+	FirstName          string                `json:"first_name"`
+	LastName           sql.NullString        `json:"last_name"`
+	Email              sql.NullString        `json:"email"`
+	Password           sql.NullString        `json:"password"`
+	Status             string                `json:"status"`
+	PhotoUrl           sql.NullString        `json:"photo_url"`
+	IsPremium          bool                  `json:"is_premium"`
+	IsEmailVerified    bool                  `json:"is_email_verified"`
+	IsVerified         bool                  `json:"is_verified"`
+	VerificationToken  sql.NullString        `json:"verification_token"`
+	VerificationExpiry sql.NullTime          `json:"verification_expiry"`
+	PublicKey          sql.NullString        `json:"public_key"`
+	EncryptedPrivKey   sql.NullString        `json:"encrypted_priv_key"`
+	EncryptionIv       sql.NullString        `json:"encryption_iv"`
+	IsBot              bool                  `json:"is_bot"`
+	BotTokenHash       sql.NullString        `json:"bot_token_hash"`
+	BotOwnerID         uuid.NullUUID         `json:"bot_owner_id"`
+	BotDescription     sql.NullString        `json:"bot_description"`
+	BotCommands        pqtype.NullRawMessage `json:"bot_commands"`
+	CreatedAt          time.Time             `json:"created_at"`
+	UpdatedAt          time.Time             `json:"updated_at"`
+	DeletedAt          sql.NullTime          `json:"deleted_at"`
 }
