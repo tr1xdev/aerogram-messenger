@@ -1,6 +1,6 @@
 type User {
    id: ID!
-   email: String!
+   email: String
    firstName: String!
    lastName: String
    displayName: String
@@ -9,19 +9,26 @@ type User {
    bio: String
    status: String!
    isVerified: Boolean!
+   isPremium: Boolean!
+   isBot: Boolean!
    publicKey: String
    encryptedPrivKey: String
    encryptionIv: String
+   botDescription: String
+   botCommands: String
 }
 
 input UpdateUserInput {
    firstName: String
    lastName: String
    username: String
+   bio: String
    publicKey: String
    encryptedPrivKey: String
    encryptionIv: String
    photoUrl: String
+   botDescription: String
+   botCommands: String
 }
 
 type UserStatusPayload {
@@ -39,6 +46,25 @@ extend type Query {
 
 extend type Mutation {
    updateUser(input: UpdateUserInput!): User!
+   createBot(
+      username: String!
+      firstName: String!
+      lastName: String
+      ownerId: ID!
+      description: String
+      commands: String
+   ): CreateBotResult!
+}
+
+union CreateBotResult =
+   | CreateBotPayload
+   | ValidationError
+   | ForbiddenError
+   | InternalError
+
+type CreateBotPayload {
+   botToken: String!
+   user: User!
 }
 
 extend type Subscription {

@@ -106,7 +106,7 @@ func (r *mutationResolver) TerminateAllOtherSessions(ctx context.Context) (bool,
 
 	for _, s := range sessions {
 		if s.ID != sid {
-			r.Store.DeactivateSession(ctx, s.ID)
+			_ = r.Store.DeactivateSession(ctx, s.ID)
 			r.RedisClient.Publish(ctx, "kill:session:"+s.ID.String(), "terminated")
 		}
 	}
@@ -121,10 +121,12 @@ func (r *mutationResolver) TerminateSession(ctx context.Context, id string) (boo
 		return false, fmt.Errorf("unauthorized")
 	}
 
-	sid, _ := uuid.Parse(id)
-
-	err := r.Store.DeactivateSession(ctx, sid)
+	sid, err := uuid.Parse(id)
 	if err != nil {
+		return false, fmt.Errorf("invalid session id")
+	}
+
+	if err := r.Store.DeactivateSession(ctx, sid); err != nil {
 		return false, err
 	}
 
@@ -155,7 +157,11 @@ func (r *queryResolver) Sessions(ctx context.Context, userID string) ([]*dbgen.S
 		return nil, fmt.Errorf("permission denied")
 	}
 
-	uid, _ := uuid.Parse(userID)
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id")
+	}
+
 	dbSessions, err := r.Store.GetSessionsByUserID(ctx, uid)
 	if err != nil {
 		return nil, err

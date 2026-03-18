@@ -13,8 +13,8 @@ type Message {
 }
 
 type ReadPayload {
-   chatId: String!
-   userId: String!
+   chatId: ID!
+   userId: ID!
    lastSequence: Long!
 }
 
@@ -28,6 +28,7 @@ union SendMessageResult =
    | ForbiddenError
    | ValidationError
    | InternalError
+
 union MessageHistoryResult =
    | MessageConnection
    | ForbiddenError
@@ -36,7 +37,7 @@ union MessageHistoryResult =
 
 extend type Query {
    messageHistory(chatId: ID!, limit: Int!, offset: Int!): MessageHistoryResult!
-   dialogRead(chatId: String!): ReadPayload!
+   dialogRead(chatId: ID!): ReadPayload!
 }
 
 extend type Mutation {
@@ -53,11 +54,12 @@ extend type Mutation {
       text: String!
       encryptionIv: String
    ): SendMessageResult!
+
    deleteMessage(id: ID!): Boolean!
-   markDialogAsRead(chatId: String!, lastSequence: Long!): Boolean!
+   markDialogAsRead(chatId: ID!, lastSequence: Long!): Boolean!
 }
 
 extend type Subscription {
    messageAdded(chatId: ID!): Message!
-   dialogRead(chatId: String!): ReadPayload!
+   dialogRead(chatId: ID!): ReadPayload!
 }

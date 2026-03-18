@@ -48,11 +48,11 @@ extend type Mutation {
       title: String
    ): CreateChatResult!
 
-   createDirectChat(userID: String!): CreateChatResult!
+   createDirectChat(userID: ID!): CreateChatResult!
 
    pinChat(id: ID!, pinned: Boolean!): PinChatResult!
    deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
-   sendTypingEvent(chatID: String!): Boolean!
+   sendTypingEvent(chatID: ID!): Boolean!
 }
 
 extend type Subscription {

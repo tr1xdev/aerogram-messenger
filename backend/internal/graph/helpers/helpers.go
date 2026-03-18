@@ -34,7 +34,7 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 
 	dbMembers, err := store.GetDialogMembers(ctx, chatID)
 	if err != nil {
-		dbMembers = []dbgen.DialogMember{}
+		dbMembers = []dbgen.GetDialogMembersRow{}
 	}
 
 	idsMap := make(map[uuid.UUID]bool)
@@ -147,7 +147,7 @@ func MapGRPCError(err error) error {
 	return err
 }
 
-func MapDBMemberToModel(m *dbgen.DialogMember, u *dbgen.User) *model.ChatMember {
+func MapDBMemberToModel(m *dbgen.GetDialogMembersRow, u *dbgen.User) *model.ChatMember {
 	if m == nil {
 		return nil
 	}

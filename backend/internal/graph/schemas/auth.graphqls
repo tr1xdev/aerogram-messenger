@@ -1,5 +1,5 @@
 type AuthPayload {
-   userId: String
+   userId: ID
 }
 
 type VerifyEmailPayload {
