@@ -57,11 +57,11 @@ extend type Query {
 
 extend type Mutation {
    updateUser(input: UpdateUserInput!): User!
+
    createBot(
       username: String!
       firstName: String!
       lastName: String
-      ownerId: ID!
       description: String
       commands: String
    ): CreateBotResult!

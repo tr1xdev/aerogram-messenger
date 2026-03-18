@@ -30,7 +30,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (dbgen.User,
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (dbgen.User, error) {
-	return r.db.Queries.GetUserByEmail(ctx, sql.NullString{String: email, Valid: email != ""})
+	return r.db.Queries.GetUserByEmail(ctx, sql.NullString{String: email, Valid: true})
 }
 
 func (r *UserRepository) GetByBotToken(ctx context.Context, tokenHash string) (dbgen.User, error) {

@@ -4,7 +4,7 @@ CREATE TABLE users (
     first_name          VARCHAR(50) NOT NULL,
     last_name           VARCHAR(50),
     email               VARCHAR(255) UNIQUE,
-    password            TEXT,
+    password            TEXT NULL,
     status              VARCHAR(20) NOT NULL DEFAULT 'OFFLINE',
     photo_url           TEXT,
     is_premium          BOOLEAN NOT NULL DEFAULT FALSE,
@@ -23,7 +23,9 @@ CREATE TABLE users (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at          TIMESTAMPTZ,
-    CONSTRAINT fk_users_bot_owner FOREIGN KEY (bot_owner_id) REFERENCES users(id) ON DELETE SET NULL
+
+    CONSTRAINT fk_users_bot_owner FOREIGN KEY (bot_owner_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT check_user_password CHECK (is_bot = TRUE OR password IS NOT NULL)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);

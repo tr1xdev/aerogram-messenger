@@ -114,7 +114,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateBot                 func(childComplexity int, username string, firstName string, lastName *string, ownerID string, description *string, commands *string) int
+		CreateBot                 func(childComplexity int, username string, firstName string, lastName *string, description *string, commands *string) int
 		CreateChat                func(childComplexity int, typeArg model.ChatType, participantIds []string, slug *string, title *string) int
 		CreateDirectChat          func(childComplexity int, userID string) int
 		DeleteChat                func(childComplexity int, id string, forEveryone *bool) int
@@ -236,7 +236,7 @@ type MutationResolver interface {
 	DeleteMessage(ctx context.Context, id string) (bool, error)
 	MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error)
 	UpdateUser(ctx context.Context, input model.UpdateUserInput) (*dbgen.User, error)
-	CreateBot(ctx context.Context, username string, firstName string, lastName *string, ownerID string, description *string, commands *string) (model.CreateBotResult, error)
+	CreateBot(ctx context.Context, username string, firstName string, lastName *string, description *string, commands *string) (model.CreateBotResult, error)
 }
 type QueryResolver interface {
 	Sessions(ctx context.Context, userID string) ([]*dbgen.Session, error)
@@ -531,7 +531,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateBot(childComplexity, args["username"].(string), args["firstName"].(string), args["lastName"].(*string), args["ownerId"].(string), args["description"].(*string), args["commands"].(*string)), true
+		return e.complexity.Mutation.CreateBot(childComplexity, args["username"].(string), args["firstName"].(string), args["lastName"].(*string), args["description"].(*string), args["commands"].(*string)), true
 	case "Mutation.createChat":
 		if e.complexity.Mutation.CreateChat == nil {
 			break
@@ -1264,21 +1264,16 @@ func (ec *executionContext) field_Mutation_createBot_args(ctx context.Context, r
 		return nil, err
 	}
 	args["lastName"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "ownerId", ec.unmarshalNID2string)
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "description", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["ownerId"] = arg3
-	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "description", ec.unmarshalOString2ᚖstring)
+	args["description"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "commands", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["description"] = arg4
-	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "commands", ec.unmarshalOString2ᚖstring)
-	if err != nil {
-		return nil, err
-	}
-	args["commands"] = arg5
+	args["commands"] = arg4
 	return args, nil
 }
 
@@ -3713,7 +3708,7 @@ func (ec *executionContext) _Mutation_createBot(ctx context.Context, field graph
 		ec.fieldContext_Mutation_createBot,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().CreateBot(ctx, fc.Args["username"].(string), fc.Args["firstName"].(string), fc.Args["lastName"].(*string), fc.Args["ownerId"].(string), fc.Args["description"].(*string), fc.Args["commands"].(*string))
+			return ec.resolvers.Mutation().CreateBot(ctx, fc.Args["username"].(string), fc.Args["firstName"].(string), fc.Args["lastName"].(*string), fc.Args["description"].(*string), fc.Args["commands"].(*string))
 		},
 		nil,
 		ec.marshalNCreateBotResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐCreateBotResult,

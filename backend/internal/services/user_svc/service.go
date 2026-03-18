@@ -3,8 +3,11 @@ package user_svc
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	errorspb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/errors/v1"
@@ -58,7 +61,7 @@ func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*us
 				},
 			}, nil
 		}
-		return nil, status.Error(codes.Internal, "db error")
+		return nil, status.Errorf(codes.Internal, "db error: %v", err)
 	}
 
 	return &userpb.UserInfoResponse{
@@ -78,7 +81,7 @@ func (s *Server) GetUsers(ctx context.Context, req *userpb.GetUsersRequest) (*us
 
 	users, err := s.userRepo.GetByIDs(ctx, uids)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch users")
+		return nil, status.Errorf(codes.Internal, "failed to fetch users: %v", err)
 	}
 
 	pbUsers := make([]*userpb.User, len(users))
@@ -100,7 +103,7 @@ func (s *Server) SearchUsers(ctx context.Context, req *userpb.SearchUsersRequest
 	}
 
 	if err != nil {
-		return nil, status.Error(codes.Internal, "search failed")
+		return nil, status.Errorf(codes.Internal, "search failed: %v", err)
 	}
 
 	pbUsers := make([]*userpb.User, len(users))
@@ -126,12 +129,19 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 		EncryptedPrivKey: database.ToNullString(req.EncryptedPrivKey),
 		EncryptionIv:     database.ToNullString(req.EncryptionIv),
 		PhotoUrl:         database.ToNullString(req.PhotoUrl),
-		IsVerified:       sql.NullBool{Valid: false},
+		BotDescription:   database.ToNullString(req.BotDescription),
+	}
+
+	if req.BotCommands != nil {
+		params.BotCommands = pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(*req.BotCommands),
+			Valid:      true,
+		}
 	}
 
 	updatedUser, err := s.userRepo.Update(ctx, params)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "update failed")
+		return nil, status.Errorf(codes.Internal, "update failed: %v", err)
 	}
 
 	return &userpb.UpdateUserResponse{
@@ -147,21 +157,26 @@ func (s *Server) CreateBot(ctx context.Context, req *userpb.CreateBotRequest) (*
 		return nil, status.Error(codes.InvalidArgument, "invalid owner id")
 	}
 
-	botToken := uuid.NewString()
-	botID := uuid.New()
-
 	params := dbgen.CreateBotParams{
-		ID:           botID,
-		Username:     sql.NullString{String: req.Username, Valid: true},
-		FirstName:    req.FirstName,
-		LastName:     database.ToNullString(req.LastName),
-		BotTokenHash: sql.NullString{String: botToken, Valid: true},
-		BotOwnerID:   uuid.NullUUID{UUID: ownerID, Valid: true},
+		ID:             uuid.New(),
+		Username:       sql.NullString{String: req.Username, Valid: req.Username != ""},
+		FirstName:      req.FirstName,
+		LastName:       database.ToNullString(req.LastName),
+		BotOwnerID:     uuid.NullUUID{UUID: ownerID, Valid: true},
+		BotDescription: database.ToNullString(req.Description),
+	}
+
+	if req.Commands != nil {
+		params.BotCommands = pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(*req.Commands),
+			Valid:      true,
+		}
 	}
 
 	bot, err := s.userRepo.CreateBot(ctx, params)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to create bot")
+		fmt.Printf("DB Error: %v\n", err)
+		return nil, status.Errorf(codes.Internal, "failed to create bot: %v", err)
 	}
 
 	return &userpb.CreateBotResponse{
@@ -209,6 +224,13 @@ func (s *Server) mapDBToProto(u dbgen.User) *userpb.User {
 	if u.BotOwnerID.Valid {
 		ownerID := u.BotOwnerID.UUID.String()
 		res.BotOwnerId = &ownerID
+	}
+	if u.BotDescription.Valid {
+		res.BotDescription = &u.BotDescription.String
+	}
+	if u.BotCommands.Valid {
+		cmds := string(u.BotCommands.RawMessage)
+		res.BotCommands = &cmds
 	}
 
 	return res
