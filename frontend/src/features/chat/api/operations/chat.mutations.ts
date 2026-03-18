@@ -35,13 +35,13 @@ export const DELETE_CHAT = gql`
 `;
 
 export const MARK_DIALOG_AS_READ = gql`
-  mutation MarkDialogAsRead($chatId: String!, $lastSequence: Long!) {
+  mutation MarkDialogAsRead($chatId: ID!, $lastSequence: Long!) {
     markDialogAsRead(chatId: $chatId, lastSequence: $lastSequence)
   }
 `;
 
 export const CREATE_DIRECT_CHAT = gql`
-  mutation CreateDirectChat($userID: String!) {
+  mutation CreateDirectChat($userID: ID!) {
     createDirectChat(userID: $userID) {
       __typename
       ... on Chat {

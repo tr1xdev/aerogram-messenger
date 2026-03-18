@@ -63,7 +63,7 @@ export const DELETE_MESSAGE = gql`
 `;
 
 export const SEND_TYPING_EVENT = gql`
-  mutation SendTypingEvent($chatID: String!) {
+  mutation SendTypingEvent($chatID: ID!) {
     sendTypingEvent(chatID: $chatID)
   }
 `;

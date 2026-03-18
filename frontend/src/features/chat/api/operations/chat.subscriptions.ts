@@ -12,7 +12,7 @@ export const MESSAGE_SUBSCRIPTION = gql`
 `;
 
 export const DIALOG_READ_SUBSCRIPTION = gql`
-  subscription OnDialogRead($chatId: String!) {
+  subscription OnDialogRead($chatId: ID!) {
     dialogRead(chatId: $chatId) {
       chatId
       userId
