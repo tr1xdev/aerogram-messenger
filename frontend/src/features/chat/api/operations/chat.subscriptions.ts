@@ -2,6 +2,15 @@ import { gql } from "@apollo/client";
 import { MESSAGE_FIELDS } from "../fragments/message.fragments";
 import { CHAT_BASE_FIELDS } from "../fragments/chat.fragments";
 
+export const USER_TYPING_SUBSCRIPTION = gql`
+  subscription OnUserTyping($chatID: ID!) {
+    userTyping(chatID: $chatID) {
+      userId
+      isTyping
+    }
+  }
+`;
+
 export const MESSAGE_SUBSCRIPTION = gql`
   subscription MessageAdded($chatId: ID!) {
     messageAdded(chatId: $chatId) {

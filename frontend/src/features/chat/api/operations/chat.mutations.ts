@@ -2,6 +2,12 @@ import { gql } from "@apollo/client";
 import { CHAT_BASE_FIELDS } from "../fragments/chat.fragments";
 import { MESSAGE_FIELDS, USER_FIELDS } from "../fragments/message.fragments";
 
+export const SEND_TYPING_EVENT = gql`
+  mutation SendTypingEvent($chatID: ID!, $typing: Boolean!) {
+    sendTypingEvent(chatID: $chatID, typing: $typing)
+  }
+`;
+
 export const PIN_CHAT = gql`
   mutation PinChat($id: ID!, $pinned: Boolean!) {
     pinChat(id: $id, pinned: $pinned) {
