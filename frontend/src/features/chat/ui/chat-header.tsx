@@ -15,6 +15,7 @@ interface ChatHeaderProps {
   members?: ChatMember[];
   meId?: string;
   isLoading: boolean;
+  typingUserId?: string | null;
 }
 
 export function ChatHeader({
@@ -24,6 +25,7 @@ export function ChatHeader({
   members,
   meId,
   isLoading,
+  typingUserId,
 }: ChatHeaderProps) {
   const navigate: ReturnType<typeof useNavigate> = useNavigate();
 
@@ -32,6 +34,12 @@ export function ChatHeader({
   );
 
   const status: string | undefined = otherMember?.user.status;
+
+  const isTyping: boolean =
+    (!!typingUserId &&
+      !!otherMember?.user.id &&
+      typingUserId.toLowerCase() === otherMember.user.id.toLowerCase()) ||
+    status === "typing";
 
   const renderAvatar = () => {
     const effectivePhotoUrl: string | undefined =
@@ -92,18 +100,35 @@ export function ChatHeader({
                 </div>
                 <span
                   className={cn(
-                    "text-[11px] mt-1 font-medium leading-none",
-                    status === "online"
+                    "text-[11px] mt-1 font-medium leading-none transition-colors duration-200 h-3 flex items-center",
+                    isTyping || status === "online"
                       ? "text-primary"
                       : "text-muted-foreground",
                   )}
                 >
-                  {status ? formatLastSeen(status) : "Offline"}
+                  {isTyping ? (
+                    <div className="flex items-center gap-0.5">
+                      <div className="flex gap-[1.5px] mr-1">
+                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s]" />
+                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s] [animation-delay:200ms]" />
+                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s] [animation-delay:400ms]" />
+                      </div>
+                      <span>typing</span>
+                    </div>
+                  ) : (
+                    <>
+                      {status === "online"
+                        ? "online"
+                        : status
+                          ? formatLastSeen(status)
+                          : "offline"}
+                    </>
+                  )}
                 </span>
               </div>
             </div>
           </ChatUserPopover>
-        ) : title ? (
+        ) : (
           <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
             {renderAvatar()}
             <div className="flex flex-col min-w-0 text-left">
@@ -112,11 +137,6 @@ export function ChatHeader({
               </span>
             </div>
           </div>
-        ) : (
-          <div className="flex items-center gap-3 ml-2 md:ml-0 opacity-40 grayscale">
-            <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-            <div className="h-4 w-24 bg-muted rounded animate-pulse" />
-          </div>
         )}
       </div>
 
@@ -124,24 +144,24 @@ export function ChatHeader({
         <Button
           variant="ghost"
           size="icon"
-          disabled={isLoading || !title}
-          className="hidden sm:flex text-muted-foreground hover:text-foreground"
+          disabled={isLoading}
+          className="hidden sm:flex text-muted-foreground"
         >
           <Phone className="h-5 w-5" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          disabled={isLoading || !title}
-          className="hidden sm:flex text-muted-foreground hover:text-foreground"
+          disabled={isLoading}
+          className="hidden sm:flex text-muted-foreground"
         >
           <Video className="h-5 w-5" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          disabled={isLoading || !title}
-          className="text-muted-foreground hover:text-foreground"
+          disabled={isLoading}
+          className="text-muted-foreground"
         >
           <MoreVertical className="h-5 w-5" />
         </Button>

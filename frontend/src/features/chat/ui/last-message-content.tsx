@@ -1,15 +1,77 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { gql } from "@apollo/client/index.js";
+import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type { Chat, Message } from "@/entities/chat/model/types";
+import {
+  LuTerminal,
+  LuTable,
+  LuImage,
+  LuList,
+  LuListOrdered,
+  LuQuote,
+} from "react-icons/lu";
 
 interface LastMessageContentProps {
   message: Message;
   myId: string;
   chat: Chat;
 }
+
+const previewComponents: Components = {
+  p: ({ children }) => <span className="inline">{children}</span>,
+  a: ({ children }) => <span className="text-blue-400">{children}</span>,
+  strong: ({ children }) => <>{children}</>,
+  em: ({ children }) => <>{children}</>,
+  code: ({ className, children }) => {
+    const isBlock: boolean = !!className?.includes("language-");
+    if (isBlock) {
+      return (
+        <span className="inline-flex items-center gap-1 align-baseline">
+          <LuTerminal className="w-3.5 h-3.5 translate-y-[1px]" /> Code
+        </span>
+      );
+    }
+    return (
+      <code className="bg-muted px-1 rounded font-mono text-[0.9em] align-baseline">
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }) => <span className="inline">{children}</span>,
+  ul: () => (
+    <span className="inline-flex items-center gap-1 align-baseline">
+      <LuList className="w-3.5 h-3.5 translate-y-[1px]" /> List
+    </span>
+  ),
+  ol: () => (
+    <span className="inline-flex items-center gap-1 align-baseline">
+      <LuListOrdered className="w-3.5 h-3.5 translate-y-[1px]" /> List
+    </span>
+  ),
+  table: () => (
+    <span className="inline-flex items-center gap-1 align-baseline">
+      <LuTable className="w-3.5 h-3.5 translate-y-[1px]" /> Table
+    </span>
+  ),
+  blockquote: ({ children }) => (
+    <span className="inline-flex items-center gap-1 align-baseline">
+      <LuQuote className="w-3.5 h-3.5 rotate-180 translate-y-[1px]" />{" "}
+      {children}
+    </span>
+  ),
+  img: () => (
+    <span className="inline-flex items-center gap-1 align-baseline">
+      <LuImage className="w-3.5 h-3.5 translate-y-[1px]" /> Photo
+    </span>
+  ),
+  br: () => <> </>,
+};
 
 export function LastMessageContent({
   message,
@@ -21,32 +83,31 @@ export function LastMessageContent({
   const [isDecrypting, setIsDecrypting] = useState<boolean>(
     message.isEncrypted,
   );
-  const [lastProcessedMessageId, setLastProcessedMessageId] = useState<
-    string | null
-  >(null);
-  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lastProcessedId, setLastProcessedId] = useState<string | null>(null);
 
-  if (lastProcessedMessageId !== message.id) {
-    setLastProcessedMessageId(message.id);
-    if (!message.isEncrypted) {
-      setDecryptedText(null);
-      setIsDecrypting(false);
-    } else {
-      setDecryptedText(null);
-      setIsDecrypting(true);
-    }
+  if (lastProcessedId !== message.id) {
+    setLastProcessedId(message.id);
+    setIsDecrypting(message.isEncrypted);
+    setDecryptedText(null);
   }
 
-  useEffect(() => {
-    let isMounted = true;
+  const senderId = message.sender.id;
+  const senderPublicKey = message.sender.publicKey;
+  const encryptionIv = message.encryptionIv;
+  const isEncrypted = message.isEncrypted;
+  const messageText = message.text;
 
-    if (!message.isEncrypted) return;
+  useEffect(() => {
+    let isMounted: boolean = true;
+    if (!isEncrypted) return;
 
     const performDecryption = async (): Promise<void> => {
       try {
         const myPrivKeyObj = await getPrivateKey(myId);
-        const isMe = message.sender.id === myId;
-        let targetPublicKey = isMe ? null : message.sender.publicKey;
+        const isMe: boolean = senderId === myId;
+        let targetPublicKey: string | null | undefined = isMe
+          ? null
+          : senderPublicKey;
 
         if (isMe) {
           const otherMember = chat.members?.find((m) => m.user.id !== myId);
@@ -55,10 +116,7 @@ export function LastMessageContent({
 
         if (!targetPublicKey && !isMe) {
           const userInCache = client.cache.readFragment<{ publicKey: string }>({
-            id: client.cache.identify({
-              __typename: "User",
-              id: message.sender.id,
-            }),
+            id: client.cache.identify({ __typename: "User", id: senderId }),
             fragment: gql`
               fragment UserKey on User {
                 publicKey
@@ -68,7 +126,7 @@ export function LastMessageContent({
           targetPublicKey = userInCache?.publicKey;
         }
 
-        if (!targetPublicKey || !myPrivKeyObj || !message.encryptionIv) {
+        if (!targetPublicKey || !myPrivKeyObj || !encryptionIv) {
           if (isMounted) {
             setDecryptedText("Encrypted");
             setIsDecrypting(false);
@@ -76,9 +134,9 @@ export function LastMessageContent({
           return;
         }
 
-        const clearText = await decryptText(
-          message.text,
-          message.encryptionIv,
+        const clearText: string = await decryptText(
+          messageText,
+          encryptionIv,
           targetPublicKey,
           myPrivKeyObj,
         );
@@ -96,30 +154,42 @@ export function LastMessageContent({
     };
 
     performDecryption();
-
-    return () => {
+    return (): void => {
       isMounted = false;
-      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
     };
   }, [
     message.id,
-    message.text,
-    message.encryptionIv,
-    message.isEncrypted,
-    message.sender.id,
-    message.sender.publicKey,
+    messageText,
+    encryptionIv,
+    isEncrypted,
+    senderId,
+    senderPublicKey,
     myId,
     chat.members,
     client.cache,
   ]);
 
-  if (!message.isEncrypted) {
-    return <span className="truncate">{message.text}</span>;
-  }
+  const rawContent: string | null = isEncrypted ? decryptedText : messageText;
+
+  const content = useMemo(() => {
+    if (!rawContent) return null;
+    return (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        components={previewComponents}
+      >
+        {rawContent}
+      </ReactMarkdown>
+    );
+  }, [rawContent]);
 
   if (isDecrypting && !decryptedText) {
-    return <Skeleton className="h-3 w-24" />;
+    return <Skeleton className="h-3 w-24 mt-1" />;
   }
 
-  return <span className="truncate">{decryptedText || "Encrypted"}</span>;
+  return (
+    <div className="line-clamp-2 break-all overflow-hidden text-ellipsis leading-[1.2]">
+      {content || (isEncrypted ? "Encrypted" : "")}
+    </div>
+  );
 }

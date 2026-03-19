@@ -90,8 +90,9 @@ export function ChatPage({ chatId }: { chatId: string }) {
     lastReadSequence,
   } = useChatHistory(chatId);
 
-  const { sendMessage, editMessage, decryptMessage, isSending } =
+  const { sendMessage, editMessage, decryptMessage, isSending, sendTyping } =
     useChatActions(chatId);
+
   const { data: chatsData } = useMyChats();
 
   const isInitialLoading: boolean = !chat && chatLoading;
@@ -136,6 +137,13 @@ export function ChatPage({ chatId }: { chatId: string }) {
     setEditingMessage(null);
     setReplyingTo(msg);
   }, []);
+
+  const handleTyping = useCallback(
+    (isTyping: boolean): void => {
+      if (sendTyping) sendTyping(isTyping);
+    },
+    [sendTyping],
+  );
 
   const totalUnread = useMemo((): number => {
     const chats: Chat[] = chatsData?.myChats?.chats || [];
@@ -212,13 +220,13 @@ export function ChatPage({ chatId }: { chatId: string }) {
   }, [allMessages.length, checkAndMarkRead]);
 
   const handleSend = useCallback(async (): Promise<void> => {
-    const currentInput: string = inputRef.current.trim();
-    if (!currentInput || isSending || !me) return;
+    const val: string = inputRef.current.trim();
+    if (!val || isSending || !me) return;
 
     if (editingMessage) {
       try {
         log.info(`Editing message: ${editingMessage.id}`);
-        await editMessage(editingMessage.id, currentInput);
+        await editMessage(editingMessage.id, val);
         cancelAction();
       } catch (err: unknown) {
         log.error("Failed to edit message", err);
@@ -226,7 +234,6 @@ export function ChatPage({ chatId }: { chatId: string }) {
       return;
     }
 
-    const val: string = currentInput;
     const nowTime: number = Date.now();
     const tempId: string = crypto.randomUUID();
     const currentReplyId: string | undefined = replyingTo?.id ?? undefined;
@@ -253,13 +260,17 @@ export function ChatPage({ chatId }: { chatId: string }) {
 
     log.info(`Sending message (optimistic): ${tempId}`);
     setOptimisticMsgs((prev: Message[]): Message[] => [...prev, newMsg]);
+
+    const originalReply = replyingTo;
     cancelAction();
+    resetInput();
 
     try {
       await sendMessage(val, { variables: { replyToId: currentReplyId } });
     } catch (err: unknown) {
       log.error("Send failed, rolling back", err);
       setInput(val);
+      if (originalReply) setReplyingTo(originalReply);
       setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] =>
         prev.filter((c: SentCacheEntry): boolean => c.id !== tempId),
       );
@@ -277,6 +288,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
     editingMessage,
     replyingTo,
     cancelAction,
+    resetInput,
     setInput,
   ]);
 
@@ -358,6 +370,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
           input={input}
           setInput={setInput}
           onSend={handleSend}
+          onTyping={handleTyping}
           disabled={isSending}
           replyingTo={replyPreview}
           editingMessage={editingMessage}

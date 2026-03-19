@@ -125,7 +125,7 @@ export const MessageList = memo(function MessageList({
 
   return (
     <div className="h-full w-full relative bg-transparent">
-      <ScrollArea ref={scrollRef} className="h-full w-full">
+      <ScrollArea key={chatId} ref={scrollRef} className="h-full w-full">
         <div className="px-4 py-6 w-full flex flex-col max-w-4xl mx-auto">
           {groupedMessages.map(
             (g: GroupedMessages): ReactNode => (
