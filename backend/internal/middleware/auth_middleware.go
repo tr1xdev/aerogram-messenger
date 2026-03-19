@@ -72,34 +72,48 @@ func AuthMiddleware(cfg *config.Config, db *database.DB) func(http.Handler) http
 					if claims, ok := token.Claims.(jwt.MapClaims); ok {
 						userIDStr, _ := claims["sub"].(string)
 						sessionIDStr, _ := claims["sid"].(string)
+						isBot, _ := claims["is_bot"].(bool)
 
-						if userIDStr != "" && sessionIDStr != "" {
-							uid, _ := uuid.Parse(userIDStr)
-							sid, _ := uuid.Parse(sessionIDStr)
+						if userIDStr != "" {
+							authorized := false
 
-							_, err := db.Queries.GetActiveSession(ctx, dbgen.GetActiveSessionParams{
-								ID:     sid,
-								UserID: uid,
-							})
+							if isBot {
+								authorized = true
+								if sessionIDStr == "" {
+									sessionIDStr = "bot_session"
+								}
+							} else if sessionIDStr != "" {
+								uid, _ := uuid.Parse(userIDStr)
+								sid, _ := uuid.Parse(sessionIDStr)
 
-							if err != nil {
-								w.Header().Set("Content-Type", "application/json")
-								w.WriteHeader(http.StatusUnauthorized)
-								fmt.Fprint(w, `{"errors": [{"message": "Session terminated"}]}`)
-								return
+								_, err := db.Queries.GetActiveSession(ctx, dbgen.GetActiveSessionParams{
+									ID:     sid,
+									UserID: uid,
+								})
+
+								if err == nil {
+									authorized = true
+								} else {
+									w.Header().Set("Content-Type", "application/json")
+									w.WriteHeader(http.StatusUnauthorized)
+									fmt.Fprint(w, `{"errors": [{"message": "Session terminated"}]}`)
+									return
+								}
 							}
 
-							ctx = context.WithValue(ctx, AuthUserIDKey, userIDStr)
-							ctx = context.WithValue(ctx, AuthSessionIDKey, sessionIDStr)
-							ctx = context.WithValue(ctx, AuthTokenKey, tokenString)
+							if authorized {
+								ctx = context.WithValue(ctx, AuthUserIDKey, userIDStr)
+								ctx = context.WithValue(ctx, AuthSessionIDKey, sessionIDStr)
+								ctx = context.WithValue(ctx, AuthTokenKey, tokenString)
 
-							md := metadata.Pairs(
-								"user-id", userIDStr,
-								"session-id", sessionIDStr,
-								"ip-address", ip,
-								"user-agent", r.Header.Get("User-Agent"),
-							)
-							ctx = metadata.NewOutgoingContext(ctx, md)
+								md := metadata.Pairs(
+									"user-id", userIDStr,
+									"session-id", sessionIDStr,
+									"ip-address", ip,
+									"user-agent", r.Header.Get("User-Agent"),
+								)
+								ctx = metadata.NewOutgoingContext(ctx, md)
+							}
 						}
 					}
 				}

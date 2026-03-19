@@ -125,7 +125,7 @@ type ComplexityRoot struct {
 		PinChat                   func(childComplexity int, id string, pinned bool) int
 		RefreshToken              func(childComplexity int, token string) int
 		SendMessage               func(childComplexity int, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) int
-		SendTypingEvent           func(childComplexity int, chatID string) int
+		SendTypingEvent           func(childComplexity int, chatID string, typing bool) int
 		SignUp                    func(childComplexity int, input model.SignUpInput) int
 		TerminateAllOtherSessions func(childComplexity int) int
 		TerminateSession          func(childComplexity int, id string) int
@@ -172,10 +172,16 @@ type ComplexityRoot struct {
 		DialogRead        func(childComplexity int, chatID string) int
 		MessageAdded      func(childComplexity int, chatID string) int
 		UserStatusChanged func(childComplexity int, chatID string) int
+		UserTyping        func(childComplexity int, chatID string) int
 	}
 
 	SuccessResult struct {
 		Success func(childComplexity int) int
+	}
+
+	TypingPayload struct {
+		IsTyping func(childComplexity int) int
+		UserID   func(childComplexity int) int
 	}
 
 	User struct {
@@ -230,7 +236,7 @@ type MutationResolver interface {
 	CreateDirectChat(ctx context.Context, userID string) (model.CreateChatResult, error)
 	PinChat(ctx context.Context, id string, pinned bool) (model.PinChatResult, error)
 	DeleteChat(ctx context.Context, id string, forEveryone *bool) (model.DeleteChatResult, error)
-	SendTypingEvent(ctx context.Context, chatID string) (bool, error)
+	SendTypingEvent(ctx context.Context, chatID string, typing bool) (bool, error)
 	SendMessage(ctx context.Context, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) (model.SendMessageResult, error)
 	UpdateMessage(ctx context.Context, id string, text string, encryptionIv *string) (model.SendMessageResult, error)
 	DeleteMessage(ctx context.Context, id string) (bool, error)
@@ -261,6 +267,7 @@ type SessionResolver interface {
 type SubscriptionResolver interface {
 	ChatCreated(ctx context.Context, userID string) (<-chan *model.Chat, error)
 	ChatDeleted(ctx context.Context, userID string) (<-chan string, error)
+	UserTyping(ctx context.Context, chatID string) (<-chan *model.TypingPayload, error)
 	MessageAdded(ctx context.Context, chatID string) (<-chan *model.Message, error)
 	DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
 	UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error)
@@ -647,7 +654,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SendTypingEvent(childComplexity, args["chatID"].(string)), true
+		return e.complexity.Mutation.SendTypingEvent(childComplexity, args["chatID"].(string), args["typing"].(bool)), true
 	case "Mutation.signUp":
 		if e.complexity.Mutation.SignUp == nil {
 			break
@@ -924,6 +931,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Subscription.UserStatusChanged(childComplexity, args["chatId"].(string)), true
+	case "Subscription.userTyping":
+		if e.complexity.Subscription.UserTyping == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_userTyping_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.UserTyping(childComplexity, args["chatID"].(string)), true
 
 	case "SuccessResult.success":
 		if e.complexity.SuccessResult.Success == nil {
@@ -931,6 +949,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.SuccessResult.Success(childComplexity), true
+
+	case "TypingPayload.isTyping":
+		if e.complexity.TypingPayload.IsTyping == nil {
+			break
+		}
+
+		return e.complexity.TypingPayload.IsTyping(childComplexity), true
+	case "TypingPayload.userId":
+		if e.complexity.TypingPayload.UserID == nil {
+			break
+		}
+
+		return e.complexity.TypingPayload.UserID(childComplexity), true
 
 	case "User.bio":
 		if e.complexity.User.Bio == nil {
@@ -1434,6 +1465,11 @@ func (ec *executionContext) field_Mutation_sendTypingEvent_args(ctx context.Cont
 		return nil, err
 	}
 	args["chatID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "typing", ec.unmarshalNBoolean2bool)
+	if err != nil {
+		return nil, err
+	}
+	args["typing"] = arg1
 	return args, nil
 }
 
@@ -1657,6 +1693,17 @@ func (ec *executionContext) field_Subscription_userStatusChanged_args(ctx contex
 		return nil, err
 	}
 	args["chatId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_userTyping_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatID", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["chatID"] = arg0
 	return args, nil
 }
 
@@ -3426,7 +3473,7 @@ func (ec *executionContext) _Mutation_sendTypingEvent(ctx context.Context, field
 		ec.fieldContext_Mutation_sendTypingEvent,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().SendTypingEvent(ctx, fc.Args["chatID"].(string))
+			return ec.resolvers.Mutation().SendTypingEvent(ctx, fc.Args["chatID"].(string), fc.Args["typing"].(bool))
 		},
 		nil,
 		ec.marshalNBoolean2bool,
@@ -4791,6 +4838,53 @@ func (ec *executionContext) fieldContext_Subscription_chatDeleted(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Subscription_userTyping(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_userTyping,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().UserTyping(ctx, fc.Args["chatID"].(string))
+		},
+		nil,
+		ec.marshalNTypingPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐTypingPayload,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_userTyping(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "userId":
+				return ec.fieldContext_TypingPayload_userId(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_TypingPayload_isTyping(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TypingPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_userTyping_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Subscription_messageAdded(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	return graphql.ResolveFieldStream(
 		ctx,
@@ -4973,6 +5067,64 @@ func (ec *executionContext) _SuccessResult_success(ctx context.Context, field gr
 func (ec *executionContext) fieldContext_SuccessResult_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SuccessResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TypingPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.TypingPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TypingPayload_userId,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TypingPayload_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TypingPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TypingPayload_isTyping(ctx context.Context, field graphql.CollectedField, obj *model.TypingPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TypingPayload_isTyping,
+		func(ctx context.Context) (any, error) {
+			return obj.IsTyping, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TypingPayload_isTyping(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TypingPayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -8907,6 +9059,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_chatCreated(ctx, fields[0])
 	case "chatDeleted":
 		return ec._Subscription_chatDeleted(ctx, fields[0])
+	case "userTyping":
+		return ec._Subscription_userTyping(ctx, fields[0])
 	case "messageAdded":
 		return ec._Subscription_messageAdded(ctx, fields[0])
 	case "dialogRead":
@@ -8931,6 +9085,50 @@ func (ec *executionContext) _SuccessResult(ctx context.Context, sel ast.Selectio
 			out.Values[i] = graphql.MarshalString("SuccessResult")
 		case "success":
 			out.Values[i] = ec._SuccessResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var typingPayloadImplementors = []string{"TypingPayload"}
+
+func (ec *executionContext) _TypingPayload(ctx context.Context, sel ast.SelectionSet, obj *model.TypingPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, typingPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TypingPayload")
+		case "userId":
+			out.Values[i] = ec._TypingPayload_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isTyping":
+			out.Values[i] = ec._TypingPayload_isTyping(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -10360,6 +10558,20 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNTypingPayload2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐTypingPayload(ctx context.Context, sel ast.SelectionSet, v model.TypingPayload) graphql.Marshaler {
+	return ec._TypingPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTypingPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐTypingPayload(ctx context.Context, sel ast.SelectionSet, v *model.TypingPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TypingPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNUpdateUserInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐUpdateUserInput(ctx context.Context, v any) (model.UpdateUserInput, error) {

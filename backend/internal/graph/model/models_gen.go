@@ -206,6 +206,11 @@ func (SuccessResult) IsPinChatResult() {}
 
 func (SuccessResult) IsDeleteChatResult() {}
 
+type TypingPayload struct {
+	UserID   string `json:"userId"`
+	IsTyping bool   `json:"isTyping"`
+}
+
 type UpdateUserInput struct {
 	FirstName        *string `json:"firstName,omitempty"`
 	LastName         *string `json:"lastName,omitempty"`

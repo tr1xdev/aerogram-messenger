@@ -97,15 +97,24 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 	}
 
 	if chatType == model.ChatTypePrivate {
+		foundPartner := false
 		for id, u := range userMap {
 			if id != parsedAuthID {
 				displayTitle = FormatFullName(u.FirstName, u.LastName)
 				if displayPhoto == nil {
 					displayPhoto = NullStringToStringPtr(u.PhotoUrl)
 				}
+				foundPartner = true
 				break
 			}
 		}
+		if !foundPartner && displayTitle == "" {
+			displayTitle = "Deleted Account"
+		}
+	}
+
+	if displayTitle == "" && chatType != model.ChatTypePrivate {
+		displayTitle = "Untitled Chat"
 	}
 
 	uCount, _ := store.CountUnreadMessages(ctx, dbgen.CountUnreadMessagesParams{
