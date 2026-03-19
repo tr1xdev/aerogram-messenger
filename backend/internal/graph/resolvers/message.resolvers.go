@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
@@ -230,14 +231,28 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 				if !ok {
 					return
 				}
+
+				var raw map[string]interface{}
+				if err := json.Unmarshal([]byte(msg.Payload), &raw); err != nil {
+					continue
+				}
+
 				var pbMsg messagesv1.Message
-				if err := json.Unmarshal([]byte(msg.Payload), &pbMsg); err == nil {
-					m := helpers.MapMessageToModel(&pbMsg)
-					select {
-					case out <- m:
-					case <-ctx.Done():
-						return
-					}
+				if err := json.Unmarshal([]byte(msg.Payload), &pbMsg); err != nil {
+					continue
+				}
+
+				m := helpers.MapMessageToModel(&pbMsg)
+				if m == nil {
+					continue
+				}
+
+				select {
+				case out <- m:
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * 5):
+					return
 				}
 			}
 		}
