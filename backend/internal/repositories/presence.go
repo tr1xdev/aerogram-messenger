@@ -12,7 +12,9 @@ import (
 type PresenceStatus struct {
 	UserID   uuid.UUID `json:"userId"`
 	Status   string    `json:"status"`
+	ChatID   string    `json:"chatId,omitempty"`
 	LastSeen string    `json:"lastSeen,omitempty"`
+	IsTyping bool      `json:"isTyping,omitempty"`
 }
 
 type PresenceRepository struct {
@@ -27,29 +29,46 @@ func (r *PresenceRepository) key(userID uuid.UUID) string {
 	return "presence:" + userID.String()
 }
 
+func (r *PresenceRepository) GetRedisClient() *redis.Client {
+	return r.redis
+}
+
+func (r *PresenceRepository) PublishStatus(ctx context.Context, status PresenceStatus) error {
+	payload, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	return r.redis.Publish(ctx, "presence:updates", payload).Err()
+}
+
+func (r *PresenceRepository) PublishTyping(ctx context.Context, status PresenceStatus) error {
+	payload, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	return r.redis.Publish(ctx, "typing:updates", payload).Err()
+}
+
 func (r *PresenceRepository) SetOnline(ctx context.Context, userID uuid.UUID, ttl time.Duration) error {
 	if err := r.redis.Set(ctx, r.key(userID), "online", ttl).Err(); err != nil {
 		return err
 	}
 
-	payload, _ := json.Marshal(PresenceStatus{
+	return r.PublishStatus(ctx, PresenceStatus{
 		UserID: userID,
 		Status: "online",
 	})
-	return r.redis.Publish(ctx, "presence:updates", payload).Err()
 }
 
 func (r *PresenceRepository) SetOffline(ctx context.Context, userID uuid.UUID) error {
 	lastSeen := time.Now().Format(time.RFC3339)
-
 	_ = r.redis.Set(ctx, r.key(userID), lastSeen, 24*time.Hour).Err()
 
-	payload, _ := json.Marshal(PresenceStatus{
+	return r.PublishStatus(ctx, PresenceStatus{
 		UserID:   userID,
 		Status:   lastSeen,
 		LastSeen: lastSeen,
 	})
-	return r.redis.Publish(ctx, "presence:updates", payload).Err()
 }
 
 func (r *PresenceRepository) GetStatus(ctx context.Context, userID uuid.UUID) (string, error) {
