@@ -8,6 +8,7 @@ import {
   DIALOG_READ_SUBSCRIPTION,
   CHAT_DELETED_SUBSCRIPTION,
   USER_PRESENCE_SUBSCRIPTION,
+  USER_TYPING_SUBSCRIPTION,
   GET_MESSAGE_HISTORY,
 } from "../api";
 import type { Message } from "@/entities/chat/model/types";
@@ -28,6 +29,13 @@ interface ChatDeletedData {
   chatDeleted: { chatId: string; forEveryone: boolean };
 }
 
+interface TypingData {
+  userTyping: {
+    userId: string;
+    isTyping: boolean;
+  };
+}
+
 interface MyChatsData {
   chats: Reference[];
   __typename?: string;
@@ -37,7 +45,31 @@ export function useGlobalSubscriptions(
   chatId: string | undefined,
   myId: string | undefined,
 ): void {
-  const client = useApolloClient();
+  const client: ReturnType<typeof useApolloClient> = useApolloClient();
+
+  useSubscription<TypingData>(USER_TYPING_SUBSCRIPTION, {
+    variables: { chatID: chatId ?? "" },
+    skip: !chatId,
+    onData({ data }): void {
+      const payload: TypingData["userTyping"] | undefined =
+        data.data?.userTyping;
+      if (!payload || payload.userId === myId) return;
+
+      const userRef: string | undefined = client.cache.identify({
+        __typename: "User",
+        id: payload.userId,
+      });
+
+      if (userRef) {
+        client.cache.modify({
+          id: userRef,
+          fields: {
+            isTyping: (): boolean => payload.isTyping,
+          },
+        });
+      }
+    },
+  });
 
   useSubscription<MessageAddedData>(MESSAGE_SUBSCRIPTION, {
     variables: { chatId: chatId ?? "" },

@@ -1,4 +1,8 @@
-import { useQuery, useMutation } from "@apollo/client/react/index.js";
+import {
+  useQuery,
+  useMutation,
+  useSubscription,
+} from "@apollo/client/react/index.js";
 import { type ApolloCache } from "@apollo/client/index.js";
 import { useMemo, useCallback } from "react";
 import { toast } from "sonner";
@@ -15,6 +19,7 @@ import {
   DELETE_CHAT,
   GET_CHAT_DETAILS,
   SEND_TYPING_EVENT,
+  USER_TYPING_SUBSCRIPTION,
 } from "../api";
 import { encryptText, decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type {
@@ -62,6 +67,11 @@ interface SendMessageOptions {
   ) => void;
 }
 
+interface TypingPayload {
+  userId: string;
+  isTyping: boolean;
+}
+
 export function useMe(): ReturnType<typeof useQuery<{ me: User }>> {
   return useQuery<{ me: User }>(GET_ME);
 }
@@ -78,6 +88,27 @@ export function useChatDetails(
     skip: !chatId,
     fetchPolicy: "cache-and-network",
   });
+}
+
+export function useTypingSubscription(
+  chatId: string,
+): (User & { isTyping: boolean }) | undefined {
+  const { data } = useSubscription<{ userTyping: TypingPayload }>(
+    USER_TYPING_SUBSCRIPTION,
+    {
+      variables: { chatID: chatId },
+      skip: !chatId,
+    },
+  );
+
+  return useMemo((): (User & { isTyping: boolean }) | undefined => {
+    if (!data?.userTyping) return undefined;
+
+    return {
+      id: data.userTyping.userId,
+      isTyping: data.userTyping.isTyping,
+    } as User & { isTyping: boolean };
+  }, [data]);
 }
 
 export function useChatHistory(chatId: string): {
@@ -102,7 +133,7 @@ export function useChatHistory(chatId: string): {
   }
 
   const messages: Message[] = useMemo((): Message[] => {
-    const history = data?.messageHistory;
+    const history: { messages: Message[] } | undefined = data?.messageHistory;
     if (!history || !("messages" in history)) {
       return [];
     }
@@ -113,7 +144,7 @@ export function useChatHistory(chatId: string): {
   }, [data]);
 
   const hasMore: boolean = useMemo((): boolean => {
-    const history = data?.messageHistory;
+    const history: { hasMore: boolean } | undefined = data?.messageHistory;
     return history ? history.hasMore : false;
   }, [data]);
 

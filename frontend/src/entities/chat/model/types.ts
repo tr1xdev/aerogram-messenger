@@ -13,6 +13,7 @@ export interface User {
   encryptionIv?: string;
   lastSeen?: string | null;
   isVerified?: boolean;
+  isTyping?: boolean;
 }
 
 export interface Message {
