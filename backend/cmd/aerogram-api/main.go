@@ -135,13 +135,13 @@ func main() {
 	go func() {
 		log.Printf("HTTP/2 (TCP) listening on %s", httpAddr)
 		if err := httpServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("http listen error: %v", err)
+			log.Printf("http2 listen error: %v", err)
 		}
 	}()
 
 	go func() {
 		log.Printf("HTTP/3 (UDP) listening on %s", httpAddr)
-		if err := h3Server.ListenAndServe(); err != nil {
+		if err := h3Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("http3 listen error: %v", err)
 		}
 	}()
@@ -149,12 +149,31 @@ func main() {
 	<-stop
 	log.Println("Shutting down gracefully...")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	httpServer.Shutdown(shutdownCtx)
-	h3Server.Close()
-	grpcServer.GracefulStop()
+	shutdownDone := make(chan struct{})
+
+	go func() {
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("HTTP/2 shutdown error: %v", err)
+		}
+
+		if err := h3Server.Close(); err != nil {
+			log.Printf("HTTP/3 close error: %v", err)
+		}
+
+		grpcServer.GracefulStop()
+		close(shutdownDone)
+	}()
+
+	select {
+	case <-shutdownDone:
+		log.Println("All services stopped cleanly")
+	case <-shutdownCtx.Done():
+		log.Println("Shutdown timeout exceeded, forcing exit")
+	}
+
 	log.Println("Server stopped")
 }
 
