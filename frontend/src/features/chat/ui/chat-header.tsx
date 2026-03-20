@@ -1,9 +1,26 @@
 import { memo, useMemo, useState, useEffect, type ReactNode } from "react";
-import { ChevronLeft, MoreVertical, Phone, Video } from "lucide-react";
+import {
+  ChevronLeft,
+  MoreVertical,
+  Phone,
+  Video,
+  Ban,
+  BellOff,
+  Search,
+  Trash2,
+  Shield,
+} from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import { differenceInMinutes } from "date-fns";
@@ -61,7 +78,6 @@ export const ChatHeader = memo(function ChatHeader({
     ) {
       const date = new Date(rawStatus);
       const diffMin: number = differenceInMinutes(new Date(), date);
-
       const intervalTime: number = diffMin < 1 ? 1000 : 60000;
 
       const interval = setInterval((): void => {
@@ -196,14 +212,48 @@ export const ChatHeader = memo(function ChatHeader({
         >
           <Video className="h-5 w-5" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={isLoading}
-          className="text-muted-foreground"
-        >
-          <MoreVertical className="h-5 w-5" />
-        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={isLoading}
+              className="text-muted-foreground"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onClick={(): void => {}}>
+              <Search className="mr-2 h-4 w-4" />
+              <span>Search messages</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(): void => {}}>
+              <BellOff className="mr-2 h-4 w-4" />
+              <span>Mute notifications</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(): void => {}}>
+              <Shield className="mr-2 h-4 w-4" />
+              <span>Start secret chat</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(): void => {}}
+              className="text-destructive focus:text-destructive"
+            >
+              <Ban className="mr-2 h-4 w-4" />
+              <span>Block user</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(): void => {}}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Delete chat</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
