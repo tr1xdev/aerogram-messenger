@@ -83,6 +83,13 @@ func (s *Server) SetOnline(ctx context.Context, req *presencepb.SetOnlineRequest
 	if err := s.repo.SetOnline(ctx, uid, 30*time.Second); err != nil {
 		return nil, status.Error(codes.Internal, "failed to set online")
 	}
+
+	payload, _ := json.Marshal(map[string]interface{}{
+		"userId": uid.String(),
+		"status": "online",
+	})
+	s.repo.GetRedisClient().Publish(ctx, "presence:updates", payload)
+
 	return &presencepb.SetOnlineResponse{Ok: true}, nil
 }
 

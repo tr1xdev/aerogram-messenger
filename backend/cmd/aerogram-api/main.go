@@ -163,7 +163,20 @@ func main() {
 			log.Printf("HTTP/3 close error: %v", err)
 		}
 
-		grpcServer.GracefulStop()
+		grpcDone := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			close(grpcDone)
+		}()
+
+		select {
+		case <-grpcDone:
+			log.Println("gRPC server stopped gracefully")
+		case <-shutdownCtx.Done():
+			log.Println("gRPC shutdown timeout, forcing stop")
+			grpcServer.Stop()
+		}
+
 		close(shutdownDone)
 	}()
 
