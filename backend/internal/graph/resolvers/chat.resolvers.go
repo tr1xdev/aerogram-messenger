@@ -9,6 +9,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 )
 
@@ -221,7 +222,7 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 }
 
 func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<-chan *model.TypingPayload, error) {
-	presenceChan, err := r.PresenceSvc.SubscribeTyping(ctx, chatID)
+	stream, err := r.PresenceClient.SubscribeTyping(ctx, &presencev1.SubscribeTypingRequest{ChatId: chatID})
 	if err != nil {
 		return nil, err
 	}
@@ -231,24 +232,20 @@ func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<
 	go func() {
 		defer close(out)
 		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				return
+			}
+
+			var payload model.TypingPayload
+			if err := json.Unmarshal([]byte(resp.Payload), &payload); err != nil {
+				continue
+			}
+
 			select {
+			case out <- &payload:
 			case <-ctx.Done():
 				return
-			case rawPayload, ok := <-presenceChan:
-				if !ok {
-					return
-				}
-
-				var payload model.TypingPayload
-				if err := json.Unmarshal([]byte(rawPayload), &payload); err != nil {
-					continue
-				}
-
-				select {
-				case out <- &payload:
-				case <-ctx.Done():
-					return
-				}
 			}
 		}
 	}()
