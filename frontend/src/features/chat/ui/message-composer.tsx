@@ -16,12 +16,14 @@ import type { Message } from "@/entities/chat/model/types";
 interface MessageComposerProps {
   input: string;
   setInput: (val: string) => void;
-  onSend: () => void;
+  onSend: (text?: string) => void;
   onTyping?: (isTyping: boolean) => void;
   disabled: boolean;
   replyingTo: Message | null;
   editingMessage: Message | null;
   onCancelAction: () => void;
+  isBot: boolean;
+  isEmpty: boolean;
 }
 
 export const MessageComposer = memo(function MessageComposer({
@@ -33,6 +35,8 @@ export const MessageComposer = memo(function MessageComposer({
   replyingTo,
   editingMessage,
   onCancelAction,
+  isBot,
+  isEmpty,
 }: MessageComposerProps): ReactNode {
   const activeAction: Message | null = editingMessage || replyingTo;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -81,6 +85,10 @@ export const MessageComposer = memo(function MessageComposer({
     onSend();
   }, [onSend, stopTyping]);
 
+  const handleStartBot = useCallback((): void => {
+    onSend("/start");
+  }, [onSend]);
+
   const adjustHeight = useCallback((): void => {
     const textarea: HTMLTextAreaElement | null = textareaRef.current;
     if (textarea) {
@@ -126,6 +134,8 @@ export const MessageComposer = memo(function MessageComposer({
     fileInputRef.current?.click();
   }, []);
 
+  const showStartButton: boolean = isBot && isEmpty;
+
   return (
     <footer className="p-2 md:p-3 bg-background shrink-0 border-t border-border/40">
       <div className="max-w-5xl mx-auto flex flex-col min-w-0">
@@ -167,53 +177,65 @@ export const MessageComposer = memo(function MessageComposer({
           )}
         </AnimatePresence>
 
-        <div className="flex items-end gap-2 relative">
-          <input type="file" ref={fileInputRef} className="hidden" multiple />
-          <Button
-            type="button"
-            size="icon"
-            onClick={handleAttachmentClick}
-            className="h-[38px] w-[38px] rounded-full shrink-0 bg-muted/40 text-muted-foreground hover:text-primary transition-colors"
-          >
-            <Paperclip className="h-5 w-5" />
-          </Button>
-
-          <div className="relative flex-1 min-w-0">
-            <div
-              className={cn(
-                "w-full rounded-[20px] bg-muted/40 border border-border/50 transition-all duration-200 focus-within:bg-muted/60 pr-1",
-                activeAction &&
-                  "rounded-tl-none rounded-tr-none border-t-transparent",
-              )}
+        {showStartButton ? (
+          <div className="flex justify-center w-full px-1">
+            <Button
+              onClick={handleStartBot}
+              disabled={disabled}
+              className="w-full uppercase h-10 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-semibold transition-all border border-primary/20"
             >
-              <div className="flex items-end">
-                <textarea
-                  ref={textareaRef}
-                  placeholder="Message"
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  disabled={disabled}
-                  rows={1}
-                  className="w-full resize-none bg-transparent px-4 py-[9px] text-[15px] focus:outline-none max-h-[200px] scrollbar-none leading-[20px]"
-                />
-                <div className="flex items-center justify-center h-[38px] pr-1">
-                  {input.trim().length > 0 && (
-                    <Button
-                      type="button"
-                      onClick={handleSendAndStopTyping}
-                      disabled={disabled}
-                      size="icon"
-                      className="h-7 w-7 rounded-full bg-primary text-primary-foreground active:scale-90 transition-transform"
-                    >
-                      <ArrowUp className="h-4 w-4" strokeWidth={3} />
-                    </Button>
-                  )}
+              Start
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-end gap-2 relative">
+            <input type="file" ref={fileInputRef} className="hidden" multiple />
+            <Button
+              type="button"
+              size="icon"
+              onClick={handleAttachmentClick}
+              className="h-[38px] w-[38px] rounded-full shrink-0 bg-muted/40 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+
+            <div className="relative flex-1 min-w-0">
+              <div
+                className={cn(
+                  "w-full rounded-[20px] bg-muted/40 border border-border/50 transition-all duration-200 focus-within:bg-muted/60 pr-1",
+                  activeAction &&
+                    "rounded-tl-none rounded-tr-none border-t-transparent",
+                )}
+              >
+                <div className="flex items-end">
+                  <textarea
+                    ref={textareaRef}
+                    placeholder="Message"
+                    value={input}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    disabled={disabled}
+                    rows={1}
+                    className="w-full resize-none bg-transparent px-4 py-[9px] text-[15px] focus:outline-none max-h-[200px] scrollbar-none leading-[20px]"
+                  />
+                  <div className="flex items-center justify-center h-[38px] pr-1">
+                    {input.trim().length > 0 && (
+                      <Button
+                        type="button"
+                        onClick={handleSendAndStopTyping}
+                        disabled={disabled}
+                        size="icon"
+                        className="h-7 w-7 rounded-full bg-primary text-primary-foreground active:scale-90 transition-transform"
+                      >
+                        <ArrowUp className="h-4 w-4" strokeWidth={3} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </footer>
   );

@@ -23,7 +23,7 @@ import { useMarkDialog } from "@/features/chat/lib/use-mark-dialog";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
-import { MessageSquare, AlertCircle, ArrowLeft } from "lucide-react";
+import { MessageSquare, AlertCircle, ArrowLeft, ArrowDown } from "lucide-react";
 import type {
   Message,
   Chat,
@@ -60,6 +60,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [decryptedReplyText, setDecryptedReplyText] = useState<string>("");
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
 
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
   const inputRef = useRef<string>(input);
@@ -91,10 +92,17 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   const { data: chatsData } = useMyChats();
 
-  const isInitialLoading: boolean = !chat && chatLoading;
+  const isInitialLoading: boolean =
+    (!chat && chatLoading) || (historyLoading && isFirstLoad);
   const isNotFound: boolean =
     (!chat && !chatLoading && !!chatError) ||
-    (!chat && !chatLoading && !!chatData);
+    (!chat && !chatLoading && !!chatData && !chatData.chat);
+
+  useEffect((): void => {
+    if (!historyLoading && !chatLoading && chat) {
+      setIsFirstLoad(false);
+    }
+  }, [historyLoading, chatLoading, chat]);
 
   useEffect((): (() => void) => {
     setActiveChatId(chatId);
@@ -164,6 +172,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     return typingMember?.user;
   }, [chat?.members, me, typingFromSub]);
 
+  const isBotChat = useMemo((): boolean => {
+    if (!chat?.members || !me) return false;
+    const otherMember = chat.members.find(
+      (m: ChatMember): boolean => m.user.id !== me.id,
+    );
+    return otherMember?.user.isBot ?? false;
+  }, [chat?.members, me]);
+
   const allMessages = useMemo((): Message[] => {
     if (!me || !chatId) return messagesFromHistory;
 
@@ -231,75 +247,78 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     }
   }, [allMessages.length, checkAndMarkRead]);
 
-  const handleSend = useCallback(async (): Promise<void> => {
-    const val: string = inputRef.current.trim();
-    if (!val || isSending || !me) return;
+  const handleSend = useCallback(
+    async (overrideText?: string): Promise<void> => {
+      const val: string = (overrideText ?? inputRef.current).trim();
+      if (!val || isSending || !me) return;
 
-    if (editingMessage) {
-      try {
-        await editMessage(editingMessage.id, val);
-        cancelAction();
-      } catch {
+      if (editingMessage) {
+        try {
+          await editMessage(editingMessage.id, val);
+          cancelAction();
+        } catch {
+          return;
+        }
         return;
       }
-      return;
-    }
 
-    const nowTime: number = Date.now();
-    const tempId: string = crypto.randomUUID();
-    const currentReplyId: string | undefined = replyingTo?.id ?? undefined;
+      const nowTime: number = Date.now();
+      const tempId: string = crypto.randomUUID();
+      const currentReplyId: string | undefined = replyingTo?.id ?? undefined;
 
-    setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] => {
-      const next: SentCacheEntry[] = [
-        ...prev,
-        { id: tempId, time: nowTime, text: val },
-      ];
-      return next.length > 50 ? next.slice(-50) : next;
-    });
+      setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] => {
+        const next: SentCacheEntry[] = [
+          ...prev,
+          { id: tempId, time: nowTime, text: val },
+        ];
+        return next.length > 50 ? next.slice(-50) : next;
+      });
 
-    const newMsg: Message = {
-      id: tempId,
-      chatId: chatId,
-      text: val,
-      sentAt: new Date(nowTime).toISOString(),
-      isRead: false,
-      isEdited: false,
-      isEncrypted: false,
-      sender: me,
-      replyTo: replyingTo || undefined,
-    };
+      const newMsg: Message = {
+        id: tempId,
+        chatId: chatId,
+        text: val,
+        sentAt: new Date(nowTime).toISOString(),
+        isRead: false,
+        isEdited: false,
+        isEncrypted: false,
+        sender: me,
+        replyTo: replyingTo || undefined,
+      };
 
-    setOptimisticMsgs((prev: Message[]): Message[] => [...prev, newMsg]);
+      setOptimisticMsgs((prev: Message[]): Message[] => [...prev, newMsg]);
 
-    const originalReply: Message | null = replyingTo;
-    cancelAction();
-    resetInput();
+      const originalReply: Message | null = replyingTo;
+      cancelAction();
+      resetInput();
 
-    try {
-      await sendMessage(val, { variables: { replyToId: currentReplyId } });
-    } catch {
-      setInput(val);
-      if (originalReply) setReplyingTo(originalReply);
-      setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] =>
-        prev.filter((c: SentCacheEntry): boolean => c.id !== tempId),
-      );
-    } finally {
-      setOptimisticMsgs((prev: Message[]): Message[] =>
-        prev.filter((m: Message): boolean => m.id !== tempId),
-      );
-    }
-  }, [
-    chatId,
-    isSending,
-    me,
-    sendMessage,
-    editMessage,
-    editingMessage,
-    replyingTo,
-    cancelAction,
-    resetInput,
-    setInput,
-  ]);
+      try {
+        await sendMessage(val, { variables: { replyToId: currentReplyId } });
+      } catch {
+        setInput(val);
+        if (originalReply) setReplyingTo(originalReply);
+        setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] =>
+          prev.filter((c: SentCacheEntry): boolean => c.id !== tempId),
+        );
+      } finally {
+        setOptimisticMsgs((prev: Message[]): Message[] =>
+          prev.filter((m: Message): boolean => m.id !== tempId),
+        );
+      }
+    },
+    [
+      chatId,
+      isSending,
+      me,
+      sendMessage,
+      editMessage,
+      editingMessage,
+      replyingTo,
+      cancelAction,
+      resetInput,
+      setInput,
+    ],
+  );
 
   const replyPreview: Message | null = useMemo((): Message | null => {
     if (!replyingTo) return null;
@@ -356,11 +375,40 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
               <Skeleton className="h-10 w-[50%] rounded-2xl rounded-tl-none" />
             </div>
           </motion.div>
-        ) : allMessages.length === 0 && !historyLoading ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
-            <p className="text-sm">No messages yet.</p>
-          </div>
+        ) : allMessages.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center h-full px-6 text-center"
+          >
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full scale-150" />
+
+              <div className="relative h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center border border-border/50 shadow-sm">
+                <MessageSquare className="h-10 w-10 text-muted-foreground/40" />
+              </div>
+            </div>
+
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              {isBotChat ? `Chat with ${chat?.title}` : "No messages yet"}
+            </h3>
+
+            <p className="text-sm text-muted-foreground max-w-[240px] leading-relaxed">
+              {isBotChat
+                ? "Send a message or tap the button below to start a conversation with the assistant."
+                : "Start the conversation by sending a message below."}
+            </p>
+
+            {isBotChat && (
+              <motion.div
+                animate={{ y: [0, 5, 0] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="mt-8 text-primary/40"
+              >
+                <ArrowDown className="h-5 w-5" />
+              </motion.div>
+            )}
+          </motion.div>
         ) : (
           <MessageList
             chatId={chatId}
@@ -377,6 +425,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
       {!isInitialLoading && (
         <MessageComposer
+          isBot={isBotChat}
+          isEmpty={allMessages.length === 0}
           input={input}
           setInput={setInput}
           onSend={handleSend}

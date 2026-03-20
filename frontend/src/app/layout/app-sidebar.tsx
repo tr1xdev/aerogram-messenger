@@ -518,7 +518,7 @@ export function AppSidebar() {
                 <div className="flex flex-col animate-in fade-in duration-300">
                   {pinnedChats.length > 0 && (
                     <div className="flex flex-col">
-                      <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/50 flex items-center gap-2">
+                      <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/65 flex items-center gap-1">
                         <BsFillPinFill className="h-3 w-3" /> PINNED CHATS
                       </div>
                       <SidebarMenu>
@@ -535,7 +535,7 @@ export function AppSidebar() {
                   )}
                   {otherChats.length > 0 && (
                     <div className="flex flex-col">
-                      <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/50">
+                      <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/65">
                         ALL CHATS
                       </div>
                       <SidebarMenu>

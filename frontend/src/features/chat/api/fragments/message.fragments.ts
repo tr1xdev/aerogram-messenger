@@ -11,6 +11,7 @@ export const USER_FIELDS = gql`
     publicKey
     photoUrl
     isVerified
+    isBot
   }
 `;
 

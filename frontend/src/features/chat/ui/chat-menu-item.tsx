@@ -133,10 +133,10 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                   )}
                 </div>
 
-                <div className="flex-1 min-w-0 flex flex-col justify-center h-full space-y-0">
-                  <div className="flex justify-between items-baseline h-5">
+                <div className="flex-1 min-w-0 flex flex-col justify-center h-full">
+                  <div className="flex justify-between items-baseline min-h-5">
                     <div className="flex items-center gap-1 min-w-0">
-                      <span className="text-[15px] font-bold truncate leading-none text-foreground/90">
+                      <span className="text-[15px] font-medium truncate text-foreground/90">
                         {displayName}
                       </span>
                       {chat.type === "PRIVATE" && otherUser?.isVerified && (
@@ -166,12 +166,12 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                   </div>
 
                   {senderName && (
-                    <div className="text-[15px] font-semibold text-foreground/80 truncate leading-tight h-5 flex items-center">
+                    <div className="text-[15px] font-medium text-foreground/80 truncate leading-tight min-h-5 flex items-center">
                       {senderName}
                     </div>
                   )}
 
-                  <div className="flex items-start justify-between gap-2 h-5 mt-0.5">
+                  <div className="flex items-start justify-between gap-2 min-h-[1.125rem] mt-0.5">
                     <div className="text-[13.5px] font-normal text-muted-foreground/70 min-w-0 leading-tight truncate">
                       {lastMessage && myId ? (
                         <LastMessageContent
@@ -189,7 +189,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                         <BsFillPinFill className="h-3.5 w-3.5 text-muted-foreground/40" />
                       )}
                       {chat.unreadCount > 0 && (
-                        <Badge className="h-5 min-w-5 px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shadow-sm">
+                        <Badge className="h-5 min-w-5 px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shadow-sm leading-none">
                           {chat.unreadCount}
                         </Badge>
                       )}
