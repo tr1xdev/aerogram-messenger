@@ -32,7 +32,7 @@ const previewComponents: Components = {
     const isBlock: boolean = !!className?.includes("language-");
     if (isBlock) {
       return (
-        <span className="inline-flex items-center gap-1 align-baseline">
+        <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
           <LuTerminal className="w-3.5 h-3.5 translate-y-[1px]" /> Code
         </span>
       );
@@ -45,28 +45,28 @@ const previewComponents: Components = {
   },
   pre: ({ children }) => <span className="inline">{children}</span>,
   ul: () => (
-    <span className="inline-flex items-center gap-1 align-baseline">
+    <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
       <LuList className="w-3.5 h-3.5 translate-y-[1px]" /> List
     </span>
   ),
   ol: () => (
-    <span className="inline-flex items-center gap-1 align-baseline">
+    <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
       <LuListOrdered className="w-3.5 h-3.5 translate-y-[1px]" /> List
     </span>
   ),
   table: () => (
-    <span className="inline-flex items-center gap-1 align-baseline">
+    <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
       <LuTable className="w-3.5 h-3.5 translate-y-[1px]" /> Table
     </span>
   ),
   blockquote: ({ children }) => (
-    <span className="inline-flex items-center gap-1 align-baseline">
+    <span className="inline-flex items-center gap-1 align-baseline italic opacity-80">
       <LuQuote className="w-3.5 h-3.5 rotate-180 translate-y-[1px]" />{" "}
       {children}
     </span>
   ),
   img: () => (
-    <span className="inline-flex items-center gap-1 align-baseline">
+    <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
       <LuImage className="w-3.5 h-3.5 translate-y-[1px]" /> Photo
     </span>
   ),
@@ -77,7 +77,7 @@ export function LastMessageContent({
   message,
   myId,
   chat,
-}: LastMessageContentProps) {
+}: LastMessageContentProps): React.ReactNode {
   const client = useApolloClient();
   const [decryptedText, setDecryptedText] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState<boolean>(
@@ -91,15 +91,15 @@ export function LastMessageContent({
     setDecryptedText(null);
   }
 
-  const senderId = message.sender.id;
-  const senderPublicKey = message.sender.publicKey;
-  const encryptionIv = message.encryptionIv;
-  const isEncrypted = message.isEncrypted;
-  const messageText = message.text;
+  const senderId: string = message.sender.id;
+  const senderPublicKey: string | undefined = message.sender.publicKey;
+  const encryptionIv: string | undefined = message.encryptionIv;
+  const isEncrypted: boolean = message.isEncrypted;
+  const messageText: string = message.text;
 
-  useEffect(() => {
+  useEffect((): (() => void) => {
     let isMounted: boolean = true;
-    if (!isEncrypted) return;
+    if (!isEncrypted) return (): void => {};
 
     const performDecryption = async (): Promise<void> => {
       try {
@@ -171,7 +171,7 @@ export function LastMessageContent({
 
   const rawContent: string | null = isEncrypted ? decryptedText : messageText;
 
-  const content = useMemo(() => {
+  const content = useMemo((): React.ReactNode => {
     if (!rawContent) return null;
     return (
       <ReactMarkdown
@@ -188,8 +188,17 @@ export function LastMessageContent({
   }
 
   return (
-    <div className="line-clamp-2 break-all overflow-hidden text-ellipsis leading-[1.2]">
-      {content || (isEncrypted ? "Encrypted" : "")}
+    <div
+      className="line-clamp-2 break-all [word-break:break-word] overflow-hidden text-ellipsis leading-[1.3]"
+      style={{
+        display: "-webkit-box",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 2,
+      }}
+    >
+      <span className="inline">
+        {content || (isEncrypted ? "Encrypted" : "")}
+      </span>
     </div>
   );
 }

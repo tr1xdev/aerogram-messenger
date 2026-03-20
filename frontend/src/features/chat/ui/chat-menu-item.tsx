@@ -30,7 +30,11 @@ interface ChatMenuItemProps {
   myId?: string;
 }
 
-export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
+export function ChatMenuItem({
+  chat,
+  isActive,
+  myId,
+}: ChatMenuItemProps): React.ReactNode {
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false);
   const { togglePin, markAsRead, deleteChat } = useChatActions(chat.id);
 
@@ -172,7 +176,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                   )}
 
                   <div className="flex items-start justify-between gap-2 min-h-4.5">
-                    <div className="text-[13.5px] font-normal text-muted-foreground/70 min-w-0 leading-tight truncate">
+                    <div className="text-[13.5px] font-normal text-muted-foreground/70 min-w-0 leading-tight">
                       {lastMessage && myId ? (
                         <LastMessageContent
                           message={lastMessage}
