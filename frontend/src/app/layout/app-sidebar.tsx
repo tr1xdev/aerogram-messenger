@@ -63,7 +63,7 @@ interface ChatFolder {
   unread: number;
 }
 
-export function AppSidebar() {
+export function AppSidebar(): React.ReactNode {
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [activeFolder, setActiveFolder] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -167,10 +167,13 @@ export function AppSidebar() {
   }, [activeFolder]);
 
   useEffect((): (() => void) => {
-    updateIndicator();
+    const timeoutId = setTimeout(updateIndicator, 0);
     window.addEventListener("resize", updateIndicator);
-    return (): void => window.removeEventListener("resize", updateIndicator);
-  }, [updateIndicator, chats]);
+    return (): void => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("resize", updateIndicator);
+    };
+  }, [updateIndicator, chats, pathname]);
 
   const addToRecent = useCallback((query: string): void => {
     const trimmed: string = query.trim();
@@ -247,7 +250,7 @@ export function AppSidebar() {
         collapsible="none"
         className="w-full border-none bg-background flex flex-col h-screen overflow-hidden"
       >
-        <SidebarHeader className="px-4 pt-3 pb-4 shrink-0 bg-background border-none">
+        <SidebarHeader className="px-4 pt-3 shrink-0 bg-background border-none">
           <div className="flex items-center justify-between h-8 relative">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
               {!isWsConnected ? (
@@ -267,7 +270,7 @@ export function AppSidebar() {
               <NewChatDialog />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-2 rounded-full hover:bg-muted/80 transition-colors outline-none">
+                  <button className="p-2 rounded-full hover:bg-muted/80 transition-colors outline-none text-foreground">
                     <MoreVertical className="h-5 w-5" />
                   </button>
                 </DropdownMenuTrigger>
@@ -295,7 +298,7 @@ export function AppSidebar() {
         </SidebarHeader>
 
         <SidebarContent className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="flex flex-col min-h-full">
+          <div className="flex flex-col min-h-full pb-24 md:pb-0">
             <div className="px-4 py-2 sticky top-0 bg-background z-20">
               <div className="flex items-center gap-2 h-10">
                 <div className="relative flex-1 h-full">
@@ -359,7 +362,7 @@ export function AppSidebar() {
             </div>
 
             {chats.length > 0 && !searchQuery && !isFocused && (
-              <div className="sticky top-14 bg-background px-4 border-b border-border/5 z-20">
+              <div className="sticky top-14 bg-background px-4 border-b border-border/50 z-20">
                 <div
                   className="relative flex items-center h-11"
                   ref={foldersRef}
@@ -557,7 +560,7 @@ export function AppSidebar() {
         </SidebarContent>
 
         <SidebarFooter
-          className="p-4 border-t border-border/5 bg-muted/2 hover:bg-muted/10 transition-colors cursor-pointer group"
+          className="hidden md:flex p-4 border-t border-border/5 bg-muted/2 hover:bg-muted/10 transition-colors cursor-pointer group"
           onClick={(): void => setSettingsOpen(true)}
         >
           {isLoadingMe || !user ? (

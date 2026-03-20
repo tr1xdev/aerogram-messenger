@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/quic-go/quic-go/http3"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -25,6 +27,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/loaders"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
+	internal_tls "github.com/tr1xdev/aerogram-messenger/internal/infrastructure/tls"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/auth_svc"
@@ -98,31 +101,59 @@ func main() {
 	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc)
 	api.SetupRoutes(router, gqlServer)
 
+	certPath := "../certs/localhost+2.pem"
+	keyPath := "../certs/localhost+2-key.pem"
+
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		log.Printf("failed to load mkcert files: %v. Falling back to self-signed.", err)
+		cert, _ = internal_tls.GenerateSelfSigned()
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		NextProtos:   []string{"h3", "h2", "http/1.1"},
+	}
+
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
+
 	httpServer := &http.Server{
-		Addr:    httpAddr,
-		Handler: router,
+		Addr:      httpAddr,
+		Handler:   router,
+		TLSConfig: tlsConfig,
+	}
+
+	h3Server := &http3.Server{
+		Addr:      httpAddr,
+		Handler:   router,
+		TLSConfig: tlsConfig,
 	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("HTTP server listening on %s", httpAddr)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("HTTP/2 (TCP) listening on %s", httpAddr)
+		if err := httpServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http listen error: %v", err)
+		}
+	}()
+
+	go func() {
+		log.Printf("HTTP/3 (UDP) listening on %s", httpAddr)
+		if err := h3Server.ListenAndServe(); err != nil {
+			log.Printf("http3 listen error: %v", err)
 		}
 	}()
 
 	<-stop
 	log.Println("Shutting down gracefully...")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP shutdown error: %v", err)
-	}
+	httpServer.Shutdown(shutdownCtx)
+	h3Server.Close()
 	grpcServer.GracefulStop()
 	log.Println("Server stopped")
 }
@@ -137,7 +168,7 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 
 func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn, rdb *redis.Client) {
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"https://localhost:5173", "http://localhost:5173"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight"},
 		AllowCredentials: true,
