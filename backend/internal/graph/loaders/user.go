@@ -3,11 +3,13 @@ package loaders
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader/v7"
+	"github.com/sqlc-dev/pqtype"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 )
@@ -39,7 +41,7 @@ func newUserBatchFn(client userpb.UserServiceClient) dataloader.BatchFunc[string
 				userMap[normalizedID] = &dbgen.User{
 					ID:               uid,
 					FirstName:        u.FirstName,
-					Email:            u.GetEmail(),
+					Email:            toNullString(u.Email),
 					LastName:         toNullString(u.LastName),
 					Username:         toNullString(u.Username),
 					PublicKey:        toNullString(u.PublicKey),
@@ -49,6 +51,11 @@ func newUserBatchFn(client userpb.UserServiceClient) dataloader.BatchFunc[string
 					IsVerified:       u.IsVerified,
 					IsPremium:        u.IsPremium,
 					IsEmailVerified:  u.IsEmailVerified,
+					IsBot:            u.IsBot,
+					BotTokenHash:     toNullString(u.BotTokenHash),
+					BotOwnerID:       toNullUUID(u.BotOwnerId),
+					BotDescription:   toNullString(u.BotDescription),
+					BotCommands:      toNullRawMessage(u.BotCommands),
 				}
 			}
 		}
@@ -72,4 +79,25 @@ func toNullString(s *string) sql.NullString {
 		return sql.NullString{Valid: false}
 	}
 	return sql.NullString{String: *s, Valid: true}
+}
+
+func toNullUUID(s *string) uuid.NullUUID {
+	if s == nil || *s == "" {
+		return uuid.NullUUID{Valid: false}
+	}
+	uid, err := uuid.Parse(*s)
+	if err != nil {
+		return uuid.NullUUID{Valid: false}
+	}
+	return uuid.NullUUID{UUID: uid, Valid: true}
+}
+
+func toNullRawMessage(s *string) pqtype.NullRawMessage {
+	if s == nil || *s == "" {
+		return pqtype.NullRawMessage{Valid: false}
+	}
+	return pqtype.NullRawMessage{
+		RawMessage: json.RawMessage([]byte(*s)),
+		Valid:      true,
+	}
 }

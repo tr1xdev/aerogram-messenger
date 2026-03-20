@@ -41,16 +41,26 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
   );
 
   const otherUser: User | undefined = otherMember?.user;
+  const otherUserFirstName: string | undefined = otherUser?.firstName;
+  const otherUserLastName: string | undefined = otherUser?.lastName;
+  const otherUserUsername: string | undefined = otherUser?.username;
+  const chatTitle: string | undefined = chat.title;
 
   const displayName: string = useMemo((): string => {
     if (otherUser) {
-      const first: string = otherUser.firstName?.trim() || "";
-      const last: string = otherUser.lastName?.trim() || "";
+      const first: string = otherUserFirstName?.trim() || "";
+      const last: string = otherUserLastName?.trim() || "";
       const full: string = `${first} ${last}`.trim();
-      return full || otherUser.username || "Chat";
+      return full || otherUserUsername || "Chat";
     }
-    return chat.title || "Chat";
-  }, [otherUser, chat.title]);
+    return chatTitle || "Chat";
+  }, [
+    otherUser,
+    otherUserFirstName,
+    otherUserLastName,
+    otherUserUsername,
+    chatTitle,
+  ]);
 
   const avatarUrl: string | undefined = useMemo((): string | undefined => {
     if (chat.type === "PRIVATE") {
@@ -72,14 +82,25 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
   const showSenderName: boolean =
     chat.type === "GROUP" || chat.type === "CHANNEL" || isMe;
 
+  const senderFirstName: string | undefined = sender?.firstName;
+  const senderLastName: string | undefined = sender?.lastName;
+  const senderUsername: string | undefined = sender?.username;
+
   const senderName: string | null = useMemo((): string | null => {
     if (!showSenderName || !sender) return null;
     if (isMe) return "You";
-    const first: string = sender.firstName?.trim() || "";
-    const last: string = sender.lastName?.trim() || "";
+    const first: string = senderFirstName?.trim() || "";
+    const last: string = senderLastName?.trim() || "";
     const full: string = `${first} ${last}`.trim();
-    return full || sender.username || null;
-  }, [showSenderName, sender, isMe]);
+    return full || senderUsername || null;
+  }, [
+    showSenderName,
+    sender,
+    isMe,
+    senderFirstName,
+    senderLastName,
+    senderUsername,
+  ]);
 
   return (
     <>
@@ -89,33 +110,33 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
             <SidebarMenuButton
               asChild
               isActive={isActive}
-              className="h-auto p-4 transition-all duration-200 hover:bg-muted/50 data-[active=true]:bg-primary/4"
+              className="h-[82px] p-3 transition-all duration-200 hover:bg-muted/50 data-[active=true]:bg-primary/5 data-[state=open]:bg-muted/50"
             >
               <Link
                 to="/chat/$chatId"
                 params={{ chatId: chat.id }}
-                className="flex items-center gap-3 w-full"
+                className="flex items-center gap-3 w-full h-full"
               >
-                <div className="relative shrink-0">
-                  <Avatar className="h-14 w-14 border border-border/40 rounded-full overflow-hidden shrink-0 aspect-square">
+                <div className="relative shrink-0 self-center h-14 w-14">
+                  <Avatar className="h-full w-full border border-border/40 rounded-full overflow-hidden aspect-square">
                     <AvatarImage
                       src={avatarUrl}
                       alt={displayName}
-                      className="aspect-square h-full w-full object-cover"
+                      className="h-full w-full object-cover aspect-square"
                     />
-                    <AvatarFallback className="text-primary font-bold text-lg h-full w-full flex items-center justify-center uppercase">
+                    <AvatarFallback className="h-full w-full flex items-center justify-center bg-gradient-to-br from-[#54a4f5] to-[#2196f3] text-white/90 font-bold text-lg uppercase aspect-square">
                       {initial}
                     </AvatarFallback>
                   </Avatar>
                   {isOnline && (
-                    <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background z-10 bg-green-500" />
+                    <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500 z-10" />
                   )}
                 </div>
 
-                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                  <div className="flex justify-between items-baseline">
+                <div className="flex-1 min-w-0 flex flex-col justify-center h-full">
+                  <div className="flex justify-between items-baseline min-h-5">
                     <div className="flex items-center gap-1 min-w-0">
-                      <span className="text-[15px] font-bold truncate leading-tight">
+                      <span className="text-[15px] font-medium truncate text-foreground/90">
                         {displayName}
                       </span>
                       {chat.type === "PRIVATE" && otherUser?.isVerified && (
@@ -134,7 +155,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                           sequence={lastMessage.sequence ?? 0}
                           lastReadSequence={chat.lastReadSequence}
                         />
-                        <span className="text-xs font-medium text-muted-foreground/60">
+                        <span className="text-xs font-medium text-muted-foreground/60 leading-none">
                           {new Date(lastMessage.sentAt).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -145,13 +166,13 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                   </div>
 
                   {senderName && (
-                    <div className="text-[13px] font-medium text-foreground/90 truncate leading-tight mt-0.5">
+                    <div className="text-[15px] font-medium text-foreground/80 truncate leading-tight min-h-5 flex items-center">
                       {senderName}
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <div className="text-[13.5px] font-normal text-muted-foreground/80 truncate leading-tight min-w-0">
+                  <div className="flex items-start justify-between gap-2 min-h-[1.125rem] mt-0.5">
+                    <div className="text-[13.5px] font-normal text-muted-foreground/70 min-w-0 leading-tight truncate">
                       {lastMessage && myId ? (
                         <LastMessageContent
                           message={lastMessage}
@@ -159,17 +180,16 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                           chat={chat}
                         />
                       ) : (
-                        "No messages yet"
+                        <span>No messages yet</span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 self-center">
                       {chat.isPinned && chat.unreadCount === 0 && (
-                        <BsFillPinFill className="h-3.5 w-3.5 text-muted-foreground/50" />
+                        <BsFillPinFill className="h-3.5 w-3.5 text-muted-foreground/40" />
                       )}
-
                       {chat.unreadCount > 0 && (
-                        <Badge className="h-5 min-w-5 px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shrink-0 shadow-sm">
+                        <Badge className="h-5 min-w-5 px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shadow-sm leading-none">
                           {chat.unreadCount}
                         </Badge>
                       )}
@@ -180,6 +200,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </ContextMenuTrigger>
+
         <ContextMenuContent className="w-56 rounded-xl shadow-xl">
           <ContextMenuItem
             onClick={(): void => {

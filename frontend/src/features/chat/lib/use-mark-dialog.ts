@@ -1,14 +1,7 @@
 import { useApolloClient, useMutation } from "@apollo/client/react";
-import { gql } from "@apollo/client";
 import { useCallback, useRef } from "react";
 import type { Chat, Message } from "@/entities/chat/model/types";
-import { GET_MY_CHATS } from "../api";
-
-const MARK_DIALOG_AS_READ = gql`
-  mutation MarkDialogAsRead($chatId: String!, $lastSequence: Long!) {
-    markDialogAsRead(chatId: $chatId, lastSequence: $lastSequence)
-  }
-`;
+import { GET_MY_CHATS, MARK_DIALOG_AS_READ } from "../api";
 
 interface MyChatsData {
   myChats: {

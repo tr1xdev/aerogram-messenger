@@ -2,6 +2,7 @@ package auth_svc
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"strings"
@@ -48,25 +49,34 @@ func (s *Server) getMetadata(ctx context.Context) (string, string) {
 		ip = v[0]
 	}
 	if v := md.Get("x-client-device"); len(v) > 0 {
-		ua = v[0]
+		ip = v[0]
 	} else if v := md.Get("user-agent"); len(v) > 0 {
 		ua = v[0]
 	}
 	return ip, ua
 }
 
-func (s *Server) createAccessToken(userID, sessionID string, verified bool) (string, error) {
-	ttl := s.cfg.JWT.TTL()
-	if ttl == 0 {
-		ttl = time.Hour * 24
+func (s *Server) createAccessToken(userID, sessionID string, verified bool, isBot bool) (string, error) {
+	var ttl time.Duration
+	if isBot {
+		ttl = time.Hour * 24 * 365
+	} else {
+		ttl = s.cfg.JWT.TTL()
+		if ttl == 0 {
+			ttl = time.Hour * 24
+		}
 	}
 
 	claims := jwt.MapClaims{
 		"sub":      userID,
-		"sid":      sessionID,
 		"verified": verified,
+		"is_bot":   isBot,
 		"exp":      time.Now().Add(ttl).Unix(),
 		"iat":      time.Now().Unix(),
+	}
+
+	if sessionID != "" {
+		claims["sid"] = sessionID
 	}
 
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -86,9 +96,9 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 	newID := uuid.New()
 	params := dbgen.CreateUserParams{
 		ID:        newID,
-		Email:     req.Email,
+		Email:     sql.NullString{String: req.Email, Valid: true},
 		FirstName: req.FirstName,
-		Password:  string(pwHash),
+		Password:  sql.NullString{String: string(pwHash), Valid: true},
 		Status:    "OFFLINE",
 		LastName:  database.ToNullString(req.LastName),
 		Username:  database.ToNullString(req.Username),
@@ -115,8 +125,6 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 		}
 	}
 
-	fmt.Printf("[AUTH] Created User: %s, Email: %s, VerID: %s\n", newID.String(), req.Email, verID)
-
 	if err := s.authRepo.StoreAndSendCode(ctx, verID, newID.String(), targetEmail, req.FirstName); err != nil {
 		fmt.Printf("DEBUG: skip email error: %v\n", err)
 	}
@@ -134,12 +142,12 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password.String), []byte(req.Password)); err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
 	verID := uuid.NewString()
-	if err := s.authRepo.StoreAndSendCode(ctx, verID, user.ID.String(), user.Email, user.FirstName); err != nil {
+	if err := s.authRepo.StoreAndSendCode(ctx, verID, user.ID.String(), user.Email.String, user.FirstName); err != nil {
 		if os.Getenv("APP_ENV") != "development" {
 			return nil, status.Error(codes.Internal, "email delivery failed")
 		}
@@ -180,7 +188,7 @@ func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest
 		return nil, status.Error(codes.Internal, "session creation failed")
 	}
 
-	token, err := s.createAccessToken(uid.String(), sid.String(), true)
+	token, err := s.createAccessToken(uid.String(), sid.String(), true, false)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "token error")
 	}
@@ -209,7 +217,7 @@ func (s *Server) RefreshToken(ctx context.Context, req *authpb.RefreshTokenReque
 		return nil, status.Error(codes.Unauthenticated, "session expired or not found")
 	}
 
-	token, err := s.createAccessToken(session.UserID.String(), session.ID.String(), true)
+	token, err := s.createAccessToken(session.UserID.String(), session.ID.String(), true, false)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "token generation failed")
 	}
@@ -217,5 +225,52 @@ func (s *Server) RefreshToken(ctx context.Context, req *authpb.RefreshTokenReque
 	return &authpb.RefreshTokenResponse{
 		AccessToken:  token,
 		RefreshToken: session.ID.String(),
+	}, nil
+}
+
+func (s *Server) GetUser(ctx context.Context, req *authpb.GetUserRequest) (*authpb.GetUserResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id required")
+	}
+
+	uid, err := uuid.Parse(req.UserId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid uuid")
+	}
+
+	user, err := s.userRepo.GetByID(ctx, uid)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	resp := &authpb.GetUserResponse{
+		Id:        user.ID.String(),
+		Email:     user.Email.String,
+		FirstName: user.FirstName,
+		Status:    user.Status,
+	}
+
+	if user.LastName.Valid {
+		resp.LastName = &user.LastName.String
+	}
+	if user.Username.Valid {
+		resp.Username = &user.Username.String
+	}
+
+	return resp, nil
+}
+
+func (s *Server) CreateBotToken(ctx context.Context, req *authpb.CreateBotTokenRequest) (*authpb.CreateBotTokenResponse, error) {
+	if req.BotId == "" {
+		return nil, status.Error(codes.InvalidArgument, "bot_id is required")
+	}
+
+	token, err := s.createAccessToken(req.BotId, "", true, true)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to generate bot token")
+	}
+
+	return &authpb.CreateBotTokenResponse{
+		AccessToken: token,
 	}, nil
 }

@@ -58,6 +58,7 @@ func main() {
 	defer rdb.Close()
 
 	pRepo := repositories.NewPresenceRepository(rdb)
+	pSvc := presence_svc.NewServer(pRepo)
 
 	templatePath := "internal/templates/verification.html"
 	emailSvc, err := mailer.NewResendService(cfg.Resend.Token, cfg.Resend.From, templatePath)
@@ -76,7 +77,7 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	registerGRPCServices(grpcServer, db, rdb, emailSvc, cfg, pRepo)
+	registerGRPCServices(grpcServer, db, rdb, emailSvc, cfg, pSvc)
 
 	go func() {
 		log.Printf("gRPC server listening on %s", grpcAddr)
@@ -94,7 +95,7 @@ func main() {
 	router := chi.NewRouter()
 	applyMiddleware(router, cfg, db, conn, rdb)
 
-	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc)
+	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc)
 	api.SetupRoutes(router, gqlServer)
 
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
@@ -126,11 +127,11 @@ func main() {
 	log.Println("Server stopped")
 }
 
-func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pRepo *repositories.PresenceRepository) {
+func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pSvc *presence_svc.Server) {
 	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, rdb, mailer, cfg))
 	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(db, rdb))
 	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
-	presencev1.RegisterPresenceServiceServer(s, presence_svc.NewServer(pRepo))
+	presencev1.RegisterPresenceServiceServer(s, pSvc)
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
 }
 
@@ -155,6 +156,7 @@ func initGraphQL(
 	cfg *config.Config,
 	geoSvc *geo_svc.Service,
 	uaSvc *ua_svc.Service,
+	pSvc *presence_svc.Server,
 ) *handler.Server {
 	resolver := resolvers.NewResolver(
 		db,
@@ -164,6 +166,7 @@ func initGraphQL(
 		messagesv1.NewMessagesServiceClient(conn),
 		userv1.NewUserServiceClient(conn),
 		presencev1.NewPresenceServiceClient(conn),
+		pSvc,
 		rdb,
 		geoSvc,
 		uaSvc,

@@ -16,6 +16,7 @@ type Querier interface {
 	CheckUserExists(ctx context.Context, id uuid.UUID) (bool, error)
 	CountPinnedDialogs(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUnreadMessages(ctx context.Context, arg CountUnreadMessagesParams) (int64, error)
+	CreateBot(ctx context.Context, arg CreateBotParams) (User, error)
 	CreateDialog(ctx context.Context, arg CreateDialogParams) (Dialog, error)
 	CreateDialogSettings(ctx context.Context, arg CreateDialogSettingsParams) error
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
@@ -26,11 +27,12 @@ type Querier interface {
 	DecrementMembersCount(ctx context.Context, id uuid.UUID) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
+	GetBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) ([]User, error)
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error)
 	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)
 	GetDialogByUsername(ctx context.Context, username sql.NullString) (Dialog, error)
 	GetDialogMember(ctx context.Context, arg GetDialogMemberParams) (DialogMember, error)
-	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]DialogMember, error)
+	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]GetDialogMembersRow, error)
 	GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (Message, error)
 	GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int64, error)
 	GetMessageByID(ctx context.Context, id uuid.UUID) (Message, error)
@@ -39,7 +41,8 @@ type Querier interface {
 	GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateDialogByMembersParams) (Dialog, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
-	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserByBotToken(ctx context.Context, botTokenHash sql.NullString) (User, error)
+	GetUserByEmail(ctx context.Context, email sql.NullString) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username sql.NullString) (User, error)
 	GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]GetUserDialogsRow, error)

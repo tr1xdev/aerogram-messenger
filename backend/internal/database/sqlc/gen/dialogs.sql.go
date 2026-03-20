@@ -8,6 +8,7 @@ package dbgen
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -267,18 +268,38 @@ func (q *Queries) GetDialogMember(ctx context.Context, arg GetDialogMemberParams
 }
 
 const getDialogMembers = `-- name: GetDialogMembers :many
-SELECT dialog_id, user_id, role, joined_at, last_read_message_id, last_read_sequence, muted_until, is_pinned, is_hidden, custom_title, notifications_on, created_at, updated_at FROM dialog_members WHERE dialog_id = $1
+SELECT dm.dialog_id, dm.user_id, dm.role, dm.joined_at, dm.last_read_message_id, dm.last_read_sequence, dm.muted_until, dm.is_pinned, dm.is_hidden, dm.custom_title, dm.notifications_on, dm.created_at, dm.updated_at, u.is_bot
+FROM dialog_members dm
+JOIN users u ON dm.user_id = u.id
+WHERE dm.dialog_id = $1
 `
 
-func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]DialogMember, error) {
+type GetDialogMembersRow struct {
+	DialogID          uuid.UUID      `json:"dialog_id"`
+	UserID            uuid.UUID      `json:"user_id"`
+	Role              string         `json:"role"`
+	JoinedAt          time.Time      `json:"joined_at"`
+	LastReadMessageID uuid.NullUUID  `json:"last_read_message_id"`
+	LastReadSequence  int64          `json:"last_read_sequence"`
+	MutedUntil        sql.NullTime   `json:"muted_until"`
+	IsPinned          bool           `json:"is_pinned"`
+	IsHidden          bool           `json:"is_hidden"`
+	CustomTitle       sql.NullString `json:"custom_title"`
+	NotificationsOn   bool           `json:"notifications_on"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	IsBot             bool           `json:"is_bot"`
+}
+
+func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]GetDialogMembersRow, error) {
 	rows, err := q.db.QueryContext(ctx, getDialogMembers, dialogID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []DialogMember
+	var items []GetDialogMembersRow
 	for rows.Next() {
-		var i DialogMember
+		var i GetDialogMembersRow
 		if err := rows.Scan(
 			&i.DialogID,
 			&i.UserID,
@@ -293,6 +314,7 @@ func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]D
 			&i.NotificationsOn,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsBot,
 		); err != nil {
 			return nil, err
 		}
@@ -371,6 +393,7 @@ SELECT
     u.username AS msg_author_username,
     u.first_name AS msg_author_first_name,
     u.public_key AS msg_author_public_key,
+    u.is_bot AS msg_author_is_bot,
     m.created_at AS msg_created_at,
     m.reply_to_id AS msg_reply_to_id,
     (
@@ -411,6 +434,7 @@ type GetUserDialogsRow struct {
 	MsgAuthorUsername  sql.NullString `json:"msg_author_username"`
 	MsgAuthorFirstName sql.NullString `json:"msg_author_first_name"`
 	MsgAuthorPublicKey sql.NullString `json:"msg_author_public_key"`
+	MsgAuthorIsBot     sql.NullBool   `json:"msg_author_is_bot"`
 	MsgCreatedAt       sql.NullTime   `json:"msg_created_at"`
 	MsgReplyToID       uuid.NullUUID  `json:"msg_reply_to_id"`
 	UnreadCount        int64          `json:"unread_count"`
@@ -445,6 +469,7 @@ func (q *Queries) GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]Get
 			&i.MsgAuthorUsername,
 			&i.MsgAuthorFirstName,
 			&i.MsgAuthorPublicKey,
+			&i.MsgAuthorIsBot,
 			&i.MsgCreatedAt,
 			&i.MsgReplyToID,
 			&i.UnreadCount,

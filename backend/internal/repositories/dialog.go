@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"fmt"
+	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
@@ -81,7 +82,7 @@ func (r *DialogRepository) GetMember(ctx context.Context, dialogID, userID strin
 	})
 }
 
-func (r *DialogRepository) GetMembers(ctx context.Context, dialogID string) ([]dbgen.DialogMember, error) {
+func (r *DialogRepository) GetMembers(ctx context.Context, dialogID string) ([]dbgen.GetDialogMembersRow, error) {
 	did, err := uuid.Parse(dialogID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dialog id: %w", err)
@@ -93,13 +94,14 @@ func (r *DialogRepository) GetDialogByUsername(ctx context.Context, username str
 	if username == "" {
 		return dbgen.Dialog{}, fmt.Errorf("username is empty")
 	}
-	return r.db.Queries.GetDialogByUsername(ctx, database.ToNullString(&username))
+	return r.db.Queries.GetDialogByUsername(ctx, sql.NullString{String: username, Valid: true})
 }
 
-func (r *DialogRepository) UpdateLastMessage(ctx context.Context, chatID uuid.UUID, messageID uuid.UUID) error {
+func (r *DialogRepository) UpdateLastMessage(ctx context.Context, chatID uuid.UUID, messageID uuid.UUID, at sql.NullTime) error {
 	return r.db.Queries.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
 		ID:            chatID,
-		LastMessageID: database.UUIDToNullUUID(messageID),
+		LastMessageID: uuid.NullUUID{UUID: messageID, Valid: true},
+		LastMessageAt: at,
 	})
 }
 
@@ -108,7 +110,6 @@ func (r *DialogRepository) Delete(ctx context.Context, dialogID string) error {
 	if err != nil {
 		return fmt.Errorf("invalid dialog id: %w", err)
 	}
-
 	return r.db.Queries.DeleteDialog(ctx, did)
 }
 
@@ -191,11 +192,4 @@ func (r *DialogRepository) DeleteChat(ctx context.Context, dialogID, userID uuid
 	}
 
 	return tx.Commit()
-}
-
-func (r *MessageRepository) GetMessageBySequence(ctx context.Context, dialogID uuid.UUID, sequence int64) (dbgen.Message, error) {
-	return r.db.Queries.GetMessageBySequence(ctx, dbgen.GetMessageBySequenceParams{
-		DialogID: dialogID,
-		Sequence: sequence,
-	})
 }

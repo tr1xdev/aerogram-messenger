@@ -17,7 +17,8 @@ SELECT
     u.first_name as author_first_name,
     u.last_name as author_last_name,
     u.public_key as author_public_key,
-    u.photo_url as author_photo_url -- This will now work
+    u.photo_url as author_photo_url,
+    u.is_bot as author_is_bot
 FROM messages m
 JOIN users u ON m.author_id = u.id
 WHERE m.dialog_id = $1 AND m.is_deleted = false

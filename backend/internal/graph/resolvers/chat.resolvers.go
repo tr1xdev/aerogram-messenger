@@ -5,18 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 )
 
 func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatType, participantIds []string, slug *string, title *string) (model.CreateChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
-		return model.ForbiddenError{Message: "unauthorized"}, nil
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
 	enumKey := "CHAT_TYPE_" + strings.ToUpper(string(typeArg))
@@ -30,7 +30,7 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 
 	resp, err := r.ChatClient.CreateChat(ctx, req)
 	if err != nil {
-		return model.InternalError{Message: err.Error()}, nil
+		return &model.InternalError{Message: err.Error()}, nil
 	}
 
 	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
@@ -39,7 +39,7 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) (model.CreateChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
-		return model.ForbiddenError{Message: "unauthorized"}, nil
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
 	resp, err := r.ChatClient.CreateChat(ctx, &chatv1.CreateChatRequest{
@@ -48,7 +48,7 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 		CreatorId:      authID,
 	})
 	if err != nil {
-		return model.InternalError{Message: err.Error()}, nil
+		return &model.InternalError{Message: err.Error()}, nil
 	}
 
 	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
@@ -75,7 +75,7 @@ func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) 
 func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryone *bool) (model.DeleteChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
-		return model.ForbiddenError{Message: "unauthorized"}, nil
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
 	everyone := false
@@ -89,31 +89,34 @@ func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryon
 		ForEveryone: everyone,
 	})
 	if err != nil {
-		return model.InternalError{Message: err.Error()}, nil
+		return &model.InternalError{Message: err.Error()}, nil
 	}
 
-	return model.SuccessResult{Success: resp.GetSuccess()}, nil
+	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
 }
 
-func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string) (bool, error) {
+func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string, typing bool) (bool, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return false, nil
 	}
-	payload, _ := json.Marshal(map[string]string{"userId": authID, "status": "typing"})
-	r.RedisClient.Publish(ctx, "presence:updates", payload)
+
+	if err := r.PresenceSvc.PublishTyping(ctx, authID, chatID, typing); err != nil {
+		return false, err
+	}
+
 	return true, nil
 }
 
 func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
-		return model.ForbiddenError{Message: "unauthorized"}, nil
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
 	resp, err := r.ChatClient.GetMyChats(ctx, &chatv1.GetMyChatsRequest{UserId: authID})
 	if err != nil {
-		return model.InternalError{Message: err.Error()}, nil
+		return &model.InternalError{Message: err.Error()}, nil
 	}
 
 	chats := make([]*model.Chat, 0, len(resp.Chats))
@@ -123,13 +126,13 @@ func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error
 		}
 	}
 
-	return model.ChatList{Chats: chats}, nil
+	return &model.ChatList{Chats: chats}, nil
 }
 
 func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (model.ChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
-		return model.ForbiddenError{Message: "unauthorized"}, nil
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
 	resp, err := r.ChatClient.GetChat(ctx, &chatv1.GetChatRequest{
@@ -138,23 +141,47 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 		UserId: authID,
 	})
 	if err != nil {
-		return model.NotFoundError{Message: "chat not found"}, nil
+		return &model.NotFoundError{Message: "chat not found"}, nil
 	}
 
 	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
 }
 
 func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (<-chan *model.Chat, error) {
-	chatChan := make(chan *model.Chat, 1)
+	authID := middleware.GetUserID(ctx)
+	if authID == "" || authID != userID {
+		return nil, errors.New("forbidden")
+	}
+
+	chatChan := make(chan *model.Chat, 10)
 	pubsub := r.RedisClient.Subscribe(ctx, "user_chats:"+userID)
 
 	go func() {
 		defer pubsub.Close()
 		defer close(chatChan)
-		for msg := range pubsub.Channel() {
-			var c model.Chat
-			if err := json.Unmarshal([]byte(msg.Payload), &c); err == nil {
-				chatChan <- &c
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-pubsub.Channel():
+				if !ok {
+					return
+				}
+
+				var c model.Chat
+				if err := json.Unmarshal([]byte(msg.Payload), &c); err != nil {
+					continue
+				}
+
+				if c.ID == "" {
+					continue
+				}
+
+				select {
+				case chatChan <- &c:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()
@@ -167,7 +194,7 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 		return nil, errors.New("forbidden")
 	}
 
-	deleteChan := make(chan string, 5)
+	deleteChan := make(chan string, 10)
 	pubsub := r.RedisClient.Subscribe(ctx, "user_chats_deleted:"+userID)
 
 	go func() {
@@ -184,8 +211,6 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 				}
 				select {
 				case deleteChan <- msg.Payload:
-				case <-time.After(time.Millisecond * 100):
-					continue
 				case <-ctx.Done():
 					return
 				}
@@ -194,4 +219,36 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 	}()
 
 	return deleteChan, nil
+}
+
+func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<-chan *model.TypingPayload, error) {
+	stream, err := r.PresenceClient.SubscribeTyping(ctx, &presencev1.SubscribeTypingRequest{ChatId: chatID})
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan *model.TypingPayload, 10)
+
+	go func() {
+		defer close(out)
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				return
+			}
+
+			var payload model.TypingPayload
+			if err := json.Unmarshal([]byte(resp.Payload), &payload); err != nil {
+				continue
+			}
+
+			select {
+			case out <- &payload:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return out, nil
 }

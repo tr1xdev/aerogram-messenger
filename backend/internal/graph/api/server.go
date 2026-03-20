@@ -52,26 +52,33 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 			}
 
 			uidStr, _ := claims["sub"].(string)
-			sidStr, _ := claims["sid"].(string)
+			isBot, _ := claims["is_bot"].(bool)
 			uid, errUID := uuid.Parse(uidStr)
-			sid, errSID := uuid.Parse(sidStr)
-			if errUID != nil || errSID != nil {
+			if errUID != nil {
 				return ctx, nil, nil
 			}
 
-			checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			defer cancel()
-
-			_, err = db.Queries.GetActiveSession(checkCtx, dbgen.GetActiveSessionParams{
-				ID:     sid,
-				UserID: uid,
-			})
-			if err != nil {
-				return nil, nil, fmt.Errorf("session expired or invalid")
-			}
-
 			newCtx := context.WithValue(ctx, middleware.AuthUserIDKey, uidStr)
-			newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sidStr)
+
+			if !isBot {
+				sidStr, _ := claims["sid"].(string)
+				sid, errSID := uuid.Parse(sidStr)
+				if errSID != nil {
+					return ctx, nil, nil
+				}
+
+				checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+
+				_, err = db.Queries.GetActiveSession(checkCtx, dbgen.GetActiveSessionParams{
+					ID:     sid,
+					UserID: uid,
+				})
+				if err != nil {
+					return nil, nil, fmt.Errorf("session expired or invalid")
+				}
+				newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sidStr)
+			}
 
 			l := loaders.NewLoaders(res.UserClient, res.PresenceClient, db.Queries)
 			newCtx = loaders.AttachToContext(newCtx, l)

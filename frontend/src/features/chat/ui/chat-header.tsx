@@ -1,3 +1,4 @@
+import { memo, useMemo, type ReactNode } from "react";
 import { ChevronLeft, MoreVertical, Phone, Video } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -5,8 +6,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
-import type { ChatMember } from "@/entities/chat/model/types";
+import type { ChatMember, User } from "@/entities/chat/model/types";
 import { ChatUserPopover } from "./chat-user-popover";
+
+interface TypingUser extends User {
+  isTyping?: boolean;
+}
 
 interface ChatHeaderProps {
   title?: string;
@@ -15,43 +20,39 @@ interface ChatHeaderProps {
   members?: ChatMember[];
   meId?: string;
   isLoading: boolean;
+  typingUser?: TypingUser;
 }
 
-export function ChatHeader({
+export const ChatHeader = memo(function ChatHeader({
   title,
   photoUrl,
   totalUnread,
   members,
   meId,
   isLoading,
-}: ChatHeaderProps) {
-  const navigate: ReturnType<typeof useNavigate> = useNavigate();
+  typingUser,
+}: ChatHeaderProps): ReactNode {
+  const navigate = useNavigate();
 
-  const otherMember: ChatMember | undefined = members?.find(
-    (m: ChatMember): boolean => m.user.id !== meId,
+  const otherMember: ChatMember | undefined = useMemo(
+    (): ChatMember | undefined =>
+      members?.find((m: ChatMember): boolean => m.user.id !== meId),
+    [members, meId],
   );
 
+  const isTyping: boolean = useMemo((): boolean => {
+    const memberId: string | undefined = otherMember?.user.id;
+
+    if (typingUser && memberId && typingUser.id === memberId) {
+      return typingUser.isTyping !== false;
+    }
+
+    return otherMember?.user.status === "typing";
+  }, [typingUser, otherMember]);
+
   const status: string | undefined = otherMember?.user.status;
-
-  const renderAvatar = () => {
-    const effectivePhotoUrl: string | undefined =
-      photoUrl ?? otherMember?.user.photoUrl ?? undefined;
-
-    return (
-      <Avatar className="h-10 w-10 border border-border/50 shadow-sm rounded-full overflow-hidden shrink-0">
-        {effectivePhotoUrl && (
-          <AvatarImage
-            src={effectivePhotoUrl}
-            alt={title || "Chat"}
-            className="aspect-square h-full w-full object-cover"
-          />
-        )}
-        <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs h-full w-full flex items-center justify-center uppercase">
-          {title?.[0] || "?"}
-        </AvatarFallback>
-      </Avatar>
-    );
-  };
+  const effectivePhotoUrl: string | undefined =
+    photoUrl ?? otherMember?.user.photoUrl ?? undefined;
 
   return (
     <header className="flex h-16 items-center justify-between px-4 border-b shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -82,9 +83,20 @@ export function ChatHeader({
           </div>
         ) : otherMember ? (
           <ChatUserPopover userId={otherMember.user.id}>
-            <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
-              {renderAvatar()}
-              <div className="flex flex-col min-w-0 text-left">
+            <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
+              <Avatar className="h-10 w-10 border border-border/50 shadow-sm rounded-full overflow-hidden shrink-0">
+                {effectivePhotoUrl && (
+                  <AvatarImage
+                    src={effectivePhotoUrl}
+                    alt={title || "Chat"}
+                    className="aspect-square h-full w-full object-cover"
+                  />
+                )}
+                <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs h-full w-full flex items-center justify-center uppercase">
+                  {title?.[0] || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1 min-w-0">
                   <span className="text-[15px] font-bold truncate leading-none">
                     {title}
@@ -92,30 +104,53 @@ export function ChatHeader({
                 </div>
                 <span
                   className={cn(
-                    "text-[11px] mt-1 font-medium leading-none",
-                    status === "online"
+                    "text-[11px] mt-1 font-medium leading-none transition-colors duration-200 h-3 flex items-center",
+                    isTyping || status === "online"
                       ? "text-primary"
                       : "text-muted-foreground",
                   )}
                 >
-                  {status ? formatLastSeen(status) : "Offline"}
+                  {isTyping ? (
+                    <div className="flex items-center gap-0.5">
+                      <div className="flex gap-[1.5px] mr-1">
+                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s]" />
+                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s] [animation-delay:200ms]" />
+                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s] [animation-delay:400ms]" />
+                      </div>
+                      <span>typing</span>
+                    </div>
+                  ) : (
+                    <>
+                      {status === "online"
+                        ? "online"
+                        : status
+                          ? formatLastSeen(status)
+                          : "offline"}
+                    </>
+                  )}
                 </span>
               </div>
             </div>
           </ChatUserPopover>
-        ) : title ? (
+        ) : (
           <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0">
-            {renderAvatar()}
+            <Avatar className="h-10 w-10 border border-border/50 shadow-sm rounded-full overflow-hidden shrink-0">
+              {effectivePhotoUrl && (
+                <AvatarImage
+                  src={effectivePhotoUrl}
+                  alt={title || "Chat"}
+                  className="aspect-square h-full w-full object-cover"
+                />
+              )}
+              <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs h-full w-full flex items-center justify-center uppercase">
+                {title?.[0] || "?"}
+              </AvatarFallback>
+            </Avatar>
             <div className="flex flex-col min-w-0 text-left">
               <span className="text-[15px] font-bold truncate leading-none">
                 {title}
               </span>
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 ml-2 md:ml-0 opacity-40 grayscale">
-            <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-            <div className="h-4 w-24 bg-muted rounded animate-pulse" />
           </div>
         )}
       </div>
@@ -124,28 +159,28 @@ export function ChatHeader({
         <Button
           variant="ghost"
           size="icon"
-          disabled={isLoading || !title}
-          className="hidden sm:flex text-muted-foreground hover:text-foreground"
+          disabled={isLoading}
+          className="hidden sm:flex text-muted-foreground"
         >
           <Phone className="h-5 w-5" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          disabled={isLoading || !title}
-          className="hidden sm:flex text-muted-foreground hover:text-foreground"
+          disabled={isLoading}
+          className="hidden sm:flex text-muted-foreground"
         >
           <Video className="h-5 w-5" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          disabled={isLoading || !title}
-          className="text-muted-foreground hover:text-foreground"
+          disabled={isLoading}
+          className="text-muted-foreground"
         >
           <MoreVertical className="h-5 w-5" />
         </Button>
       </div>
     </header>
   );
-}
+});

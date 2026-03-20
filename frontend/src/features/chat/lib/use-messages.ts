@@ -1,6 +1,10 @@
-import { useQuery, useMutation } from "@apollo/client/react/index.js";
-import { type ApolloCache, type StoreObject } from "@apollo/client/index.js";
-import { useMemo } from "react";
+import {
+  useQuery,
+  useMutation,
+  useSubscription,
+} from "@apollo/client/react/index.js";
+import { type ApolloCache } from "@apollo/client/index.js";
+import { useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import {
   SEND_MESSAGE,
@@ -14,6 +18,8 @@ import {
   PIN_CHAT,
   DELETE_CHAT,
   GET_CHAT_DETAILS,
+  SEND_TYPING_EVENT,
+  USER_TYPING_SUBSCRIPTION,
 } from "../api";
 import { encryptText, decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type {
@@ -61,6 +67,11 @@ interface SendMessageOptions {
   ) => void;
 }
 
+interface TypingPayload {
+  userId: string;
+  isTyping: boolean;
+}
+
 export function useMe(): ReturnType<typeof useQuery<{ me: User }>> {
   return useQuery<{ me: User }>(GET_ME);
 }
@@ -77,6 +88,27 @@ export function useChatDetails(
     skip: !chatId,
     fetchPolicy: "cache-and-network",
   });
+}
+
+export function useTypingSubscription(
+  chatId: string,
+): (User & { isTyping: boolean }) | undefined {
+  const { data } = useSubscription<{ userTyping: TypingPayload }>(
+    USER_TYPING_SUBSCRIPTION,
+    {
+      variables: { chatID: chatId },
+      skip: !chatId,
+    },
+  );
+
+  return useMemo((): (User & { isTyping: boolean }) | undefined => {
+    if (!data?.userTyping) return undefined;
+
+    return {
+      id: data.userTyping.userId,
+      isTyping: data.userTyping.isTyping,
+    } as User & { isTyping: boolean };
+  }, [data]);
 }
 
 export function useChatHistory(chatId: string): {
@@ -101,25 +133,19 @@ export function useChatHistory(chatId: string): {
   }
 
   const messages: Message[] = useMemo((): Message[] => {
-    const history = data?.messageHistory;
-
+    const history: { messages: Message[] } | undefined = data?.messageHistory;
     if (!history || !("messages" in history)) {
       return [];
     }
-
     const list: Message[] = history.messages;
-
     return [...list].sort(
       (a: Message, b: Message): number => (a.sequence ?? 0) - (b.sequence ?? 0),
     );
   }, [data]);
 
   const hasMore: boolean = useMemo((): boolean => {
-    const history = data?.messageHistory;
-    if (history && "hasMore" in history) {
-      return history.hasMore;
-    }
-    return false;
+    const history: { hasMore: boolean } | undefined = data?.messageHistory;
+    return history ? history.hasMore : false;
   }, [data]);
 
   return {
@@ -143,6 +169,7 @@ export function useChatActions(chatId: string): {
   sendMessage: (text: string, options?: SendMessageOptions) => Promise<void>;
   editMessage: (id: string, text: string) => Promise<void>;
   decryptMessage: (message: Message) => Promise<string>;
+  sendTyping: (isTyping: boolean) => Promise<void>;
   isSending: boolean;
   markAsRead: (lastSequence: number) => void;
   createChat: (userID: string) => Promise<Chat | undefined>;
@@ -183,23 +210,42 @@ export function useChatActions(chatId: string): {
     { id: string; forEveryone: boolean }
   >(DELETE_CHAT);
 
+  const [typing] = useMutation<
+    { sendTypingEvent: boolean },
+    { chatID: string; typing: boolean }
+  >(SEND_TYPING_EVENT, {
+    fetchPolicy: "no-cache",
+  });
+
+  const sendTyping = useCallback(
+    async (isTyping: boolean): Promise<void> => {
+      try {
+        await typing({
+          variables: {
+            chatID: chatId,
+            typing: isTyping,
+          },
+        });
+      } catch (err: unknown) {
+        console.error(err);
+      }
+    },
+    [chatId, typing],
+  );
+
   const decryptMessage = async (message: Message): Promise<string> => {
     if (!message.isEncrypted || !message.encryptionIv || !meData?.me) {
       return message.text;
     }
-
     const me: User = meData.me;
     const chat: Chat | undefined = chatData?.chat;
     const peer: User | undefined = chat?.members?.find(
       (m: ChatMember): boolean => m.user.id !== me.id,
     )?.user;
-
     if (!peer?.publicKey) return message.text;
-
     try {
       const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
       if (!myPrivKeyObj) return message.text;
-
       return await decryptText(
         message.text,
         message.encryptionIv,
@@ -218,18 +264,15 @@ export function useChatActions(chatId: string): {
     const me: User | undefined = meData?.me;
     const chat: Chat | undefined = chatData?.chat;
     if (!me || !chat) return;
-
     const peer: User | undefined = chat.members?.find(
       (m: ChatMember): boolean => m.user.id !== me.id,
     )?.user;
-
     let finalVariables: SendMessageVariables = {
       chatId,
       text,
       isEncrypted: false,
       ...options?.variables,
     };
-
     if (chat.type === "PRIVATE" && peer?.publicKey) {
       try {
         const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
@@ -247,20 +290,16 @@ export function useChatActions(chatId: string): {
         console.error(err);
       }
     }
-
     await send({
       ...options,
       variables: finalVariables,
       update: (cache: ApolloCache, { data: mutationData }): void => {
         const newMessage: Message | undefined = mutationData?.sendMessage;
         if (!newMessage) return;
-
-        const chatIdentifier: StoreObject = {
+        const chatRef: string | undefined = cache.identify({
           __typename: "Chat",
           id: chatId,
-        };
-        const chatRef: string | undefined = cache.identify(chatIdentifier);
-
+        });
         if (chatRef) {
           cache.modify({
             id: chatRef,
@@ -270,12 +309,10 @@ export function useChatActions(chatId: string): {
             },
           });
         }
-
         const queryData: MyChatsResponse | null =
           cache.readQuery<MyChatsResponse>({
             query: GET_MY_CHATS,
           });
-
         if (queryData?.myChats?.chats) {
           const existingChats: Chat[] = queryData.myChats.chats;
           const filteredChats: Chat[] = existingChats.filter(
@@ -284,7 +321,6 @@ export function useChatActions(chatId: string): {
           const targetChat: Chat | undefined =
             existingChats.find((c: Chat): boolean => c.id === chatId) ||
             chatData?.chat;
-
           if (targetChat) {
             cache.writeQuery<MyChatsResponse>({
               query: GET_MY_CHATS,
@@ -300,7 +336,6 @@ export function useChatActions(chatId: string): {
             });
           }
         }
-
         if (options?.update) {
           options.update(cache, { data: mutationData });
         }
@@ -311,7 +346,6 @@ export function useChatActions(chatId: string): {
   const editMessage = async (id: string, text: string): Promise<void> => {
     const me: User | undefined = meData?.me;
     if (!me) return;
-
     await edit({
       variables: { id, text },
       optimisticResponse: {
@@ -325,7 +359,7 @@ export function useChatActions(chatId: string): {
           isEdited: true,
           isEncrypted: false,
           sender: me,
-        } as unknown as Message,
+        } as Message,
       },
     });
   };
@@ -335,11 +369,10 @@ export function useChatActions(chatId: string): {
       variables: { chatId, lastSequence: Number(lastSequence) },
       optimisticResponse: { markDialogAsRead: true },
       update: (cache: ApolloCache): void => {
-        const chatIdentifier: StoreObject = {
+        const chatRef: string | undefined = cache.identify({
           __typename: "Chat",
           id: chatId,
-        };
-        const chatRef: string | undefined = cache.identify(chatIdentifier);
+        });
         if (chatRef) {
           cache.modify({
             id: chatRef,
@@ -356,40 +389,34 @@ export function useChatActions(chatId: string): {
 
   const createChat = async (userID: string): Promise<Chat | undefined> => {
     try {
-      const result: { data?: { createDirectChat: Chat } | null } =
-        await createDirect({
-          variables: { userID },
-          update: (cache: ApolloCache, { data: mutationData }): void => {
-            const newChat: (Chat & { __typename?: string }) | undefined =
-              mutationData?.createDirectChat;
-
-            if (!newChat) return;
-
-            const queryData: MyChatsResponse | null =
-              cache.readQuery<MyChatsResponse>({
+      const result = await createDirect({
+        variables: { userID },
+        update: (cache: ApolloCache, { data: mutationData }): void => {
+          const newChat: Chat | undefined = mutationData?.createDirectChat;
+          if (!newChat) return;
+          const queryData: MyChatsResponse | null =
+            cache.readQuery<MyChatsResponse>({
+              query: GET_MY_CHATS,
+            });
+          if (queryData?.myChats?.chats) {
+            const existingChats: Chat[] = queryData.myChats.chats;
+            const exists: boolean = existingChats.some(
+              (c: Chat): boolean => c.id === newChat.id,
+            );
+            if (!exists) {
+              cache.writeQuery<MyChatsResponse>({
                 query: GET_MY_CHATS,
-              });
-
-            if (queryData?.myChats?.chats) {
-              const existingChats: Chat[] = queryData.myChats.chats;
-              const exists: boolean = existingChats.some(
-                (c: Chat): boolean => c.id === newChat.id,
-              );
-
-              if (!exists) {
-                cache.writeQuery<MyChatsResponse>({
-                  query: GET_MY_CHATS,
-                  data: {
-                    myChats: {
-                      ...queryData.myChats,
-                      chats: [newChat as Chat, ...existingChats],
-                    },
+                data: {
+                  myChats: {
+                    ...queryData.myChats,
+                    chats: [newChat, ...existingChats],
                   },
-                });
-              }
+                },
+              });
             }
-          },
-        });
+          }
+        },
+      });
       return result.data?.createDirectChat;
     } catch {
       toast.error("Failed to create chat");
@@ -402,7 +429,6 @@ export function useChatActions(chatId: string): {
       const pinnedCount: number =
         myChatsData?.myChats.chats.filter((c: Chat): boolean => c.isPinned)
           .length ?? 0;
-
       if (pinnedCount >= 5) {
         toast.error("Limit reached", {
           description: "You can pin up to 5 chats maximum.",
@@ -410,7 +436,6 @@ export function useChatActions(chatId: string): {
         return;
       }
     }
-
     try {
       await pin({
         variables: { id: chatId, pinned },
@@ -421,11 +446,10 @@ export function useChatActions(chatId: string): {
           },
         },
         update: (cache: ApolloCache): void => {
-          const chatIdentifier: StoreObject = {
+          const chatRef: string | undefined = cache.identify({
             __typename: "Chat",
             id: chatId,
-          };
-          const chatRef: string | undefined = cache.identify(chatIdentifier);
+          });
           if (chatRef) {
             cache.modify({
               id: chatRef,
@@ -441,18 +465,13 @@ export function useChatActions(chatId: string): {
 
   const deleteChat = async (forEveryone: boolean = false): Promise<boolean> => {
     try {
-      const {
-        data: mutationData,
-      }: {
-        data?: { deleteChat: { __typename: string; success?: boolean } } | null;
-      } = await remove({
+      const { data: mutationData } = await remove({
         variables: { id: chatId, forEveryone },
         update: (cache: ApolloCache): void => {
           const queryData: MyChatsResponse | null =
             cache.readQuery<MyChatsResponse>({
               query: GET_MY_CHATS,
             });
-
           if (queryData?.myChats?.chats) {
             cache.writeQuery<MyChatsResponse>({
               query: GET_MY_CHATS,
@@ -466,13 +485,10 @@ export function useChatActions(chatId: string): {
               },
             });
           }
-
-          const chatIdentifier: StoreObject = {
+          const chatRef: string | undefined = cache.identify({
             __typename: "Chat",
             id: chatId,
-          };
-          const chatRef: string | undefined = cache.identify(chatIdentifier);
-
+          });
           if (chatRef) {
             cache.evict({ id: chatRef });
             cache.gc();
@@ -490,6 +506,7 @@ export function useChatActions(chatId: string): {
     sendMessage,
     editMessage,
     decryptMessage,
+    sendTyping,
     isSending,
     markAsRead,
     createChat,

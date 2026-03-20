@@ -2,6 +2,12 @@ import { gql } from "@apollo/client";
 import { CHAT_BASE_FIELDS } from "../fragments/chat.fragments";
 import { MESSAGE_FIELDS, USER_FIELDS } from "../fragments/message.fragments";
 
+export const SEND_TYPING_EVENT = gql`
+  mutation SendTypingEvent($chatID: ID!, $typing: Boolean!) {
+    sendTypingEvent(chatID: $chatID, typing: $typing)
+  }
+`;
+
 export const PIN_CHAT = gql`
   mutation PinChat($id: ID!, $pinned: Boolean!) {
     pinChat(id: $id, pinned: $pinned) {
@@ -35,13 +41,13 @@ export const DELETE_CHAT = gql`
 `;
 
 export const MARK_DIALOG_AS_READ = gql`
-  mutation MarkDialogAsRead($chatId: String!, $lastSequence: Long!) {
+  mutation MarkDialogAsRead($chatId: ID!, $lastSequence: Long!) {
     markDialogAsRead(chatId: $chatId, lastSequence: $lastSequence)
   }
 `;
 
 export const CREATE_DIRECT_CHAT = gql`
-  mutation CreateDirectChat($userID: String!) {
+  mutation CreateDirectChat($userID: ID!) {
     createDirectChat(userID: $userID) {
       __typename
       ... on Chat {

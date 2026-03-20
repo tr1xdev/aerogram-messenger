@@ -1,4 +1,10 @@
-import { useState, useEffect, useMemo, memo } from "react";
+import { useState, useEffect, useMemo, memo, type ReactElement } from "react";
+import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
   Clock,
   Check,
@@ -116,12 +122,12 @@ export const MessageBubble = memo(function MessageBubble({
       }
 
       if (message.replyTo?.isEncrypted && message.replyTo.encryptionIv) {
-        const isReplyMe: boolean = message.replyTo.sender.id === myId;
+        const isReplyMe: boolean = message.replyTo.sender?.id === myId;
         const res: string | null = await decrypt(
           message.replyTo.text,
           message.replyTo.encryptionIv,
           isReplyMe,
-          message.replyTo.sender.publicKey,
+          message.replyTo.sender?.publicKey,
         );
         if (isMounted) setDecryptedReplyText(res);
       }
@@ -197,8 +203,116 @@ export const MessageBubble = memo(function MessageBubble({
     ? (decryptedReplyText ?? "...")
     : message.replyTo?.text;
 
+  const replySenderName: string = useMemo((): string => {
+    if (!message.replyTo) return "";
+    return message.replyTo.sender?.firstName || "User";
+  }, [message.replyTo]);
+
   const handleCopy = (): void => {
     if (displayText) navigator.clipboard.writeText(displayText);
+  };
+
+  const markdownComponents: Components = {
+    p: ({ children }): ReactElement => (
+      <p className="m-0 leading-relaxed break-words">{children}</p>
+    ),
+    a: ({ href, children }): ReactElement => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(
+          "underline underline-offset-2 hover:opacity-80 transition-opacity",
+          isMe ? "text-primary-foreground" : "text-primary",
+        )}
+      >
+        {children}
+      </a>
+    ),
+    code: ({ className, children, ...props }): ReactElement => {
+      const content: string = String(children).replace(/\n$/, "");
+      const match: RegExpExecArray | null = /language-(\w+)/.exec(
+        className || "",
+      );
+      const isBlock: boolean =
+        !props.node?.properties?.["inline"] && content.includes("\n");
+
+      if (isBlock || match) {
+        return (
+          <div className="my-2 rounded-xl overflow-hidden text-[13px] border border-black/20 dark:border-white/10 shadow-inner">
+            <SyntaxHighlighter
+              style={oneDark as { [key: string]: React.CSSProperties }}
+              language={match?.[1] || "typescript"}
+              PreTag="div"
+              codeTagProps={{
+                style: {
+                  background: "transparent",
+                  color: "inherit",
+                  WebkitFontSmoothing: "antialiased",
+                  MozOsxFontSmoothing: "grayscale",
+                  fontFamily:
+                    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                },
+              }}
+              customStyle={{
+                margin: 0,
+                padding: "14px",
+                background: "#1e1e1e",
+                fontSize: "13px",
+                lineHeight: "1.6",
+              }}
+            >
+              {content}
+            </SyntaxHighlighter>
+          </div>
+        );
+      }
+
+      return (
+        <code
+          className={cn(
+            "px-1.5 py-0.5 rounded-md text-[0.9em] font-mono antialiased",
+            isMe ? "bg-black/30 text-white" : "bg-black/10 dark:bg-white/10",
+          )}
+        >
+          {children}
+        </code>
+      );
+    },
+    table: ({ children }): ReactElement => (
+      <div className="my-3 overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
+        <table className="w-full border-collapse text-left text-[13px]">
+          {children}
+        </table>
+      </div>
+    ),
+    thead: ({ children }): ReactElement => (
+      <thead
+        className={cn(
+          "border-b border-black/10 dark:border-white/10",
+          isMe ? "bg-black/10" : "bg-muted/50",
+        )}
+      >
+        {children}
+      </thead>
+    ),
+    th: ({ children }): ReactElement => (
+      <th className="px-3 py-2 font-semibold">{children}</th>
+    ),
+    td: ({ children }): ReactElement => (
+      <td className="px-3 py-2 border-b border-black/5 dark:border-white/5 last:border-0">
+        {children}
+      </td>
+    ),
+    ul: ({ children }): ReactElement => (
+      <ul className="list-disc ml-4 my-1 space-y-0.5">{children}</ul>
+    ),
+    ol: ({ children }): ReactElement => (
+      <ol className="list-decimal ml-4 my-1 space-y-0.5">{children}</ol>
+    ),
+    li: ({ children }): ReactElement => (
+      <li className="leading-normal">{children}</li>
+    ),
   };
 
   return (
@@ -244,7 +358,7 @@ export const MessageBubble = memo(function MessageBubble({
                       isMe ? "text-primary-foreground" : "text-primary",
                     )}
                   >
-                    {message.replyTo.sender.firstName}
+                    {replySenderName}
                   </span>
                   <span className="text-[12px] truncate opacity-90 leading-tight ml-1">
                     {displayReplyText}
@@ -252,9 +366,14 @@ export const MessageBubble = memo(function MessageBubble({
                 </div>
               )}
               <div className="grid grid-cols-1 min-w-0">
-                <span className="block whitespace-pre-wrap break-all overflow-hidden wrap-anywhere">
-                  {displayText}
-                </span>
+                <div className="markdown-content overflow-hidden prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    components={markdownComponents}
+                  >
+                    {displayText}
+                  </ReactMarkdown>
+                </div>
                 <div
                   className={cn(
                     "flex items-center justify-end gap-1 mt-1 -mr-1 select-none pointer-events-none shrink-0",

@@ -40,6 +40,11 @@ extend type Query {
    chat(id: ID, slug: String): ChatResult!
 }
 
+type TypingPayload {
+   userId: ID!
+   isTyping: Boolean!
+}
+
 extend type Mutation {
    createChat(
       type: ChatType!
@@ -47,15 +52,14 @@ extend type Mutation {
       slug: String
       title: String
    ): CreateChatResult!
-
-   createDirectChat(userID: String!): CreateChatResult!
-
+   createDirectChat(userID: ID!): CreateChatResult!
    pinChat(id: ID!, pinned: Boolean!): PinChatResult!
    deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
-   sendTypingEvent(chatID: String!): Boolean!
+   sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
 }
 
 extend type Subscription {
    chatCreated(userId: ID!): Chat!
    chatDeleted(userId: ID!): ID!
+   userTyping(chatID: ID!): TypingPayload!
 }

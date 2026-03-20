@@ -15,6 +15,10 @@ type ChatResult interface {
 	IsChatResult()
 }
 
+type CreateBotResult interface {
+	IsCreateBotResult()
+}
+
 type CreateChatResult interface {
 	IsCreateChatResult()
 }
@@ -79,6 +83,13 @@ type ChatMember struct {
 	LastReadSequence int64       `json:"lastReadSequence"`
 }
 
+type CreateBotPayload struct {
+	BotToken string      `json:"botToken"`
+	User     *dbgen.User `json:"user"`
+}
+
+func (CreateBotPayload) IsCreateBotResult() {}
+
 type ForbiddenError struct {
 	Message string `json:"message"`
 }
@@ -100,6 +111,8 @@ func (ForbiddenError) IsSendMessageResult() {}
 
 func (ForbiddenError) IsMessageHistoryResult() {}
 
+func (ForbiddenError) IsCreateBotResult() {}
+
 type InternalError struct {
 	Message string `json:"message"`
 }
@@ -120,6 +133,8 @@ func (this InternalError) GetMessage() string { return this.Message }
 func (InternalError) IsSendMessageResult() {}
 
 func (InternalError) IsMessageHistoryResult() {}
+
+func (InternalError) IsCreateBotResult() {}
 
 type LoginInput struct {
 	Email    string `json:"email"`
@@ -191,14 +206,22 @@ func (SuccessResult) IsPinChatResult() {}
 
 func (SuccessResult) IsDeleteChatResult() {}
 
+type TypingPayload struct {
+	UserID   string `json:"userId"`
+	IsTyping bool   `json:"isTyping"`
+}
+
 type UpdateUserInput struct {
 	FirstName        *string `json:"firstName,omitempty"`
 	LastName         *string `json:"lastName,omitempty"`
 	Username         *string `json:"username,omitempty"`
+	Bio              *string `json:"bio,omitempty"`
 	PublicKey        *string `json:"publicKey,omitempty"`
 	EncryptedPrivKey *string `json:"encryptedPrivKey,omitempty"`
 	EncryptionIv     *string `json:"encryptionIv,omitempty"`
 	PhotoURL         *string `json:"photoUrl,omitempty"`
+	BotDescription   *string `json:"botDescription,omitempty"`
+	BotCommands      *string `json:"botCommands,omitempty"`
 }
 
 type UserStatusPayload struct {
@@ -218,6 +241,8 @@ func (ValidationError) IsError()                {}
 func (this ValidationError) GetMessage() string { return this.Message }
 
 func (ValidationError) IsSendMessageResult() {}
+
+func (ValidationError) IsCreateBotResult() {}
 
 type VerifyEmailInput struct {
 	UserID string `json:"userID"`

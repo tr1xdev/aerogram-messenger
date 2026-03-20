@@ -81,6 +81,11 @@ type ComplexityRoot struct {
 		User             func(childComplexity int) int
 	}
 
+	CreateBotPayload struct {
+		BotToken func(childComplexity int) int
+		User     func(childComplexity int) int
+	}
+
 	ForbiddenError struct {
 		Message func(childComplexity int) int
 	}
@@ -109,6 +114,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		CreateBot                 func(childComplexity int, username string, firstName string, lastName *string, description *string, commands *string) int
 		CreateChat                func(childComplexity int, typeArg model.ChatType, participantIds []string, slug *string, title *string) int
 		CreateDirectChat          func(childComplexity int, userID string) int
 		DeleteChat                func(childComplexity int, id string, forEveryone *bool) int
@@ -119,7 +125,7 @@ type ComplexityRoot struct {
 		PinChat                   func(childComplexity int, id string, pinned bool) int
 		RefreshToken              func(childComplexity int, token string) int
 		SendMessage               func(childComplexity int, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) int
-		SendTypingEvent           func(childComplexity int, chatID string) int
+		SendTypingEvent           func(childComplexity int, chatID string, typing bool) int
 		SignUp                    func(childComplexity int, input model.SignUpInput) int
 		TerminateAllOtherSessions func(childComplexity int) int
 		TerminateSession          func(childComplexity int, id string) int
@@ -166,20 +172,30 @@ type ComplexityRoot struct {
 		DialogRead        func(childComplexity int, chatID string) int
 		MessageAdded      func(childComplexity int, chatID string) int
 		UserStatusChanged func(childComplexity int, chatID string) int
+		UserTyping        func(childComplexity int, chatID string) int
 	}
 
 	SuccessResult struct {
 		Success func(childComplexity int) int
 	}
 
+	TypingPayload struct {
+		IsTyping func(childComplexity int) int
+		UserID   func(childComplexity int) int
+	}
+
 	User struct {
 		Bio              func(childComplexity int) int
+		BotCommands      func(childComplexity int) int
+		BotDescription   func(childComplexity int) int
 		DisplayName      func(childComplexity int) int
 		Email            func(childComplexity int) int
 		EncryptedPrivKey func(childComplexity int) int
 		EncryptionIv     func(childComplexity int) int
 		FirstName        func(childComplexity int) int
 		ID               func(childComplexity int) int
+		IsBot            func(childComplexity int) int
+		IsPremium        func(childComplexity int) int
 		IsVerified       func(childComplexity int) int
 		LastName         func(childComplexity int) int
 		PhotoURL         func(childComplexity int) int
@@ -220,12 +236,13 @@ type MutationResolver interface {
 	CreateDirectChat(ctx context.Context, userID string) (model.CreateChatResult, error)
 	PinChat(ctx context.Context, id string, pinned bool) (model.PinChatResult, error)
 	DeleteChat(ctx context.Context, id string, forEveryone *bool) (model.DeleteChatResult, error)
-	SendTypingEvent(ctx context.Context, chatID string) (bool, error)
+	SendTypingEvent(ctx context.Context, chatID string, typing bool) (bool, error)
 	SendMessage(ctx context.Context, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) (model.SendMessageResult, error)
 	UpdateMessage(ctx context.Context, id string, text string, encryptionIv *string) (model.SendMessageResult, error)
 	DeleteMessage(ctx context.Context, id string) (bool, error)
 	MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error)
 	UpdateUser(ctx context.Context, input model.UpdateUserInput) (*dbgen.User, error)
+	CreateBot(ctx context.Context, username string, firstName string, lastName *string, description *string, commands *string) (model.CreateBotResult, error)
 }
 type QueryResolver interface {
 	Sessions(ctx context.Context, userID string) ([]*dbgen.Session, error)
@@ -250,13 +267,14 @@ type SessionResolver interface {
 type SubscriptionResolver interface {
 	ChatCreated(ctx context.Context, userID string) (<-chan *model.Chat, error)
 	ChatDeleted(ctx context.Context, userID string) (<-chan string, error)
+	UserTyping(ctx context.Context, chatID string) (<-chan *model.TypingPayload, error)
 	MessageAdded(ctx context.Context, chatID string) (<-chan *model.Message, error)
 	DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
 	UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error)
 }
 type UserResolver interface {
 	ID(ctx context.Context, obj *dbgen.User) (string, error)
-	Email(ctx context.Context, obj *dbgen.User) (string, error)
+	Email(ctx context.Context, obj *dbgen.User) (*string, error)
 	FirstName(ctx context.Context, obj *dbgen.User) (string, error)
 	LastName(ctx context.Context, obj *dbgen.User) (*string, error)
 	DisplayName(ctx context.Context, obj *dbgen.User) (*string, error)
@@ -265,9 +283,12 @@ type UserResolver interface {
 	Bio(ctx context.Context, obj *dbgen.User) (*string, error)
 	Status(ctx context.Context, obj *dbgen.User) (string, error)
 	IsVerified(ctx context.Context, obj *dbgen.User) (bool, error)
+
 	PublicKey(ctx context.Context, obj *dbgen.User) (*string, error)
 	EncryptedPrivKey(ctx context.Context, obj *dbgen.User) (*string, error)
 	EncryptionIv(ctx context.Context, obj *dbgen.User) (*string, error)
+	BotDescription(ctx context.Context, obj *dbgen.User) (*string, error)
+	BotCommands(ctx context.Context, obj *dbgen.User) (*string, error)
 }
 
 type executableSchema struct {
@@ -400,6 +421,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ChatMember.User(childComplexity), true
 
+	case "CreateBotPayload.botToken":
+		if e.complexity.CreateBotPayload.BotToken == nil {
+			break
+		}
+
+		return e.complexity.CreateBotPayload.BotToken(childComplexity), true
+	case "CreateBotPayload.user":
+		if e.complexity.CreateBotPayload.User == nil {
+			break
+		}
+
+		return e.complexity.CreateBotPayload.User(childComplexity), true
+
 	case "ForbiddenError.message":
 		if e.complexity.ForbiddenError.Message == nil {
 			break
@@ -494,6 +528,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.MessageConnection.Messages(childComplexity), true
 
+	case "Mutation.createBot":
+		if e.complexity.Mutation.CreateBot == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createBot_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateBot(childComplexity, args["username"].(string), args["firstName"].(string), args["lastName"].(*string), args["description"].(*string), args["commands"].(*string)), true
 	case "Mutation.createChat":
 		if e.complexity.Mutation.CreateChat == nil {
 			break
@@ -609,7 +654,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SendTypingEvent(childComplexity, args["chatID"].(string)), true
+		return e.complexity.Mutation.SendTypingEvent(childComplexity, args["chatID"].(string), args["typing"].(bool)), true
 	case "Mutation.signUp":
 		if e.complexity.Mutation.SignUp == nil {
 			break
@@ -886,6 +931,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Subscription.UserStatusChanged(childComplexity, args["chatId"].(string)), true
+	case "Subscription.userTyping":
+		if e.complexity.Subscription.UserTyping == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_userTyping_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.UserTyping(childComplexity, args["chatID"].(string)), true
 
 	case "SuccessResult.success":
 		if e.complexity.SuccessResult.Success == nil {
@@ -894,12 +950,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.SuccessResult.Success(childComplexity), true
 
+	case "TypingPayload.isTyping":
+		if e.complexity.TypingPayload.IsTyping == nil {
+			break
+		}
+
+		return e.complexity.TypingPayload.IsTyping(childComplexity), true
+	case "TypingPayload.userId":
+		if e.complexity.TypingPayload.UserID == nil {
+			break
+		}
+
+		return e.complexity.TypingPayload.UserID(childComplexity), true
+
 	case "User.bio":
 		if e.complexity.User.Bio == nil {
 			break
 		}
 
 		return e.complexity.User.Bio(childComplexity), true
+	case "User.botCommands":
+		if e.complexity.User.BotCommands == nil {
+			break
+		}
+
+		return e.complexity.User.BotCommands(childComplexity), true
+	case "User.botDescription":
+		if e.complexity.User.BotDescription == nil {
+			break
+		}
+
+		return e.complexity.User.BotDescription(childComplexity), true
 	case "User.displayName":
 		if e.complexity.User.DisplayName == nil {
 			break
@@ -936,6 +1017,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.ID(childComplexity), true
+	case "User.isBot":
+		if e.complexity.User.IsBot == nil {
+			break
+		}
+
+		return e.complexity.User.IsBot(childComplexity), true
+	case "User.isPremium":
+		if e.complexity.User.IsPremium == nil {
+			break
+		}
+
+		return e.complexity.User.IsPremium(childComplexity), true
 	case "User.isVerified":
 		if e.complexity.User.IsVerified == nil {
 			break
@@ -1184,6 +1277,37 @@ func (ec *executionContext) field_Chat_messages_args(ctx context.Context, rawArg
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createBot_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "username", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["username"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "firstName", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["firstName"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "lastName", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["lastName"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "description", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["description"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "commands", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["commands"] = arg4
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createChat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1213,7 +1337,7 @@ func (ec *executionContext) field_Mutation_createChat_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_createDirectChat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userID", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userID", ec.unmarshalNID2string)
 	if err != nil {
 		return nil, err
 	}
@@ -1262,7 +1386,7 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 func (ec *executionContext) field_Mutation_markDialogAsRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNID2string)
 	if err != nil {
 		return nil, err
 	}
@@ -1336,11 +1460,16 @@ func (ec *executionContext) field_Mutation_sendMessage_args(ctx context.Context,
 func (ec *executionContext) field_Mutation_sendTypingEvent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatID", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatID", ec.unmarshalNID2string)
 	if err != nil {
 		return nil, err
 	}
 	args["chatID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "typing", ec.unmarshalNBoolean2bool)
+	if err != nil {
+		return nil, err
+	}
+	args["typing"] = arg1
 	return args, nil
 }
 
@@ -1439,7 +1568,7 @@ func (ec *executionContext) field_Query_chat_args(ctx context.Context, rawArgs m
 func (ec *executionContext) field_Query_dialogRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNID2string)
 	if err != nil {
 		return nil, err
 	}
@@ -1537,7 +1666,7 @@ func (ec *executionContext) field_Subscription_chatDeleted_args(ctx context.Cont
 func (ec *executionContext) field_Subscription_dialogRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNID2string)
 	if err != nil {
 		return nil, err
 	}
@@ -1564,6 +1693,17 @@ func (ec *executionContext) field_Subscription_userStatusChanged_args(ctx contex
 		return nil, err
 	}
 	args["chatId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_userTyping_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatID", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["chatID"] = arg0
 	return args, nil
 }
 
@@ -1629,7 +1769,7 @@ func (ec *executionContext) _AuthPayload_userId(ctx context.Context, field graph
 			return obj.UserID, nil
 		},
 		nil,
-		ec.marshalOString2ᚖstring,
+		ec.marshalOID2ᚖstring,
 		true,
 		false,
 	)
@@ -1642,7 +1782,7 @@ func (ec *executionContext) fieldContext_AuthPayload_userId(_ context.Context, f
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -2191,12 +2331,20 @@ func (ec *executionContext) fieldContext_ChatMember_user(_ context.Context, fiel
 				return ec.fieldContext_User_status(ctx, field)
 			case "isVerified":
 				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
 			case "encryptedPrivKey":
 				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
 			case "encryptionIv":
 				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -2228,6 +2376,100 @@ func (ec *executionContext) fieldContext_ChatMember_lastReadSequence(_ context.C
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Long does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CreateBotPayload_botToken(ctx context.Context, field graphql.CollectedField, obj *model.CreateBotPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CreateBotPayload_botToken,
+		func(ctx context.Context) (any, error) {
+			return obj.BotToken, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CreateBotPayload_botToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CreateBotPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CreateBotPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.CreateBotPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CreateBotPayload_user,
+		func(ctx context.Context) (any, error) {
+			return obj.User, nil
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CreateBotPayload_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CreateBotPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "firstName":
+				return ec.fieldContext_User_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_User_lastName(ctx, field)
+			case "displayName":
+				return ec.fieldContext_User_displayName(ctx, field)
+			case "username":
+				return ec.fieldContext_User_username(ctx, field)
+			case "photoUrl":
+				return ec.fieldContext_User_photoUrl(ctx, field)
+			case "bio":
+				return ec.fieldContext_User_bio(ctx, field)
+			case "status":
+				return ec.fieldContext_User_status(ctx, field)
+			case "isVerified":
+				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
+			case "publicKey":
+				return ec.fieldContext_User_publicKey(ctx, field)
+			case "encryptedPrivKey":
+				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
+			case "encryptionIv":
+				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
 	}
 	return fc, nil
@@ -2393,12 +2635,20 @@ func (ec *executionContext) fieldContext_Message_sender(_ context.Context, field
 				return ec.fieldContext_User_status(ctx, field)
 			case "isVerified":
 				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
 			case "encryptedPrivKey":
 				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
 			case "encryptionIv":
 				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -3223,7 +3473,7 @@ func (ec *executionContext) _Mutation_sendTypingEvent(ctx context.Context, field
 		ec.fieldContext_Mutation_sendTypingEvent,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().SendTypingEvent(ctx, fc.Args["chatID"].(string))
+			return ec.resolvers.Mutation().SendTypingEvent(ctx, fc.Args["chatID"].(string), fc.Args["typing"].(bool))
 		},
 		nil,
 		ec.marshalNBoolean2bool,
@@ -3465,12 +3715,20 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 				return ec.fieldContext_User_status(ctx, field)
 			case "isVerified":
 				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
 			case "encryptedPrivKey":
 				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
 			case "encryptionIv":
 				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -3483,6 +3741,47 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createBot(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_createBot,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().CreateBot(ctx, fc.Args["username"].(string), fc.Args["firstName"].(string), fc.Args["lastName"].(*string), fc.Args["description"].(*string), fc.Args["commands"].(*string))
+		},
+		nil,
+		ec.marshalNCreateBotResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐCreateBotResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createBot(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type CreateBotResult does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createBot_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3779,12 +4078,20 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_status(ctx, field)
 			case "isVerified":
 				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
 			case "encryptedPrivKey":
 				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
 			case "encryptionIv":
 				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -3837,12 +4144,20 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_status(ctx, field)
 			case "isVerified":
 				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
 			case "encryptedPrivKey":
 				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
 			case "encryptionIv":
 				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -3906,12 +4221,20 @@ func (ec *executionContext) fieldContext_Query_getUser(ctx context.Context, fiel
 				return ec.fieldContext_User_status(ctx, field)
 			case "isVerified":
 				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
 			case "encryptedPrivKey":
 				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
 			case "encryptionIv":
 				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -3975,12 +4298,20 @@ func (ec *executionContext) fieldContext_Query_searchUsers(ctx context.Context, 
 				return ec.fieldContext_User_status(ctx, field)
 			case "isVerified":
 				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
 			case "publicKey":
 				return ec.fieldContext_User_publicKey(ctx, field)
 			case "encryptedPrivKey":
 				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
 			case "encryptionIv":
 				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -4117,7 +4448,7 @@ func (ec *executionContext) _ReadPayload_chatId(ctx context.Context, field graph
 			return obj.ChatID, nil
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalNID2string,
 		true,
 		true,
 	)
@@ -4130,7 +4461,7 @@ func (ec *executionContext) fieldContext_ReadPayload_chatId(_ context.Context, f
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4146,7 +4477,7 @@ func (ec *executionContext) _ReadPayload_userId(ctx context.Context, field graph
 			return obj.UserID, nil
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalNID2string,
 		true,
 		true,
 	)
@@ -4159,7 +4490,7 @@ func (ec *executionContext) fieldContext_ReadPayload_userId(_ context.Context, f
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4507,6 +4838,53 @@ func (ec *executionContext) fieldContext_Subscription_chatDeleted(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Subscription_userTyping(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_userTyping,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().UserTyping(ctx, fc.Args["chatID"].(string))
+		},
+		nil,
+		ec.marshalNTypingPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐTypingPayload,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_userTyping(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "userId":
+				return ec.fieldContext_TypingPayload_userId(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_TypingPayload_isTyping(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TypingPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_userTyping_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Subscription_messageAdded(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	return graphql.ResolveFieldStream(
 		ctx,
@@ -4699,6 +5077,64 @@ func (ec *executionContext) fieldContext_SuccessResult_success(_ context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _TypingPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.TypingPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TypingPayload_userId,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TypingPayload_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TypingPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TypingPayload_isTyping(ctx context.Context, field graphql.CollectedField, obj *model.TypingPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TypingPayload_isTyping,
+		func(ctx context.Context) (any, error) {
+			return obj.IsTyping, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TypingPayload_isTyping(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TypingPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4738,9 +5174,9 @@ func (ec *executionContext) _User_email(ctx context.Context, field graphql.Colle
 			return ec.resolvers.User().Email(ctx, obj)
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalOString2ᚖstring,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4989,6 +5425,64 @@ func (ec *executionContext) fieldContext_User_isVerified(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _User_isPremium(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_isPremium,
+		func(ctx context.Context) (any, error) {
+			return obj.IsPremium, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_isPremium(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_isBot(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_isBot,
+		func(ctx context.Context) (any, error) {
+			return obj.IsBot, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_isBot(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _User_publicKey(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5064,6 +5558,64 @@ func (ec *executionContext) _User_encryptionIv(ctx context.Context, field graphq
 }
 
 func (ec *executionContext) fieldContext_User_encryptionIv(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_botDescription(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_botDescription,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.User().BotDescription(ctx, obj)
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_botDescription(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_botCommands(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_botCommands,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.User().BotCommands(ctx, obj)
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_botCommands(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
@@ -6821,7 +7373,7 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"firstName", "lastName", "username", "publicKey", "encryptedPrivKey", "encryptionIv", "photoUrl"}
+	fieldsInOrder := [...]string{"firstName", "lastName", "username", "bio", "publicKey", "encryptedPrivKey", "encryptionIv", "photoUrl", "botDescription", "botCommands"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -6849,6 +7401,13 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.Username = data
+		case "bio":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bio"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Bio = data
 		case "publicKey":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("publicKey"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -6877,6 +7436,20 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.PhotoURL = data
+		case "botDescription":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("botDescription"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BotDescription = data
+		case "botCommands":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("botCommands"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BotCommands = data
 		}
 	}
 
@@ -6958,6 +7531,47 @@ func (ec *executionContext) _ChatResult(ctx context.Context, sel ast.SelectionSe
 			return typedObj
 		} else {
 			panic(fmt.Errorf("unexpected type %T; non-generated variants of ChatResult must implement graphql.Marshaler", obj))
+		}
+	}
+}
+
+func (ec *executionContext) _CreateBotResult(ctx context.Context, sel ast.SelectionSet, obj model.CreateBotResult) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ValidationError:
+		return ec._ValidationError(ctx, sel, &obj)
+	case *model.ValidationError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ValidationError(ctx, sel, obj)
+	case model.InternalError:
+		return ec._InternalError(ctx, sel, &obj)
+	case *model.InternalError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._InternalError(ctx, sel, obj)
+	case model.ForbiddenError:
+		return ec._ForbiddenError(ctx, sel, &obj)
+	case *model.ForbiddenError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ForbiddenError(ctx, sel, obj)
+	case model.CreateBotPayload:
+		return ec._CreateBotPayload(ctx, sel, &obj)
+	case *model.CreateBotPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CreateBotPayload(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of CreateBotResult must implement graphql.Marshaler", obj))
 		}
 	}
 }
@@ -7438,7 +8052,51 @@ func (ec *executionContext) _ChatMember(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var forbiddenErrorImplementors = []string{"ForbiddenError", "ChatResult", "MyChatsResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "Error", "SendMessageResult", "MessageHistoryResult"}
+var createBotPayloadImplementors = []string{"CreateBotPayload", "CreateBotResult"}
+
+func (ec *executionContext) _CreateBotPayload(ctx context.Context, sel ast.SelectionSet, obj *model.CreateBotPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, createBotPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CreateBotPayload")
+		case "botToken":
+			out.Values[i] = ec._CreateBotPayload_botToken(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "user":
+			out.Values[i] = ec._CreateBotPayload_user(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var forbiddenErrorImplementors = []string{"ForbiddenError", "ChatResult", "MyChatsResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "Error", "SendMessageResult", "MessageHistoryResult", "CreateBotResult"}
 
 func (ec *executionContext) _ForbiddenError(ctx context.Context, sel ast.SelectionSet, obj *model.ForbiddenError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, forbiddenErrorImplementors)
@@ -7477,7 +8135,7 @@ func (ec *executionContext) _ForbiddenError(ctx context.Context, sel ast.Selecti
 	return out
 }
 
-var internalErrorImplementors = []string{"InternalError", "ChatResult", "MyChatsResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "Error", "SendMessageResult", "MessageHistoryResult"}
+var internalErrorImplementors = []string{"InternalError", "ChatResult", "MyChatsResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "Error", "SendMessageResult", "MessageHistoryResult", "CreateBotResult"}
 
 func (ec *executionContext) _InternalError(ctx context.Context, sel ast.SelectionSet, obj *model.InternalError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, internalErrorImplementors)
@@ -7802,6 +8460,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateUser(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createBot":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createBot(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -8394,6 +9059,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_chatCreated(ctx, fields[0])
 	case "chatDeleted":
 		return ec._Subscription_chatDeleted(ctx, fields[0])
+	case "userTyping":
+		return ec._Subscription_userTyping(ctx, fields[0])
 	case "messageAdded":
 		return ec._Subscription_messageAdded(ctx, fields[0])
 	case "dialogRead":
@@ -8418,6 +9085,50 @@ func (ec *executionContext) _SuccessResult(ctx context.Context, sel ast.Selectio
 			out.Values[i] = graphql.MarshalString("SuccessResult")
 		case "success":
 			out.Values[i] = ec._SuccessResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var typingPayloadImplementors = []string{"TypingPayload"}
+
+func (ec *executionContext) _TypingPayload(ctx context.Context, sel ast.SelectionSet, obj *model.TypingPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, typingPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TypingPayload")
+		case "userId":
+			out.Values[i] = ec._TypingPayload_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isTyping":
+			out.Values[i] = ec._TypingPayload_isTyping(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -8494,16 +9205,13 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "email":
 			field := field
 
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
 				res = ec._User_email(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
 				return res
 			}
 
@@ -8800,6 +9508,16 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "isPremium":
+			out.Values[i] = ec._User_isPremium(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "isBot":
+			out.Values[i] = ec._User_isBot(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "publicKey":
 			field := field
 
@@ -8899,6 +9617,72 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "botDescription":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_botDescription(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "botCommands":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_botCommands(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8968,7 +9752,7 @@ func (ec *executionContext) _UserStatusPayload(ctx context.Context, sel ast.Sele
 	return out
 }
 
-var validationErrorImplementors = []string{"ValidationError", "CreateChatResult", "Error", "SendMessageResult"}
+var validationErrorImplementors = []string{"ValidationError", "CreateChatResult", "Error", "SendMessageResult", "CreateBotResult"}
 
 func (ec *executionContext) _ValidationError(ctx context.Context, sel ast.SelectionSet, obj *model.ValidationError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, validationErrorImplementors)
@@ -9506,6 +10290,16 @@ func (ec *executionContext) marshalNChatType2githubᚗcomᚋtr1xdevᚋaerogram�
 	return v
 }
 
+func (ec *executionContext) marshalNCreateBotResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐCreateBotResult(ctx context.Context, sel ast.SelectionSet, v model.CreateBotResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CreateBotResult(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNCreateChatResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐCreateChatResult(ctx context.Context, sel ast.SelectionSet, v model.CreateChatResult) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -9764,6 +10558,20 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNTypingPayload2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐTypingPayload(ctx context.Context, sel ast.SelectionSet, v model.TypingPayload) graphql.Marshaler {
+	return ec._TypingPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTypingPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐTypingPayload(ctx context.Context, sel ast.SelectionSet, v *model.TypingPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TypingPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNUpdateUserInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐUpdateUserInput(ctx context.Context, v any) (model.UpdateUserInput, error) {

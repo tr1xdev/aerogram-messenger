@@ -68,12 +68,7 @@ export const MessageList = memo(function MessageList({
         }
       }
       if (isMounted && hasChanges) {
-        setDecryptedMap(
-          (prev: Record<string, string>): Record<string, string> => ({
-            ...prev,
-            ...newEntries,
-          }),
-        );
+        setDecryptedMap((prev) => ({ ...prev, ...newEntries }));
       }
     };
     fetchDecrypted();
@@ -84,27 +79,34 @@ export const MessageList = memo(function MessageList({
 
   const processedMessages = useMemo((): Message[] => {
     return messages.map((m: Message): Message => {
-      if (m.replyTo && decryptedMap[m.replyTo.id]) {
-        return {
-          ...m,
-          replyTo: {
-            ...m.replyTo,
-            text: decryptedMap[m.replyTo.id],
-            isEncrypted: false,
-          },
+      let currentReplyTo = m.replyTo;
+
+      if (currentReplyTo) {
+        const decryptedText = decryptedMap[currentReplyTo.id];
+
+        const senderFromMembers = members?.find(
+          (member) => member.user.id === currentReplyTo?.sender?.id,
+        )?.user;
+
+        currentReplyTo = {
+          ...currentReplyTo,
+          text: decryptedText ?? currentReplyTo.text,
+          isEncrypted: decryptedText ? false : currentReplyTo.isEncrypted,
+          sender: currentReplyTo.sender?.firstName
+            ? currentReplyTo.sender
+            : (senderFromMembers ?? currentReplyTo.sender),
         };
       }
-      return m;
+
+      return { ...m, replyTo: currentReplyTo };
     });
-  }, [messages, decryptedMap]);
+  }, [messages, decryptedMap, members]);
 
   const groupedMessages = useMemo((): GroupedMessages[] => {
     const groups: GroupedMessages[] = [];
     processedMessages.forEach((msg: Message): void => {
       const d: string = new Date(msg.sentAt).toDateString();
-      const g: GroupedMessages | undefined = groups.find(
-        (it: GroupedMessages): boolean => it.date === d,
-      );
+      const g: GroupedMessages | undefined = groups.find((it) => it.date === d);
       if (g) g.items.push(msg);
       else groups.push({ date: d, items: [msg] });
     });
@@ -112,8 +114,7 @@ export const MessageList = memo(function MessageList({
   }, [processedMessages]);
 
   const peerPublicKey: string | undefined = useMemo((): string | undefined => {
-    return members?.find((m: ChatMember): boolean => m.user.id !== myId)?.user
-      .publicKey;
+    return members?.find((m) => m.user.id !== myId)?.user.publicKey;
   }, [members, myId]);
 
   const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
@@ -125,7 +126,7 @@ export const MessageList = memo(function MessageList({
 
   return (
     <div className="h-full w-full relative bg-transparent">
-      <ScrollArea ref={scrollRef} className="h-full w-full">
+      <ScrollArea key={chatId} ref={scrollRef} className="h-full w-full">
         <div className="px-4 py-6 w-full flex flex-col max-w-4xl mx-auto">
           {groupedMessages.map(
             (g: GroupedMessages): ReactNode => (

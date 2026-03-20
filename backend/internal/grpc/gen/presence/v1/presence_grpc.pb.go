@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PresenceService_SetOnline_FullMethodName  = "/presence.v1.PresenceService/SetOnline"
-	PresenceService_SetOffline_FullMethodName = "/presence.v1.PresenceService/SetOffline"
-	PresenceService_IsOnline_FullMethodName   = "/presence.v1.PresenceService/IsOnline"
-	PresenceService_GetBulk_FullMethodName    = "/presence.v1.PresenceService/GetBulk"
+	PresenceService_SetOnline_FullMethodName       = "/presence.v1.PresenceService/SetOnline"
+	PresenceService_SetOffline_FullMethodName      = "/presence.v1.PresenceService/SetOffline"
+	PresenceService_IsOnline_FullMethodName        = "/presence.v1.PresenceService/IsOnline"
+	PresenceService_GetBulk_FullMethodName         = "/presence.v1.PresenceService/GetBulk"
+	PresenceService_SubscribeTyping_FullMethodName = "/presence.v1.PresenceService/SubscribeTyping"
 )
 
 // PresenceServiceClient is the client API for PresenceService service.
@@ -33,6 +34,7 @@ type PresenceServiceClient interface {
 	SetOffline(ctx context.Context, in *SetOfflineRequest, opts ...grpc.CallOption) (*SetOfflineResponse, error)
 	IsOnline(ctx context.Context, in *IsOnlineRequest, opts ...grpc.CallOption) (*IsOnlineResponse, error)
 	GetBulk(ctx context.Context, in *GetBulkRequest, opts ...grpc.CallOption) (*GetBulkResponse, error)
+	SubscribeTyping(ctx context.Context, in *SubscribeTypingRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeTypingResponse], error)
 }
 
 type presenceServiceClient struct {
@@ -83,6 +85,25 @@ func (c *presenceServiceClient) GetBulk(ctx context.Context, in *GetBulkRequest,
 	return out, nil
 }
 
+func (c *presenceServiceClient) SubscribeTyping(ctx context.Context, in *SubscribeTypingRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeTypingResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &PresenceService_ServiceDesc.Streams[0], PresenceService_SubscribeTyping_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[SubscribeTypingRequest, SubscribeTypingResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PresenceService_SubscribeTypingClient = grpc.ServerStreamingClient[SubscribeTypingResponse]
+
 // PresenceServiceServer is the server API for PresenceService service.
 // All implementations must embed UnimplementedPresenceServiceServer
 // for forward compatibility.
@@ -91,6 +112,7 @@ type PresenceServiceServer interface {
 	SetOffline(context.Context, *SetOfflineRequest) (*SetOfflineResponse, error)
 	IsOnline(context.Context, *IsOnlineRequest) (*IsOnlineResponse, error)
 	GetBulk(context.Context, *GetBulkRequest) (*GetBulkResponse, error)
+	SubscribeTyping(*SubscribeTypingRequest, grpc.ServerStreamingServer[SubscribeTypingResponse]) error
 	mustEmbedUnimplementedPresenceServiceServer()
 }
 
@@ -112,6 +134,9 @@ func (UnimplementedPresenceServiceServer) IsOnline(context.Context, *IsOnlineReq
 }
 func (UnimplementedPresenceServiceServer) GetBulk(context.Context, *GetBulkRequest) (*GetBulkResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetBulk not implemented")
+}
+func (UnimplementedPresenceServiceServer) SubscribeTyping(*SubscribeTypingRequest, grpc.ServerStreamingServer[SubscribeTypingResponse]) error {
+	return status.Error(codes.Unimplemented, "method SubscribeTyping not implemented")
 }
 func (UnimplementedPresenceServiceServer) mustEmbedUnimplementedPresenceServiceServer() {}
 func (UnimplementedPresenceServiceServer) testEmbeddedByValue()                         {}
@@ -206,6 +231,17 @@ func _PresenceService_GetBulk_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PresenceService_SubscribeTyping_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SubscribeTypingRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PresenceServiceServer).SubscribeTyping(m, &grpc.GenericServerStream[SubscribeTypingRequest, SubscribeTypingResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PresenceService_SubscribeTypingServer = grpc.ServerStreamingServer[SubscribeTypingResponse]
+
 // PresenceService_ServiceDesc is the grpc.ServiceDesc for PresenceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -230,6 +266,12 @@ var PresenceService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _PresenceService_GetBulk_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "SubscribeTyping",
+			Handler:       _PresenceService_SubscribeTyping_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "presence/v1/presence.proto",
 }

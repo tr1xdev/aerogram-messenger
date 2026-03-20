@@ -113,24 +113,18 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) (*chatpb.CreateChatResponse, error) {
 	creatorIDStr := s.getUserID(ctx, req.CreatorId)
 	if creatorIDStr == "" {
-		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
 	if req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
-		if len(req.ParticipantIds) != 2 {
-			return nil, status.Error(codes.InvalidArgument, "private chat must have 2 participants")
-		}
-
 		existingDialog, err := s.dialogRepo.GetPrivateDialogByMembers(ctx, req.ParticipantIds[0], req.ParticipantIds[1])
 		if err == nil {
-			return &chatpb.CreateChatResponse{
-				Chat: s.mapDBDialogToProto(existingDialog),
-			}, nil
+			return &chatpb.CreateChatResponse{Chat: s.mapDBDialogToProto(existingDialog)}, nil
 		}
 	}
 
-	creatorUUID, _ := uuid.Parse(creatorIDStr)
 	newID := uuid.New()
+	creatorUUID, _ := uuid.Parse(creatorIDStr)
 
 	dParams := dbgen.CreateDialogParams{
 		ID:           newID,
@@ -149,44 +143,45 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		if pID == creatorIDStr {
 			role = "owner"
 		}
-
 		mParams[i] = dbgen.AddDialogMemberParams{
-			DialogID:         newID,
-			UserID:           pUUID,
-			Role:             role,
-			NotificationsOn:  true,
-			IsPinned:         false,
-			LastReadSequence: 0,
+			DialogID: newID,
+			UserID:   pUUID,
+			Role:     role,
 		}
 	}
 
-	sParams := dbgen.CreateDialogSettingsParams{
-		DialogID:            newID,
-		Permissions:         0,
-		SlowModeDelay:       0,
-		IsHistoryHidden:     false,
-		IsSignaturesEnabled: false,
-	}
+	sParams := dbgen.CreateDialogSettingsParams{DialogID: newID}
 
 	if err := s.dialogRepo.CreateDialog(ctx, dParams, mParams, sParams); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, "database error")
 	}
 
-	dialog, err := s.dialogRepo.GetDialogByID(ctx, newID.String())
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch chat")
-	}
-
+	dialog, _ := s.dialogRepo.GetDialogByID(ctx, newID.String())
 	protoChat := s.mapDBDialogToProto(dialog)
-	payload, _ := json.Marshal(protoChat)
 
+	chatType := strings.ToUpper(strings.TrimPrefix(req.Type.String(), "CHAT_TYPE_"))
+	displayTitle := protoChat.Title
+	if displayTitle == "" && req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
+		displayTitle = "New Chat"
+	}
+
+	notification := map[string]interface{}{
+		"id":           protoChat.Id,
+		"title":        displayTitle,
+		"type":         chatType,
+		"slug":         protoChat.Slug,
+		"membersCount": protoChat.MembersCount,
+		"isVerified":   protoChat.IsVerified,
+		"createdAt":    time.Now().Format(time.RFC3339),
+		"unreadCount":  0,
+	}
+
+	payload, _ := json.Marshal(notification)
 	for _, pID := range req.ParticipantIds {
 		s.rdb.Publish(ctx, "user_chats:"+pID, payload)
 	}
 
-	return &chatpb.CreateChatResponse{
-		Chat: protoChat,
-	}, nil
+	return &chatpb.CreateChatResponse{Chat: protoChat}, nil
 }
 
 func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) (*chatpb.GetMyChatsResponse, error) {

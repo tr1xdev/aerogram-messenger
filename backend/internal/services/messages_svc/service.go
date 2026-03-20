@@ -3,12 +3,15 @@ package messages_svc
 import (
 	"context"
 	"encoding/json"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
+	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
@@ -35,15 +38,18 @@ func NewServer(db *database.DB, rdb *redis.Client) *Server {
 func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageRequest) (*messagespb.SendMessageResponse, error) {
 	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
+		log.Printf("[SVC_ERR] Invalid ChatId: %s", req.ChatId)
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
 	senderID, err := uuid.Parse(req.SenderId)
 	if err != nil {
+		log.Printf("[SVC_ERR] Invalid SenderId: %s", req.SenderId)
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
 
 	tx, err := s.db.Conn.BeginTx(ctx, nil)
 	if err != nil {
+		log.Printf("[ERROR] SendMessage: failed to begin tx: %v", err)
 		return nil, status.Error(codes.Internal, "failed to begin transaction")
 	}
 	defer tx.Rollback()
@@ -61,6 +67,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		IsSystem:     false,
 	})
 	if err != nil {
+		log.Printf("[ERROR] SendMessage: failed to save message: %v. Params: ChatID=%s, SenderID=%s", err, chatID, senderID)
 		return nil, status.Error(codes.Internal, "failed to save message")
 	}
 
@@ -70,20 +77,47 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		LastMessageAt: database.TimeToNullTime(msg.CreatedAt),
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to update dialog metadata")
+		log.Printf("[WARN] SendMessage: failed to update last message: %v", err)
 	}
 
-	if err := qtx.UnhideDialogForMembers(ctx, chatID); err != nil {
-		return nil, status.Error(codes.Internal, "failed to restore dialog visibility")
-	}
+	_ = qtx.UnhideDialogForMembers(ctx, chatID)
 
 	if err := tx.Commit(); err != nil {
+		log.Printf("[ERROR] SendMessage: failed to commit tx: %v", err)
 		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
 	protoMsg := s.mapDBToProto(msg)
-	payload, _ := json.Marshal(protoMsg)
-	s.rdb.Publish(ctx, "chat:"+req.ChatId, payload)
+
+	msgPayload, _ := json.Marshal(protoMsg)
+	s.rdb.Publish(ctx, "chat:"+req.ChatId, msgPayload)
+
+	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
+	if err == nil {
+		protoChat := s.mapDBDialogToProto(dialog)
+		chatType := strings.ToUpper(strings.TrimPrefix(protoChat.Type.String(), "CHAT_TYPE_"))
+
+		chatNotification := map[string]interface{}{
+			"id":           protoChat.Id,
+			"title":        protoChat.Title,
+			"type":         chatType,
+			"slug":         protoChat.Slug,
+			"membersCount": protoChat.MembersCount,
+			"lastMessage":  protoMsg,
+		}
+
+		chatJson, _ := json.Marshal(chatNotification)
+		members, err := s.db.Queries.GetDialogMembers(ctx, chatID)
+		if err == nil {
+			for _, m := range members {
+				s.rdb.Publish(ctx, "user_chats:"+m.UserID.String(), chatJson)
+			}
+		} else {
+			log.Printf("[WARN] SendMessage: failed to get members for notification: %v", err)
+		}
+	} else {
+		log.Printf("[WARN] SendMessage: failed to get dialog for notification: %v", err)
+	}
 
 	return &messagespb.SendMessageResponse{Message: protoMsg}, nil
 }
@@ -195,17 +229,14 @@ func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 		IsEncrypted: m.IsEncrypted,
 		IsSystem:    m.IsSystem,
 	}
-
 	if m.EncryptionIv.Valid {
 		iv := m.EncryptionIv.String
 		pb.EncryptionIv = &iv
 	}
-
 	if m.ReplyToID.Valid {
 		rid := m.ReplyToID.UUID.String()
 		pb.ReplyToId = &rid
 	}
-
 	return pb
 }
 
@@ -229,16 +260,39 @@ func (s *Server) mapHistoryRowToProto(m dbgen.GetChatHistoryRow) *messagespb.Mes
 			PhotoUrl:  m.AuthorPhotoUrl.String,
 		},
 	}
-
 	if m.EncryptionIv.Valid {
 		iv := m.EncryptionIv.String
 		pb.EncryptionIv = &iv
 	}
-
 	if m.ReplyToID.Valid {
 		rid := m.ReplyToID.UUID.String()
 		pb.ReplyToId = &rid
 	}
-
 	return pb
+}
+
+func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatv1.Chat {
+	res := &chatv1.Chat{
+		Id:           d.ID.String(),
+		MembersCount: int32(d.MembersCount),
+		IsVerified:   d.IsVerified,
+	}
+	if d.Name.Valid {
+		res.Title = d.Name.String
+	}
+	if d.Username.Valid {
+		res.Slug = d.Username.String
+	}
+	if d.LastMessageID.Valid {
+		res.LastMessageId = d.LastMessageID.UUID.String()
+	}
+	switch d.Type {
+	case "group":
+		res.Type = chatv1.ChatType_CHAT_TYPE_GROUP
+	case "channel":
+		res.Type = chatv1.ChatType_CHAT_TYPE_CHANNEL
+	default:
+		res.Type = chatv1.ChatType_CHAT_TYPE_PRIVATE
+	}
+	return res
 }

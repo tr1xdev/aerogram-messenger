@@ -1,4 +1,11 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion, type Variants } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,13 +17,19 @@ import {
   useMe,
   useChatDetails,
   useMyChats,
+  useTypingSubscription,
 } from "@/features/chat/lib/use-messages";
 import { useMarkDialog } from "@/features/chat/lib/use-mark-dialog";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
-import { MessageSquare, AlertCircle, ArrowLeft } from "lucide-react";
-import type { Message, Chat, User } from "@/entities/chat/model/types";
+import { MessageSquare, AlertCircle, ArrowLeft, ArrowDown } from "lucide-react";
+import type {
+  Message,
+  Chat,
+  User,
+  ChatMember,
+} from "@/entities/chat/model/types";
 
 interface SentCacheEntry {
   id: string;
@@ -31,41 +44,23 @@ const PAGE_VARIANTS: Variants = {
 
 const MATCH_THRESHOLD_MS: number = 5000;
 
-const log = {
-  info: (msg: string, data?: unknown): void => {
-    console.log(
-      "%c info %c " + msg,
-      "background: #3b82f6; color: white; border-radius: 4px; padding: 2px 6px; font-weight: bold;",
-      "color: #3b82f6; font-weight: 500;",
-      data ?? "",
-    );
-  },
-  error: (msg: string, err: unknown): void => {
-    console.log(
-      "%c error %c " + msg,
-      "background: #ef4444; color: white; border-radius: 4px; padding: 2px 6px; font-weight: bold;",
-      "color: #ef4444;",
-      err,
-    );
-  },
-};
-
 export const Route = createFileRoute("/(protected)/_layout/chat/$chatId")({
   component: ChatRoute,
 });
 
-function ChatRoute() {
+function ChatRoute(): ReactNode {
   const { chatId } = Route.useParams();
   return <ChatPage key={chatId} chatId={chatId} />;
 }
 
-export function ChatPage({ chatId }: { chatId: string }) {
+export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const navigate = useNavigate();
   const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
   const [sentCache, setSentCache] = useState<SentCacheEntry[]>([]);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [decryptedReplyText, setDecryptedReplyText] = useState<string>("");
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
 
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
   const inputRef = useRef<string>(input);
@@ -84,24 +79,33 @@ export function ChatPage({ chatId }: { chatId: string }) {
   const me: User | undefined = meData?.me;
   const chat: Chat | undefined = chatData?.chat;
 
+  const typingFromSub = useTypingSubscription(chatId);
+
   const {
     messages: messagesFromHistory,
     isLoading: historyLoading,
     lastReadSequence,
   } = useChatHistory(chatId);
 
-  const { sendMessage, editMessage, decryptMessage, isSending } =
+  const { sendMessage, editMessage, decryptMessage, isSending, sendTyping } =
     useChatActions(chatId);
+
   const { data: chatsData } = useMyChats();
 
-  const isInitialLoading: boolean = !chat && chatLoading;
+  const isInitialLoading: boolean =
+    (!chat && chatLoading) || (historyLoading && isFirstLoad);
   const isNotFound: boolean =
     (!chat && !chatLoading && !!chatError) ||
-    (!chat && !chatLoading && !!chatData);
+    (!chat && !chatLoading && !!chatData && !chatData.chat);
+
+  useEffect((): void => {
+    if (!historyLoading && !chatLoading && chat) {
+      setIsFirstLoad(false);
+    }
+  }, [historyLoading, chatLoading, chat]);
 
   useEffect((): (() => void) => {
     setActiveChatId(chatId);
-    log.info(`Switched context to chat: ${chatId}`);
     return (): void => {
       setActiveChatId(null);
     };
@@ -137,12 +141,44 @@ export function ChatPage({ chatId }: { chatId: string }) {
     setReplyingTo(msg);
   }, []);
 
+  const handleTyping = useCallback(
+    (isTyping: boolean): void => {
+      if (sendTyping) sendTyping(isTyping);
+    },
+    [sendTyping],
+  );
+
   const totalUnread = useMemo((): number => {
     const chats: Chat[] = chatsData?.myChats?.chats || [];
     return chats.reduce((acc: number, c: Chat): number => {
       return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
     }, 0);
   }, [chatsData, chatId]);
+
+  const typingUser = useMemo((): User | undefined => {
+    if (!chat?.members || !me) return undefined;
+
+    if (typingFromSub?.isTyping && typingFromSub.id !== me.id) {
+      const subUser = chat.members.find(
+        (m: ChatMember): boolean => m.user.id === typingFromSub.id,
+      )?.user;
+      if (subUser) return subUser;
+    }
+
+    const typingMember: ChatMember | undefined = chat.members.find(
+      (m: ChatMember): boolean =>
+        m.user.id !== me.id && m.user.isTyping === true,
+    );
+    return typingMember?.user;
+  }, [chat?.members, me, typingFromSub]);
+
+  const isBotChat = useMemo((): boolean => {
+    if (!chat?.members || !me) return false;
+    const otherMember = chat.members.find(
+      (m: ChatMember): boolean => m.user.id !== me.id,
+    );
+    return otherMember?.user.isBot ?? false;
+  }, [chat?.members, me]);
 
   const allMessages = useMemo((): Message[] => {
     if (!me || !chatId) return messagesFromHistory;
@@ -211,74 +247,78 @@ export function ChatPage({ chatId }: { chatId: string }) {
     }
   }, [allMessages.length, checkAndMarkRead]);
 
-  const handleSend = useCallback(async (): Promise<void> => {
-    const currentInput: string = inputRef.current.trim();
-    if (!currentInput || isSending || !me) return;
+  const handleSend = useCallback(
+    async (overrideText?: string): Promise<void> => {
+      const val: string = (overrideText ?? inputRef.current).trim();
+      if (!val || isSending || !me) return;
 
-    if (editingMessage) {
-      try {
-        log.info(`Editing message: ${editingMessage.id}`);
-        await editMessage(editingMessage.id, currentInput);
-        cancelAction();
-      } catch (err: unknown) {
-        log.error("Failed to edit message", err);
+      if (editingMessage) {
+        try {
+          await editMessage(editingMessage.id, val);
+          cancelAction();
+        } catch {
+          return;
+        }
+        return;
       }
-      return;
-    }
 
-    const val: string = currentInput;
-    const nowTime: number = Date.now();
-    const tempId: string = crypto.randomUUID();
-    const currentReplyId: string | undefined = replyingTo?.id ?? undefined;
+      const nowTime: number = Date.now();
+      const tempId: string = crypto.randomUUID();
+      const currentReplyId: string | undefined = replyingTo?.id ?? undefined;
 
-    setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] => {
-      const next: SentCacheEntry[] = [
-        ...prev,
-        { id: tempId, time: nowTime, text: val },
-      ];
-      return next.length > 50 ? next.slice(-50) : next;
-    });
+      setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] => {
+        const next: SentCacheEntry[] = [
+          ...prev,
+          { id: tempId, time: nowTime, text: val },
+        ];
+        return next.length > 50 ? next.slice(-50) : next;
+      });
 
-    const newMsg: Message = {
-      id: tempId,
-      chatId: chatId,
-      text: val,
-      sentAt: new Date(nowTime).toISOString(),
-      isRead: false,
-      isEdited: false,
-      isEncrypted: false,
-      sender: me,
-      replyTo: replyingTo || undefined,
-    };
+      const newMsg: Message = {
+        id: tempId,
+        chatId: chatId,
+        text: val,
+        sentAt: new Date(nowTime).toISOString(),
+        isRead: false,
+        isEdited: false,
+        isEncrypted: false,
+        sender: me,
+        replyTo: replyingTo || undefined,
+      };
 
-    log.info(`Sending message (optimistic): ${tempId}`);
-    setOptimisticMsgs((prev: Message[]): Message[] => [...prev, newMsg]);
-    cancelAction();
+      setOptimisticMsgs((prev: Message[]): Message[] => [...prev, newMsg]);
 
-    try {
-      await sendMessage(val, { variables: { replyToId: currentReplyId } });
-    } catch (err: unknown) {
-      log.error("Send failed, rolling back", err);
-      setInput(val);
-      setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] =>
-        prev.filter((c: SentCacheEntry): boolean => c.id !== tempId),
-      );
-    } finally {
-      setOptimisticMsgs((prev: Message[]): Message[] =>
-        prev.filter((m: Message): boolean => m.id !== tempId),
-      );
-    }
-  }, [
-    chatId,
-    isSending,
-    me,
-    sendMessage,
-    editMessage,
-    editingMessage,
-    replyingTo,
-    cancelAction,
-    setInput,
-  ]);
+      const originalReply: Message | null = replyingTo;
+      cancelAction();
+      resetInput();
+
+      try {
+        await sendMessage(val, { variables: { replyToId: currentReplyId } });
+      } catch {
+        setInput(val);
+        if (originalReply) setReplyingTo(originalReply);
+        setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] =>
+          prev.filter((c: SentCacheEntry): boolean => c.id !== tempId),
+        );
+      } finally {
+        setOptimisticMsgs((prev: Message[]): Message[] =>
+          prev.filter((m: Message): boolean => m.id !== tempId),
+        );
+      }
+    },
+    [
+      chatId,
+      isSending,
+      me,
+      sendMessage,
+      editMessage,
+      editingMessage,
+      replyingTo,
+      cancelAction,
+      resetInput,
+      setInput,
+    ],
+  );
 
   const replyPreview: Message | null = useMemo((): Message | null => {
     if (!replyingTo) return null;
@@ -316,6 +356,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
         members={chat?.members}
         meId={me?.id}
         isLoading={isInitialLoading}
+        typingUser={typingUser}
       />
 
       <main className="flex-1 relative min-h-0 bg-background">
@@ -334,11 +375,40 @@ export function ChatPage({ chatId }: { chatId: string }) {
               <Skeleton className="h-10 w-[50%] rounded-2xl rounded-tl-none" />
             </div>
           </motion.div>
-        ) : allMessages.length === 0 && !historyLoading ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
-            <p className="text-sm">No messages yet.</p>
-          </div>
+        ) : allMessages.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center h-full px-6 text-center"
+          >
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full scale-150" />
+
+              <div className="relative h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center border border-border/50 shadow-sm">
+                <MessageSquare className="h-10 w-10 text-muted-foreground/40" />
+              </div>
+            </div>
+
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              {isBotChat ? `Chat with ${chat?.title}` : "No messages yet"}
+            </h3>
+
+            <p className="text-sm text-muted-foreground max-w-[240px] leading-relaxed">
+              {isBotChat
+                ? "Send a message or tap the button below to start a conversation with the assistant."
+                : "Start the conversation by sending a message below."}
+            </p>
+
+            {isBotChat && (
+              <motion.div
+                animate={{ y: [0, 5, 0] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="mt-8 text-primary/40"
+              >
+                <ArrowDown className="h-5 w-5" />
+              </motion.div>
+            )}
+          </motion.div>
         ) : (
           <MessageList
             chatId={chatId}
@@ -355,9 +425,12 @@ export function ChatPage({ chatId }: { chatId: string }) {
 
       {!isInitialLoading && (
         <MessageComposer
+          isBot={isBotChat}
+          isEmpty={allMessages.length === 0}
           input={input}
           setInput={setInput}
           onSend={handleSend}
+          onTyping={handleTyping}
           disabled={isSending}
           replyingTo={replyPreview}
           editingMessage={editingMessage}

@@ -2,6 +2,7 @@ package chat_svc
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 
@@ -18,6 +19,11 @@ import (
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+// nullStr — хелпер для создания валидных NullString
+func nullStr(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: s != ""}
 }
 
 func setupTest(t *testing.T) (*Server, *miniredis.Miniredis) {
@@ -40,10 +46,10 @@ func createUser(t *testing.T, s *Server, id string) {
 
 	_, err = s.db.Queries.CreateUser(context.Background(), dbgen.CreateUserParams{
 		ID:        uid,
-		Username:  database.ToNullString(ptr("u_" + shortID)),
+		Username:  nullStr("u_" + shortID),
 		FirstName: "Test",
-		Email:     "e_" + shortID + "@t.com",
-		Password:  "hash",
+		Email:     nullStr("e_" + shortID + "@t.com"),
+		Password:  nullStr("hash"),
 		Status:    "ONLINE",
 	})
 
@@ -96,9 +102,16 @@ func TestChatServer(t *testing.T) {
 		uUUID := uuid.MustParse(uID)
 
 		_, err := server.db.Queries.CreateDialog(ctx, dbgen.CreateDialogParams{
-			ID:       chatID,
-			Type:     "private",
-			IsActive: true,
+			ID:          chatID,
+			Type:        "private",
+			IsActive:    true,
+			Name:        nullStr("Test Chat"),
+			Username:    sql.NullString{Valid: false},
+			PhotoUrl:    sql.NullString{Valid: false},
+			Bio:         sql.NullString{Valid: false},
+			Description: sql.NullString{Valid: false},
+			InviteLink:  sql.NullString{Valid: false},
+			CreatorID:   uuid.NullUUID{UUID: uUUID, Valid: true},
 		})
 		require.NoError(t, err)
 

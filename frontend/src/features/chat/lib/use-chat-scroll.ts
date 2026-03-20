@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useLayoutEffect,
+} from "react";
 import type { Message } from "@/entities/chat/model/types";
 
 interface UseChatScrollProps {
@@ -13,22 +19,24 @@ export function useChatScroll({
   onMarkRead,
 }: UseChatScrollProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const isInitialLoad = useRef(true);
-  const prevChatId = useRef<string | null>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState<boolean>(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  const getViewport = useCallback(
-    (): HTMLElement | null =>
-      scrollRef.current?.querySelector(
-        "[data-radix-scroll-area-viewport]",
-      ) as HTMLElement | null,
-    [],
-  );
+  const isInitialLoad = useRef<boolean>(true);
+  const prevChatId = useRef<string | null>(null);
+  const lastMsgId = useRef<string | null>(null);
+  const isNearBottomRef = useRef<boolean>(true);
+
+  const getViewport = useCallback((): HTMLElement | null => {
+    if (!scrollRef.current) return null;
+    return scrollRef.current.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement | null;
+  }, []);
 
   const scrollToBottom = useCallback(
-    (behavior: ScrollBehavior = "smooth") => {
-      const viewport = getViewport();
+    (behavior: ScrollBehavior = "smooth"): void => {
+      const viewport: HTMLElement | null = getViewport();
       if (viewport) {
         viewport.scrollTo({ top: viewport.scrollHeight, behavior });
       }
@@ -36,59 +44,81 @@ export function useChatScroll({
     [getViewport],
   );
 
-  useEffect(() => {
-    const viewport = getViewport();
-    if (!viewport || messages.length === 0) return;
-
-    const currentChatId = messages[0].chatId;
+  useLayoutEffect((): void => {
+    const currentChatId: string | null =
+      messages.length > 0 ? messages[0].chatId : null;
+    if (!currentChatId) return;
 
     if (prevChatId.current !== currentChatId) {
-      isInitialLoad.current = true;
       prevChatId.current = currentChatId;
-      requestAnimationFrame(() => {
-        setUnreadCount(0);
-      });
+      isInitialLoad.current = true;
+      lastMsgId.current = null;
     }
 
-    if (isInitialLoad.current) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "instant" });
-      isInitialLoad.current = false;
-      return;
+    if (isInitialLoad.current && messages.length > 0) {
+      const viewport: HTMLElement | null = getViewport();
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: "instant" });
+        isInitialLoad.current = false;
+        isNearBottomRef.current = true;
+        Promise.resolve().then((): void => setUnreadCount(0));
+      }
     }
+  }, [messages, getViewport]);
 
-    const lastMsg = messages[messages.length - 1];
-    const isMe = lastMsg.sender.id === myId;
-    const isNearBottom =
-      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150;
-
-    if (isMe || isNearBottom) {
-      scrollToBottom("smooth");
-    } else {
-      requestAnimationFrame(() => {
-        setUnreadCount((prev) => prev + 1);
-      });
-    }
-  }, [messages, myId, scrollToBottom, getViewport]);
-
-  useEffect(() => {
-    const viewport = getViewport();
+  useEffect((): (() => void) | void => {
+    const viewport: HTMLElement | null = getViewport();
     if (!viewport) return;
 
+    const content: HTMLElement | null =
+      viewport.firstElementChild as HTMLElement;
+    if (!content) return;
+
+    const resizeObserver: ResizeObserver = new ResizeObserver((): void => {
+      if (isInitialLoad.current) return;
+
+      const lastMsg: Message = messages[messages.length - 1];
+      if (!lastMsg) return;
+
+      const isMe: boolean = lastMsg.sender.id === myId;
+
+      if (isMe || isNearBottomRef.current) {
+        scrollToBottom("smooth");
+        if (lastMsg.id !== lastMsgId.current) {
+          lastMsgId.current = lastMsg.id;
+        }
+      } else if (lastMsg.id !== lastMsgId.current) {
+        lastMsgId.current = lastMsg.id;
+        Promise.resolve().then((): void => {
+          setUnreadCount((prev: number): number => prev + 1);
+        });
+      }
+    });
+
+    resizeObserver.observe(content);
+    return (): void => resizeObserver.disconnect();
+  }, [messages, myId, scrollToBottom, getViewport]);
+
+  useEffect((): (() => void) => {
+    const viewport: HTMLElement | null = getViewport();
+    if (!viewport) return (): void => {};
+
     const handleScroll = (): void => {
-      const bottom =
-        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
-        100;
+      const distance: number =
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      const isAtBottom: boolean = distance < 100;
 
-      setShowScrollBtn(!bottom);
+      isNearBottomRef.current = distance < 400;
+      setShowScrollBtn(!isAtBottom);
 
-      if (bottom) {
-        setUnreadCount(0);
+      if (isAtBottom) {
+        Promise.resolve().then((): void => setUnreadCount(0));
         onMarkRead();
       }
     };
 
     viewport.addEventListener("scroll", handleScroll);
-    return () => viewport.removeEventListener("scroll", handleScroll);
+    return (): void => viewport.removeEventListener("scroll", handleScroll);
   }, [onMarkRead, getViewport]);
 
   return { scrollRef, showScrollBtn, unreadCount, scrollToBottom };

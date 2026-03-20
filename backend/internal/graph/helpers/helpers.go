@@ -34,7 +34,7 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 
 	dbMembers, err := store.GetDialogMembers(ctx, chatID)
 	if err != nil {
-		dbMembers = []dbgen.DialogMember{}
+		dbMembers = []dbgen.GetDialogMembersRow{}
 	}
 
 	idsMap := make(map[uuid.UUID]bool)
@@ -97,15 +97,24 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 	}
 
 	if chatType == model.ChatTypePrivate {
+		foundPartner := false
 		for id, u := range userMap {
 			if id != parsedAuthID {
 				displayTitle = FormatFullName(u.FirstName, u.LastName)
 				if displayPhoto == nil {
 					displayPhoto = NullStringToStringPtr(u.PhotoUrl)
 				}
+				foundPartner = true
 				break
 			}
 		}
+		if !foundPartner && displayTitle == "" {
+			displayTitle = "Deleted Account"
+		}
+	}
+
+	if displayTitle == "" && chatType != model.ChatTypePrivate {
+		displayTitle = "Untitled Chat"
 	}
 
 	uCount, _ := store.CountUnreadMessages(ctx, dbgen.CountUnreadMessagesParams{
@@ -147,7 +156,7 @@ func MapGRPCError(err error) error {
 	return err
 }
 
-func MapDBMemberToModel(m *dbgen.DialogMember, u *dbgen.User) *model.ChatMember {
+func MapDBMemberToModel(m *dbgen.GetDialogMembersRow, u *dbgen.User) *model.ChatMember {
 	if m == nil {
 		return nil
 	}
