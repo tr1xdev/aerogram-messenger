@@ -91,9 +91,18 @@ func (s *Server) SetOffline(ctx context.Context, req *presencepb.SetOfflineReque
 	if err != nil {
 		return nil, err
 	}
+
 	if err := s.repo.SetOffline(ctx, uid); err != nil {
 		return nil, status.Error(codes.Internal, "failed to set offline")
 	}
+
+	payload, _ := json.Marshal(map[string]interface{}{
+		"userId":   uid.String(),
+		"status":   "offline",
+		"lastSeen": time.Now().Format(time.RFC3339),
+	})
+	s.repo.GetRedisClient().Publish(ctx, "presence:updates", payload)
+
 	return &presencepb.SetOfflineResponse{Ok: true}, nil
 }
 

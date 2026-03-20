@@ -1,4 +1,4 @@
-import { memo, useMemo, type ReactNode } from "react";
+import { memo, useMemo, useState, useEffect, type ReactNode } from "react";
 import { ChevronLeft, MoreVertical, Phone, Video } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
+import { differenceInMinutes } from "date-fns";
 import type { ChatMember, User } from "@/entities/chat/model/types";
 import { ChatUserPopover } from "./chat-user-popover";
 
@@ -33,6 +34,7 @@ export const ChatHeader = memo(function ChatHeader({
   typingUser,
 }: ChatHeaderProps): ReactNode {
   const navigate = useNavigate();
+  const [now, setNow] = useState<number>(() => Date.now());
 
   const otherMember: ChatMember | undefined = useMemo(
     (): ChatMember | undefined =>
@@ -40,17 +42,45 @@ export const ChatHeader = memo(function ChatHeader({
     [members, meId],
   );
 
+  const rawStatus: string | undefined = otherMember?.user.status;
+
   const isTyping: boolean = useMemo((): boolean => {
     const memberId: string | undefined = otherMember?.user.id;
-
     if (typingUser && memberId && typingUser.id === memberId) {
       return typingUser.isTyping !== false;
     }
+    return rawStatus === "typing";
+  }, [typingUser, otherMember, rawStatus]);
 
-    return otherMember?.user.status === "typing";
-  }, [typingUser, otherMember]);
+  useEffect((): (() => void) => {
+    if (
+      rawStatus &&
+      rawStatus !== "online" &&
+      rawStatus !== "offline" &&
+      !isTyping
+    ) {
+      const date = new Date(rawStatus);
+      const diffMin: number = differenceInMinutes(new Date(), date);
 
-  const status: string | undefined = otherMember?.user.status;
+      const intervalTime: number = diffMin < 1 ? 1000 : 60000;
+
+      const interval = setInterval((): void => {
+        setNow(Date.now());
+      }, intervalTime);
+
+      return (): void => clearInterval(interval);
+    }
+    return (): void => {};
+  }, [rawStatus, isTyping, now]);
+
+  const statusText: string = useMemo((): string => {
+    if (isTyping) return "typing";
+    if (rawStatus === "online") return "online";
+    if (!rawStatus || rawStatus === "offline") return "offline";
+
+    return formatLastSeen(rawStatus, new Date(now));
+  }, [rawStatus, isTyping, now]);
+
   const effectivePhotoUrl: string | undefined =
     photoUrl ?? otherMember?.user.photoUrl ?? undefined;
 
@@ -105,7 +135,7 @@ export const ChatHeader = memo(function ChatHeader({
                 <span
                   className={cn(
                     "text-[11px] mt-1 font-medium leading-none transition-colors duration-200 h-3 flex items-center",
-                    isTyping || status === "online"
+                    isTyping || rawStatus === "online"
                       ? "text-primary"
                       : "text-muted-foreground",
                   )}
@@ -120,13 +150,7 @@ export const ChatHeader = memo(function ChatHeader({
                       <span>typing</span>
                     </div>
                   ) : (
-                    <>
-                      {status === "online"
-                        ? "online"
-                        : status
-                          ? formatLastSeen(status)
-                          : "offline"}
-                    </>
+                    statusText
                   )}
                 </span>
               </div>
