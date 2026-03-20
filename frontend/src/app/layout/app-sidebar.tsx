@@ -167,10 +167,13 @@ export function AppSidebar() {
   }, [activeFolder]);
 
   useEffect((): (() => void) => {
-    updateIndicator();
+    const timeoutId = setTimeout(updateIndicator, 0);
     window.addEventListener("resize", updateIndicator);
-    return (): void => window.removeEventListener("resize", updateIndicator);
-  }, [updateIndicator, chats]);
+    return (): void => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("resize", updateIndicator);
+    };
+  }, [updateIndicator, chats, pathname]);
 
   const addToRecent = useCallback((query: string): void => {
     const trimmed: string = query.trim();
