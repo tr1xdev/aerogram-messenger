@@ -65,7 +65,9 @@ export const logoutAll = async (): Promise<void> => {
   }
 };
 
-const httpLink: HttpLink = new HttpLink({ uri: "http://localhost:8080/query" });
+const httpLink: HttpLink = new HttpLink({
+  uri: "https://localhost:8080/query",
+});
 
 const authLink: SetContextLink = new SetContextLink((prevContext) => {
   const token: string | null = localStorage.getItem("access_token");
@@ -187,7 +189,7 @@ const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;
 
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
-    url: "ws://localhost:8080/query",
+    url: "wss://localhost:8080/query",
     lazy: false,
     connectionParams: async () => {
       if (isRefreshing) {
