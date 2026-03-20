@@ -122,12 +122,12 @@ export const MessageBubble = memo(function MessageBubble({
       }
 
       if (message.replyTo?.isEncrypted && message.replyTo.encryptionIv) {
-        const isReplyMe: boolean = message.replyTo.sender.id === myId;
+        const isReplyMe: boolean = message.replyTo.sender?.id === myId;
         const res: string | null = await decrypt(
           message.replyTo.text,
           message.replyTo.encryptionIv,
           isReplyMe,
-          message.replyTo.sender.publicKey,
+          message.replyTo.sender?.publicKey,
         );
         if (isMounted) setDecryptedReplyText(res);
       }
@@ -202,6 +202,11 @@ export const MessageBubble = memo(function MessageBubble({
   const displayReplyText: string | undefined = message.replyTo?.isEncrypted
     ? (decryptedReplyText ?? "...")
     : message.replyTo?.text;
+
+  const replySenderName: string = useMemo((): string => {
+    if (!message.replyTo) return "";
+    return message.replyTo.sender?.firstName || "User";
+  }, [message.replyTo]);
 
   const handleCopy = (): void => {
     if (displayText) navigator.clipboard.writeText(displayText);
@@ -353,7 +358,7 @@ export const MessageBubble = memo(function MessageBubble({
                       isMe ? "text-primary-foreground" : "text-primary",
                     )}
                   >
-                    {message.replyTo.sender.firstName}
+                    {replySenderName}
                   </span>
                   <span className="text-[12px] truncate opacity-90 leading-tight ml-1">
                     {displayReplyText}
