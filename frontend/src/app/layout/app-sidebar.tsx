@@ -247,7 +247,7 @@ export function AppSidebar() {
         collapsible="none"
         className="w-full border-none bg-background flex flex-col h-screen overflow-hidden"
       >
-        <SidebarHeader className="px-4 pt-3 pb-4 shrink-0 bg-background border-none">
+        <SidebarHeader className="px-4 pt-3 shrink-0 bg-background border-none">
           <div className="flex items-center justify-between h-8 relative">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
               {!isWsConnected ? (
@@ -359,7 +359,7 @@ export function AppSidebar() {
             </div>
 
             {chats.length > 0 && !searchQuery && !isFocused && (
-              <div className="sticky top-14 bg-background px-4 border-b border-border/5 z-20">
+              <div className="sticky top-14 bg-background px-4 border-b border-border/50 z-20">
                 <div
                   className="relative flex items-center h-11"
                   ref={foldersRef}

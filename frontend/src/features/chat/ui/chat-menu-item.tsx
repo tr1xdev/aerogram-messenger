@@ -110,7 +110,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
             <SidebarMenuButton
               asChild
               isActive={isActive}
-              className="h-[82px] p-3 transition-all duration-200 hover:bg-muted/50 data-[active=true]:bg-primary/5 data-[state=open]:bg-muted/50"
+              className="h-20.5 p-3 transition-all duration-200 hover:bg-muted/50 data-[active=true]:bg-primary/5 data-[state=open]:bg-muted/50"
             >
               <Link
                 to="/chat/$chatId"
@@ -124,7 +124,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                       alt={displayName}
                       className="h-full w-full object-cover aspect-square"
                     />
-                    <AvatarFallback className="h-full w-full flex items-center justify-center bg-gradient-to-br from-[#54a4f5] to-[#2196f3] text-white/90 font-bold text-lg uppercase aspect-square">
+                    <AvatarFallback className="h-full w-full flex items-center justify-center bg-linear-to-br from-[#54a4f5] to-[#2196f3] text-white/90 font-bold text-lg uppercase aspect-square">
                       {initial}
                     </AvatarFallback>
                   </Avatar>
@@ -145,7 +145,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                     </div>
 
                     {lastMessage && (
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
                         <MessageStatus
                           isRead={
                             (lastMessage.sequence ?? 0) <=
@@ -155,7 +155,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                           sequence={lastMessage.sequence ?? 0}
                           lastReadSequence={chat.lastReadSequence}
                         />
-                        <span className="text-xs font-medium text-muted-foreground/60 leading-none">
+                        <span className="text-xs font-medium text-muted-foreground/70 leading-none">
                           {new Date(lastMessage.sentAt).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -171,7 +171,7 @@ export function ChatMenuItem({ chat, isActive, myId }: ChatMenuItemProps) {
                     </div>
                   )}
 
-                  <div className="flex items-start justify-between gap-2 min-h-[1.125rem] mt-0.5">
+                  <div className="flex items-start justify-between gap-2 min-h-4.5">
                     <div className="text-[13.5px] font-normal text-muted-foreground/70 min-w-0 leading-tight truncate">
                       {lastMessage && myId ? (
                         <LastMessageContent
