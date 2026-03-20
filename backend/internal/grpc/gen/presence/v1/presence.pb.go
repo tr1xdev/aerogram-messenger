@@ -373,6 +373,94 @@ func (x *GetBulkResponse) GetStatuses() map[string]string {
 	return nil
 }
 
+type SubscribeTypingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChatId        string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubscribeTypingRequest) Reset() {
+	*x = SubscribeTypingRequest{}
+	mi := &file_presence_v1_presence_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubscribeTypingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubscribeTypingRequest) ProtoMessage() {}
+
+func (x *SubscribeTypingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_presence_v1_presence_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubscribeTypingRequest.ProtoReflect.Descriptor instead.
+func (*SubscribeTypingRequest) Descriptor() ([]byte, []int) {
+	return file_presence_v1_presence_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SubscribeTypingRequest) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+type SubscribeTypingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Payload       string                 `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubscribeTypingResponse) Reset() {
+	*x = SubscribeTypingResponse{}
+	mi := &file_presence_v1_presence_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubscribeTypingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubscribeTypingResponse) ProtoMessage() {}
+
+func (x *SubscribeTypingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_presence_v1_presence_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubscribeTypingResponse.ProtoReflect.Descriptor instead.
+func (*SubscribeTypingResponse) Descriptor() ([]byte, []int) {
+	return file_presence_v1_presence_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SubscribeTypingResponse) GetPayload() string {
+	if x != nil {
+		return x.Payload
+	}
+	return ""
+}
+
 var File_presence_v1_presence_proto protoreflect.FileDescriptor
 
 const file_presence_v1_presence_proto_rawDesc = "" +
@@ -396,13 +484,18 @@ const file_presence_v1_presence_proto_rawDesc = "" +
 	"\bstatuses\x18\x01 \x03(\v2*.presence.v1.GetBulkResponse.StatusesEntryR\bstatuses\x1a;\n" +
 	"\rStatusesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xbb\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"1\n" +
+	"\x16SubscribeTypingRequest\x12\x17\n" +
+	"\achat_id\x18\x01 \x01(\tR\x06chatId\"3\n" +
+	"\x17SubscribeTypingResponse\x12\x18\n" +
+	"\apayload\x18\x01 \x01(\tR\apayload2\x9b\x03\n" +
 	"\x0fPresenceService\x12J\n" +
 	"\tSetOnline\x12\x1d.presence.v1.SetOnlineRequest\x1a\x1e.presence.v1.SetOnlineResponse\x12M\n" +
 	"\n" +
 	"SetOffline\x12\x1e.presence.v1.SetOfflineRequest\x1a\x1f.presence.v1.SetOfflineResponse\x12G\n" +
 	"\bIsOnline\x12\x1c.presence.v1.IsOnlineRequest\x1a\x1d.presence.v1.IsOnlineResponse\x12D\n" +
-	"\aGetBulk\x12\x1b.presence.v1.GetBulkRequest\x1a\x1c.presence.v1.GetBulkResponseBPZNgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1;presencev1b\x06proto3"
+	"\aGetBulk\x12\x1b.presence.v1.GetBulkRequest\x1a\x1c.presence.v1.GetBulkResponse\x12^\n" +
+	"\x0fSubscribeTyping\x12#.presence.v1.SubscribeTypingRequest\x1a$.presence.v1.SubscribeTypingResponse0\x01BPZNgithub.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1;presencev1b\x06proto3"
 
 var (
 	file_presence_v1_presence_proto_rawDescOnce sync.Once
@@ -416,33 +509,37 @@ func file_presence_v1_presence_proto_rawDescGZIP() []byte {
 	return file_presence_v1_presence_proto_rawDescData
 }
 
-var file_presence_v1_presence_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_presence_v1_presence_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_presence_v1_presence_proto_goTypes = []any{
-	(*SetOnlineRequest)(nil),   // 0: presence.v1.SetOnlineRequest
-	(*SetOnlineResponse)(nil),  // 1: presence.v1.SetOnlineResponse
-	(*SetOfflineRequest)(nil),  // 2: presence.v1.SetOfflineRequest
-	(*SetOfflineResponse)(nil), // 3: presence.v1.SetOfflineResponse
-	(*IsOnlineRequest)(nil),    // 4: presence.v1.IsOnlineRequest
-	(*IsOnlineResponse)(nil),   // 5: presence.v1.IsOnlineResponse
-	(*GetBulkRequest)(nil),     // 6: presence.v1.GetBulkRequest
-	(*GetBulkResponse)(nil),    // 7: presence.v1.GetBulkResponse
-	nil,                        // 8: presence.v1.GetBulkResponse.StatusesEntry
+	(*SetOnlineRequest)(nil),        // 0: presence.v1.SetOnlineRequest
+	(*SetOnlineResponse)(nil),       // 1: presence.v1.SetOnlineResponse
+	(*SetOfflineRequest)(nil),       // 2: presence.v1.SetOfflineRequest
+	(*SetOfflineResponse)(nil),      // 3: presence.v1.SetOfflineResponse
+	(*IsOnlineRequest)(nil),         // 4: presence.v1.IsOnlineRequest
+	(*IsOnlineResponse)(nil),        // 5: presence.v1.IsOnlineResponse
+	(*GetBulkRequest)(nil),          // 6: presence.v1.GetBulkRequest
+	(*GetBulkResponse)(nil),         // 7: presence.v1.GetBulkResponse
+	(*SubscribeTypingRequest)(nil),  // 8: presence.v1.SubscribeTypingRequest
+	(*SubscribeTypingResponse)(nil), // 9: presence.v1.SubscribeTypingResponse
+	nil,                             // 10: presence.v1.GetBulkResponse.StatusesEntry
 }
 var file_presence_v1_presence_proto_depIdxs = []int32{
-	8, // 0: presence.v1.GetBulkResponse.statuses:type_name -> presence.v1.GetBulkResponse.StatusesEntry
-	0, // 1: presence.v1.PresenceService.SetOnline:input_type -> presence.v1.SetOnlineRequest
-	2, // 2: presence.v1.PresenceService.SetOffline:input_type -> presence.v1.SetOfflineRequest
-	4, // 3: presence.v1.PresenceService.IsOnline:input_type -> presence.v1.IsOnlineRequest
-	6, // 4: presence.v1.PresenceService.GetBulk:input_type -> presence.v1.GetBulkRequest
-	1, // 5: presence.v1.PresenceService.SetOnline:output_type -> presence.v1.SetOnlineResponse
-	3, // 6: presence.v1.PresenceService.SetOffline:output_type -> presence.v1.SetOfflineResponse
-	5, // 7: presence.v1.PresenceService.IsOnline:output_type -> presence.v1.IsOnlineResponse
-	7, // 8: presence.v1.PresenceService.GetBulk:output_type -> presence.v1.GetBulkResponse
-	5, // [5:9] is the sub-list for method output_type
-	1, // [1:5] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	10, // 0: presence.v1.GetBulkResponse.statuses:type_name -> presence.v1.GetBulkResponse.StatusesEntry
+	0,  // 1: presence.v1.PresenceService.SetOnline:input_type -> presence.v1.SetOnlineRequest
+	2,  // 2: presence.v1.PresenceService.SetOffline:input_type -> presence.v1.SetOfflineRequest
+	4,  // 3: presence.v1.PresenceService.IsOnline:input_type -> presence.v1.IsOnlineRequest
+	6,  // 4: presence.v1.PresenceService.GetBulk:input_type -> presence.v1.GetBulkRequest
+	8,  // 5: presence.v1.PresenceService.SubscribeTyping:input_type -> presence.v1.SubscribeTypingRequest
+	1,  // 6: presence.v1.PresenceService.SetOnline:output_type -> presence.v1.SetOnlineResponse
+	3,  // 7: presence.v1.PresenceService.SetOffline:output_type -> presence.v1.SetOfflineResponse
+	5,  // 8: presence.v1.PresenceService.IsOnline:output_type -> presence.v1.IsOnlineResponse
+	7,  // 9: presence.v1.PresenceService.GetBulk:output_type -> presence.v1.GetBulkResponse
+	9,  // 10: presence.v1.PresenceService.SubscribeTyping:output_type -> presence.v1.SubscribeTypingResponse
+	6,  // [6:11] is the sub-list for method output_type
+	1,  // [1:6] is the sub-list for method input_type
+	1,  // [1:1] is the sub-list for extension type_name
+	1,  // [1:1] is the sub-list for extension extendee
+	0,  // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_presence_v1_presence_proto_init() }
@@ -456,7 +553,7 @@ func file_presence_v1_presence_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_presence_v1_presence_proto_rawDesc), len(file_presence_v1_presence_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

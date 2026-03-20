@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +30,10 @@ func (r *PresenceRepository) key(userID uuid.UUID) string {
 	return "presence:" + userID.String()
 }
 
+func (r *PresenceRepository) typingKey(chatID string) string {
+	return fmt.Sprintf("typing:%s", chatID)
+}
+
 func (r *PresenceRepository) GetRedisClient() *redis.Client {
 	return r.redis
 }
@@ -46,14 +51,13 @@ func (r *PresenceRepository) PublishTyping(ctx context.Context, status PresenceS
 	if err != nil {
 		return err
 	}
-	return r.redis.Publish(ctx, "typing:updates", payload).Err()
+	return r.redis.Publish(ctx, r.typingKey(status.ChatID), payload).Err()
 }
 
 func (r *PresenceRepository) SetOnline(ctx context.Context, userID uuid.UUID, ttl time.Duration) error {
 	if err := r.redis.Set(ctx, r.key(userID), "online", ttl).Err(); err != nil {
 		return err
 	}
-
 	return r.PublishStatus(ctx, PresenceStatus{
 		UserID: userID,
 		Status: "online",
@@ -63,7 +67,6 @@ func (r *PresenceRepository) SetOnline(ctx context.Context, userID uuid.UUID, tt
 func (r *PresenceRepository) SetOffline(ctx context.Context, userID uuid.UUID) error {
 	lastSeen := time.Now().Format(time.RFC3339)
 	_ = r.redis.Set(ctx, r.key(userID), lastSeen, 24*time.Hour).Err()
-
 	return r.PublishStatus(ctx, PresenceStatus{
 		UserID:   userID,
 		Status:   lastSeen,
@@ -86,17 +89,14 @@ func (r *PresenceRepository) GetStatuses(ctx context.Context, userIDs []uuid.UUI
 	if len(userIDs) == 0 {
 		return make(map[uuid.UUID]string), nil
 	}
-
 	keys := make([]string, len(userIDs))
 	for i, id := range userIDs {
 		keys[i] = r.key(id)
 	}
-
 	values, err := r.redis.MGet(ctx, keys...).Result()
 	if err != nil {
 		return nil, err
 	}
-
 	result := make(map[uuid.UUID]string)
 	for i, val := range values {
 		status := "offline"

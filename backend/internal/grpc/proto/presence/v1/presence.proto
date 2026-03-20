@@ -9,6 +9,7 @@ service PresenceService {
   rpc SetOffline(SetOfflineRequest) returns (SetOfflineResponse);
   rpc IsOnline(IsOnlineRequest) returns (IsOnlineResponse);
   rpc GetBulk(GetBulkRequest) returns (GetBulkResponse);
+  rpc SubscribeTyping(SubscribeTypingRequest) returns (stream SubscribeTypingResponse);
 }
 
 message SetOnlineRequest {
@@ -41,4 +42,12 @@ message GetBulkRequest {
 
 message GetBulkResponse {
   map<string, string> statuses = 1;
+}
+
+message SubscribeTypingRequest {
+  string chat_id = 1;
+}
+
+message SubscribeTypingResponse {
+  string payload = 1;
 }

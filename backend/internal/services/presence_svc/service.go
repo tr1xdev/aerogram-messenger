@@ -3,6 +3,7 @@ package presence_svc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -30,11 +31,36 @@ func (s *Server) parseUUID(id string) (uuid.UUID, error) {
 	return uid, nil
 }
 
-func (s *Server) getStatus(statuses map[uuid.UUID]string, uid uuid.UUID) string {
-	if val, ok := statuses[uid]; ok {
-		return val
+func (s *Server) SubscribeTyping(req *presencepb.SubscribeTypingRequest, stream presencepb.PresenceService_SubscribeTypingServer) error {
+	channel := fmt.Sprintf("typing:%s", req.ChatId)
+	pubsub := s.repo.GetRedisClient().Subscribe(stream.Context(), channel)
+	defer pubsub.Close()
+
+	ch := pubsub.Channel()
+	for {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		case msg, ok := <-ch:
+			if !ok {
+				return nil
+			}
+
+			var ps repositories.PresenceStatus
+			if err := json.Unmarshal([]byte(msg.Payload), &ps); err != nil {
+				continue
+			}
+
+			resp, _ := json.Marshal(map[string]interface{}{
+				"userId":   ps.UserID.String(),
+				"isTyping": ps.IsTyping,
+			})
+
+			if err := stream.Send(&presencepb.SubscribeTypingResponse{Payload: string(resp)}); err != nil {
+				return err
+			}
+		}
 	}
-	return "offline"
 }
 
 func (s *Server) PublishTyping(ctx context.Context, userID string, chatID string, isTyping bool) error {
@@ -42,7 +68,6 @@ func (s *Server) PublishTyping(ctx context.Context, userID string, chatID string
 	if err != nil {
 		return err
 	}
-
 	return s.repo.PublishTyping(ctx, repositories.PresenceStatus{
 		UserID:   uid,
 		ChatID:   chatID,
@@ -50,60 +75,14 @@ func (s *Server) PublishTyping(ctx context.Context, userID string, chatID string
 	})
 }
 
-func (s *Server) SubscribeTyping(ctx context.Context, chatID string) (<-chan string, error) {
-	ch := make(chan string, 10)
-	pubsub := s.repo.GetRedisClient().Subscribe(ctx, "typing:updates")
-
-	go func() {
-		defer pubsub.Close()
-		defer close(ch)
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-pubsub.Channel():
-				if !ok {
-					return
-				}
-
-				var ps repositories.PresenceStatus
-				if err := json.Unmarshal([]byte(msg.Payload), &ps); err != nil {
-					continue
-				}
-
-				if ps.ChatID == chatID {
-					resp, err := json.Marshal(map[string]interface{}{
-						"userId":   ps.UserID.String(),
-						"isTyping": ps.IsTyping,
-					})
-					if err != nil {
-						continue
-					}
-
-					select {
-					case ch <- string(resp):
-					case <-ctx.Done():
-						return
-					}
-				}
-			}
-		}
-	}()
-
-	return ch, nil
-}
-
 func (s *Server) SetOnline(ctx context.Context, req *presencepb.SetOnlineRequest) (*presencepb.SetOnlineResponse, error) {
 	uid, err := s.parseUUID(req.UserId)
 	if err != nil {
 		return nil, err
 	}
-
 	if err := s.repo.SetOnline(ctx, uid, 30*time.Second); err != nil {
 		return nil, status.Error(codes.Internal, "failed to set online")
 	}
-
 	return &presencepb.SetOnlineResponse{Ok: true}, nil
 }
 
@@ -112,11 +91,9 @@ func (s *Server) SetOffline(ctx context.Context, req *presencepb.SetOfflineReque
 	if err != nil {
 		return nil, err
 	}
-
 	if err := s.repo.SetOffline(ctx, uid); err != nil {
 		return nil, status.Error(codes.Internal, "failed to set offline")
 	}
-
 	return &presencepb.SetOfflineResponse{Ok: true}, nil
 }
 
@@ -125,20 +102,21 @@ func (s *Server) IsOnline(ctx context.Context, req *presencepb.IsOnlineRequest) 
 	if err != nil {
 		return nil, err
 	}
-
 	statuses, err := s.repo.GetStatuses(ctx, []uuid.UUID{uid})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get status")
 	}
-
-	return &presencepb.IsOnlineResponse{Status: s.getStatus(statuses, uid)}, nil
+	statusStr := "offline"
+	if val, ok := statuses[uid]; ok {
+		statusStr = val
+	}
+	return &presencepb.IsOnlineResponse{Status: statusStr}, nil
 }
 
 func (s *Server) GetBulk(ctx context.Context, req *presencepb.GetBulkRequest) (*presencepb.GetBulkResponse, error) {
 	if len(req.UserIds) == 0 {
 		return &presencepb.GetBulkResponse{Statuses: make(map[string]string)}, nil
 	}
-
 	uids := make([]uuid.UUID, len(req.UserIds))
 	for i, idStr := range req.UserIds {
 		uid, err := s.parseUUID(idStr)
@@ -147,16 +125,17 @@ func (s *Server) GetBulk(ctx context.Context, req *presencepb.GetBulkRequest) (*
 		}
 		uids[i] = uid
 	}
-
 	statuses, err := s.repo.GetStatuses(ctx, uids)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get bulk statuses")
 	}
-
 	res := make(map[string]string, len(uids))
 	for _, uid := range uids {
-		res[strings.ToLower(uid.String())] = s.getStatus(statuses, uid)
+		statusStr := "offline"
+		if val, ok := statuses[uid]; ok {
+			statusStr = val
+		}
+		res[strings.ToLower(uid.String())] = statusStr
 	}
-
 	return &presencepb.GetBulkResponse{Statuses: res}, nil
 }
