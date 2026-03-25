@@ -37,3 +37,24 @@ export const CREATE_BOT = gql`
   }
   ${BOT_USER_FIELDS}
 `;
+
+export const UPDATE_BOT = gql`
+  mutation UpdateBot($id: ID!, $input: UpdateUserInput!) {
+    updateBot(id: $id, input: $input) {
+      ...BotUserFields
+    }
+  }
+  ${BOT_USER_FIELDS}
+`;
+
+export const DELETE_BOT = gql`
+  mutation DeleteBot($id: ID!) {
+    deleteBot(id: $id)
+  }
+`;
+
+export const ROTATE_BOT_TOKEN = gql`
+  mutation RotateBotToken($id: ID!) {
+    rotateBotToken(id: $id)
+  }
+`;
