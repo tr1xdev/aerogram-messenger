@@ -154,20 +154,45 @@ func (r *queryResolver) SearchUsers(ctx context.Context, username string) ([]*db
 		return []*dbgen.User{}, nil
 	}
 
-	users, err := r.Store.SearchUsersByUsername(ctx, "%"+strings.ToLower(username)+"%")
+	// SQL: ILIKE $1::text || '%' -> ожидается строка
+	users, err := r.Store.SearchUsersByUsername(ctx, username)
 	if err != nil {
 		return nil, err
-	}
-
-	limit := 20
-	if len(users) > limit {
-		users = users[:limit]
 	}
 
 	result := make([]*dbgen.User, len(users))
 	for i := range users {
 		result[i] = &users[i]
 	}
+	return result, nil
+}
+
+// MyBots is the resolver for the myBots field.
+func (r *queryResolver) MyBots(ctx context.Context) ([]*dbgen.User, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	ownerUUID, err := uuid.Parse(authID)
+	if err != nil {
+		return nil, errors.New("invalid user id")
+	}
+
+	// Вызываем корректный метод из users.sql
+	bots, err := r.Store.GetBotsByOwnerID(ctx, uuid.NullUUID{
+		UUID:  ownerUUID,
+		Valid: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch bots: %w", err)
+	}
+
+	result := make([]*dbgen.User, len(bots))
+	for i := range bots {
+		result[i] = &bots[i]
+	}
+
 	return result, nil
 }
 
@@ -313,3 +338,18 @@ func (r *userResolver) BotCommands(ctx context.Context, obj *dbgen.User) (*strin
 func (r *Resolver) User() graph.UserResolver { return &userResolver{r} }
 
 type userResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *userResolver) IsPremium(ctx context.Context, obj *dbgen.User) (bool, error) {
+	return obj.IsPremium, nil
+}
+func (r *userResolver) IsBot(ctx context.Context, obj *dbgen.User) (bool, error) {
+	return obj.IsBot, nil
+}
+*/
