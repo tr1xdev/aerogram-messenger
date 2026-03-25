@@ -15,8 +15,11 @@ import { Route as publicLoginRouteImport } from './app/routes/(public)/login'
 import { Route as protectedLayoutRouteImport } from './app/routes/(protected)/_layout'
 import { Route as protectedLayoutIndexRouteImport } from './app/routes/(protected)/_layout/index'
 import { Route as protectedLayoutSettingsRouteImport } from './app/routes/(protected)/_layout/settings'
+import { Route as protectedLayoutBotsIndexRouteImport } from './app/routes/(protected)/_layout/bots.index'
 import { Route as protectedLayoutUserUserIdRouteImport } from './app/routes/(protected)/_layout/user.$userId'
 import { Route as protectedLayoutChatChatIdRouteImport } from './app/routes/(protected)/_layout/chat.$chatId'
+import { Route as protectedLayoutBotsCreateRouteImport } from './app/routes/(protected)/_layout/bots.create'
+import { Route as protectedLayoutBotsBotIdRouteImport } from './app/routes/(protected)/_layout/bots.$botId'
 
 const publicSignupRoute = publicSignupRouteImport.update({
   id: '/(public)/signup',
@@ -47,6 +50,12 @@ const protectedLayoutSettingsRoute = protectedLayoutSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => protectedLayoutRoute,
 } as any)
+const protectedLayoutBotsIndexRoute =
+  protectedLayoutBotsIndexRouteImport.update({
+    id: '/bots/',
+    path: '/bots/',
+    getParentRoute: () => protectedLayoutRoute,
+  } as any)
 const protectedLayoutUserUserIdRoute =
   protectedLayoutUserUserIdRouteImport.update({
     id: '/user/$userId',
@@ -59,6 +68,18 @@ const protectedLayoutChatChatIdRoute =
     path: '/chat/$chatId',
     getParentRoute: () => protectedLayoutRoute,
   } as any)
+const protectedLayoutBotsCreateRoute =
+  protectedLayoutBotsCreateRouteImport.update({
+    id: '/bots/create',
+    path: '/bots/create',
+    getParentRoute: () => protectedLayoutRoute,
+  } as any)
+const protectedLayoutBotsBotIdRoute =
+  protectedLayoutBotsBotIdRouteImport.update({
+    id: '/bots/$botId',
+    path: '/bots/$botId',
+    getParentRoute: () => protectedLayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/login': typeof publicLoginRoute
@@ -66,8 +87,11 @@ export interface FileRoutesByFullPath {
   '/signup': typeof publicSignupRoute
   '/settings': typeof protectedLayoutSettingsRoute
   '/': typeof protectedLayoutIndexRoute
+  '/bots/$botId': typeof protectedLayoutBotsBotIdRoute
+  '/bots/create': typeof protectedLayoutBotsCreateRoute
   '/chat/$chatId': typeof protectedLayoutChatChatIdRoute
   '/user/$userId': typeof protectedLayoutUserUserIdRoute
+  '/bots/': typeof protectedLayoutBotsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof publicLoginRoute
@@ -75,8 +99,11 @@ export interface FileRoutesByTo {
   '/signup': typeof publicSignupRoute
   '/settings': typeof protectedLayoutSettingsRoute
   '/': typeof protectedLayoutIndexRoute
+  '/bots/$botId': typeof protectedLayoutBotsBotIdRoute
+  '/bots/create': typeof protectedLayoutBotsCreateRoute
   '/chat/$chatId': typeof protectedLayoutChatChatIdRoute
   '/user/$userId': typeof protectedLayoutUserUserIdRoute
+  '/bots': typeof protectedLayoutBotsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,8 +113,11 @@ export interface FileRoutesById {
   '/(public)/signup': typeof publicSignupRoute
   '/(protected)/_layout/settings': typeof protectedLayoutSettingsRoute
   '/(protected)/_layout/': typeof protectedLayoutIndexRoute
+  '/(protected)/_layout/bots/$botId': typeof protectedLayoutBotsBotIdRoute
+  '/(protected)/_layout/bots/create': typeof protectedLayoutBotsCreateRoute
   '/(protected)/_layout/chat/$chatId': typeof protectedLayoutChatChatIdRoute
   '/(protected)/_layout/user/$userId': typeof protectedLayoutUserUserIdRoute
+  '/(protected)/_layout/bots/': typeof protectedLayoutBotsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,8 +127,11 @@ export interface FileRouteTypes {
     | '/signup'
     | '/settings'
     | '/'
+    | '/bots/$botId'
+    | '/bots/create'
     | '/chat/$chatId'
     | '/user/$userId'
+    | '/bots/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -106,8 +139,11 @@ export interface FileRouteTypes {
     | '/signup'
     | '/settings'
     | '/'
+    | '/bots/$botId'
+    | '/bots/create'
     | '/chat/$chatId'
     | '/user/$userId'
+    | '/bots'
   id:
     | '__root__'
     | '/(protected)/_layout'
@@ -116,8 +152,11 @@ export interface FileRouteTypes {
     | '/(public)/signup'
     | '/(protected)/_layout/settings'
     | '/(protected)/_layout/'
+    | '/(protected)/_layout/bots/$botId'
+    | '/(protected)/_layout/bots/create'
     | '/(protected)/_layout/chat/$chatId'
     | '/(protected)/_layout/user/$userId'
+    | '/(protected)/_layout/bots/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof protectedLayoutSettingsRouteImport
       parentRoute: typeof protectedLayoutRoute
     }
+    '/(protected)/_layout/bots/': {
+      id: '/(protected)/_layout/bots/'
+      path: '/bots'
+      fullPath: '/bots/'
+      preLoaderRoute: typeof protectedLayoutBotsIndexRouteImport
+      parentRoute: typeof protectedLayoutRoute
+    }
     '/(protected)/_layout/user/$userId': {
       id: '/(protected)/_layout/user/$userId'
       path: '/user/$userId'
@@ -185,21 +231,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof protectedLayoutChatChatIdRouteImport
       parentRoute: typeof protectedLayoutRoute
     }
+    '/(protected)/_layout/bots/create': {
+      id: '/(protected)/_layout/bots/create'
+      path: '/bots/create'
+      fullPath: '/bots/create'
+      preLoaderRoute: typeof protectedLayoutBotsCreateRouteImport
+      parentRoute: typeof protectedLayoutRoute
+    }
+    '/(protected)/_layout/bots/$botId': {
+      id: '/(protected)/_layout/bots/$botId'
+      path: '/bots/$botId'
+      fullPath: '/bots/$botId'
+      preLoaderRoute: typeof protectedLayoutBotsBotIdRouteImport
+      parentRoute: typeof protectedLayoutRoute
+    }
   }
 }
 
 interface protectedLayoutRouteChildren {
   protectedLayoutSettingsRoute: typeof protectedLayoutSettingsRoute
   protectedLayoutIndexRoute: typeof protectedLayoutIndexRoute
+  protectedLayoutBotsBotIdRoute: typeof protectedLayoutBotsBotIdRoute
+  protectedLayoutBotsCreateRoute: typeof protectedLayoutBotsCreateRoute
   protectedLayoutChatChatIdRoute: typeof protectedLayoutChatChatIdRoute
   protectedLayoutUserUserIdRoute: typeof protectedLayoutUserUserIdRoute
+  protectedLayoutBotsIndexRoute: typeof protectedLayoutBotsIndexRoute
 }
 
 const protectedLayoutRouteChildren: protectedLayoutRouteChildren = {
   protectedLayoutSettingsRoute: protectedLayoutSettingsRoute,
   protectedLayoutIndexRoute: protectedLayoutIndexRoute,
+  protectedLayoutBotsBotIdRoute: protectedLayoutBotsBotIdRoute,
+  protectedLayoutBotsCreateRoute: protectedLayoutBotsCreateRoute,
   protectedLayoutChatChatIdRoute: protectedLayoutChatChatIdRoute,
   protectedLayoutUserUserIdRoute: protectedLayoutUserUserIdRoute,
+  protectedLayoutBotsIndexRoute: protectedLayoutBotsIndexRoute,
 }
 
 const protectedLayoutRouteWithChildren = protectedLayoutRoute._addFileChildren(

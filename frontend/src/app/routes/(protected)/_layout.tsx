@@ -1,22 +1,27 @@
+import * as React from "react";
 import {
   createFileRoute,
   redirect,
   Outlet,
   useLocation,
   useMatch,
+  useMatches,
   useNavigate,
 } from "@tanstack/react-router";
+import { AnimatePresence } from "framer-motion";
+
 import { useAuthStore } from "@/store/auth";
+import { useChatStore } from "@/store/chat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app/layout/app-sidebar";
 import { MobileNav } from "@/features/navigation/ui/mobile-nav";
-import { cn } from "@/lib/utils";
+import { UserProfileOverlay } from "./_layout/user.$userId";
+import { Toaster } from "@/components/ui/sonner";
+
 import { useMe } from "@/features/chat/lib/use-messages";
 import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
-import { Toaster } from "@/components/ui/sonner";
-import { AnimatePresence } from "framer-motion";
-import { UserProfileOverlay } from "./_layout/user.$userId";
-import { useRef, useEffect, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/(protected)/_layout")({
   beforeLoad: () => {
@@ -28,44 +33,53 @@ export const Route = createFileRoute("/(protected)/_layout")({
 });
 
 function LayoutComponent() {
+  const matches = useMatches();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const lastChatPath = useRef<string | null>(null);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const isMobile: boolean = useIsMobile();
 
-  useEffect(() => {
-    const checkMobile = (): void => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  useEffect(() => {
-    if (pathname.includes("/chat/")) {
-      lastChatPath.current = pathname;
-    }
-  }, [pathname]);
-
-  useEffect(() => {
-    if (!isMobile && pathname.includes("/user/")) {
-      navigate({ to: lastChatPath.current || "/", replace: true });
-    }
-  }, [isMobile, pathname, navigate]);
+  const lastChatPath = React.useRef<string | null>(null);
+  const setActiveChatId = useChatStore((state) => state.setActiveChatId);
 
   const userMatch = useMatch({
     from: "/(protected)/_layout/user/$userId",
     shouldThrow: false,
   });
 
-  const isProfileOpen = !!userMatch && isMobile;
-  const isChatOpen = pathname.includes("/chat/");
-  const isSettingsPage = pathname === "/settings";
-
-  const isDetailView = isChatOpen || isProfileOpen || isSettingsPage;
-  const shouldHideNav = isChatOpen || isProfileOpen;
-
   const { data: meData } = useMe();
   useE2EEInit(meData?.me);
+
+  React.useEffect((): void => {
+    if (pathname.includes("/chat/")) {
+      const id: string | undefined = pathname.split("/").pop();
+      lastChatPath.current = pathname;
+      setActiveChatId(id || null);
+    } else {
+      setActiveChatId(null);
+    }
+  }, [pathname, setActiveChatId]);
+
+  React.useEffect((): void => {
+    if (!isMobile && pathname.includes("/user/")) {
+      navigate({ to: lastChatPath.current || "/", replace: true });
+    }
+  }, [isMobile, pathname, navigate]);
+
+  const hideSidebarRequested: boolean = matches.some(
+    (m) => m.staticData?.hideSidebar,
+  );
+  const hideMobileNavRequested: boolean = matches.some(
+    (m) => m.staticData?.hideMobileNav,
+  );
+
+  const isProfileOpen: boolean = !!userMatch && isMobile;
+  const isChatOpen: boolean = pathname.includes("/chat/");
+  const isSettingsPage: boolean = pathname === "/settings";
+
+  const isDetailView: boolean =
+    isChatOpen || isProfileOpen || isSettingsPage || hideSidebarRequested;
+  const shouldHideNav: boolean =
+    isChatOpen || isProfileOpen || hideMobileNavRequested;
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -75,6 +89,7 @@ function LayoutComponent() {
             className={cn(
               "flex-shrink-0 border-r bg-background z-20 transition-[width] duration-200 ease-in-out w-full md:w-80 lg:w-96",
               isDetailView ? "hidden md:flex" : "flex",
+              hideSidebarRequested && "md:hidden",
             )}
           >
             <AppSidebar />
@@ -91,7 +106,7 @@ function LayoutComponent() {
             </div>
           </main>
 
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {isProfileOpen && userMatch?.params?.userId && (
               <UserProfileOverlay
                 key={userMatch.params.userId}
@@ -103,6 +118,7 @@ function LayoutComponent() {
 
         {!shouldHideNav && <MobileNav />}
       </div>
+
       <Toaster
         position="bottom-center"
         toastOptions={{
