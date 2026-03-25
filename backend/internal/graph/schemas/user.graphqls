@@ -66,6 +66,9 @@ extend type Mutation {
         description: String
         commands: String
     ): CreateBotResult!
+    updateBot(id: ID!, input: UpdateUserInput!): User!
+    deleteBot(id: ID!): Boolean!
+    rotateBotToken(id: ID!): String!
 }
 
 extend type Subscription {

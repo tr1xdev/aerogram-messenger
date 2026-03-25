@@ -25,6 +25,7 @@ type Querier interface {
 	DeactivateAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	DeactivateSession(ctx context.Context, id uuid.UUID) error
 	DecrementMembersCount(ctx context.Context, id uuid.UUID) error
+	DeleteBot(ctx context.Context, arg DeleteBotParams) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
 	GetBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) ([]User, error)
@@ -59,6 +60,7 @@ type Querier interface {
 	SoftDeleteMessage(ctx context.Context, arg SoftDeleteMessageParams) error
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error
+	UpdateBot(ctx context.Context, arg UpdateBotParams) (User, error)
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
 	UpdateMemberPinStatus(ctx context.Context, arg UpdateMemberPinStatusParams) error
 	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error

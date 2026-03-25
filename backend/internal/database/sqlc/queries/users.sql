@@ -86,3 +86,22 @@ RETURNING *;
 -- name: GetUserByUsername :one
 SELECT * FROM users
 WHERE username = $1 AND deleted_at IS NULL LIMIT 1;
+
+-- name: UpdateBot :one
+UPDATE users
+SET
+    first_name = COALESCE(sqlc.narg('first_name'), first_name),
+    last_name = COALESCE(sqlc.narg('last_name'), last_name),
+    username = COALESCE(sqlc.narg('username'), username),
+    public_key = COALESCE(sqlc.narg('public_key'), public_key),
+    encrypted_priv_key = COALESCE(sqlc.narg('encrypted_priv_key'), encrypted_priv_key),
+    encryption_iv = COALESCE(sqlc.narg('encryption_iv'), encryption_iv),
+    photo_url = COALESCE(sqlc.narg('photo_url'), photo_url),
+    bot_description = COALESCE(sqlc.narg('bot_description'), bot_description),
+    bot_commands = COALESCE(sqlc.narg('bot_commands'), bot_commands)
+WHERE id = $1 AND bot_owner_id = $2
+RETURNING *;
+
+-- name: DeleteBot :exec
+DELETE FROM users
+WHERE id = $1 AND bot_owner_id = $2;

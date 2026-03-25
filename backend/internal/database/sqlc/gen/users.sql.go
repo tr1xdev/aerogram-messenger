@@ -171,6 +171,21 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteBot = `-- name: DeleteBot :exec
+DELETE FROM users
+WHERE id = $1 AND bot_owner_id = $2
+`
+
+type DeleteBotParams struct {
+	ID         uuid.UUID     `json:"id"`
+	BotOwnerID uuid.NullUUID `json:"bot_owner_id"`
+}
+
+func (q *Queries) DeleteBot(ctx context.Context, arg DeleteBotParams) error {
+	_, err := q.db.ExecContext(ctx, deleteBot, arg.ID, arg.BotOwnerID)
+	return err
+}
+
 const getBotsByOwnerID = `-- name: GetBotsByOwnerID :many
 SELECT id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at FROM users
 WHERE bot_owner_id = $1 AND is_bot = TRUE AND deleted_at IS NULL
@@ -543,6 +558,80 @@ WHERE id = $1
 func (q *Queries) SoftDeleteUser(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, softDeleteUser, id)
 	return err
+}
+
+const updateBot = `-- name: UpdateBot :one
+UPDATE users
+SET
+    first_name = COALESCE($3, first_name),
+    last_name = COALESCE($4, last_name),
+    username = COALESCE($5, username),
+    public_key = COALESCE($6, public_key),
+    encrypted_priv_key = COALESCE($7, encrypted_priv_key),
+    encryption_iv = COALESCE($8, encryption_iv),
+    photo_url = COALESCE($9, photo_url),
+    bot_description = COALESCE($10, bot_description),
+    bot_commands = COALESCE($11, bot_commands)
+WHERE id = $1 AND bot_owner_id = $2
+RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at
+`
+
+type UpdateBotParams struct {
+	ID               uuid.UUID             `json:"id"`
+	BotOwnerID       uuid.NullUUID         `json:"bot_owner_id"`
+	FirstName        sql.NullString        `json:"first_name"`
+	LastName         sql.NullString        `json:"last_name"`
+	Username         sql.NullString        `json:"username"`
+	PublicKey        sql.NullString        `json:"public_key"`
+	EncryptedPrivKey sql.NullString        `json:"encrypted_priv_key"`
+	EncryptionIv     sql.NullString        `json:"encryption_iv"`
+	PhotoUrl         sql.NullString        `json:"photo_url"`
+	BotDescription   sql.NullString        `json:"bot_description"`
+	BotCommands      pqtype.NullRawMessage `json:"bot_commands"`
+}
+
+func (q *Queries) UpdateBot(ctx context.Context, arg UpdateBotParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateBot,
+		arg.ID,
+		arg.BotOwnerID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Username,
+		arg.PublicKey,
+		arg.EncryptedPrivKey,
+		arg.EncryptionIv,
+		arg.PhotoUrl,
+		arg.BotDescription,
+		arg.BotCommands,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.Password,
+		&i.Status,
+		&i.PhotoUrl,
+		&i.IsPremium,
+		&i.IsEmailVerified,
+		&i.IsVerified,
+		&i.VerificationToken,
+		&i.VerificationExpiry,
+		&i.PublicKey,
+		&i.EncryptedPrivKey,
+		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }
 
 const updateUser = `-- name: UpdateUser :one

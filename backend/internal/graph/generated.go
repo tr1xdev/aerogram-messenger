@@ -117,6 +117,7 @@ type ComplexityRoot struct {
 		CreateBot                 func(childComplexity int, username string, firstName string, lastName *string, description *string, commands *string) int
 		CreateChat                func(childComplexity int, typeArg model.ChatType, participantIds []string, slug *string, title *string) int
 		CreateDirectChat          func(childComplexity int, userID string) int
+		DeleteBot                 func(childComplexity int, id string) int
 		DeleteChat                func(childComplexity int, id string, forEveryone *bool) int
 		DeleteMessage             func(childComplexity int, id string) int
 		Login                     func(childComplexity int, input model.LoginInput) int
@@ -124,11 +125,13 @@ type ComplexityRoot struct {
 		MarkDialogAsRead          func(childComplexity int, chatID string, lastSequence int64) int
 		PinChat                   func(childComplexity int, id string, pinned bool) int
 		RefreshToken              func(childComplexity int, token string) int
+		RotateBotToken            func(childComplexity int, id string) int
 		SendMessage               func(childComplexity int, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) int
 		SendTypingEvent           func(childComplexity int, chatID string, typing bool) int
 		SignUp                    func(childComplexity int, input model.SignUpInput) int
 		TerminateAllOtherSessions func(childComplexity int) int
 		TerminateSession          func(childComplexity int, id string) int
+		UpdateBot                 func(childComplexity int, id string, input model.UpdateUserInput) int
 		UpdateMessage             func(childComplexity int, id string, text string, encryptionIv *string) int
 		UpdateUser                func(childComplexity int, input model.UpdateUserInput) int
 		VerifyEmail               func(childComplexity int, input model.VerifyEmailInput) int
@@ -244,6 +247,9 @@ type MutationResolver interface {
 	MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error)
 	UpdateUser(ctx context.Context, input model.UpdateUserInput) (*dbgen.User, error)
 	CreateBot(ctx context.Context, username string, firstName string, lastName *string, description *string, commands *string) (model.CreateBotResult, error)
+	UpdateBot(ctx context.Context, id string, input model.UpdateUserInput) (*dbgen.User, error)
+	DeleteBot(ctx context.Context, id string) (bool, error)
+	RotateBotToken(ctx context.Context, id string) (string, error)
 }
 type QueryResolver interface {
 	Sessions(ctx context.Context, userID string) ([]*dbgen.Session, error)
@@ -563,6 +569,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CreateDirectChat(childComplexity, args["userID"].(string)), true
+	case "Mutation.deleteBot":
+		if e.complexity.Mutation.DeleteBot == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteBot_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteBot(childComplexity, args["id"].(string)), true
 	case "Mutation.deleteChat":
 		if e.complexity.Mutation.DeleteChat == nil {
 			break
@@ -635,6 +652,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.RefreshToken(childComplexity, args["token"].(string)), true
+	case "Mutation.rotateBotToken":
+		if e.complexity.Mutation.RotateBotToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_rotateBotToken_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RotateBotToken(childComplexity, args["id"].(string)), true
 	case "Mutation.sendMessage":
 		if e.complexity.Mutation.SendMessage == nil {
 			break
@@ -685,6 +713,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.TerminateSession(childComplexity, args["id"].(string)), true
+	case "Mutation.updateBot":
+		if e.complexity.Mutation.UpdateBot == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateBot_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateBot(childComplexity, args["id"].(string), args["input"].(model.UpdateUserInput)), true
 	case "Mutation.updateMessage":
 		if e.complexity.Mutation.UpdateMessage == nil {
 			break
@@ -1353,6 +1392,17 @@ func (ec *executionContext) field_Mutation_createDirectChat_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteBot_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteChat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1434,6 +1484,17 @@ func (ec *executionContext) field_Mutation_refreshToken_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_rotateBotToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_sendMessage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1500,6 +1561,22 @@ func (ec *executionContext) field_Mutation_terminateSession_args(ctx context.Con
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateBot_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateUserInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐUpdateUserInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
 	return args, nil
 }
 
@@ -3790,6 +3867,165 @@ func (ec *executionContext) fieldContext_Mutation_createBot(ctx context.Context,
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createBot_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateBot(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updateBot,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UpdateBot(ctx, fc.Args["id"].(string), fc.Args["input"].(model.UpdateUserInput))
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateBot(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "firstName":
+				return ec.fieldContext_User_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_User_lastName(ctx, field)
+			case "displayName":
+				return ec.fieldContext_User_displayName(ctx, field)
+			case "username":
+				return ec.fieldContext_User_username(ctx, field)
+			case "photoUrl":
+				return ec.fieldContext_User_photoUrl(ctx, field)
+			case "bio":
+				return ec.fieldContext_User_bio(ctx, field)
+			case "status":
+				return ec.fieldContext_User_status(ctx, field)
+			case "isVerified":
+				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
+			case "publicKey":
+				return ec.fieldContext_User_publicKey(ctx, field)
+			case "encryptedPrivKey":
+				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
+			case "encryptionIv":
+				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateBot_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteBot(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_deleteBot,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().DeleteBot(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteBot(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteBot_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_rotateBotToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_rotateBotToken,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().RotateBotToken(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_rotateBotToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_rotateBotToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8540,6 +8776,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "createBot":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createBot(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateBot":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateBot(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteBot":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteBot(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "rotateBotToken":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_rotateBotToken(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
