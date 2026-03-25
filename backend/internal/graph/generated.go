@@ -144,6 +144,7 @@ type ComplexityRoot struct {
 		GetUser        func(childComplexity int, id string) int
 		Me             func(childComplexity int) int
 		MessageHistory func(childComplexity int, chatID string, limit int, offset int) int
+		MyBots         func(childComplexity int) int
 		MyChats        func(childComplexity int) int
 		SearchUsers    func(childComplexity int, username string) int
 		Sessions       func(childComplexity int, userID string) int
@@ -254,6 +255,7 @@ type QueryResolver interface {
 	User(ctx context.Context, id string) (*dbgen.User, error)
 	GetUser(ctx context.Context, id string) (*dbgen.User, error)
 	SearchUsers(ctx context.Context, username string) ([]*dbgen.User, error)
+	MyBots(ctx context.Context) ([]*dbgen.User, error)
 }
 type SessionResolver interface {
 	ID(ctx context.Context, obj *dbgen.Session) (string, error)
@@ -774,6 +776,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MessageHistory(childComplexity, args["chatId"].(string), args["limit"].(int), args["offset"].(int)), true
+	case "Query.myBots":
+		if e.complexity.Query.MyBots == nil {
+			break
+		}
+
+		return e.complexity.Query.MyBots(childComplexity), true
 	case "Query.myChats":
 		if e.complexity.Query.MyChats == nil {
 			break
@@ -4326,6 +4334,71 @@ func (ec *executionContext) fieldContext_Query_searchUsers(ctx context.Context, 
 	if fc.Args, err = ec.field_Query_searchUsers_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myBots(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_myBots,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().MyBots(ctx)
+		},
+		nil,
+		ec.marshalNUser2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUserᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_myBots(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "firstName":
+				return ec.fieldContext_User_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_User_lastName(ctx, field)
+			case "displayName":
+				return ec.fieldContext_User_displayName(ctx, field)
+			case "username":
+				return ec.fieldContext_User_username(ctx, field)
+			case "photoUrl":
+				return ec.fieldContext_User_photoUrl(ctx, field)
+			case "bio":
+				return ec.fieldContext_User_bio(ctx, field)
+			case "status":
+				return ec.fieldContext_User_status(ctx, field)
+			case "isVerified":
+				return ec.fieldContext_User_isVerified(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "isBot":
+				return ec.fieldContext_User_isBot(ctx, field)
+			case "publicKey":
+				return ec.fieldContext_User_publicKey(ctx, field)
+			case "encryptedPrivKey":
+				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
+			case "encryptionIv":
+				return ec.fieldContext_User_encryptionIv(ctx, field)
+			case "botDescription":
+				return ec.fieldContext_User_botDescription(ctx, field)
+			case "botCommands":
+				return ec.fieldContext_User_botCommands(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -8738,6 +8811,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_searchUsers(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myBots":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myBots(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

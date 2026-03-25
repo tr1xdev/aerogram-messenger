@@ -1,72 +1,73 @@
 type User {
-   id: ID!
-   email: String
-   firstName: String!
-   lastName: String
-   displayName: String
-   username: String
-   photoUrl: String
-   bio: String
-   status: String!
-   isVerified: Boolean!
-   isPremium: Boolean!
-   isBot: Boolean!
-   publicKey: String
-   encryptedPrivKey: String
-   encryptionIv: String
-   botDescription: String
-   botCommands: String
+    id: ID!
+    email: String
+    firstName: String!
+    lastName: String
+    displayName: String
+    username: String
+    photoUrl: String
+    bio: String
+    status: String!
+    isVerified: Boolean!
+    isPremium: Boolean!
+    isBot: Boolean!
+    publicKey: String
+    encryptedPrivKey: String
+    encryptionIv: String
+    botDescription: String
+    botCommands: String
 }
 
 input UpdateUserInput {
-   firstName: String
-   lastName: String
-   username: String
-   bio: String
-   publicKey: String
-   encryptedPrivKey: String
-   encryptionIv: String
-   photoUrl: String
-   botDescription: String
-   botCommands: String
+    firstName: String
+    lastName: String
+    username: String
+    bio: String
+    publicKey: String
+    encryptedPrivKey: String
+    encryptionIv: String
+    photoUrl: String
+    botDescription: String
+    botCommands: String
 }
 
 type UserStatusPayload {
-   userId: ID!
-   status: String!
-   lastSeen: String
+    userId: ID!
+    status: String!
+    lastSeen: String
 }
 
 type CreateBotPayload {
-   botToken: String!
-   user: User!
+    botToken: String!
+    user: User!
 }
 
 union CreateBotResult =
-   | CreateBotPayload
-   | ValidationError
-   | ForbiddenError
-   | InternalError
+    | CreateBotPayload
+    | ValidationError
+    | ForbiddenError
+    | InternalError
 
 extend type Query {
-   me: User!
-   user(id: ID!): User!
-   getUser(id: ID!): User!
-   searchUsers(username: String!): [User!]!
+    me: User!
+    user(id: ID!): User!
+    getUser(id: ID!): User!
+    searchUsers(username: String!): [User!]!
+    myBots: [User!]!
 }
 
 extend type Mutation {
-   updateUser(input: UpdateUserInput!): User!
+    updateUser(input: UpdateUserInput!): User!
 
-   createBot(
-      username: String!
-      firstName: String!
-      lastName: String
-      description: String
-      commands: String
-   ): CreateBotResult!
+    createBot(
+        username: String!
+        firstName: String!
+        lastName: String
+        description: String
+        commands: String
+    ): CreateBotResult!
 }
 
 extend type Subscription {
-   userStatusChanged(chatId: ID!): UserStatusPayload!
+    userStatusChanged(chatId: ID!): UserStatusPayload!
 }
