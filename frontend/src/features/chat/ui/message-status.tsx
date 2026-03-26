@@ -1,33 +1,45 @@
-import { Check, CheckCheck } from "lucide-react";
+import { Check, CheckCheck, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface MessageStatusProps {
+  isSending?: boolean;
   isRead: boolean;
   isMe: boolean;
   sequence?: number;
   lastReadSequence?: number;
+  className?: string;
 }
 
 export function MessageStatus({
+  isSending,
   isRead,
   isMe,
   sequence,
   lastReadSequence,
+  className,
 }: MessageStatusProps) {
   if (!isMe) return null;
 
-  const isActuallyRead =
+  const isActuallyRead: boolean =
     isRead ||
     (sequence !== undefined &&
       lastReadSequence !== undefined &&
       sequence <= lastReadSequence);
 
   return (
-    <div className="flex items-center ml-1">
-      {isActuallyRead ? (
-        <CheckCheck className="h-3.5 w-3.5 text-primary" strokeWidth={2.5} />
+    <div
+      className={cn(
+        "inline-flex items-center justify-center w-4 h-4 shrink-0",
+        className,
+      )}
+    >
+      {isSending ? (
+        <Clock className="h-3 w-3 animate-pulse opacity-70" strokeWidth={2.5} />
+      ) : isActuallyRead ? (
+        <CheckCheck className="h-3.5 w-3.5 text-inherit" strokeWidth={2.5} />
       ) : (
         <Check
-          className="h-3.5 w-3.5 text-muted-foreground/40"
+          className="h-3.5 w-3.5 opacity-60 text-inherit"
           strokeWidth={2.5}
         />
       )}

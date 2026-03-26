@@ -5,17 +5,7 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import {
-  Clock,
-  Check,
-  CheckCheck,
-  Copy,
-  Forward,
-  Reply,
-  Pencil,
-  Trash2,
-  Info,
-} from "lucide-react";
+import { Copy, Forward, Reply, Pencil, Trash2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type { Message } from "@/entities/chat/model/types";
@@ -27,6 +17,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { MessageInfoDialog } from "./message-info-dialog";
+import { MessageStatus } from "./message-status";
 
 interface MessageBubbleProps {
   message: Message;
@@ -77,17 +68,7 @@ export const MessageBubble = memo(function MessageBubble({
   const [error, setError] = useState<string | null>(null);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
 
-  const isTemp: boolean =
-    message.id.startsWith("temp-") || message.id.length < 10;
-
-  const isActuallyRead: boolean = useMemo((): boolean => {
-    if (isRead || message.isRead) return true;
-    if (message.sequence === undefined || lastReadSequence === undefined)
-      return false;
-    return message.sequence <= lastReadSequence;
-  }, [isRead, message.isRead, message.sequence, lastReadSequence]);
-
-  useEffect(() => {
+  useEffect((): (() => void) => {
     let isMounted: boolean = true;
 
     const decrypt = async (
@@ -152,7 +133,7 @@ export const MessageBubble = memo(function MessageBubble({
     }
   };
 
-  useEffect(() => {
+  useEffect((): (() => void) => {
     let timeoutId: ReturnType<typeof setTimeout>;
     let observer: IntersectionObserver | null = null;
 
@@ -171,7 +152,7 @@ export const MessageBubble = memo(function MessageBubble({
                 setIsHighlighted(true);
                 timeoutId = setTimeout(
                   (): void => setIsHighlighted(false),
-                  500,
+                  800,
                 );
               }, 100);
               observer?.disconnect();
@@ -212,108 +193,95 @@ export const MessageBubble = memo(function MessageBubble({
     if (displayText) navigator.clipboard.writeText(displayText);
   };
 
-  const markdownComponents: Components = {
-    p: ({ children }): ReactElement => (
-      <p className="m-0 leading-relaxed break-words">{children}</p>
-    ),
-    a: ({ href, children }): ReactElement => (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(
-          "underline underline-offset-2 hover:opacity-80 transition-opacity",
-          isMe ? "text-primary-foreground" : "text-primary",
-        )}
-      >
-        {children}
-      </a>
-    ),
-    code: ({ className, children, ...props }): ReactElement => {
-      const content: string = String(children).replace(/\n$/, "");
-      const match: RegExpExecArray | null = /language-(\w+)/.exec(
-        className || "",
-      );
-      const isBlock: boolean =
-        !props.node?.properties?.["inline"] && content.includes("\n");
-
-      if (isBlock || match) {
-        return (
-          <div className="my-2 rounded-xl overflow-hidden text-[13px] border border-black/20 dark:border-white/10 shadow-inner">
-            <SyntaxHighlighter
-              style={oneDark as { [key: string]: React.CSSProperties }}
-              language={match?.[1] || "typescript"}
-              PreTag="div"
-              codeTagProps={{
-                style: {
-                  background: "transparent",
-                  color: "inherit",
-                  WebkitFontSmoothing: "antialiased",
-                  MozOsxFontSmoothing: "grayscale",
-                  fontFamily:
-                    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                },
-              }}
-              customStyle={{
-                margin: 0,
-                padding: "14px",
-                background: "#1e1e1e",
-                fontSize: "13px",
-                lineHeight: "1.6",
-              }}
-            >
-              {content}
-            </SyntaxHighlighter>
-          </div>
-        );
-      }
-
-      return (
-        <code
+  const markdownComponents: Components = useMemo(
+    (): Components => ({
+      p: ({ children }): ReactElement => (
+        <p className="m-0 leading-relaxed break-words whitespace-pre-wrap">
+          {children}
+        </p>
+      ),
+      a: ({ href, children }): ReactElement => (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
           className={cn(
-            "px-1.5 py-0.5 rounded-md text-[0.9em] font-mono antialiased",
-            isMe ? "bg-black/30 text-white" : "bg-black/10 dark:bg-white/10",
+            "underline underline-offset-2 hover:opacity-80 transition-opacity",
+            isMe ? "text-primary-foreground" : "text-primary",
           )}
         >
           {children}
-        </code>
-      );
-    },
-    table: ({ children }): ReactElement => (
-      <div className="my-3 overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
-        <table className="w-full border-collapse text-left text-[13px]">
-          {children}
-        </table>
-      </div>
-    ),
-    thead: ({ children }): ReactElement => (
-      <thead
-        className={cn(
-          "border-b border-black/10 dark:border-white/10",
-          isMe ? "bg-black/10" : "bg-muted/50",
-        )}
-      >
-        {children}
-      </thead>
-    ),
-    th: ({ children }): ReactElement => (
-      <th className="px-3 py-2 font-semibold">{children}</th>
-    ),
-    td: ({ children }): ReactElement => (
-      <td className="px-3 py-2 border-b border-black/5 dark:border-white/5 last:border-0">
-        {children}
-      </td>
-    ),
-    ul: ({ children }): ReactElement => (
-      <ul className="list-disc ml-4 my-1 space-y-0.5">{children}</ul>
-    ),
-    ol: ({ children }): ReactElement => (
-      <ol className="list-decimal ml-4 my-1 space-y-0.5">{children}</ol>
-    ),
-    li: ({ children }): ReactElement => (
-      <li className="leading-normal">{children}</li>
-    ),
-  };
+        </a>
+      ),
+      code: ({ className, children, ...props }): ReactElement => {
+        const content: string = String(children).replace(/\n$/, "");
+        const match: RegExpExecArray | null = /language-(\w+)/.exec(
+          className || "",
+        );
+        const isBlock: boolean =
+          !props.node?.properties?.["inline"] && content.includes("\n");
+
+        if (isBlock || match) {
+          return (
+            <div className="my-2 rounded-xl overflow-hidden text-[13px] border border-black/20 dark:border-white/10 shadow-inner">
+              <SyntaxHighlighter
+                style={oneDark as { [key: string]: React.CSSProperties }}
+                language={match?.[1] || "typescript"}
+                PreTag="div"
+                codeTagProps={{
+                  style: {
+                    background: "transparent",
+                    color: "inherit",
+                    WebkitFontSmoothing: "antialiased",
+                    MozOsxFontSmoothing: "grayscale",
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                  },
+                }}
+                customStyle={{
+                  margin: 0,
+                  padding: "14px",
+                  background: "#1e1e1e",
+                  fontSize: "13px",
+                  lineHeight: "1.6",
+                }}
+              >
+                {content}
+              </SyntaxHighlighter>
+            </div>
+          );
+        }
+
+        return (
+          <code
+            className={cn(
+              "px-1.5 py-0.5 rounded-md text-[0.9em] font-mono antialiased",
+              isMe ? "bg-black/30 text-white" : "bg-black/10 dark:bg-white/10",
+            )}
+          >
+            {children}
+          </code>
+        );
+      },
+      ul: ({ children }): ReactElement => (
+        <ul className="list-disc ml-4 my-1 space-y-0.5">{children}</ul>
+      ),
+      ol: ({ children }): ReactElement => (
+        <ol className="list-decimal ml-4 my-1 space-y-0.5">{children}</ol>
+      ),
+      li: ({ children }): ReactElement => (
+        <li className="leading-normal">{children}</li>
+      ),
+    }),
+    [isMe],
+  );
+
+  const timeString = useMemo(() => {
+    return new Date(message.sentAt).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [message.sentAt]);
 
   return (
     <>
@@ -321,52 +289,56 @@ export const MessageBubble = memo(function MessageBubble({
         <ContextMenuTrigger
           id={`msg-${message.id}`}
           className={cn(
-            "flex w-full mb-1 px-4 min-w-0 overflow-hidden transition-colors ease-in-out",
+            "flex w-full mb-0.5 px-4 min-w-0 overflow-hidden transition-colors duration-500",
             isMe ? "justify-end" : "justify-start",
-            isHighlighted
-              ? "bg-black/10 dark:bg-white/10 duration-100"
-              : "duration-700",
+            isHighlighted && "bg-primary/10",
           )}
         >
-          <div className="grid grid-cols-1 max-w-[85%] sm:max-w-[70%] min-w-0">
+          <div
+            className={cn(
+              "grid grid-cols-1 max-w-[85%] sm:max-w-[70%] min-w-0",
+              isMe ? "items-end" : "items-start",
+            )}
+          >
             <div
               className={cn(
-                "relative px-3 py-1.5 text-sm rounded-2xl shadow-sm min-w-0 overflow-hidden flex flex-col",
+                "relative px-2.5 py-1.5 text-[15px] rounded-2xl shadow-sm min-w-[60px] flex flex-col transition-transform active:scale-[0.99]",
                 isMe
                   ? "bg-primary text-primary-foreground rounded-tr-none"
                   : "bg-muted text-foreground rounded-tl-none",
-                isTemp && "opacity-70",
+                message.isSending && "opacity-70",
               )}
             >
               {message.replyTo && (
                 <div
                   className={cn(
-                    "mb-1.5 flex flex-col relative rounded-sm px-2 py-1 cursor-pointer overflow-hidden transition-colors hover:brightness-90 min-w-0 w-full shrink-0",
-                    isMe ? "bg-primary-foreground/10" : "bg-primary/5",
+                    "mb-1.5 flex flex-col relative rounded-lg px-2.5 py-1 cursor-pointer overflow-hidden transition-all hover:brightness-95 min-w-0 w-full shrink-0",
+                    isMe ? "bg-black/10" : "bg-primary/5",
                   )}
                   onClick={handleScrollToReply}
                 >
                   <div
                     className={cn(
-                      "absolute left-0 top-0 bottom-0 w-0.75",
-                      isMe ? "bg-primary-foreground/80" : "bg-primary/80",
+                      "absolute left-0 top-0 bottom-0 w-1",
+                      isMe ? "bg-primary-foreground/60" : "bg-primary/60",
                     )}
                   />
                   <span
                     className={cn(
-                      "text-[12px] font-medium leading-tight mb-0.5 ml-1 truncate",
+                      "text-[12px] font-semibold leading-tight mb-0.5 truncate",
                       isMe ? "text-primary-foreground" : "text-primary",
                     )}
                   >
                     {replySenderName}
                   </span>
-                  <span className="text-[12px] truncate opacity-90 leading-tight ml-1">
+                  <span className="text-[12px] truncate opacity-80 leading-tight">
                     {displayReplyText}
                   </span>
                 </div>
               )}
-              <div className="grid grid-cols-1 min-w-0">
-                <div className="markdown-content overflow-hidden prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent">
+
+              <div className="flex flex-col min-w-0 relative">
+                <div className="markdown-content prose prose-sm dark:prose-invert max-w-none prose-p:leading-snug prose-pre:p-0 prose-pre:bg-transparent">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkBreaks]}
                     components={markdownComponents}
@@ -374,33 +346,32 @@ export const MessageBubble = memo(function MessageBubble({
                     {displayText}
                   </ReactMarkdown>
                 </div>
+
                 <div
                   className={cn(
-                    "flex items-center justify-end gap-1 mt-1 -mr-1 select-none pointer-events-none shrink-0",
+                    "flex items-center justify-end gap-1 h-3 mt-1 self-end select-none pointer-events-none shrink-0",
                     isMe
-                      ? "text-primary-foreground/70"
-                      : "text-muted-foreground/70",
+                      ? "text-primary-foreground/60"
+                      : "text-muted-foreground/60",
                   )}
                 >
                   {message.isEdited && (
-                    <span className="text-[9px]">edited</span>
+                    <span className="text-[9px] font-medium italic mr-0.5">
+                      edited
+                    </span>
                   )}
-                  <span className="text-[10px] leading-none">
-                    {new Date(message.sentAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                  <span className="text-[10px] font-medium leading-none">
+                    {timeString}
                   </span>
                   {isMe && (
-                    <span className="flex items-center justify-center w-3.5 h-3.5 shrink-0">
-                      {isTemp ? (
-                        <Clock className="h-3 w-3 animate-pulse" />
-                      ) : isActuallyRead ? (
-                        <CheckCheck className="h-3.5 w-3.5" />
-                      ) : (
-                        <Check className="h-3.5 w-3.5" />
-                      )}
-                    </span>
+                    <MessageStatus
+                      isMe={isMe}
+                      isSending={message.isSending}
+                      isRead={!!message.isRead || !!isRead}
+                      sequence={message.sequence}
+                      lastReadSequence={lastReadSequence}
+                      className="w-3.5 h-3.5 ml-0.5"
+                    />
                   )}
                 </div>
               </div>
@@ -417,7 +388,7 @@ export const MessageBubble = memo(function MessageBubble({
           <ContextMenuItem onClick={(): void => onForward?.(message)}>
             <Forward className="mr-2 h-4 w-4" /> Forward
           </ContextMenuItem>
-          {isMe && !isTemp && (
+          {isMe && !message.isSending && (
             <>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={(): void => onEdit?.(message)}>
