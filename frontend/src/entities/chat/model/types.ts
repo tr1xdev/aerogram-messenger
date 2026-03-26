@@ -26,6 +26,7 @@ export interface Message {
   isRead: boolean;
   isEdited: boolean;
   isEncrypted: boolean;
+  isSending?: boolean;
   encryptionIv?: string;
   sender: User;
   replyTo?: Message;
@@ -51,22 +52,4 @@ export interface Chat {
   isPinned: boolean;
   messages?: Message[];
   createdAt: string;
-}
-
-export interface Session {
-  id: string;
-  device?: string | null;
-  ipAddress?: string | null;
-  location?: string | null;
-  isActive: boolean;
-  isCurrent: boolean;
-  createdAt: string;
-}
-
-export interface StatusChanged {
-  userStatusChanged: {
-    userId: string;
-    status: string;
-    lastSeen?: string;
-  };
 }
