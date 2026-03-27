@@ -2,17 +2,22 @@ package database
 
 import (
 	"database/sql"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sort"
+	"embed"
+	"fmt"
+	"io/fs"
 	"testing"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/pgx/v5"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 )
+
+//go:embed sqlc/migrations/*.sql
+var migrationsFS embed.FS
 
 type DB struct {
 	Conn    *sql.DB
@@ -33,6 +38,35 @@ func NewPostgres(dsn string) (*DB, error) {
 		Conn:    db,
 		Queries: dbgen.New(db),
 	}, nil
+}
+
+func (db *DB) RunMigrations() error {
+	// Спускаемся в подпапку, чтобы мигратор видел файлы напрямую
+	subFS, err := fs.Sub(migrationsFS, "sqlc/migrations")
+	if err != nil {
+		return fmt.Errorf("failed to create subfs: %w", err)
+	}
+
+	d, err := iofs.New(subFS, ".")
+	if err != nil {
+		return err
+	}
+
+	driver, err := pgx.WithInstance(db.Conn, &pgx.Config{})
+	if err != nil {
+		return err
+	}
+
+	m, err := migrate.NewWithInstance("iofs", d, "pgx", driver)
+	if err != nil {
+		return err
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+
+	return nil
 }
 
 func (db *DB) Close() error {
@@ -92,6 +126,20 @@ func TimeToNullTime(t time.Time) sql.NullTime {
 	}
 }
 
+func ToNullTimePtr(t *time.Time) sql.NullTime {
+	if t == nil {
+		return sql.NullTime{Valid: false}
+	}
+	return sql.NullTime{Time: *t, Valid: true}
+}
+
+func UUIDToNullUUIDPtr(id *uuid.UUID) uuid.NullUUID {
+	if id == nil {
+		return uuid.NullUUID{Valid: false}
+	}
+	return uuid.NullUUID{UUID: *id, Valid: true}
+}
+
 func SetupTestDB(t *testing.T) *DB {
 	dsn := "postgres://postgres:postgres@localhost:5432/aerogram_test?sslmode=disable"
 
@@ -111,37 +159,16 @@ func SetupTestDB(t *testing.T) *DB {
 		t.Fatalf("failed to reset schema: %v", err)
 	}
 
-	_, filename, _, _ := runtime.Caller(0)
-	migrationsDir := filepath.Join(filepath.Dir(filename), "sqlc", "migrations")
-
-	files, err := os.ReadDir(migrationsDir)
+	inst, err := NewPostgres(dsn)
 	if err != nil {
-		t.Fatalf("failed to read migrations: %v", err)
+		t.Fatalf("failed to init db instance: %v", err)
 	}
 
-	var filenames []string
-	for _, f := range files {
-		if !f.IsDir() && filepath.Ext(f.Name()) == ".sql" {
-			filenames = append(filenames, f.Name())
-		}
-	}
-	sort.Strings(filenames)
-
-	for _, name := range filenames {
-		content, err := os.ReadFile(filepath.Join(migrationsDir, name))
-		if err != nil {
-			t.Fatalf("failed to read migration %s: %v", name, err)
-		}
-
-		if _, err := db.Exec(string(content)); err != nil {
-			t.Fatalf("failed migration %s: %v", name, err)
-		}
+	if err := inst.RunMigrations(); err != nil {
+		t.Fatalf("failed to run test migrations: %v", err)
 	}
 
-	return &DB{
-		Conn:    db,
-		Queries: dbgen.New(db),
-	}
+	return inst
 }
 
 func (db *DB) TruncateTables(t *testing.T) {
@@ -158,18 +185,4 @@ func (db *DB) TruncateTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to truncate tables: %v", err)
 	}
-}
-
-func ToNullTimePtr(t *time.Time) sql.NullTime {
-	if t == nil {
-		return sql.NullTime{Valid: false}
-	}
-	return sql.NullTime{Time: *t, Valid: true}
-}
-
-func UUIDToNullUUIDPtr(id *uuid.UUID) uuid.NullUUID {
-	if id == nil {
-		return uuid.NullUUID{Valid: false}
-	}
-	return uuid.NullUUID{UUID: *id, Valid: true}
 }
