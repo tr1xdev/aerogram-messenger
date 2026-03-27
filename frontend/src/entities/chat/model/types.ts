@@ -53,3 +53,13 @@ export interface Chat {
   messages?: Message[];
   createdAt: string;
 }
+
+export interface Session {
+  id: string;
+  device?: string | null;
+  ipAddress: string;
+  location?: string | null;
+  isActive: boolean;
+  isCurrent: boolean;
+  createdAt: string;
+}

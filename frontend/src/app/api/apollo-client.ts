@@ -15,6 +15,9 @@ import { getMainDefinition } from "@apollo/client/utilities";
 import { REFRESH_TOKEN_MUTATION } from "@/features/auth/api/auth.gql";
 import { useConnectionStore } from "@/store/connection";
 
+const endpoint = import.meta.env.VITE_API_URL || "http://localhost:8080/query";
+const wsEndpoint = import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
+
 interface RefreshTokenResponse {
   refreshToken: {
     access_token: string;
@@ -66,7 +69,7 @@ export const logoutAll = async (): Promise<void> => {
 };
 
 const httpLink: HttpLink = new HttpLink({
-  uri: "https://localhost:8080/query",
+  uri: endpoint,
 });
 
 const authLink: SetContextLink = new SetContextLink((prevContext) => {
@@ -189,7 +192,7 @@ const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;
 
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
-    url: "wss://localhost:8080/query",
+    url: wsEndpoint,
     lazy: false,
     connectionParams: async () => {
       if (isRefreshing) {
