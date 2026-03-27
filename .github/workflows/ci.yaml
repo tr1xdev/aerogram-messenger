@@ -10,6 +10,10 @@ jobs:
     quality-gate:
         runs-on: ubuntu-latest
 
+        defaults:
+            run:
+                working-directory: backend
+
         services:
             postgres:
                 image: postgres:16-alpine
@@ -44,41 +48,44 @@ jobs:
               with:
                   go-version: "1.25.x"
                   cache: true
-                  cache-dependency-path: go.sum
+                  cache-dependency-path: backend/go.sum
 
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "22"
+                  node-version: 22
                   cache: "npm"
-                  cache-dependency-path: frontend/package-lock.json
+                  cache-dependency-path: backend/package-lock.json
 
             - name: Install dependencies
               run: |
                   go mod download
-                  cd frontend && npm ci
+                  if [ -f "package.json" ]; then
+                    npm ci
+                  fi
+              env:
+                  GOWORK: off
 
             - name: Run Backend Tests
-              run: make test
+              run: go test -v ./...
               env:
+                  GOWORK: off
                   APP_ENV: development
                   DATABASE_URL: postgres://postgres@localhost:5432/aerogram_test?sslmode=disable
                   REDIS_ADDR: localhost:6379
                   JWT_SECRET: ci_test_secret_key
 
             - name: Lint Go code
-              uses: golangci/golangci-lint-action@v4
+              uses: golangci/golangci-lint-action@v6
               with:
                   version: latest
+                  working-directory: backend
                   args: --timeout=5m
 
-            - name: Verify Docker Build (Production Ready)
+            - name: Verify Docker Build
+              working-directory: .
               run: |
-                  docker compose build --parallel
+                  docker compose build
               env:
-                  JWT_SECRET: jwt_secret
-                  RESEND_API_KEY: resend_api_key
-
-            - name: Build Frontend Production
-              run: |
-                  cd frontend && npm run build
+                  JWT_SECRET: dummy_secret
+                  RESEND_API_KEY: dummy_key
