@@ -1,0 +1,26 @@
+app:
+   env: ${APP_ENV:-development} # Application mode: development, production
+   test_email: ${TEST_EMAIL} # Email for dev mode redirects
+
+server:
+   http:
+      host: "0.0.0.0" # IP address to bind (0.0.0.0 for all interfaces)
+      port: ${HTTP_PORT:-8080} # HTTP server port
+   grpc:
+      host: "0.0.0.0" # IP address to bind
+      port: ${GRPC_PORT:-50051} # gRPC server port
+
+database:
+   postgres:
+      host: ${DB_HOST:-localhost} # PostgreSQL host
+      port: ${DB_PORT:-5432} # PostgreSQL port (default 5432)
+      user: ${DB_USER:-your_user} # database user
+      dbname: ${DB_NAME:-your_db} # database name
+      sslmode: ${DB_SSL:-disable} # SSL mode: disable, require, verify-full
+   redis:
+      host: ${REDIS_HOST:-localhost} # Redis host
+      port: ${REDIS_PORT:-6379} # Redis port (default 6379)
+      db: ${REDIS_DB:-0} # Redis database index (0-15)
+
+jwt:
+   ttl_minutes: ${JWT_TTL:-60} # JWT token lifetime in minutes

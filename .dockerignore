@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+backend/vendor
+frontend/dist
+certs
+pgdata
+.env
+*.log
+assets/*.mmdb

@@ -47,7 +47,6 @@ frontend/.tanstack/
 
 # Configuration files
 .env
-config.yaml
 
 # Zed editor
 .zed/
