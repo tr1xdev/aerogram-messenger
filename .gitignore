@@ -52,8 +52,8 @@ frontend/.tanstack/
 .zed/
 
 # Go
-go.work
-go.work.sum
+backend/go.work
+backend/go.work.sum
 
 # Other
 backend/assets/*.mmdb
