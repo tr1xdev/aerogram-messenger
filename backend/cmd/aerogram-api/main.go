@@ -57,6 +57,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := db.RunMigrations(); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
+
 	rdb := database.NewRedis(cfg.RedisAddr(), cfg.RedisPassword(), 0)
 	defer rdb.Close()
 
@@ -101,8 +105,8 @@ func main() {
 	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc)
 	api.SetupRoutes(router, gqlServer)
 
-	certPath := "../certs/localhost+2.pem"
-	keyPath := "../certs/localhost+2-key.pem"
+	certPath := "certs/localhost+2.pem"
+	keyPath := "certs/localhost+2-key.pem"
 
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
@@ -200,9 +204,15 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 
 func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn, rdb *redis.Client) {
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://localhost:5173", "http://localhost:5173"},
+		AllowedOrigins: []string{
+			"https://localhost:3443",
+			"https://localhost:3000",
+			"http://localhost:3000",
+			"http://localhost:5173",
+			"https://localhost:5173",
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight", "Upgrade", "Connection"},
 		AllowCredentials: true,
 	}))
 

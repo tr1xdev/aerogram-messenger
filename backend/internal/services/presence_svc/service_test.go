@@ -43,14 +43,17 @@ func TestPresenceServer(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, res.Ok)
 
-		val, _ := mr.Get("presence:" + userID)
+		val, err := mr.Get("presence:" + userID)
+		require.NoError(t, err)
 		assert.Equal(t, "online", val)
 	})
 
 	t.Run("IsOnline_True", func(t *testing.T) {
 		mr.FlushAll()
 		userID := uuid.New().String()
-		mr.Set("presence:"+userID, "online")
+
+		err := mr.Set("presence:"+userID, "online")
+		require.NoError(t, err)
 
 		req := &presencepb.IsOnlineRequest{UserId: userID}
 		res, err := server.IsOnline(ctx, req)
@@ -62,7 +65,9 @@ func TestPresenceServer(t *testing.T) {
 	t.Run("SetOffline", func(t *testing.T) {
 		mr.FlushAll()
 		userID := uuid.New().String()
-		mr.Set("presence:"+userID, "online")
+
+		err := mr.Set("presence:"+userID, "online")
+		require.NoError(t, err)
 
 		req := &presencepb.SetOfflineRequest{UserId: userID}
 		res, err := server.SetOffline(ctx, req)
@@ -82,8 +87,12 @@ func TestPresenceServer(t *testing.T) {
 		u3 := uuid.New().String()
 
 		lastSeen := "2026-03-07T12:00:00Z"
-		mr.Set("presence:"+u1, "online")
-		mr.Set("presence:"+u2, lastSeen)
+
+		err1 := mr.Set("presence:"+u1, "online")
+		require.NoError(t, err1)
+
+		err2 := mr.Set("presence:"+u2, lastSeen)
+		require.NoError(t, err2)
 
 		req := &presencepb.GetBulkRequest{
 			UserIds: []string{u1, u2, u3},

@@ -49,7 +49,7 @@ func (s *Server) getMetadata(ctx context.Context) (string, string) {
 		ip = v[0]
 	}
 	if v := md.Get("x-client-device"); len(v) > 0 {
-		ip = v[0]
+		ua = v[0]
 	} else if v := md.Get("user-agent"); len(v) > 0 {
 		ua = v[0]
 	}
@@ -125,9 +125,13 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 		}
 	}
 
-	if err := s.authRepo.StoreAndSendCode(ctx, verID, newID.String(), targetEmail, req.FirstName); err != nil {
-		fmt.Printf("DEBUG: skip email error: %v\n", err)
-	}
+	go func(vID, uID, email, name string) {
+		asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.authRepo.StoreAndSendCode(asyncCtx, vID, uID, email, name); err != nil {
+			fmt.Printf("ASYNC MAIL ERROR: %v\n", err)
+		}
+	}(verID, newID.String(), targetEmail, req.FirstName)
 
 	return &authpb.SignUpResponse{UserId: verID}, nil
 }
@@ -147,11 +151,14 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 	}
 
 	verID := uuid.NewString()
-	if err := s.authRepo.StoreAndSendCode(ctx, verID, user.ID.String(), user.Email.String, user.FirstName); err != nil {
-		if os.Getenv("APP_ENV") != "development" {
-			return nil, status.Error(codes.Internal, "email delivery failed")
+
+	go func(vID, uID, email, name string) {
+		asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.authRepo.StoreAndSendCode(asyncCtx, vID, uID, email, name); err != nil {
+			fmt.Printf("ASYNC MAIL ERROR: %v\n", err)
 		}
-	}
+	}(verID, user.ID.String(), user.Email.String, user.FirstName)
 
 	return &authpb.LoginResponse{UserId: verID}, nil
 }
@@ -174,7 +181,9 @@ func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest
 	if err != nil {
 		return nil, status.Error(codes.Internal, "tx error")
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	qtx := s.db.Queries.WithTx(tx)
 

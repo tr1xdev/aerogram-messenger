@@ -47,10 +47,13 @@ frontend/.tanstack/
 
 # Configuration files
 .env
-config.yaml
 
 # Zed editor
 .zed/
+
+# Go
+backend/go.work
+backend/go.work.sum
 
 # Other
 backend/assets/*.mmdb

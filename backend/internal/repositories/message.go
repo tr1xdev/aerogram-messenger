@@ -22,7 +22,9 @@ func (r *MessageRepository) Create(ctx context.Context, arg dbgen.CreateMessageP
 	if err != nil {
 		return dbgen.Message{}, err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	qtx := r.db.Queries.WithTx(tx)
 

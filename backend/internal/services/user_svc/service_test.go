@@ -14,10 +14,6 @@ import (
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 )
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 func TestUserInfo(t *testing.T) {
 	db := database.SetupTestDB(t)
 	server := NewServer(db)

@@ -1,0 +1,97 @@
+services:
+    api:
+        build:
+            context: .
+            dockerfile: backend/Dockerfile
+        container_name: aerogram-api
+        restart: always
+        ports:
+            - "${HTTP_PORT:-8080}:8080/tcp"
+            - "${HTTP_PORT:-8080}:8080/udp"
+            - "${GRPC_PORT:-50051}:50051/tcp"
+        env_file: .env
+        environment:
+            - DB_HOST=postgres
+            - REDIS_HOST=redis
+        volumes:
+            - ./certs:/app/certs:ro
+            - ./assets:/app/assets:ro
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        networks:
+            - aerogram-net
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+    frontend:
+        build:
+            context: .
+            dockerfile: frontend/Dockerfile
+            args:
+                - VITE_API_URL=${VITE_API_URL}
+                - VITE_WS_URL=${VITE_WS_URL}
+        container_name: aerogram-ui
+        ports:
+            - "3000:8080"
+            - "3443:8443"
+        volumes:
+            - ./certs:/etc/nginx/certs:ro
+        networks:
+            - aerogram-net
+        depends_on:
+            - api
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+    postgres:
+        image: postgres:15-alpine
+        container_name: aerogram-db
+        shm_size: 128mb
+        env_file: .env
+        environment:
+            POSTGRES_USER: ${DB_USER}
+            POSTGRES_DB: ${DB_NAME}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+        networks:
+            - aerogram-net
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+    redis:
+        image: redis:7.2-alpine
+        container_name: aerogram-redis
+        env_file: .env
+        command: redis-server --requirepass ${REDIS_PASSWORD}
+        networks:
+            - aerogram-net
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+networks:
+    aerogram-net:
+        driver: bridge
+
+volumes:
+    pgdata:

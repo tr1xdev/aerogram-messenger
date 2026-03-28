@@ -68,7 +68,7 @@ func (r *AuthRepository) VerifyCode(ctx context.Context, verID, code string) (st
 	}
 
 	var attempts int
-	fmt.Sscanf(data["attempts"], "%d", &attempts)
+	_, _ = fmt.Sscanf(data["attempts"], "%d", &attempts)
 	if attempts >= 5 {
 		r.rdb.Del(ctx, key)
 		return "", ErrTooManyAttempts
