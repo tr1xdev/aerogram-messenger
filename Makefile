@@ -2,13 +2,11 @@
         dev-backend dev-frontend test test-coverage clean download-geoip \
         infra stop-infra help
 
-# Цвета для вывода
 GREEN  := \033[0;32m
 YELLOW := \033[0;33m
 CYAN   := \033[0;36m
 RESET  := \033[0m
 
-# Переменные путей
 PWD := $(shell pwd)
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
