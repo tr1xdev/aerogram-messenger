@@ -60,6 +60,7 @@ const botSchema = z.object({
     .string()
     .min(3, "Username must be at least 3 characters")
     .max(32, "Username cannot exceed 32 characters")
+    .endsWith("bot", "Username must end with 'bot'")
     .regex(/^[a-zA-Z0-9_]+$/, "Only letters, numbers, and underscores allowed"),
   firstName: z.string().min(1, "First name is required").max(64),
   lastName: z.string().max(64).optional(),
