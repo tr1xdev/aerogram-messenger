@@ -1,4 +1,4 @@
-FROM node:24-alpine AS builder
+FROM node:22-alpine AS builder
 
 ARG VITE_API_URL
 ARG VITE_WS_URL
