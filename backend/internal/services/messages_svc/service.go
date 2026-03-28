@@ -52,7 +52,9 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		log.Printf("[ERROR] SendMessage: failed to begin tx: %v", err)
 		return nil, status.Error(codes.Internal, "failed to begin transaction")
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	qtx := s.db.Queries.WithTx(tx)
 
@@ -90,7 +92,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	protoMsg := s.mapDBToProto(msg)
 
 	msgPayload, _ := json.Marshal(protoMsg)
-	s.rdb.Publish(ctx, "chat:"+req.ChatId, msgPayload)
+	_ = s.rdb.Publish(ctx, "chat:"+req.ChatId, msgPayload)
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
 	if err == nil {
@@ -110,7 +112,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		members, err := s.db.Queries.GetDialogMembers(ctx, chatID)
 		if err == nil {
 			for _, m := range members {
-				s.rdb.Publish(ctx, "user_chats:"+m.UserID.String(), chatJson)
+				_ = s.rdb.Publish(ctx, "user_chats:"+m.UserID.String(), chatJson)
 			}
 		} else {
 			log.Printf("[WARN] SendMessage: failed to get members for notification: %v", err)

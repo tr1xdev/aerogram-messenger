@@ -181,7 +181,9 @@ func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest
 	if err != nil {
 		return nil, status.Error(codes.Internal, "tx error")
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	qtx := s.db.Queries.WithTx(tx)
 
