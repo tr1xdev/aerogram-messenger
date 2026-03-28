@@ -2,8 +2,8 @@ package repositories
 
 import (
 	"context"
-	"fmt"
 	"database/sql"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
@@ -30,7 +30,9 @@ func (r *DialogRepository) CreateDialog(
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	qtx := r.db.Queries.WithTx(tx)
 
@@ -179,7 +181,9 @@ func (r *DialogRepository) DeleteChat(ctx context.Context, dialogID, userID uuid
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	qtx := r.db.Queries.WithTx(tx)
 

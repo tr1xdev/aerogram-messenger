@@ -41,7 +41,6 @@ func NewPostgres(dsn string) (*DB, error) {
 }
 
 func (db *DB) RunMigrations() error {
-	// Спускаемся в подпапку, чтобы мигратор видел файлы напрямую
 	subFS, err := fs.Sub(migrationsFS, "sqlc/migrations")
 	if err != nil {
 		return fmt.Errorf("failed to create subfs: %w", err)
