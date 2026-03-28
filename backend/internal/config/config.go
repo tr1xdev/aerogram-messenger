@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -71,16 +72,28 @@ type ResendConfig struct {
 }
 
 func Load() (*Config, error) {
-	_ = godotenv.Load()
-
-	configPath := "config.yaml"
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		configPath = "config/config.yaml"
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		locations := []string{"config.yaml", "config/config.yaml", "../config.yaml"}
+		for _, loc := range locations {
+			if _, err := os.Stat(loc); err == nil {
+				configPath = loc
+				break
+			}
+		}
 	}
+
+	if configPath == "" {
+		return nil, fmt.Errorf("config file not found")
+	}
+
+	configDir := filepath.Dir(configPath)
+	_ = godotenv.Load(filepath.Join(configDir, ".env"))
+	_ = godotenv.Load()
 
 	content, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read config at %s: %w", configPath, err)
 	}
 
 	expandedContent := os.Expand(string(content), func(s string) string {

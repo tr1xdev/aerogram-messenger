@@ -1,6 +1,0 @@
-{
-  "devDependencies": {
-    "@tanstack/router-plugin": "^1.166.14",
-    "@tanstack/router-vite-plugin": "^1.166.14"
-  }
-}

@@ -1,4 +1,4 @@
-CREATE TABLE dialog_members (
+CREATE TABLE IF NOT EXISTS dialog_members (
     dialog_id             UUID NOT NULL REFERENCES dialogs(id) ON DELETE CASCADE,
     user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role                  VARCHAR(20) NOT NULL DEFAULT 'member',
@@ -15,5 +15,5 @@ CREATE TABLE dialog_members (
     PRIMARY KEY (dialog_id, user_id)
 );
 
-CREATE INDEX idx_dialog_members_user_id ON dialog_members(user_id);
-CREATE INDEX idx_dialog_members_role ON dialog_members(role);
+CREATE INDEX IF NOT EXISTS idx_dialog_members_user_id ON dialog_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_dialog_members_role ON dialog_members(role);

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -67,13 +66,22 @@ func main() {
 	pRepo := repositories.NewPresenceRepository(rdb)
 	pSvc := presence_svc.NewServer(pRepo)
 
-	templatePath := "internal/templates/verification.html"
+	templatePath := os.Getenv("VERIFICATION_TEMPLATE_PATH")
+	if templatePath == "" {
+		templatePath = "internal/templates/verification.html"
+	}
+
 	emailSvc, err := mailer.NewResendService(cfg.Resend.Token, cfg.Resend.From, templatePath)
 	if err != nil {
 		log.Printf("Warning: mailer init error: %v", err)
 	}
 
-	geoSvc := geo_svc.New("assets/GeoLite2-City.mmdb")
+	geoPath := os.Getenv("GEOIP_PATH")
+	if geoPath == "" {
+		geoPath = "assets/GeoLite2-City.mmdb"
+	}
+
+	geoSvc := geo_svc.New(geoPath)
 	defer geoSvc.Close()
 	uaSvc := ua_svc.New()
 
@@ -105,19 +113,14 @@ func main() {
 	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc)
 	api.SetupRoutes(router, gqlServer)
 
-	certPath := "certs/localhost+2.pem"
-	keyPath := "certs/localhost+2-key.pem"
-
-	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-	if err != nil {
-		log.Printf("failed to load mkcert files: %v. Falling back to self-signed.", err)
-		cert, _ = internal_tls.GenerateSelfSigned()
+	certPath := os.Getenv("CERT_PATH")
+	keyPath := os.Getenv("KEY_PATH")
+	if certPath == "" || keyPath == "" {
+		certPath = "certs/localhost+2.pem"
+		keyPath = "certs/localhost+2-key.pem"
 	}
 
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		NextProtos:   []string{"h3", "h2", "http/1.1"},
-	}
+	tlsConfig := internal_tls.LoadServerConfig(certPath, keyPath)
 
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 

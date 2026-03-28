@@ -61,6 +61,8 @@ services:
             POSTGRES_USER: ${DB_USER}
             POSTGRES_DB: ${DB_NAME}
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        ports:
+            - "5432:5432"
         volumes:
             - pgdata:/var/lib/postgresql/data
         healthcheck:
@@ -81,6 +83,8 @@ services:
         container_name: aerogram-redis
         env_file: .env
         command: redis-server --requirepass ${REDIS_PASSWORD}
+        ports:
+            - "6379:6379"
         networks:
             - aerogram-net
         logging:

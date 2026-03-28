@@ -1,87 +1,134 @@
-.PHONY: all proto gql generate build-backend build-frontend install-deps dev-backend dev-frontend test test-services test-coverage clean download-geoip infra stop-infra help
+.PHONY: all proto gql generate build-backend build-frontend install-deps \
+        dev-backend dev-frontend test test-coverage clean download-geoip \
+        infra stop-infra help
 
+# Цвета для вывода
 GREEN  := \033[0;32m
 YELLOW := \033[0;33m
+CYAN   := \033[0;36m
 RESET  := \033[0m
+
+# Переменные путей
+PWD := $(shell pwd)
+BACKEND_DIR := backend
+FRONTEND_DIR := frontend
+ASSETS_DIR := $(BACKEND_DIR)/assets
+CERTS_DIR := certs
 
 all: install-deps proto gql generate test build-backend build-frontend
 
 help:
-	@echo "$(YELLOW)Usage:$(RESET) make [target]"
+	@echo "$(YELLOW)Aerogram Messenger - Development Toolkit$(RESET)"
 	@echo ""
-	@echo "$(YELLOW)Development:$(RESET)"
-	@echo "  infra          - Start Postgres and Redis in Docker"
-	@echo "  stop-infra     - Stop infrastructure containers"
-	@echo "  dev-backend    - Run Go backend (connects to localhost DB)"
-	@echo "  dev-frontend   - Run Vite frontend (connects to localhost API)"
+	@echo "$(CYAN)Infrastructure:$(RESET)"
+	@echo "  make infra           - Start Postgres and Redis (Docker)"
+	@echo "  make stop-infra      - Stop infrastructure containers"
 	@echo ""
-	@echo "$(YELLOW)Code Generation:$(RESET)"
-	@echo "  proto          - Format, Lint and Generate gRPC code"
-	@echo "  gql            - Generate GraphQL schemas"
-	@echo "  generate       - Run go generate"
+	@echo "$(CYAN)Development:$(RESET)"
+	@echo "  make dev-backend     - Run Go API with local env and TLS"
+	@echo "  make dev-frontend    - Run Vite frontend (Hot Reload)"
+	@echo ""
+	@echo "$(CYAN)Code Generation:$(RESET)"
+	@echo "  make proto           - Generate gRPC code using Buf"
+	@echo "  make gql             - Generate GraphQL resolvers & models"
+	@echo "  make generate        - Run standard go generate"
+	@echo ""
+	@echo "$(CYAN)Testing & Quality:$(RESET)"
+	@echo "  make test            - Run all backend tests"
+	@echo "  make test-coverage   - Generate and view test coverage"
+	@echo "  make lint            - Run golangci-lint (if installed)"
+	@echo ""
+	@echo "$(CYAN)Build & Cleanup:$(RESET)"
+	@echo "  make install-deps    - Install Go & NPM dependencies + GeoIP"
+	@echo "  make build-backend   - Compile optimized Go binary"
+	@echo "  make build-frontend  - Build production-ready frontend"
+	@echo "  make clean           - Remove binaries, gen-code and coverage"
 
 # --- Infrastructure ---
 
 infra:
-	@echo "$(GREEN)Starting DB and Redis...$(RESET)"
-	@docker compose up -d postgres redis
+	@echo "$(GREEN)▶ Starting infrastructure...$(RESET)"
+	docker compose up -d postgres redis
 
 stop-infra:
-	@echo "$(GREEN)Stopping infrastructure...$(RESET)"
-	@docker compose stop postgres redis
+	@echo "$(YELLOW)▶ Stopping infrastructure...$(RESET)"
+	docker compose stop postgres redis
 
-# --- Execution (Local DX) ---
+# --- Development ---
 
 dev-backend:
-	@echo "$(GREEN)Starting Backend in Dev mode...$(RESET)"
-	@cd backend && DB_HOST=localhost REDIS_HOST=localhost go run cmd/aerogram-api/main.go
+	@echo "$(GREEN)▶ Starting Backend Server...$(RESET)"
+	@cd $(BACKEND_DIR) && \
+	DB_HOST=localhost \
+	REDIS_HOST=localhost \
+	CONFIG_PATH=$(PWD)/config.yaml \
+	CERT_PATH=$(PWD)/$(CERTS_DIR)/localhost+2.pem \
+	KEY_PATH=$(PWD)/$(CERTS_DIR)/localhost+2-key.pem \
+	GEOIP_PATH=$(PWD)/$(ASSETS_DIR)/GeoLite2-City.mmdb \
+	VERIFICATION_TEMPLATE_PATH=$(PWD)/$(BACKEND_DIR)/internal/templates/verification.html \
+	go run cmd/aerogram-api/main.go
 
 dev-frontend:
-	@echo "$(GREEN)Starting Frontend in Dev mode...$(RESET)"
-	@cd frontend && VITE_API_URL=http://localhost:8080/query VITE_WS_URL=wss://localhost:8080/query npm run dev
+	@echo "$(GREEN)▶ Starting Frontend...$(RESET)"
+	@cd $(FRONTEND_DIR) && \
+	VITE_API_URL=https://localhost:8080/query \
+	VITE_WS_URL=wss://localhost:8080/query \
+	npm run dev
 
 # --- Code Generation ---
 
 proto:
-	@echo "$(GREEN)Running Buf...$(RESET)"
-	@cd backend/internal/grpc/proto && buf format -w && buf lint && buf generate
+	@echo "$(GREEN)▶ Generating gRPC code...$(RESET)"
+	@cd $(BACKEND_DIR)/internal/grpc/proto && buf format -w && buf lint && buf generate
 
 gql:
-	@echo "$(GREEN)Generating GraphQL...$(RESET)"
-	@cd backend && go run github.com/99designs/gqlgen generate --config gqlgen.yml
+	@echo "$(GREEN)▶ Generating GraphQL code...$(RESET)"
+	@cd $(BACKEND_DIR) && go run github.com/99designs/gqlgen generate --config gqlgen.yml
 
 generate:
-	@echo "$(GREEN)Running go generate...$(RESET)"
-	@cd backend && go generate ./...
+	@echo "$(GREEN)▶ Running go generate...$(RESET)"
+	@cd $(BACKEND_DIR) && go generate ./...
 
-# --- Testing ---
+# --- Quality & Tests ---
 
 test:
-	@cd backend && go test -p 1 -count=1 ./...
+	@echo "$(GREEN)▶ Running tests...$(RESET)"
+	@cd $(BACKEND_DIR) && go test -v -p 1 -count=1 ./...
 
 test-coverage:
-	@cd backend && go test -coverprofile=coverage.out ./internal/services/... && go tool cover -func=coverage.out
+	@echo "$(GREEN)▶ Calculating coverage...$(RESET)"
+	@cd $(BACKEND_DIR) && go test -coverprofile=coverage.out ./internal/services/...
+	@cd $(BACKEND_DIR) && go tool cover -func=coverage.out
 
-# --- Build ---
+lint:
+	@echo "$(GREEN)▶ Linting code...$(RESET)"
+	@cd $(BACKEND_DIR) && golangci-lint run
 
-build-backend:
-	@cd backend && go build -ldflags="-s -w" -o ../bin/server ./cmd/aerogram-api/main.go
-
-build-frontend:
-	@cd frontend && npm run build
-
-# --- Deps ---
+# --- Build & Dependencies ---
 
 install-deps:
-	@cd backend && go mod tidy
-	@cd frontend && npm install
+	@echo "$(GREEN)▶ Installing dependencies...$(RESET)"
+	@cd $(BACKEND_DIR) && go mod tidy
+	@cd $(FRONTEND_DIR) && npm install
 	@$(MAKE) download-geoip
 
 download-geoip:
-	@mkdir -p backend/assets
-	@if [ ! -f backend/assets/GeoLite2-City.mmdb ]; then \
-		curl -L https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-City.mmdb -o backend/assets/GeoLite2-City.mmdb; \
+	@echo "$(GREEN)▶ Checking GeoIP database...$(RESET)"
+	@mkdir -p $(ASSETS_DIR)
+	@if [ ! -f $(ASSETS_DIR)/GeoLite2-City.mmdb ]; then \
+		curl -L https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-City.mmdb -o $(ASSETS_DIR)/GeoLite2-City.mmdb; \
+	else \
+		echo "GeoIP already exists."; \
 	fi
 
+build-backend:
+	@echo "$(GREEN)▶ Building backend binary...$(RESET)"
+	@cd $(BACKEND_DIR) && go build -ldflags="-s -w" -o ../bin/server ./cmd/aerogram-api/main.go
+
+build-frontend:
+	@echo "$(GREEN)▶ Building frontend bundle...$(RESET)"
+	@cd $(FRONTEND_DIR) && npm run build
+
 clean:
-	@rm -rf backend/internal/grpc/gen/* bin/ frontend/dist/ backend/coverage.out
+	@echo "$(YELLOW)▶ Cleaning up...$(RESET)"
+	rm -rf $(BACKEND_DIR)/internal/grpc/gen/* bin/ $(FRONTEND_DIR)/dist/ $(BACKEND_DIR)/coverage.out

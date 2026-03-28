@@ -1,4 +1,4 @@
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
     id              UUID PRIMARY KEY,
     dialog_id       UUID NOT NULL REFERENCES dialogs(id) ON DELETE CASCADE,
     author_id       UUID NOT NULL REFERENCES users(id),
@@ -18,21 +18,21 @@ CREATE TABLE messages (
     deleted_at      TIMESTAMPTZ
 );
 
-CREATE UNIQUE INDEX idx_messages_dialog_sequence ON messages(dialog_id, sequence);
-CREATE INDEX idx_messages_author_id ON messages(author_id);
-CREATE INDEX idx_messages_deleted_at ON messages(deleted_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dialog_sequence ON messages(dialog_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_messages_author_id ON messages(author_id);
+CREATE INDEX IF NOT EXISTS idx_messages_deleted_at ON messages(deleted_at);
 
-CREATE TABLE message_revisions (
-    id         UUID PRIMARY KEY,
-    message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-    old_text   TEXT NOT NULL,
-    editor_id  UUID NOT NULL REFERENCES users(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS message_revisions (
+    id          UUID PRIMARY KEY,
+    message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    old_text    TEXT NOT NULL,
+    editor_id   UUID NOT NULL REFERENCES users(id),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_message_revisions_message_id ON message_revisions(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_revisions_message_id ON message_revisions(message_id);
 
-CREATE TABLE message_actions (
+CREATE TABLE IF NOT EXISTS message_actions (
     id          UUID PRIMARY KEY,
     message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
     user_id     UUID NOT NULL REFERENCES users(id),
@@ -40,4 +40,4 @@ CREATE TABLE message_actions (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_message_actions_message_id ON message_actions(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_actions_message_id ON message_actions(message_id);
