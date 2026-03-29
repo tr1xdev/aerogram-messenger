@@ -13,6 +13,11 @@ import { Route as publicSignupRouteImport } from './app/routes/(public)/signup'
 import { Route as publicOtpRouteImport } from './app/routes/(public)/otp'
 import { Route as publicLoginRouteImport } from './app/routes/(public)/login'
 import { Route as protectedLayoutRouteImport } from './app/routes/(protected)/_layout'
+import { Route as errors503RouteImport } from './app/routes/(errors)/503'
+import { Route as errors500RouteImport } from './app/routes/(errors)/500'
+import { Route as errors404RouteImport } from './app/routes/(errors)/404'
+import { Route as errors403RouteImport } from './app/routes/(errors)/403'
+import { Route as errors401RouteImport } from './app/routes/(errors)/401'
 import { Route as protectedLayoutIndexRouteImport } from './app/routes/(protected)/_layout/index'
 import { Route as protectedLayoutSettingsRouteImport } from './app/routes/(protected)/_layout/settings'
 import { Route as protectedLayoutBotsIndexRouteImport } from './app/routes/(protected)/_layout/bots.index'
@@ -38,6 +43,31 @@ const publicLoginRoute = publicLoginRouteImport.update({
 } as any)
 const protectedLayoutRoute = protectedLayoutRouteImport.update({
   id: '/(protected)/_layout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const errors503Route = errors503RouteImport.update({
+  id: '/(errors)/503',
+  path: '/503',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const errors500Route = errors500RouteImport.update({
+  id: '/(errors)/500',
+  path: '/500',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const errors404Route = errors404RouteImport.update({
+  id: '/(errors)/404',
+  path: '/404',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const errors403Route = errors403RouteImport.update({
+  id: '/(errors)/403',
+  path: '/403',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const errors401Route = errors401RouteImport.update({
+  id: '/(errors)/401',
+  path: '/401',
   getParentRoute: () => rootRouteImport,
 } as any)
 const protectedLayoutIndexRoute = protectedLayoutIndexRouteImport.update({
@@ -82,6 +112,11 @@ const protectedLayoutBotsBotIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/401': typeof errors401Route
+  '/403': typeof errors403Route
+  '/404': typeof errors404Route
+  '/500': typeof errors500Route
+  '/503': typeof errors503Route
   '/login': typeof publicLoginRoute
   '/otp': typeof publicOtpRoute
   '/signup': typeof publicSignupRoute
@@ -94,6 +129,11 @@ export interface FileRoutesByFullPath {
   '/bots/': typeof protectedLayoutBotsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/401': typeof errors401Route
+  '/403': typeof errors403Route
+  '/404': typeof errors404Route
+  '/500': typeof errors500Route
+  '/503': typeof errors503Route
   '/login': typeof publicLoginRoute
   '/otp': typeof publicOtpRoute
   '/signup': typeof publicSignupRoute
@@ -107,6 +147,11 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/(errors)/401': typeof errors401Route
+  '/(errors)/403': typeof errors403Route
+  '/(errors)/404': typeof errors404Route
+  '/(errors)/500': typeof errors500Route
+  '/(errors)/503': typeof errors503Route
   '/(protected)/_layout': typeof protectedLayoutRouteWithChildren
   '/(public)/login': typeof publicLoginRoute
   '/(public)/otp': typeof publicOtpRoute
@@ -122,6 +167,11 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/401'
+    | '/403'
+    | '/404'
+    | '/500'
+    | '/503'
     | '/login'
     | '/otp'
     | '/signup'
@@ -134,6 +184,11 @@ export interface FileRouteTypes {
     | '/bots/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/401'
+    | '/403'
+    | '/404'
+    | '/500'
+    | '/503'
     | '/login'
     | '/otp'
     | '/signup'
@@ -146,6 +201,11 @@ export interface FileRouteTypes {
     | '/bots'
   id:
     | '__root__'
+    | '/(errors)/401'
+    | '/(errors)/403'
+    | '/(errors)/404'
+    | '/(errors)/500'
+    | '/(errors)/503'
     | '/(protected)/_layout'
     | '/(public)/login'
     | '/(public)/otp'
@@ -160,6 +220,11 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  errors401Route: typeof errors401Route
+  errors403Route: typeof errors403Route
+  errors404Route: typeof errors404Route
+  errors500Route: typeof errors500Route
+  errors503Route: typeof errors503Route
   protectedLayoutRoute: typeof protectedLayoutRouteWithChildren
   publicLoginRoute: typeof publicLoginRoute
   publicOtpRoute: typeof publicOtpRoute
@@ -194,6 +259,41 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: ''
       preLoaderRoute: typeof protectedLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/503': {
+      id: '/(errors)/503'
+      path: '/503'
+      fullPath: '/503'
+      preLoaderRoute: typeof errors503RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/500': {
+      id: '/(errors)/500'
+      path: '/500'
+      fullPath: '/500'
+      preLoaderRoute: typeof errors500RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/404': {
+      id: '/(errors)/404'
+      path: '/404'
+      fullPath: '/404'
+      preLoaderRoute: typeof errors404RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/403': {
+      id: '/(errors)/403'
+      path: '/403'
+      fullPath: '/403'
+      preLoaderRoute: typeof errors403RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/401': {
+      id: '/(errors)/401'
+      path: '/401'
+      fullPath: '/401'
+      preLoaderRoute: typeof errors401RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(protected)/_layout/': {
@@ -273,6 +373,11 @@ const protectedLayoutRouteWithChildren = protectedLayoutRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  errors401Route: errors401Route,
+  errors403Route: errors403Route,
+  errors404Route: errors404Route,
+  errors500Route: errors500Route,
+  errors503Route: errors503Route,
   protectedLayoutRoute: protectedLayoutRouteWithChildren,
   publicLoginRoute: publicLoginRoute,
   publicOtpRoute: publicOtpRoute,
