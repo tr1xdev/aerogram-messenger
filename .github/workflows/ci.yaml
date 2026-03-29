@@ -2,17 +2,13 @@ name: CI/CD Pipeline
 
 on:
     push:
-        branches: [main, master, develop]
+        branches: [main, master, develop, "refactor/*"]
     pull_request:
         branches: [main, master, develop]
 
 jobs:
     quality-gate:
         runs-on: ubuntu-latest
-
-        defaults:
-            run:
-                working-directory: backend
 
         services:
             postgres:
@@ -50,23 +46,14 @@ jobs:
                   cache: true
                   cache-dependency-path: backend/go.sum
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 22
-                  cache: "npm"
-                  cache-dependency-path: backend/package-lock.json
-
-            - name: Install dependencies
-              run: |
-                  go mod download
-                  if [ -f "package.json" ]; then
-                    npm ci
-                  fi
+            - name: Install Backend Dependencies
+              working-directory: backend
+              run: go mod download
               env:
                   GOWORK: off
 
             - name: Run Backend Tests
+              working-directory: backend
               run: go test -v -p 1 -count=1 ./...
               env:
                   GOWORK: off
@@ -76,16 +63,14 @@ jobs:
                   JWT_SECRET: ci_test_secret_key
 
             - name: Lint Go code
-              run: |
-                  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-                  $(go env GOPATH)/bin/golangci-lint run --timeout=10m
-              env:
-                  GOWORK: off
+              uses: golangci/golangci-lint-action@v6
+              with:
+                  version: latest
+                  working-directory: backend
+                  args: --timeout=10m
 
             - name: Verify Docker Build
-              working-directory: .
-              run: |
-                  docker compose build
+              run: docker compose build
               env:
                   JWT_SECRET: dummy_secret
                   RESEND_API_KEY: dummy_key
