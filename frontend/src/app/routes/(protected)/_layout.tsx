@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { AnimatePresence } from "framer-motion";
 
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app/layout/app-sidebar";
@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/(protected)/_layout")({
   beforeLoad: () => {
     if (!useAuthStore.getState().isAuth) {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/sign-in" });
     }
   },
   component: LayoutComponent,

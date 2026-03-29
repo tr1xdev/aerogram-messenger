@@ -9,8 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './app/routes/__root'
+import { Route as authRouteRouteImport } from './app/routes/(auth)/route'
+import { Route as publicV1OtpRouteImport } from './app/routes/(public)/v1-otp'
 import { Route as publicSignupRouteImport } from './app/routes/(public)/signup'
-import { Route as publicOtpRouteImport } from './app/routes/(public)/otp'
 import { Route as publicLoginRouteImport } from './app/routes/(public)/login'
 import { Route as protectedLayoutRouteImport } from './app/routes/(protected)/_layout'
 import { Route as errors503RouteImport } from './app/routes/(errors)/503'
@@ -18,6 +19,10 @@ import { Route as errors500RouteImport } from './app/routes/(errors)/500'
 import { Route as errors404RouteImport } from './app/routes/(errors)/404'
 import { Route as errors403RouteImport } from './app/routes/(errors)/403'
 import { Route as errors401RouteImport } from './app/routes/(errors)/401'
+import { Route as authSignUpRouteImport } from './app/routes/(auth)/sign-up'
+import { Route as authSignInRouteImport } from './app/routes/(auth)/sign-in'
+import { Route as authOtpRouteImport } from './app/routes/(auth)/otp'
+import { Route as authForgotPasswordRouteImport } from './app/routes/(auth)/forgot-password'
 import { Route as protectedLayoutIndexRouteImport } from './app/routes/(protected)/_layout/index'
 import { Route as protectedLayoutSettingsRouteImport } from './app/routes/(protected)/_layout/settings'
 import { Route as protectedLayoutBotsIndexRouteImport } from './app/routes/(protected)/_layout/bots.index'
@@ -26,14 +31,18 @@ import { Route as protectedLayoutChatChatIdRouteImport } from './app/routes/(pro
 import { Route as protectedLayoutBotsCreateRouteImport } from './app/routes/(protected)/_layout/bots.create'
 import { Route as protectedLayoutBotsBotIdRouteImport } from './app/routes/(protected)/_layout/bots.$botId'
 
+const authRouteRoute = authRouteRouteImport.update({
+  id: '/(auth)',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicV1OtpRoute = publicV1OtpRouteImport.update({
+  id: '/(public)/v1-otp',
+  path: '/v1-otp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const publicSignupRoute = publicSignupRouteImport.update({
   id: '/(public)/signup',
   path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const publicOtpRoute = publicOtpRouteImport.update({
-  id: '/(public)/otp',
-  path: '/otp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const publicLoginRoute = publicLoginRouteImport.update({
@@ -69,6 +78,26 @@ const errors401Route = errors401RouteImport.update({
   id: '/(errors)/401',
   path: '/401',
   getParentRoute: () => rootRouteImport,
+} as any)
+const authSignUpRoute = authSignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authSignInRoute = authSignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authOtpRoute = authOtpRouteImport.update({
+  id: '/otp',
+  path: '/otp',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => authRouteRoute,
 } as any)
 const protectedLayoutIndexRoute = protectedLayoutIndexRouteImport.update({
   id: '/',
@@ -112,14 +141,18 @@ const protectedLayoutBotsBotIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/forgot-password': typeof authForgotPasswordRoute
+  '/otp': typeof authOtpRoute
+  '/sign-in': typeof authSignInRoute
+  '/sign-up': typeof authSignUpRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/login': typeof publicLoginRoute
-  '/otp': typeof publicOtpRoute
   '/signup': typeof publicSignupRoute
+  '/v1-otp': typeof publicV1OtpRoute
   '/settings': typeof protectedLayoutSettingsRoute
   '/': typeof protectedLayoutIndexRoute
   '/bots/$botId': typeof protectedLayoutBotsBotIdRoute
@@ -129,14 +162,18 @@ export interface FileRoutesByFullPath {
   '/bots/': typeof protectedLayoutBotsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/forgot-password': typeof authForgotPasswordRoute
+  '/otp': typeof authOtpRoute
+  '/sign-in': typeof authSignInRoute
+  '/sign-up': typeof authSignUpRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/login': typeof publicLoginRoute
-  '/otp': typeof publicOtpRoute
   '/signup': typeof publicSignupRoute
+  '/v1-otp': typeof publicV1OtpRoute
   '/settings': typeof protectedLayoutSettingsRoute
   '/': typeof protectedLayoutIndexRoute
   '/bots/$botId': typeof protectedLayoutBotsBotIdRoute
@@ -147,6 +184,11 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/(auth)': typeof authRouteRouteWithChildren
+  '/(auth)/forgot-password': typeof authForgotPasswordRoute
+  '/(auth)/otp': typeof authOtpRoute
+  '/(auth)/sign-in': typeof authSignInRoute
+  '/(auth)/sign-up': typeof authSignUpRoute
   '/(errors)/401': typeof errors401Route
   '/(errors)/403': typeof errors403Route
   '/(errors)/404': typeof errors404Route
@@ -154,8 +196,8 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/(protected)/_layout': typeof protectedLayoutRouteWithChildren
   '/(public)/login': typeof publicLoginRoute
-  '/(public)/otp': typeof publicOtpRoute
   '/(public)/signup': typeof publicSignupRoute
+  '/(public)/v1-otp': typeof publicV1OtpRoute
   '/(protected)/_layout/settings': typeof protectedLayoutSettingsRoute
   '/(protected)/_layout/': typeof protectedLayoutIndexRoute
   '/(protected)/_layout/bots/$botId': typeof protectedLayoutBotsBotIdRoute
@@ -167,14 +209,18 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/forgot-password'
+    | '/otp'
+    | '/sign-in'
+    | '/sign-up'
     | '/401'
     | '/403'
     | '/404'
     | '/500'
     | '/503'
     | '/login'
-    | '/otp'
     | '/signup'
+    | '/v1-otp'
     | '/settings'
     | '/'
     | '/bots/$botId'
@@ -184,14 +230,18 @@ export interface FileRouteTypes {
     | '/bots/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/forgot-password'
+    | '/otp'
+    | '/sign-in'
+    | '/sign-up'
     | '/401'
     | '/403'
     | '/404'
     | '/500'
     | '/503'
     | '/login'
-    | '/otp'
     | '/signup'
+    | '/v1-otp'
     | '/settings'
     | '/'
     | '/bots/$botId'
@@ -201,6 +251,11 @@ export interface FileRouteTypes {
     | '/bots'
   id:
     | '__root__'
+    | '/(auth)'
+    | '/(auth)/forgot-password'
+    | '/(auth)/otp'
+    | '/(auth)/sign-in'
+    | '/(auth)/sign-up'
     | '/(errors)/401'
     | '/(errors)/403'
     | '/(errors)/404'
@@ -208,8 +263,8 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/(protected)/_layout'
     | '/(public)/login'
-    | '/(public)/otp'
     | '/(public)/signup'
+    | '/(public)/v1-otp'
     | '/(protected)/_layout/settings'
     | '/(protected)/_layout/'
     | '/(protected)/_layout/bots/$botId'
@@ -220,6 +275,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  authRouteRoute: typeof authRouteRouteWithChildren
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
   errors404Route: typeof errors404Route
@@ -227,24 +283,31 @@ export interface RootRouteChildren {
   errors503Route: typeof errors503Route
   protectedLayoutRoute: typeof protectedLayoutRouteWithChildren
   publicLoginRoute: typeof publicLoginRoute
-  publicOtpRoute: typeof publicOtpRoute
   publicSignupRoute: typeof publicSignupRoute
+  publicV1OtpRoute: typeof publicV1OtpRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/(auth)': {
+      id: '/(auth)'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof authRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/v1-otp': {
+      id: '/(public)/v1-otp'
+      path: '/v1-otp'
+      fullPath: '/v1-otp'
+      preLoaderRoute: typeof publicV1OtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(public)/signup': {
       id: '/(public)/signup'
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof publicSignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(public)/otp': {
-      id: '/(public)/otp'
-      path: '/otp'
-      fullPath: '/otp'
-      preLoaderRoute: typeof publicOtpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(public)/login': {
@@ -295,6 +358,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/401'
       preLoaderRoute: typeof errors401RouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/sign-up': {
+      id: '/(auth)/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof authSignUpRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/sign-in': {
+      id: '/(auth)/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof authSignInRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/otp': {
+      id: '/(auth)/otp'
+      path: '/otp'
+      fullPath: '/otp'
+      preLoaderRoute: typeof authOtpRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/forgot-password': {
+      id: '/(auth)/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof authForgotPasswordRouteImport
+      parentRoute: typeof authRouteRoute
     }
     '/(protected)/_layout/': {
       id: '/(protected)/_layout/'
@@ -348,6 +439,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface authRouteRouteChildren {
+  authForgotPasswordRoute: typeof authForgotPasswordRoute
+  authOtpRoute: typeof authOtpRoute
+  authSignInRoute: typeof authSignInRoute
+  authSignUpRoute: typeof authSignUpRoute
+}
+
+const authRouteRouteChildren: authRouteRouteChildren = {
+  authForgotPasswordRoute: authForgotPasswordRoute,
+  authOtpRoute: authOtpRoute,
+  authSignInRoute: authSignInRoute,
+  authSignUpRoute: authSignUpRoute,
+}
+
+const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
+  authRouteRouteChildren,
+)
+
 interface protectedLayoutRouteChildren {
   protectedLayoutSettingsRoute: typeof protectedLayoutSettingsRoute
   protectedLayoutIndexRoute: typeof protectedLayoutIndexRoute
@@ -373,6 +482,7 @@ const protectedLayoutRouteWithChildren = protectedLayoutRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  authRouteRoute: authRouteRouteWithChildren,
   errors401Route: errors401Route,
   errors403Route: errors403Route,
   errors404Route: errors404Route,
@@ -380,8 +490,8 @@ const rootRouteChildren: RootRouteChildren = {
   errors503Route: errors503Route,
   protectedLayoutRoute: protectedLayoutRouteWithChildren,
   publicLoginRoute: publicLoginRoute,
-  publicOtpRoute: publicOtpRoute,
   publicSignupRoute: publicSignupRoute,
+  publicV1OtpRoute: publicV1OtpRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
