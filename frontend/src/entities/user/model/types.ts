@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { gqlClient } from "@/shared/api/client";
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/store/auth-store";
 import {
   LOGIN_MUTATION,
   SIGNUP_MUTATION,
@@ -75,7 +75,7 @@ export const useSignUp = () => {
 
 export const useVerifyEmail = () => {
   const navigate = useNavigate();
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const setTokens = useAuthStore((state) => state.setTokens);
 
   return useMutation({
     mutationFn: async (variables: VerifyVariables) => {
@@ -86,9 +86,7 @@ export const useVerifyEmail = () => {
       return response.verifyEmail;
     },
     onSuccess: (data) => {
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
-      setAuth(true);
+      setTokens(data.access_token, data.refresh_token);
       navigate({ to: "/" });
     },
   });
