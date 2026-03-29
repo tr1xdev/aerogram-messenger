@@ -28,9 +28,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface UserAuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
-  redirectTo?: string;
-}
+type UserAuthFormProps = React.HTMLAttributes<HTMLFormElement>;
 
 export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const { mutate, isPending, error } = useLogin();
