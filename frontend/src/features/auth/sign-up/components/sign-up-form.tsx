@@ -19,7 +19,7 @@ import { PasswordInput } from "@/components/password-input";
 
 const formSchema = z
   .object({
-    firstName: z.string().min(2, "First name must be at least 2 characters"),
+    firstName: z.string().min(2, "Min. 2 characters"),
     lastName: z.string().optional(),
     username: z
       .string()
@@ -85,7 +85,7 @@ export function SignUpForm({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
           <FormField
             control={form.control}
             name="firstName"
@@ -208,15 +208,12 @@ export function SignUpForm({
           Create Account
         </Button>
 
-        <div className="relative my-2">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
-              Or continue with
-            </span>
-          </div>
+        <div className="my-2 flex items-center gap-3">
+          <div className="flex-1 border-t" />
+          <span className="text-xs uppercase text-muted-foreground">
+            Or continue with
+          </span>
+          <div className="flex-1 border-t" />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
