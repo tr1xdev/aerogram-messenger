@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useMutation, useApolloClient } from "@apollo/client/react";
 import { gql } from "@apollo/client";
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/store/auth-store";
 import type { User } from "@/entities/chat/model/types";
 
 const LOGOUT = gql`
@@ -29,7 +29,7 @@ export function ProfileContent({
 }: ProfileContentProps) {
   const [logoutMutation] = useMutation(LOGOUT);
   const client = useApolloClient();
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const logout = useAuthStore((s) => s.logout);
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -37,12 +37,8 @@ export function ProfileContent({
     } catch (e) {
       console.error(e);
     } finally {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-
       await client.clearStore();
-
-      setAuth(false);
+      logout();
       onActionComplete?.();
     }
   };

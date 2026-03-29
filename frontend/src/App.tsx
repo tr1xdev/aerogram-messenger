@@ -1,17 +1,12 @@
-import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { routeTree } from "./routeTree.gen";
-import { QueryClient } from "@tanstack/react-query";
+import { RouterProvider } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { router } from "@/app/router";
 import { useThemeStore } from "./store/theme";
 import { useEffect } from "react";
-
-const queryClient = new QueryClient();
-
-const router = createRouter({
-  routeTree,
-  context: { queryClient },
-});
+import { Toaster } from "@/components/ui/sonner";
 
 export default function App() {
+  const queryClient = useQueryClient();
   const theme = useThemeStore((state) => state.theme);
 
   useEffect(() => {
@@ -20,5 +15,10 @@ export default function App() {
     else root.classList.remove("dark");
   }, [theme]);
 
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} context={{ queryClient }} />
+      <Toaster />
+    </>
+  );
 }

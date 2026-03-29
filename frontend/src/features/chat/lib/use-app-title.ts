@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useApolloClient } from "@apollo/client/react";
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/store/auth-store";
 import { GET_MY_CHATS } from "../api";
 import type { Chat } from "@/entities/chat/model/types";
 
