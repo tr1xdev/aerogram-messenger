@@ -4,7 +4,7 @@ import { useApolloClient } from "@apollo/client/react";
 import {
   useSearchUsers,
   useChatActions,
-} from "@/features/chat/lib/use-messages";
+} from "@/features/chat/lib";
 import {
   Dialog,
   DialogContent,

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
+import { useMyChats, useMe } from "@/features/chat/lib";
 import { ChatMenuItem } from "@/features/chat/ui/chat-menu-item";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Chat } from "@/entities/chat/model/types";

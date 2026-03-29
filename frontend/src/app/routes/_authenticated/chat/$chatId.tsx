@@ -12,12 +12,13 @@ import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/store/chat";
 import {
   useChatHistory,
-  useChatActions,
   useMe,
   useChatDetails,
   useMyChats,
   useTypingSubscription,
-} from "@/features/chat/lib/use-messages";
+  useMessageActions,
+  useSendTyping,
+} from "@/features/chat/lib";
 import { useMarkDialog } from "@/features/chat/lib/use-mark-dialog";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
@@ -82,8 +83,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     lastReadSequence,
   } = useChatHistory(chatId);
 
-  const { sendMessage, editMessage, decryptMessage, sendTyping } =
-    useChatActions(chatId);
+  const { sendMessage, editMessage, decryptMessage } =
+    useMessageActions(chatId);
+  const { sendTyping } = useSendTyping(chatId);
 
   const { data: chatsData } = useMyChats();
 

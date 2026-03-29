@@ -18,7 +18,7 @@ import { MobileNav } from "@/features/navigation/ui/mobile-nav";
 import { UserProfileOverlay } from "@/features/user/ui/user-profile-overlay";
 import { Toaster } from "@/components/ui/sonner";
 
-import { useMe } from "@/features/chat/lib/use-messages";
+import { useMe } from "@/features/chat/lib/use-me";
 import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";

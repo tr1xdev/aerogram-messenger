@@ -1,4 +1,4 @@
-import { useMyChats, useMe } from "@/features/chat/lib/use-messages";
+import { useMyChats, useMe } from "@/features/chat/lib";
 import { useGlobalSubscriptions } from "@/features/chat/lib/use-global-subscription";
 import { useEffect } from "react";
 import type { Chat } from "@/entities/chat/model/types";

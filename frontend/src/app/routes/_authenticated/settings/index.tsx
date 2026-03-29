@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMe } from "@/features/chat/lib/use-messages";
+import { useMe } from "@/features/chat/lib";
 import { MobileSettingsView } from "@/features/settings/ui/mobile-settings-view";
 
 const SettingsPage = () => {
