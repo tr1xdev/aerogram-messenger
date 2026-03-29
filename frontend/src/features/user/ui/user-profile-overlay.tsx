@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import { useQuery } from "@apollo/client/react";
 import { motion } from "framer-motion";
 import { GET_USER_BY_ID } from "@/features/chat/api";
@@ -16,10 +16,6 @@ import {
 import { toast } from "sonner";
 import type { User } from "@/entities/chat/model/types";
 import { MdVerified } from "react-icons/md";
-
-export const Route = createFileRoute("/(protected)/_layout/user/$userId")({
-  component: () => null,
-});
 
 export function UserProfileOverlay({ userId }: { userId: string }) {
   const router = useRouter();

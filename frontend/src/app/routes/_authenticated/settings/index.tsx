@@ -7,6 +7,6 @@ const SettingsPage = () => {
   return <MobileSettingsView user={userData?.me} />;
 };
 
-export const Route = createFileRoute("/(protected)/_layout/settings")({
+export const Route = createFileRoute("/_authenticated/settings/")({
   component: SettingsPage,
 });

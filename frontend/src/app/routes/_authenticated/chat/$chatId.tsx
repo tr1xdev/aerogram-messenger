@@ -38,7 +38,7 @@ interface SentCacheEntry {
 
 const MATCH_THRESHOLD_MS: number = 5000;
 
-export const Route = createFileRoute("/(protected)/_layout/chat/$chatId")({
+export const Route = createFileRoute("/_authenticated/chat/$chatId")({
   component: ChatRoute,
 });
 

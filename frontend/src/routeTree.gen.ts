@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './app/routes/__root'
+import { Route as AuthenticatedRouteRouteImport } from './app/routes/_authenticated/route'
 import { Route as authRouteRouteImport } from './app/routes/(auth)/route'
+import { Route as AuthenticatedIndexRouteImport } from './app/routes/_authenticated/index'
 import { Route as publicV1OtpRouteImport } from './app/routes/(public)/v1-otp'
 import { Route as publicSignupRouteImport } from './app/routes/(public)/signup'
 import { Route as publicLoginRouteImport } from './app/routes/(public)/login'
@@ -23,17 +25,25 @@ import { Route as authSignUpRouteImport } from './app/routes/(auth)/sign-up'
 import { Route as authSignInRouteImport } from './app/routes/(auth)/sign-in'
 import { Route as authOtpRouteImport } from './app/routes/(auth)/otp'
 import { Route as authForgotPasswordRouteImport } from './app/routes/(auth)/forgot-password'
-import { Route as protectedLayoutIndexRouteImport } from './app/routes/(protected)/_layout/index'
-import { Route as protectedLayoutSettingsRouteImport } from './app/routes/(protected)/_layout/settings'
-import { Route as protectedLayoutBotsIndexRouteImport } from './app/routes/(protected)/_layout/bots.index'
-import { Route as protectedLayoutUserUserIdRouteImport } from './app/routes/(protected)/_layout/user.$userId'
-import { Route as protectedLayoutChatChatIdRouteImport } from './app/routes/(protected)/_layout/chat.$chatId'
-import { Route as protectedLayoutBotsCreateRouteImport } from './app/routes/(protected)/_layout/bots.create'
-import { Route as protectedLayoutBotsBotIdRouteImport } from './app/routes/(protected)/_layout/bots.$botId'
+import { Route as AuthenticatedSettingsIndexRouteImport } from './app/routes/_authenticated/settings/index'
+import { Route as AuthenticatedBotsIndexRouteImport } from './app/routes/_authenticated/bots/index'
+import { Route as AuthenticatedUsersUserIdRouteImport } from './app/routes/_authenticated/users/$userId'
+import { Route as AuthenticatedChatChatIdRouteImport } from './app/routes/_authenticated/chat/$chatId'
+import { Route as AuthenticatedBotsCreateRouteImport } from './app/routes/_authenticated/bots/create'
+import { Route as AuthenticatedBotsBotIdRouteImport } from './app/routes/_authenticated/bots/$botId'
 
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const authRouteRoute = authRouteRouteImport.update({
   id: '/(auth)',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const publicV1OtpRoute = publicV1OtpRouteImport.update({
   id: '/(public)/v1-otp',
@@ -99,48 +109,41 @@ const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => authRouteRoute,
 } as any)
-const protectedLayoutIndexRoute = protectedLayoutIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => protectedLayoutRoute,
+const AuthenticatedSettingsIndexRoute =
+  AuthenticatedSettingsIndexRouteImport.update({
+    id: '/settings/',
+    path: '/settings/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedBotsIndexRoute = AuthenticatedBotsIndexRouteImport.update({
+  id: '/bots/',
+  path: '/bots/',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const protectedLayoutSettingsRoute = protectedLayoutSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => protectedLayoutRoute,
+const AuthenticatedUsersUserIdRoute =
+  AuthenticatedUsersUserIdRouteImport.update({
+    id: '/users/$userId',
+    path: '/users/$userId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedChatChatIdRoute = AuthenticatedChatChatIdRouteImport.update({
+  id: '/chat/$chatId',
+  path: '/chat/$chatId',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const protectedLayoutBotsIndexRoute =
-  protectedLayoutBotsIndexRouteImport.update({
-    id: '/bots/',
-    path: '/bots/',
-    getParentRoute: () => protectedLayoutRoute,
-  } as any)
-const protectedLayoutUserUserIdRoute =
-  protectedLayoutUserUserIdRouteImport.update({
-    id: '/user/$userId',
-    path: '/user/$userId',
-    getParentRoute: () => protectedLayoutRoute,
-  } as any)
-const protectedLayoutChatChatIdRoute =
-  protectedLayoutChatChatIdRouteImport.update({
-    id: '/chat/$chatId',
-    path: '/chat/$chatId',
-    getParentRoute: () => protectedLayoutRoute,
-  } as any)
-const protectedLayoutBotsCreateRoute =
-  protectedLayoutBotsCreateRouteImport.update({
-    id: '/bots/create',
-    path: '/bots/create',
-    getParentRoute: () => protectedLayoutRoute,
-  } as any)
-const protectedLayoutBotsBotIdRoute =
-  protectedLayoutBotsBotIdRouteImport.update({
-    id: '/bots/$botId',
-    path: '/bots/$botId',
-    getParentRoute: () => protectedLayoutRoute,
-  } as any)
+const AuthenticatedBotsCreateRoute = AuthenticatedBotsCreateRouteImport.update({
+  id: '/bots/create',
+  path: '/bots/create',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedBotsBotIdRoute = AuthenticatedBotsBotIdRouteImport.update({
+  id: '/bots/$botId',
+  path: '/bots/$botId',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof AuthenticatedIndexRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
@@ -153,13 +156,12 @@ export interface FileRoutesByFullPath {
   '/login': typeof publicLoginRoute
   '/signup': typeof publicSignupRoute
   '/v1-otp': typeof publicV1OtpRoute
-  '/settings': typeof protectedLayoutSettingsRoute
-  '/': typeof protectedLayoutIndexRoute
-  '/bots/$botId': typeof protectedLayoutBotsBotIdRoute
-  '/bots/create': typeof protectedLayoutBotsCreateRoute
-  '/chat/$chatId': typeof protectedLayoutChatChatIdRoute
-  '/user/$userId': typeof protectedLayoutUserUserIdRoute
-  '/bots/': typeof protectedLayoutBotsIndexRoute
+  '/bots/$botId': typeof AuthenticatedBotsBotIdRoute
+  '/bots/create': typeof AuthenticatedBotsCreateRoute
+  '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
+  '/users/$userId': typeof AuthenticatedUsersUserIdRoute
+  '/bots/': typeof AuthenticatedBotsIndexRoute
+  '/settings/': typeof AuthenticatedSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/forgot-password': typeof authForgotPasswordRoute
@@ -174,17 +176,18 @@ export interface FileRoutesByTo {
   '/login': typeof publicLoginRoute
   '/signup': typeof publicSignupRoute
   '/v1-otp': typeof publicV1OtpRoute
-  '/settings': typeof protectedLayoutSettingsRoute
-  '/': typeof protectedLayoutIndexRoute
-  '/bots/$botId': typeof protectedLayoutBotsBotIdRoute
-  '/bots/create': typeof protectedLayoutBotsCreateRoute
-  '/chat/$chatId': typeof protectedLayoutChatChatIdRoute
-  '/user/$userId': typeof protectedLayoutUserUserIdRoute
-  '/bots': typeof protectedLayoutBotsIndexRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/bots/$botId': typeof AuthenticatedBotsBotIdRoute
+  '/bots/create': typeof AuthenticatedBotsCreateRoute
+  '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
+  '/users/$userId': typeof AuthenticatedUsersUserIdRoute
+  '/bots': typeof AuthenticatedBotsIndexRoute
+  '/settings': typeof AuthenticatedSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(auth)': typeof authRouteRouteWithChildren
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/sign-in': typeof authSignInRoute
@@ -194,21 +197,22 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
-  '/(protected)/_layout': typeof protectedLayoutRouteWithChildren
+  '/(protected)/_layout': typeof protectedLayoutRoute
   '/(public)/login': typeof publicLoginRoute
   '/(public)/signup': typeof publicSignupRoute
   '/(public)/v1-otp': typeof publicV1OtpRoute
-  '/(protected)/_layout/settings': typeof protectedLayoutSettingsRoute
-  '/(protected)/_layout/': typeof protectedLayoutIndexRoute
-  '/(protected)/_layout/bots/$botId': typeof protectedLayoutBotsBotIdRoute
-  '/(protected)/_layout/bots/create': typeof protectedLayoutBotsCreateRoute
-  '/(protected)/_layout/chat/$chatId': typeof protectedLayoutChatChatIdRoute
-  '/(protected)/_layout/user/$userId': typeof protectedLayoutUserUserIdRoute
-  '/(protected)/_layout/bots/': typeof protectedLayoutBotsIndexRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/bots/$botId': typeof AuthenticatedBotsBotIdRoute
+  '/_authenticated/bots/create': typeof AuthenticatedBotsCreateRoute
+  '/_authenticated/chat/$chatId': typeof AuthenticatedChatChatIdRoute
+  '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
+  '/_authenticated/bots/': typeof AuthenticatedBotsIndexRoute
+  '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/forgot-password'
     | '/otp'
     | '/sign-in'
@@ -221,13 +225,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/v1-otp'
-    | '/settings'
-    | '/'
     | '/bots/$botId'
     | '/bots/create'
     | '/chat/$chatId'
-    | '/user/$userId'
+    | '/users/$userId'
     | '/bots/'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/forgot-password'
@@ -242,16 +245,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/v1-otp'
-    | '/settings'
     | '/'
     | '/bots/$botId'
     | '/bots/create'
     | '/chat/$chatId'
-    | '/user/$userId'
+    | '/users/$userId'
     | '/bots'
+    | '/settings'
   id:
     | '__root__'
     | '/(auth)'
+    | '/_authenticated'
     | '/(auth)/forgot-password'
     | '/(auth)/otp'
     | '/(auth)/sign-in'
@@ -265,23 +269,24 @@ export interface FileRouteTypes {
     | '/(public)/login'
     | '/(public)/signup'
     | '/(public)/v1-otp'
-    | '/(protected)/_layout/settings'
-    | '/(protected)/_layout/'
-    | '/(protected)/_layout/bots/$botId'
-    | '/(protected)/_layout/bots/create'
-    | '/(protected)/_layout/chat/$chatId'
-    | '/(protected)/_layout/user/$userId'
-    | '/(protected)/_layout/bots/'
+    | '/_authenticated/'
+    | '/_authenticated/bots/$botId'
+    | '/_authenticated/bots/create'
+    | '/_authenticated/chat/$chatId'
+    | '/_authenticated/users/$userId'
+    | '/_authenticated/bots/'
+    | '/_authenticated/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   authRouteRoute: typeof authRouteRouteWithChildren
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
   errors404Route: typeof errors404Route
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
-  protectedLayoutRoute: typeof protectedLayoutRouteWithChildren
+  protectedLayoutRoute: typeof protectedLayoutRoute
   publicLoginRoute: typeof publicLoginRoute
   publicSignupRoute: typeof publicSignupRoute
   publicV1OtpRoute: typeof publicV1OtpRoute
@@ -289,12 +294,26 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(auth)': {
       id: '/(auth)'
       path: ''
       fullPath: ''
       preLoaderRoute: typeof authRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/': {
+      id: '/_authenticated/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/(public)/v1-otp': {
       id: '/(public)/v1-otp'
@@ -387,54 +406,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authForgotPasswordRouteImport
       parentRoute: typeof authRouteRoute
     }
-    '/(protected)/_layout/': {
-      id: '/(protected)/_layout/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof protectedLayoutIndexRouteImport
-      parentRoute: typeof protectedLayoutRoute
-    }
-    '/(protected)/_layout/settings': {
-      id: '/(protected)/_layout/settings'
+    '/_authenticated/settings/': {
+      id: '/_authenticated/settings/'
       path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof protectedLayoutSettingsRouteImport
-      parentRoute: typeof protectedLayoutRoute
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/(protected)/_layout/bots/': {
-      id: '/(protected)/_layout/bots/'
+    '/_authenticated/bots/': {
+      id: '/_authenticated/bots/'
       path: '/bots'
       fullPath: '/bots/'
-      preLoaderRoute: typeof protectedLayoutBotsIndexRouteImport
-      parentRoute: typeof protectedLayoutRoute
+      preLoaderRoute: typeof AuthenticatedBotsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/(protected)/_layout/user/$userId': {
-      id: '/(protected)/_layout/user/$userId'
-      path: '/user/$userId'
-      fullPath: '/user/$userId'
-      preLoaderRoute: typeof protectedLayoutUserUserIdRouteImport
-      parentRoute: typeof protectedLayoutRoute
+    '/_authenticated/users/$userId': {
+      id: '/_authenticated/users/$userId'
+      path: '/users/$userId'
+      fullPath: '/users/$userId'
+      preLoaderRoute: typeof AuthenticatedUsersUserIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/(protected)/_layout/chat/$chatId': {
-      id: '/(protected)/_layout/chat/$chatId'
+    '/_authenticated/chat/$chatId': {
+      id: '/_authenticated/chat/$chatId'
       path: '/chat/$chatId'
       fullPath: '/chat/$chatId'
-      preLoaderRoute: typeof protectedLayoutChatChatIdRouteImport
-      parentRoute: typeof protectedLayoutRoute
+      preLoaderRoute: typeof AuthenticatedChatChatIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/(protected)/_layout/bots/create': {
-      id: '/(protected)/_layout/bots/create'
+    '/_authenticated/bots/create': {
+      id: '/_authenticated/bots/create'
       path: '/bots/create'
       fullPath: '/bots/create'
-      preLoaderRoute: typeof protectedLayoutBotsCreateRouteImport
-      parentRoute: typeof protectedLayoutRoute
+      preLoaderRoute: typeof AuthenticatedBotsCreateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/(protected)/_layout/bots/$botId': {
-      id: '/(protected)/_layout/bots/$botId'
+    '/_authenticated/bots/$botId': {
+      id: '/_authenticated/bots/$botId'
       path: '/bots/$botId'
       fullPath: '/bots/$botId'
-      preLoaderRoute: typeof protectedLayoutBotsBotIdRouteImport
-      parentRoute: typeof protectedLayoutRoute
+      preLoaderRoute: typeof AuthenticatedBotsBotIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
@@ -457,38 +469,38 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
   authRouteRouteChildren,
 )
 
-interface protectedLayoutRouteChildren {
-  protectedLayoutSettingsRoute: typeof protectedLayoutSettingsRoute
-  protectedLayoutIndexRoute: typeof protectedLayoutIndexRoute
-  protectedLayoutBotsBotIdRoute: typeof protectedLayoutBotsBotIdRoute
-  protectedLayoutBotsCreateRoute: typeof protectedLayoutBotsCreateRoute
-  protectedLayoutChatChatIdRoute: typeof protectedLayoutChatChatIdRoute
-  protectedLayoutUserUserIdRoute: typeof protectedLayoutUserUserIdRoute
-  protectedLayoutBotsIndexRoute: typeof protectedLayoutBotsIndexRoute
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedBotsBotIdRoute: typeof AuthenticatedBotsBotIdRoute
+  AuthenticatedBotsCreateRoute: typeof AuthenticatedBotsCreateRoute
+  AuthenticatedChatChatIdRoute: typeof AuthenticatedChatChatIdRoute
+  AuthenticatedUsersUserIdRoute: typeof AuthenticatedUsersUserIdRoute
+  AuthenticatedBotsIndexRoute: typeof AuthenticatedBotsIndexRoute
+  AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
 }
 
-const protectedLayoutRouteChildren: protectedLayoutRouteChildren = {
-  protectedLayoutSettingsRoute: protectedLayoutSettingsRoute,
-  protectedLayoutIndexRoute: protectedLayoutIndexRoute,
-  protectedLayoutBotsBotIdRoute: protectedLayoutBotsBotIdRoute,
-  protectedLayoutBotsCreateRoute: protectedLayoutBotsCreateRoute,
-  protectedLayoutChatChatIdRoute: protectedLayoutChatChatIdRoute,
-  protectedLayoutUserUserIdRoute: protectedLayoutUserUserIdRoute,
-  protectedLayoutBotsIndexRoute: protectedLayoutBotsIndexRoute,
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedBotsBotIdRoute: AuthenticatedBotsBotIdRoute,
+  AuthenticatedBotsCreateRoute: AuthenticatedBotsCreateRoute,
+  AuthenticatedChatChatIdRoute: AuthenticatedChatChatIdRoute,
+  AuthenticatedUsersUserIdRoute: AuthenticatedUsersUserIdRoute,
+  AuthenticatedBotsIndexRoute: AuthenticatedBotsIndexRoute,
+  AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
 }
 
-const protectedLayoutRouteWithChildren = protectedLayoutRoute._addFileChildren(
-  protectedLayoutRouteChildren,
-)
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   authRouteRoute: authRouteRouteWithChildren,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   errors401Route: errors401Route,
   errors403Route: errors403Route,
   errors404Route: errors404Route,
   errors500Route: errors500Route,
   errors503Route: errors503Route,
-  protectedLayoutRoute: protectedLayoutRouteWithChildren,
+  protectedLayoutRoute: protectedLayoutRoute,
   publicLoginRoute: publicLoginRoute,
   publicSignupRoute: publicSignupRoute,
   publicV1OtpRoute: publicV1OtpRoute,

@@ -1,7 +1,5 @@
 import * as React from "react";
 import {
-  createFileRoute,
-  redirect,
   Outlet,
   useLocation,
   useMatch,
@@ -10,29 +8,18 @@ import {
 } from "@tanstack/react-router";
 import { AnimatePresence } from "framer-motion";
 
-import { useAuthStore } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app/layout/app-sidebar";
 import { MobileNav } from "@/features/navigation/ui/mobile-nav";
 import { UserProfileOverlay } from "@/features/user/ui/user-profile-overlay";
 import { Toaster } from "@/components/ui/sonner";
-
 import { useMe } from "@/features/chat/lib/use-messages";
 import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/(protected)/_layout")({
-  beforeLoad: () => {
-    if (!useAuthStore.getState().isAuth) {
-      throw redirect({ to: "/sign-in" });
-    }
-  },
-  component: LayoutComponent,
-});
-
-function LayoutComponent() {
+export function AuthenticatedLayout() {
   const matches = useMatches();
   const { pathname } = useLocation();
   const navigate = useNavigate();

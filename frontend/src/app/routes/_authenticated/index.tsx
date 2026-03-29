@@ -9,7 +9,7 @@ interface MyChatsResponse {
   chats: Chat[];
 }
 
-export const Route = createFileRoute("/(protected)/_layout/")({
+export const Route = createFileRoute("/_authenticated/")({
   component: IndexComponent,
 });
 
