@@ -19,13 +19,12 @@ export function SignUp() {
             Create an account
           </CardTitle>
           <CardDescription>
-            Enter your email and password to create an account. <br />
             Already have an account?{" "}
             <Link
               to="/sign-in"
-              className="underline underline-offset-4 hover:text-primary"
+              className="underline underline-offset-4 hover:text-primary font-medium"
             >
-              Sign In
+              Sign in
             </Link>
           </CardDescription>
         </CardHeader>

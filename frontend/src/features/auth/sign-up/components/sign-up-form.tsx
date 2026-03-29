@@ -21,6 +21,13 @@ const formSchema = z
   .object({
     firstName: z.string().min(2, "First name must be at least 2 characters"),
     lastName: z.string().optional(),
+    username: z
+      .string()
+      .optional()
+      .refine(
+        (val) => !val || /^[a-zA-Z0-9_]{3,32}$/.test(val),
+        "Username must be 3–32 characters and only contain letters, numbers, or underscores",
+      ),
     email: z.string().email("Please enter a valid email"),
     password: z
       .string()
@@ -46,6 +53,7 @@ export function SignUpForm({
     defaultValues: {
       firstName: "",
       lastName: "",
+      username: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -56,10 +64,10 @@ export function SignUpForm({
     mutate({
       input: {
         firstName: data.firstName,
-        lastName: data.lastName,
+        lastName: data.lastName || undefined,
+        username: data.username || undefined,
         email: data.email,
         password: data.password,
-        username: data.email.split("@")[0],
       },
     });
   }
@@ -96,7 +104,12 @@ export function SignUpForm({
             name="lastName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Last Name</FormLabel>
+                <FormLabel>
+                  Last Name{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional)
+                  </span>
+                </FormLabel>
                 <FormControl>
                   <Input placeholder="Doe" disabled={isPending} {...field} />
                 </FormControl>
@@ -108,12 +121,42 @@ export function SignUpForm({
 
         <FormField
           control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                Username{" "}
+                <span className="text-muted-foreground font-normal">
+                  (optional)
+                </span>
+              </FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none">
+                    @
+                  </span>
+                  <Input
+                    placeholder="yourhandle"
+                    disabled={isPending}
+                    className="pl-7"
+                    {...field}
+                  />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
           name="email"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input
+                  type="email"
                   placeholder="name@example.com"
                   disabled={isPending}
                   {...field}
@@ -132,7 +175,7 @@ export function SignUpForm({
               <FormLabel>Password</FormLabel>
               <FormControl>
                 <PasswordInput
-                  placeholder="********"
+                  placeholder="••••••••"
                   disabled={isPending}
                   {...field}
                 />
@@ -150,7 +193,7 @@ export function SignUpForm({
               <FormLabel>Confirm Password</FormLabel>
               <FormControl>
                 <PasswordInput
-                  placeholder="********"
+                  placeholder="••••••••"
                   disabled={isPending}
                   {...field}
                 />

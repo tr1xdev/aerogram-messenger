@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import {
   Card,
   CardContent,
@@ -16,8 +17,13 @@ export function SignIn() {
         <CardHeader>
           <CardTitle className="text-lg tracking-tight">Sign in</CardTitle>
           <CardDescription>
-            Enter your email and password below to <br />
-            log into your account
+            Enter your email and password below to log into your account.{" "}
+            <Link
+              to="/sign-up"
+              className="underline underline-offset-4 hover:text-primary"
+            >
+              Don&apos;t have an account?
+            </Link>
           </CardDescription>
         </CardHeader>
         <CardContent>
