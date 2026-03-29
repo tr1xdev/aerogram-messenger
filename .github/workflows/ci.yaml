@@ -7,9 +7,8 @@ on:
         branches: [main, master, develop]
 
 jobs:
-    quality-gate:
+    quality-gate-backend:
         runs-on: ubuntu-latest
-
         services:
             postgres:
                 image: postgres:16-alpine
@@ -24,7 +23,6 @@ jobs:
                     --health-interval 10s
                     --health-timeout 5s
                     --health-retries 5
-
             redis:
                 image: redis:7-alpine
                 ports:
@@ -63,14 +61,49 @@ jobs:
                   JWT_SECRET: ci_test_secret_key
 
             - name: Lint Go code
-              uses: golangci/golangci-lint-action@v6
-              with:
-                  version: latest
-                  working-directory: backend
-                  args: --timeout=10m
+              working-directory: backend
+              run: |
+                  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+                  $(go env GOPATH)/bin/golangci-lint run --timeout=10m
+              env:
+                  GOWORK: off
 
+    quality-gate-frontend:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: "npm"
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Install Frontend Dependencies
+              working-directory: frontend
+              run: npm ci
+
+            - name: Lint Frontend
+              working-directory: frontend
+              run: npm run lint
+              continue-on-error: false
+
+            - name: Type Check
+              working-directory: frontend
+              run: npx tsc --noEmit
+
+    verify-docker:
+        needs: [quality-gate-backend, quality-gate-frontend]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
             - name: Verify Docker Build
               run: docker compose build
               env:
                   JWT_SECRET: dummy_secret
                   RESEND_API_KEY: dummy_key
+                  VITE_API_URL: http://localhost:8080
+                  VITE_WS_URL: ws://localhost:8080
