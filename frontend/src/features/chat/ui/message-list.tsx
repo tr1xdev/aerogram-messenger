@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageBubble } from "./message-bubble";
 import { DateDivider } from "./date-divider";
 import type { Message, ChatMember } from "@/entities/chat/model/types";
-import { useChatScroll } from "../lib/use-chat-scroll";
+import { useChatScroll } from "../lib/chat/use-chat-scroll";
 import { useMessageActions } from "../lib";
 
 interface MessageListProps {

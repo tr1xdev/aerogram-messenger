@@ -19,7 +19,7 @@ import {
   useMessageActions,
   useSendTyping,
 } from "@/features/chat/lib";
-import { useMarkDialog } from "@/features/chat/lib/use-mark-dialog";
+import { useMarkDialog } from "@/features/chat/lib";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
