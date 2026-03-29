@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
-import { showSubmittedData } from "@/lib/show-submitted-data";
+import { useVerifyEmail, parseApiError } from "@/features/auth/lib/use-auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,28 +27,23 @@ const formSchema = z.object({
     .max(6, "Please enter the 6-digit code."),
 });
 
-type OtpFormProps = React.HTMLAttributes<HTMLFormElement>;
+type FormValues = z.infer<typeof formSchema>;
 
-export function OtpForm({ className, ...props }: OtpFormProps) {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+interface OtpFormProps extends React.HTMLAttributes<HTMLFormElement> {
+  userId: string;
+}
 
-  const form = useForm<z.infer<typeof formSchema>>({
+export function OtpForm({ className, userId, ...props }: OtpFormProps) {
+  const { mutate, isPending, error } = useVerifyEmail();
+
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    mode: "onChange",
     defaultValues: { otp: "" },
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const otp = form.watch("otp");
-
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-    showSubmittedData(data);
-
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate({ to: "/" });
-    }, 1500);
+  function onSubmit(data: FormValues) {
+    mutate({ input: { userID: userId, code: data.otp } });
   }
 
   return (
@@ -59,6 +53,12 @@ export function OtpForm({ className, ...props }: OtpFormProps) {
         className={cn("grid gap-6", className)}
         {...props}
       >
+        {error && (
+          <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+            {parseApiError(error)}
+          </div>
+        )}
+
         <FormField
           control={form.control}
           name="otp"
@@ -67,9 +67,9 @@ export function OtpForm({ className, ...props }: OtpFormProps) {
               <FormLabel className="sr-only">One-Time Password</FormLabel>
               <FormControl>
                 <InputOTP
-                  id="digits-only"
                   maxLength={6}
                   pattern={REGEXP_ONLY_DIGITS}
+                  disabled={isPending}
                   {...field}
                 >
                   <InputOTPGroup>
@@ -86,8 +86,13 @@ export function OtpForm({ className, ...props }: OtpFormProps) {
             </FormItem>
           )}
         />
-        <Button className="w-full" disabled={otp.length < 6 || isLoading}>
-          {isLoading ? "Verifying..." : "Verify"}
+
+        <Button
+          className="w-full"
+          disabled={!form.formState.isValid || isPending}
+        >
+          {isPending ? <Loader2 className="animate-spin" /> : null}
+          {isPending ? "Verifying..." : "Verify"}
         </Button>
       </form>
     </Form>

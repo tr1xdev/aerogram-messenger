@@ -1,8 +1,9 @@
-import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
 import { IconFacebook, IconGithub } from "@/assets/brand-icons";
+import { useSignUp, parseApiError } from "@/features/auth/lib/use-auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,44 +19,49 @@ import { PasswordInput } from "@/components/password-input";
 
 const formSchema = z
   .object({
-    email: z.email({
-      error: (iss) =>
-        iss.input === "" ? "Please enter your email" : undefined,
-    }),
+    firstName: z.string().min(2, "First name must be at least 2 characters"),
+    lastName: z.string().optional(),
+    email: z.string().email("Please enter a valid email"),
     password: z
       .string()
       .min(1, "Please enter your password")
-      .min(7, "Password must be at least 7 characters long"),
+      .min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match.",
+    message: "Passwords don't match",
     path: ["confirmPassword"],
   });
+
+type FormValues = z.infer<typeof formSchema>;
 
 export function SignUpForm({
   className,
   ...props
 }: React.HTMLAttributes<HTMLFormElement>) {
-  const [isLoading, setIsLoading] = useState(false);
+  const { mutate, isPending, error } = useSignUp();
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      firstName: "",
+      lastName: "",
       email: "",
       password: "",
       confirmPassword: "",
     },
   });
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-    // eslint-disable-next-line no-console
-    console.log(data);
-
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 3000);
+  function onSubmit(data: FormValues) {
+    mutate({
+      input: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        password: data.password,
+        username: data.email.split("@")[0],
+      },
+    });
   }
 
   return (
@@ -65,6 +71,41 @@ export function SignUpForm({
         className={cn("grid gap-3", className)}
         {...props}
       >
+        {error && (
+          <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+            {parseApiError(error)}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="firstName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>First Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="John" disabled={isPending} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="lastName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Last Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Doe" disabled={isPending} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         <FormField
           control={form.control}
           name="email"
@@ -72,12 +113,17 @@ export function SignUpForm({
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="name@example.com" {...field} />
+                <Input
+                  placeholder="name@example.com"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="password"
@@ -85,12 +131,17 @@ export function SignUpForm({
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <PasswordInput placeholder="********" {...field} />
+                <PasswordInput
+                  placeholder="********"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="confirmPassword"
@@ -98,13 +149,19 @@ export function SignUpForm({
             <FormItem>
               <FormLabel>Confirm Password</FormLabel>
               <FormControl>
-                <PasswordInput placeholder="********" {...field} />
+                <PasswordInput
+                  placeholder="********"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button className="mt-2" disabled={isLoading}>
+
+        <Button className="mt-2" disabled={isPending}>
+          {isPending && <Loader2 className="animate-spin" />}
           Create Account
         </Button>
 
@@ -120,20 +177,10 @@ export function SignUpForm({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="outline"
-            className="w-full"
-            type="button"
-            disabled={isLoading}
-          >
+          <Button variant="outline" type="button" disabled={isPending}>
             <IconGithub className="h-4 w-4" /> GitHub
           </Button>
-          <Button
-            variant="outline"
-            className="w-full"
-            type="button"
-            disabled={isLoading}
-          >
+          <Button variant="outline" type="button" disabled={isPending}>
             <IconFacebook className="h-4 w-4" /> Facebook
           </Button>
         </div>

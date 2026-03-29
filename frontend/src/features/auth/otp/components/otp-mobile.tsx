@@ -1,7 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { OtpForm } from "./otp-form";
 
-export function OtpMobile() {
+interface OtpMobileProps {
+  userId: string;
+}
+
+export function OtpMobile({ userId }: OtpMobileProps) {
   return (
     <div className="flex w-full flex-col items-center justify-center space-y-6 px-4">
       <div className="flex flex-col space-y-2 text-center">
@@ -14,12 +18,12 @@ export function OtpMobile() {
         </p>
       </div>
 
-      <OtpForm className="w-full" />
+      <OtpForm className="w-full" userId={userId} />
 
       <p className="text-center text-sm text-muted-foreground">
-        Haven't received it?{" "}
+        Haven&apos;t received it?{" "}
         <Link
-          to="/login"
+          to="/sign-in"
           className="underline underline-offset-4 hover:text-primary"
         >
           Resend a new code.

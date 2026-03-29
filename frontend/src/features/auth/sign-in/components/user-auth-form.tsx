@@ -1,13 +1,11 @@
-import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
-import { toast } from "sonner";
 import { IconFacebook, IconGithub } from "@/assets/brand-icons";
-import { useAuthStore, type AuthUser } from "@/store/auth-store";
-import { sleep, cn } from "@/lib/utils";
+import { useLogin, parseApiError } from "@/features/auth/lib/use-auth";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -21,62 +19,29 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
 
 const formSchema = z.object({
-  email: z.email({
-    error: (iss) => (iss.input === "" ? "Please enter your email" : undefined),
-  }),
+  email: z.string().email("Please enter a valid email"),
   password: z
     .string()
     .min(1, "Please enter your password")
-    .min(7, "Password must be at least 7 characters long"),
+    .min(6, "Password must be at least 6 characters"),
 });
+
+type FormValues = z.infer<typeof formSchema>;
 
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
   redirectTo?: string;
 }
 
-export function UserAuthForm({
-  className,
-  redirectTo,
-  ...props
-}: UserAuthFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
-  const { login } = useAuthStore();
+export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
+  const { mutate, isPending, error } = useLogin();
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "", password: "" },
   });
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-
-    toast.promise(sleep(2000), {
-      loading: "Signing in...",
-      success: () => {
-        setIsLoading(false);
-
-        const mockUser: AuthUser = {
-          accountNo: "ACC001",
-          email: data.email,
-          role: ["user"],
-          exp: Date.now() + 24 * 60 * 60 * 1000,
-        };
-
-        login(mockUser, "mock-access-token", "mock-refresh-token");
-
-        navigate({ to: redirectTo ?? "/", replace: true });
-
-        return `Welcome back, ${data.email}!`;
-      },
-      error: () => {
-        setIsLoading(false);
-        return "Sign in failed. Please try again.";
-      },
-    });
+  function onSubmit(data: FormValues) {
+    mutate({ input: data });
   }
 
   return (
@@ -86,6 +51,12 @@ export function UserAuthForm({
         className={cn("grid gap-3", className)}
         {...props}
       >
+        {error && (
+          <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+            {parseApiError(error)}
+          </div>
+        )}
+
         <FormField
           control={form.control}
           name="email"
@@ -93,12 +64,17 @@ export function UserAuthForm({
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="name@example.com" {...field} />
+                <Input
+                  placeholder="name@example.com"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="password"
@@ -106,20 +82,25 @@ export function UserAuthForm({
             <FormItem className="relative">
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <PasswordInput placeholder="********" {...field} />
+                <PasswordInput
+                  placeholder="••••••••"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
               <Link
                 to="/forgot-password"
-                className="absolute end-0 -top-0.5 text-sm font-medium text-muted-foreground hover:opacity-75"
+                className="absolute inset-e-0 -top-0.5 text-sm font-medium text-muted-foreground hover:opacity-75"
               >
                 Forgot password?
               </Link>
             </FormItem>
           )}
         />
-        <Button className="mt-2" disabled={isLoading}>
-          {isLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
+
+        <Button className="mt-2" disabled={isPending}>
+          {isPending ? <Loader2 className="animate-spin" /> : <LogIn />}
           Sign in
         </Button>
 
@@ -135,10 +116,10 @@ export function UserAuthForm({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" type="button" disabled={isLoading}>
+          <Button variant="outline" type="button" disabled={isPending}>
             <IconGithub className="h-4 w-4" /> GitHub
           </Button>
-          <Button variant="outline" type="button" disabled={isLoading}>
+          <Button variant="outline" type="button" disabled={isPending}>
             <IconFacebook className="h-4 w-4" /> Facebook
           </Button>
         </div>

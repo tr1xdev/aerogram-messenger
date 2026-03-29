@@ -1,3 +1,4 @@
+import { useSearch } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import {
   Card,
@@ -14,11 +15,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 export function Otp() {
   const isMobile = useIsMobile();
+  const { userId } = useSearch({ from: "/(auth)/otp" });
 
   return (
     <AuthLayout>
       {isMobile ? (
-        <OtpMobile />
+        <OtpMobile userId={userId} />
       ) : (
         <Card className="mx-auto w-full max-w-sm">
           <CardHeader>
@@ -31,13 +33,13 @@ export function Otp() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <OtpForm />
+            <OtpForm userId={userId} />
           </CardContent>
           <CardFooter>
             <p className="px-4 text-center text-sm text-muted-foreground">
-              Haven't received it?{" "}
+              Haven&apos;t received it?{" "}
               <Link
-                to="/login"
+                to="/sign-in"
                 className="underline underline-offset-4 hover:text-primary"
               >
                 Resend a new code.
