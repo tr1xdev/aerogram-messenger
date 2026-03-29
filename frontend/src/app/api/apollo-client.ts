@@ -13,6 +13,7 @@ import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient, type Message as WsMessage } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { REFRESH_TOKEN_MUTATION } from "@/features/auth/api/auth.gql";
+import { useAuthStore } from "@/store/auth-store";
 import { useConnectionStore } from "@/store/connection";
 
 const endpoint = import.meta.env.VITE_API_URL || "http://localhost:8080/query";
@@ -20,8 +21,8 @@ const wsEndpoint = import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
 
 interface RefreshTokenResponse {
   refreshToken: {
-    access_token: string;
-    refresh_token: string;
+    accessToken: string;
+    refreshToken: string;
   };
 }
 
@@ -57,14 +58,13 @@ export const logoutAll = async (): Promise<void> => {
   if (isLoggingOut) return;
   isLoggingOut = true;
 
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
+  useAuthStore.getState().logout();
   authChannel.postMessage({ type: "LOGOUT" });
 
   await client.clearStore();
 
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
+  if (window.location.pathname !== "/sign-in") {
+    window.location.href = "/sign-in";
   }
 };
 
@@ -73,7 +73,7 @@ const httpLink: HttpLink = new HttpLink({
 });
 
 const authLink: SetContextLink = new SetContextLink((prevContext) => {
-  const token: string | null = localStorage.getItem("access_token");
+  const token = useAuthStore.getState().accessToken;
   const prevHeaders: Record<string, string> =
     (prevContext.headers as Record<string, string>) || {};
   return {
@@ -108,8 +108,7 @@ const interceptorLink: ApolloLink = new ApolloLink(
               return;
             }
 
-            const refresh: string | null =
-              localStorage.getItem("refresh_token");
+            const refresh = useAuthStore.getState().refreshToken;
             if (!refresh) {
               logoutAll();
               observer.next(response);
@@ -127,18 +126,16 @@ const interceptorLink: ApolloLink = new ApolloLink(
                 })
                 .then(({ data }: FetchResult<RefreshTokenResponse>) => {
                   if (data?.refreshToken) {
-                    localStorage.setItem(
-                      "access_token",
-                      data.refreshToken.access_token,
-                    );
-                    localStorage.setItem(
-                      "refresh_token",
-                      data.refreshToken.refresh_token,
-                    );
+                    useAuthStore
+                      .getState()
+                      .setTokens(
+                        data.refreshToken.accessToken,
+                        data.refreshToken.refreshToken,
+                      );
                     authChannel.postMessage({ type: "REFRESH_SUCCESS" });
                     resolvePendingRequests();
                   } else {
-                    throw new Error();
+                    throw new Error("No token data in refresh response");
                   }
                 })
                 .catch(() => {
@@ -151,8 +148,7 @@ const interceptorLink: ApolloLink = new ApolloLink(
             }
 
             pendingRequests.push(() => {
-              const newToken: string | null =
-                localStorage.getItem("access_token");
+              const newToken = useAuthStore.getState().accessToken;
               operation.setContext((prev: Record<string, unknown>) => ({
                 ...prev,
                 headers: {
@@ -193,22 +189,24 @@ const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
     url: wsEndpoint,
-    lazy: false,
+    lazy: true,
     connectionParams: async () => {
       if (isRefreshing) {
         await new Promise<void>((resolve) => pendingRequests.push(resolve));
       }
-      const token: string | null = localStorage.getItem("access_token");
+      const token = useAuthStore.getState().accessToken;
       return { Authorization: token ? `Bearer ${token}` : "" };
     },
     keepAlive: 10000,
     connectionAckWaitTimeout: 15000,
-    shouldRetry: () => true,
+    shouldRetry: (err) => {
+      const event = err as CloseEvent;
+      return event?.code !== 1000 && event?.reason !== "terminated";
+    },
     retryAttempts: Infinity,
     retryWait: async (retries: number) => {
       const delay: number =
         retries < 5 ? 1000 : Math.min(1000 * Math.pow(2, retries - 5), 30000);
-
       const jitter: number = Math.random() * 0.2 * delay;
       await new Promise((resolve) => setTimeout(resolve, delay + jitter));
     },
