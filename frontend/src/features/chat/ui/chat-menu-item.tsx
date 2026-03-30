@@ -15,7 +15,7 @@ import { LastMessageContent } from "./last-message-content";
 import { MessageStatus } from "./message-status";
 import { BsFillPinFill } from "react-icons/bs";
 import { Trash2, CheckCircle2, BellOff, PinOff } from "lucide-react";
-import { useChatActions } from "../lib/use-messages";
+import { useChatActions, useMessageActions } from "../lib";
 import { DeleteChatDialog } from "./delete-chat-dialog";
 import type {
   Chat,
@@ -36,7 +36,8 @@ export function ChatMenuItem({
   myId,
 }: ChatMenuItemProps): React.ReactNode {
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false);
-  const { togglePin, markAsRead, deleteChat } = useChatActions(chat.id);
+  const { togglePin, deleteChat } = useChatActions(chat.id);
+  const { markAsRead } = useMessageActions(chat.id);
 
   const otherMember: ChatMember | undefined = useMemo(
     (): ChatMember | undefined =>
@@ -228,7 +229,7 @@ export function ChatMenuItem({
           {chat.unreadCount > 0 && lastMessage?.sequence !== undefined && (
             <ContextMenuItem
               onClick={(): void => {
-                markAsRead(lastMessage.sequence!);
+                markAsRead();
               }}
               className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
             >

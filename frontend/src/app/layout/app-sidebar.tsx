@@ -37,7 +37,7 @@ import {
   useMe,
   useSearchUsers,
   useChatActions,
-} from "@/features/chat/lib/use-messages";
+} from "@/features/chat/lib";
 import { GET_MY_CHATS } from "@/features/chat/api";
 import { useConnectionStore } from "@/store/connection";
 import { cn } from "@/lib/utils";

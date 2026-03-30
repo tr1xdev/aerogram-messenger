@@ -10,15 +10,15 @@ import {
 } from "@tanstack/react-router";
 import { AnimatePresence } from "framer-motion";
 
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app/layout/app-sidebar";
 import { MobileNav } from "@/features/navigation/ui/mobile-nav";
-import { UserProfileOverlay } from "./_layout/user.$userId";
+import { UserProfileOverlay } from "@/features/user/ui/user-profile-overlay";
 import { Toaster } from "@/components/ui/sonner";
 
-import { useMe } from "@/features/chat/lib/use-messages";
+import { useMe } from "@/features/chat/lib/common/use-me";
 import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/(protected)/_layout")({
   beforeLoad: () => {
     if (!useAuthStore.getState().isAuth) {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/sign-in" });
     }
   },
   component: LayoutComponent,
@@ -42,7 +42,7 @@ function LayoutComponent() {
   const setActiveChatId = useChatStore((state) => state.setActiveChatId);
 
   const userMatch = useMatch({
-    from: "/(protected)/_layout/user/$userId",
+    from: "/_authenticated/users/$userId",
     shouldThrow: false,
   });
 
@@ -60,7 +60,7 @@ function LayoutComponent() {
   }, [pathname, setActiveChatId]);
 
   React.useEffect((): void => {
-    if (!isMobile && pathname.includes("/user/")) {
+    if (!isMobile && pathname.includes("/users/")) {
       navigate({ to: lastChatPath.current || "/", replace: true });
     }
   }, [isMobile, pathname, navigate]);

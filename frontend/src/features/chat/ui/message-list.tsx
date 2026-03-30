@@ -13,8 +13,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageBubble } from "./message-bubble";
 import { DateDivider } from "./date-divider";
 import type { Message, ChatMember } from "@/entities/chat/model/types";
-import { useChatScroll } from "../lib/use-chat-scroll";
-import { useChatActions } from "../lib/use-messages";
+import { useChatScroll } from "../lib/chat/use-chat-scroll";
+import { useMessageActions } from "../lib";
 
 interface MessageListProps {
   chatId: string;
@@ -42,7 +42,7 @@ export const MessageList = memo(function MessageList({
   onReply,
   onEdit,
 }: MessageListProps): ReactNode {
-  const { decryptMessage } = useChatActions(chatId);
+  const { decryptMessage } = useMessageActions(chatId);
   const [decryptedMap, setDecryptedMap] = useState<Record<string, string>>({});
   const mapRef = useRef<Record<string, string>>({});
   const lastProcessedLength = useRef<number>(0);

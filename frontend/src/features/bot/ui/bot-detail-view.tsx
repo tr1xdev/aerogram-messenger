@@ -76,7 +76,7 @@ interface RotateBotTokenData {
 }
 
 export const BotDetailView: React.FC = () => {
-  const { botId } = useParams({ from: "/(protected)/_layout/bots/$botId" });
+  const { botId } = useParams({ from: "/_authenticated/bots/$botId" });
   const navigate = useNavigate();
 
   const [showToken, setShowToken] = React.useState<boolean>(false);

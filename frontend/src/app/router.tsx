@@ -1,9 +1,13 @@
 import { createRouter } from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
 import { routeTree } from "@/routeTree.gen";
 import { Loader2 } from "lucide-react";
 
 export const router = createRouter({
   routeTree,
+  context: {
+    queryClient: undefined! as QueryClient,
+  },
   defaultPreload: "intent",
   defaultStaleTime: 5000,
   defaultPendingComponent: () => (

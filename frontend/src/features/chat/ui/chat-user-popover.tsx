@@ -39,7 +39,7 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
     if (isMobile) {
       e.preventDefault();
       e.stopPropagation();
-      navigate({ to: "/user/$userId", params: { userId } });
+      navigate({ to: "/users/$userId", params: { userId } });
     }
   };
 
