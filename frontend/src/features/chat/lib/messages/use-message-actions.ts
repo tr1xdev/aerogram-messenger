@@ -43,7 +43,7 @@ export function useMessageActions(chatId: string): {
   sendMessage: (text: string, options?: SendMessageOptions) => Promise<void>;
   editMessage: (id: string, text: string) => Promise<void>;
   decryptMessage: (message: Message) => Promise<string>;
-  markAsRead: (lastSequence: number) => void;
+  markAsRead: () => void;
   isSending: boolean;
 } {
   const { data: meData } = useMe();
@@ -59,10 +59,9 @@ export function useMessageActions(chatId: string): {
     { id: string; text: string }
   >(EDIT_MESSAGE);
 
-  const [read] = useMutation<
-    { markDialogAsRead: boolean },
-    { chatId: string; lastSequence: number }
-  >(MARK_DIALOG_AS_READ);
+  const [read] = useMutation<{ markDialogAsRead: boolean }, { chatId: string }>(
+    MARK_DIALOG_AS_READ,
+  );
 
   const decryptMessage = async (message: Message): Promise<string> => {
     if (!message.isEncrypted || !message.encryptionIv || !meData?.me) {
@@ -189,9 +188,9 @@ export function useMessageActions(chatId: string): {
     });
   };
 
-  const markAsRead = (lastSequence: number): void => {
+  const markAsRead = (): void => {
     read({
-      variables: { chatId, lastSequence: Number(lastSequence) },
+      variables: { chatId },
       optimisticResponse: { markDialogAsRead: true },
       update: (cache: ApolloCache): void => {
         const chatRef = cache.identify({ __typename: "Chat", id: chatId });
@@ -200,8 +199,6 @@ export function useMessageActions(chatId: string): {
             id: chatRef,
             fields: {
               unreadCount: (): number => 0,
-              lastReadSequence: (prev: number): number =>
-                Math.max(prev || 0, lastSequence),
             },
           });
         }

@@ -229,7 +229,7 @@ export function ChatMenuItem({
           {chat.unreadCount > 0 && lastMessage?.sequence !== undefined && (
             <ContextMenuItem
               onClick={(): void => {
-                markAsRead(lastMessage.sequence!);
+                markAsRead();
               }}
               className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
             >

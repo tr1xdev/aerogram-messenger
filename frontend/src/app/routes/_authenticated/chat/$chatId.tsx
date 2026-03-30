@@ -237,8 +237,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const { checkAndMarkRead } = useMarkDialog(
     chatId,
     allMessages,
-    me,
-    lastReadSequence ?? 0,
+    me ?? undefined,
   );
 
   useEffect((): void => {

@@ -22,7 +22,7 @@ interface StatusChanged {
 }
 
 interface DialogReadData {
-  dialogRead: { chatId: string; userId: string; lastSequence: number };
+  dialogRead: { chatId: string; userId: string };
 }
 
 interface ChatDeletedData {
@@ -170,8 +170,6 @@ export function useGlobalSubscriptions(
         client.cache.modify({
           id: chatRef,
           fields: {
-            lastReadSequence: (prev: number): number =>
-              Math.max(prev || 0, payload.lastSequence),
             unreadCount: (prev: number): number =>
               myId && payload.userId === myId ? 0 : prev,
           },

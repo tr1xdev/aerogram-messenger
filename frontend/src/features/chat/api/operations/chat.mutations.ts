@@ -41,8 +41,8 @@ export const DELETE_CHAT = gql`
 `;
 
 export const MARK_DIALOG_AS_READ = gql`
-  mutation MarkDialogAsRead($chatId: ID!, $lastSequence: Long!) {
-    markDialogAsRead(chatId: $chatId, lastSequence: $lastSequence)
+  mutation MarkDialogAsRead($chatId: ID!) {
+    markDialogAsRead(chatId: $chatId)
   }
 `;
 
