@@ -1,65 +1,69 @@
 type Message {
-   id: ID!
-   chatId: ID!
-   sender: User
-   text: String!
-   sentAt: String!
-   sequence: Long!
-   isEdited: Boolean!
-   isEncrypted: Boolean!
-   encryptionIv: String
-   replyTo: Message
-   forwardedFrom: Message
+    id: ID!
+    chatId: ID!
+    sender: User
+    text: String!
+    sentAt: String!
+    sequence: Long!
+    isEdited: Boolean!
+    isEncrypted: Boolean!
+    encryptionIv: String
+    replyTo: Message
+    forwardedFrom: Message
 }
 
 type ReadPayload {
-   chatId: ID!
-   userId: ID!
-   lastSequence: Long!
+    chatId: ID!
+    userId: ID!
+    lastSequence: Long!
 }
 
 type MessageConnection {
-   messages: [Message!]!
-   hasMore: Boolean!
+    messages: [Message!]!
+    hasMore: Boolean!
 }
 
 union SendMessageResult =
-   | Message
-   | ForbiddenError
-   | ValidationError
-   | InternalError
+    | Message
+    | ForbiddenError
+    | ValidationError
+    | InternalError
 
 union MessageHistoryResult =
-   | MessageConnection
-   | ForbiddenError
-   | NotFoundError
-   | InternalError
+    | MessageConnection
+    | ForbiddenError
+    | NotFoundError
+    | InternalError
 
 extend type Query {
-   messageHistory(chatId: ID!, limit: Int!, offset: Int!): MessageHistoryResult!
-   dialogRead(chatId: ID!): ReadPayload!
+    messageHistory(
+        chatId: ID!
+        limit: Int!
+        offset: Int!
+    ): MessageHistoryResult!
+    dialogRead(chatId: ID!): ReadPayload!
 }
 
 extend type Mutation {
-   sendMessage(
-      chatId: ID!
-      text: String!
-      isEncrypted: Boolean!
-      encryptionIv: String
-      replyToId: ID
-   ): SendMessageResult!
+    sendMessage(
+        chatId: ID!
+        text: String!
+        isEncrypted: Boolean!
+        encryptionIv: String
+        replyToId: ID
+    ): SendMessageResult!
 
-   updateMessage(
-      id: ID!
-      text: String!
-      encryptionIv: String
-   ): SendMessageResult!
+    updateMessage(
+        id: ID!
+        text: String!
+        encryptionIv: String
+    ): SendMessageResult!
 
-   deleteMessage(id: ID!): Boolean!
-   markDialogAsRead(chatId: ID!, lastSequence: Long!): Boolean!
+    deleteMessage(id: ID!): Boolean!
+    markDialogAsRead(chatId: ID!): Boolean!
 }
 
 extend type Subscription {
-   messageAdded(chatId: ID!): Message!
-   dialogRead(chatId: ID!): ReadPayload!
+    messageAdded(chatId: ID!): Message!
+    dialogRead(chatId: ID!): ReadPayload!
 }
