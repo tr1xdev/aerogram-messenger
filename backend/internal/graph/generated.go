@@ -122,7 +122,7 @@ type ComplexityRoot struct {
 		DeleteMessage             func(childComplexity int, id string) int
 		Login                     func(childComplexity int, input model.LoginInput) int
 		Logout                    func(childComplexity int) int
-		MarkDialogAsRead          func(childComplexity int, chatID string, lastSequence int64) int
+		MarkDialogAsRead          func(childComplexity int, chatID string) int
 		PinChat                   func(childComplexity int, id string, pinned bool) int
 		RefreshToken              func(childComplexity int, token string) int
 		RotateBotToken            func(childComplexity int, id string) int
@@ -244,7 +244,7 @@ type MutationResolver interface {
 	SendMessage(ctx context.Context, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) (model.SendMessageResult, error)
 	UpdateMessage(ctx context.Context, id string, text string, encryptionIv *string) (model.SendMessageResult, error)
 	DeleteMessage(ctx context.Context, id string) (bool, error)
-	MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error)
+	MarkDialogAsRead(ctx context.Context, chatID string) (bool, error)
 	UpdateUser(ctx context.Context, input model.UpdateUserInput) (*dbgen.User, error)
 	CreateBot(ctx context.Context, username string, firstName string, lastName *string, description *string, commands *string) (model.CreateBotResult, error)
 	UpdateBot(ctx context.Context, id string, input model.UpdateUserInput) (*dbgen.User, error)
@@ -629,7 +629,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.MarkDialogAsRead(childComplexity, args["chatId"].(string), args["lastSequence"].(int64)), true
+		return e.complexity.Mutation.MarkDialogAsRead(childComplexity, args["chatId"].(string)), true
 	case "Mutation.pinChat":
 		if e.complexity.Mutation.PinChat == nil {
 			break
@@ -1449,11 +1449,6 @@ func (ec *executionContext) field_Mutation_markDialogAsRead_args(ctx context.Con
 		return nil, err
 	}
 	args["chatId"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "lastSequence", ec.unmarshalNLong2int64)
-	if err != nil {
-		return nil, err
-	}
-	args["lastSequence"] = arg1
 	return args, nil
 }
 
@@ -3722,7 +3717,7 @@ func (ec *executionContext) _Mutation_markDialogAsRead(ctx context.Context, fiel
 		ec.fieldContext_Mutation_markDialogAsRead,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().MarkDialogAsRead(ctx, fc.Args["chatId"].(string), fc.Args["lastSequence"].(int64))
+			return ec.resolvers.Mutation().MarkDialogAsRead(ctx, fc.Args["chatId"].(string))
 		},
 		nil,
 		ec.marshalNBoolean2bool,

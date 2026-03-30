@@ -117,7 +117,7 @@ func (r *mutationResolver) DeleteMessage(ctx context.Context, id string) (bool, 
 }
 
 // MarkDialogAsRead is the resolver for the markDialogAsRead field.
-func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, lastSequence int64) (bool, error) {
+func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string) (bool, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return false, nil
@@ -128,12 +128,23 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string, 
 		return false, err
 	}
 
-	msg, err := r.Store.GetMessageBySequence(ctx, dbgen.GetMessageBySequenceParams{
-		DialogID: chatUUID,
-		Sequence: lastSequence,
+	authUUID, err := uuid.Parse(authID)
+	if err != nil {
+		return false, err
+	}
+
+	msg, err := r.Store.GetLastChatMessage(ctx, chatUUID)
+	if err != nil {
+		return true, nil
+	}
+
+	err = r.Store.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
+		DialogID:         chatUUID,
+		UserID:           authUUID,
+		LastReadSequence: msg.Sequence,
 	})
 	if err != nil {
-		return false, fmt.Errorf("message sequence not found: %w", err)
+		return false, fmt.Errorf("failed to update read sequence in db: %w", err)
 	}
 
 	_, err = r.MessagesClient.MarkAsRead(ctx, &messagesv1.MarkAsReadRequest{
