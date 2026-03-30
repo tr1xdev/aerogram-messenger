@@ -1,3 +1,4 @@
+/** eslint-disable react-hooks/incompatible-library */
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,7 +37,6 @@ import {
   GET_MY_BOTS,
 } from "@/features/bot/api";
 
-// Обновленная схема с проверками как на бэкенде
 const botSchema = z.object({
   username: z
     .string()
@@ -97,7 +97,7 @@ export const BotDetailView: React.FC = () => {
 
   const form = useForm<BotFormValues>({
     resolver: zodResolver(botSchema),
-    mode: "onChange", // Валидация при каждом изменении для живого фидбека
+    mode: "onChange",
     defaultValues: {
       username: "",
       firstName: "",
@@ -208,6 +208,7 @@ export const BotDetailView: React.FC = () => {
           </div>
           <div className="flex flex-col">
             <h1 className="text-xl font-bold tracking-tight leading-none">
+              // eslint-disable-next-line react-hooks/incompatible-library
               {form.watch("firstName") || "Untitled Bot"}
             </h1>
             <p className="text-[12px] font-mono text-muted-foreground/50 mt-1.5">

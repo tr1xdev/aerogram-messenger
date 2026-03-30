@@ -10,7 +10,7 @@ import (
 	presencepb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/geo_svc"
-	"github.com/tr1xdev/aerogram-messenger/internal/services/presence_svc" // Добавляем импорт
+	"github.com/tr1xdev/aerogram-messenger/internal/services/presence_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/ua_svc"
 )
 
@@ -22,7 +22,7 @@ type Resolver struct {
 	MessagesClient messagespb.MessagesServiceClient
 	UserClient     userpb.UserServiceClient
 	PresenceClient presencepb.PresenceServiceClient
-	PresenceSvc    *presence_svc.Server // Добавляем сервис для работы с подписками
+	PresenceSvc    *presence_svc.Server
 	RedisClient    *redis.Client
 	GeoService     *geo_svc.Service
 	UaService      *ua_svc.Service

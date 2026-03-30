@@ -336,7 +336,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
         </div>
         <h2 className="text-xl font-bold mb-2">Chat not found</h2>
-        <p className="text-muted-foreground text-sm max-w-[280px] mb-8">
+        <p className="text-muted-foreground text-sm max-w-70 mb-8">
           The chat doesn't exist or you don't have permission to view it.
         </p>
         <Button
@@ -352,7 +352,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background w-full fixed inset-0 z-[60] md:relative md:z-auto overflow-hidden">
+    <div className="flex flex-col h-dvh bg-background w-full fixed inset-0 z-60 md:relative md:z-auto overflow-hidden">
       <ChatHeader
         title={chat?.title ?? undefined}
         photoUrl={chat?.photoUrl ?? undefined}
@@ -379,7 +379,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
             <h3 className="text-lg font-semibold text-foreground mb-2">
               {isBotChat ? `Chat with ${chat?.title}` : "No messages yet"}
             </h3>
-            <p className="text-sm text-muted-foreground max-w-[240px]">
+            <p className="text-sm text-muted-foreground max-w-60">
               {isBotChat
                 ? "Send a message to start."
                 : "Start by sending a message."}

@@ -33,7 +33,7 @@ const previewComponents: Components = {
     if (isBlock) {
       return (
         <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
-          <LuTerminal className="w-3.5 h-3.5 translate-y-[1px]" /> Code
+          <LuTerminal className="w-3.5 h-3.5 translate-y-px" /> Code
         </span>
       );
     }
@@ -46,28 +46,27 @@ const previewComponents: Components = {
   pre: ({ children }) => <span className="inline">{children}</span>,
   ul: () => (
     <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
-      <LuList className="w-3.5 h-3.5 translate-y-[1px]" /> List
+      <LuList className="w-3.5 h-3.5 translate-y-px" /> List
     </span>
   ),
   ol: () => (
     <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
-      <LuListOrdered className="w-3.5 h-3.5 translate-y-[1px]" /> List
+      <LuListOrdered className="w-3.5 h-3.5 translate-y-px" /> List
     </span>
   ),
   table: () => (
     <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
-      <LuTable className="w-3.5 h-3.5 translate-y-[1px]" /> Table
+      <LuTable className="w-3.5 h-3.5 translate-y-px" /> Table
     </span>
   ),
   blockquote: ({ children }) => (
     <span className="inline-flex items-center gap-1 align-baseline italic opacity-80">
-      <LuQuote className="w-3.5 h-3.5 rotate-180 translate-y-[1px]" />{" "}
-      {children}
+      <LuQuote className="w-3.5 h-3.5 rotate-180 translate-y-px" /> {children}
     </span>
   ),
   img: () => (
     <span className="inline-flex items-center gap-1 align-baseline text-muted-foreground">
-      <LuImage className="w-3.5 h-3.5 translate-y-[1px]" /> Photo
+      <LuImage className="w-3.5 h-3.5 translate-y-px" /> Photo
     </span>
   ),
   br: () => <> </>,
