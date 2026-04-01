@@ -53,7 +53,10 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	AuthPayload struct {
-		UserID func(childComplexity int) int
+		AccessToken          func(childComplexity int) int
+		RefreshToken         func(childComplexity int) int
+		RequiresVerification func(childComplexity int) int
+		UserID               func(childComplexity int) int
 	}
 
 	Chat struct {
@@ -218,11 +221,6 @@ type ComplexityRoot struct {
 		Field   func(childComplexity int) int
 		Message func(childComplexity int) int
 	}
-
-	VerifyEmailPayload struct {
-		AccessToken  func(childComplexity int) int
-		RefreshToken func(childComplexity int) int
-	}
 }
 
 type MessageResolver interface {
@@ -231,8 +229,8 @@ type MessageResolver interface {
 type MutationResolver interface {
 	SignUp(ctx context.Context, input model.SignUpInput) (*model.AuthPayload, error)
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
-	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (*model.VerifyEmailPayload, error)
-	RefreshToken(ctx context.Context, token string) (*model.VerifyEmailPayload, error)
+	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (*model.AuthPayload, error)
+	RefreshToken(ctx context.Context, token string) (*model.AuthPayload, error)
 	TerminateAllOtherSessions(ctx context.Context) (bool, error)
 	TerminateSession(ctx context.Context, id string) (bool, error)
 	Logout(ctx context.Context) (bool, error)
@@ -318,6 +316,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	_ = ec
 	switch typeName + "." + field {
 
+	case "AuthPayload.accessToken":
+		if e.complexity.AuthPayload.AccessToken == nil {
+			break
+		}
+
+		return e.complexity.AuthPayload.AccessToken(childComplexity), true
+	case "AuthPayload.refreshToken":
+		if e.complexity.AuthPayload.RefreshToken == nil {
+			break
+		}
+
+		return e.complexity.AuthPayload.RefreshToken(childComplexity), true
+	case "AuthPayload.requiresVerification":
+		if e.complexity.AuthPayload.RequiresVerification == nil {
+			break
+		}
+
+		return e.complexity.AuthPayload.RequiresVerification(childComplexity), true
 	case "AuthPayload.userId":
 		if e.complexity.AuthPayload.UserID == nil {
 			break
@@ -1145,19 +1161,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ValidationError.Message(childComplexity), true
 
-	case "VerifyEmailPayload.accessToken":
-		if e.complexity.VerifyEmailPayload.AccessToken == nil {
-			break
-		}
-
-		return e.complexity.VerifyEmailPayload.AccessToken(childComplexity), true
-	case "VerifyEmailPayload.refreshToken":
-		if e.complexity.VerifyEmailPayload.RefreshToken == nil {
-			break
-		}
-
-		return e.complexity.VerifyEmailPayload.RefreshToken(childComplexity), true
-
 	}
 	return 0, false
 }
@@ -1849,9 +1852,9 @@ func (ec *executionContext) _AuthPayload_userId(ctx context.Context, field graph
 			return obj.UserID, nil
 		},
 		nil,
-		ec.marshalOID2ᚖstring,
+		ec.marshalNID2string,
 		true,
-		false,
+		true,
 	)
 }
 
@@ -1863,6 +1866,93 @@ func (ec *executionContext) fieldContext_AuthPayload_userId(_ context.Context, f
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthPayload_accessToken(ctx context.Context, field graphql.CollectedField, obj *model.AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthPayload_accessToken,
+		func(ctx context.Context) (any, error) {
+			return obj.AccessToken, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthPayload_accessToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthPayload_refreshToken(ctx context.Context, field graphql.CollectedField, obj *model.AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthPayload_refreshToken,
+		func(ctx context.Context) (any, error) {
+			return obj.RefreshToken, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthPayload_refreshToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthPayload_requiresVerification(ctx context.Context, field graphql.CollectedField, obj *model.AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthPayload_requiresVerification,
+		func(ctx context.Context) (any, error) {
+			return obj.RequiresVerification, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthPayload_requiresVerification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3125,6 +3215,12 @@ func (ec *executionContext) fieldContext_Mutation_signUp(ctx context.Context, fi
 			switch field.Name {
 			case "userId":
 				return ec.fieldContext_AuthPayload_userId(ctx, field)
+			case "accessToken":
+				return ec.fieldContext_AuthPayload_accessToken(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthPayload_refreshToken(ctx, field)
+			case "requiresVerification":
+				return ec.fieldContext_AuthPayload_requiresVerification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
 		},
@@ -3170,6 +3266,12 @@ func (ec *executionContext) fieldContext_Mutation_login(ctx context.Context, fie
 			switch field.Name {
 			case "userId":
 				return ec.fieldContext_AuthPayload_userId(ctx, field)
+			case "accessToken":
+				return ec.fieldContext_AuthPayload_accessToken(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthPayload_refreshToken(ctx, field)
+			case "requiresVerification":
+				return ec.fieldContext_AuthPayload_requiresVerification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
 		},
@@ -3199,7 +3301,7 @@ func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field gra
 			return ec.resolvers.Mutation().VerifyEmail(ctx, fc.Args["input"].(model.VerifyEmailInput))
 		},
 		nil,
-		ec.marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload,
+		ec.marshalNAuthPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAuthPayload,
 		true,
 		true,
 	)
@@ -3213,12 +3315,16 @@ func (ec *executionContext) fieldContext_Mutation_verifyEmail(ctx context.Contex
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "userId":
+				return ec.fieldContext_AuthPayload_userId(ctx, field)
 			case "accessToken":
-				return ec.fieldContext_VerifyEmailPayload_accessToken(ctx, field)
+				return ec.fieldContext_AuthPayload_accessToken(ctx, field)
 			case "refreshToken":
-				return ec.fieldContext_VerifyEmailPayload_refreshToken(ctx, field)
+				return ec.fieldContext_AuthPayload_refreshToken(ctx, field)
+			case "requiresVerification":
+				return ec.fieldContext_AuthPayload_requiresVerification(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type VerifyEmailPayload", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
 		},
 	}
 	defer func() {
@@ -3246,7 +3352,7 @@ func (ec *executionContext) _Mutation_refreshToken(ctx context.Context, field gr
 			return ec.resolvers.Mutation().RefreshToken(ctx, fc.Args["token"].(string))
 		},
 		nil,
-		ec.marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload,
+		ec.marshalNAuthPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAuthPayload,
 		true,
 		true,
 	)
@@ -3260,12 +3366,16 @@ func (ec *executionContext) fieldContext_Mutation_refreshToken(ctx context.Conte
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "userId":
+				return ec.fieldContext_AuthPayload_userId(ctx, field)
 			case "accessToken":
-				return ec.fieldContext_VerifyEmailPayload_accessToken(ctx, field)
+				return ec.fieldContext_AuthPayload_accessToken(ctx, field)
 			case "refreshToken":
-				return ec.fieldContext_VerifyEmailPayload_refreshToken(ctx, field)
+				return ec.fieldContext_AuthPayload_refreshToken(ctx, field)
+			case "requiresVerification":
+				return ec.fieldContext_AuthPayload_requiresVerification(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type VerifyEmailPayload", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
 		},
 	}
 	defer func() {
@@ -6077,64 +6187,6 @@ func (ec *executionContext) fieldContext_ValidationError_field(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _VerifyEmailPayload_accessToken(ctx context.Context, field graphql.CollectedField, obj *model.VerifyEmailPayload) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_VerifyEmailPayload_accessToken,
-		func(ctx context.Context) (any, error) {
-			return obj.AccessToken, nil
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_VerifyEmailPayload_accessToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "VerifyEmailPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _VerifyEmailPayload_refreshToken(ctx context.Context, field graphql.CollectedField, obj *model.VerifyEmailPayload) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_VerifyEmailPayload_refreshToken,
-		func(ctx context.Context) (any, error) {
-			return obj.RefreshToken, nil
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_VerifyEmailPayload_refreshToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "VerifyEmailPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8163,6 +8215,18 @@ func (ec *executionContext) _AuthPayload(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = graphql.MarshalString("AuthPayload")
 		case "userId":
 			out.Values[i] = ec._AuthPayload_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "accessToken":
+			out.Values[i] = ec._AuthPayload_accessToken(ctx, field, obj)
+		case "refreshToken":
+			out.Values[i] = ec._AuthPayload_refreshToken(ctx, field, obj)
+		case "requiresVerification":
+			out.Values[i] = ec._AuthPayload_requiresVerification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10140,50 +10204,6 @@ func (ec *executionContext) _ValidationError(ctx context.Context, sel ast.Select
 	return out
 }
 
-var verifyEmailPayloadImplementors = []string{"VerifyEmailPayload"}
-
-func (ec *executionContext) _VerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, obj *model.VerifyEmailPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, verifyEmailPayloadImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("VerifyEmailPayload")
-		case "accessToken":
-			out.Values[i] = ec._VerifyEmailPayload_accessToken(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "refreshToken":
-			out.Values[i] = ec._VerifyEmailPayload_refreshToken(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var __DirectiveImplementors = []string{"__Directive"}
 
 func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionSet, obj *introspection.Directive) graphql.Marshaler {
@@ -11001,20 +11021,6 @@ func (ec *executionContext) marshalNUserStatusPayload2ᚖgithubᚗcomᚋtr1xdev�
 func (ec *executionContext) unmarshalNVerifyEmailInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailInput(ctx context.Context, v any) (model.VerifyEmailInput, error) {
 	res, err := ec.unmarshalInputVerifyEmailInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNVerifyEmailPayload2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, v model.VerifyEmailPayload) graphql.Marshaler {
-	return ec._VerifyEmailPayload(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNVerifyEmailPayload2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐVerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, v *model.VerifyEmailPayload) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._VerifyEmailPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {

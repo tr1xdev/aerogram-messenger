@@ -1,50 +1,48 @@
 type AuthPayload {
-   userId: ID
-}
-
-type VerifyEmailPayload {
-   accessToken: String!
-   refreshToken: String!
+    userId: ID!
+    accessToken: String
+    refreshToken: String
+    requiresVerification: Boolean!
 }
 
 type Session {
-   id: ID!
-   device: String
-   ipAddress: String
-   location: String
-   isActive: Boolean
-   isCurrent: Boolean!
-   createdAt: String!
+    id: ID!
+    device: String
+    ipAddress: String
+    location: String
+    isActive: Boolean
+    isCurrent: Boolean!
+    createdAt: String!
 }
 
 input SignUpInput {
-   username: String
-   email: String!
-   password: String!
-   firstName: String!
-   lastName: String
+    username: String
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String
 }
 
 input LoginInput {
-   email: String!
-   password: String!
+    email: String!
+    password: String!
 }
 
 input VerifyEmailInput {
-   userID: ID!
-   code: String!
+    userID: ID!
+    code: String!
 }
 
 extend type Query {
-   sessions(userId: ID!): [Session!]!
+    sessions(userId: ID!): [Session!]!
 }
 
 extend type Mutation {
-   signUp(input: SignUpInput!): AuthPayload!
-   login(input: LoginInput!): AuthPayload!
-   verifyEmail(input: VerifyEmailInput!): VerifyEmailPayload!
-   refreshToken(token: String!): VerifyEmailPayload!
-   terminateAllOtherSessions: Boolean!
-   terminateSession(id: ID!): Boolean!
-   logout: Boolean!
+    signUp(input: SignUpInput!): AuthPayload!
+    login(input: LoginInput!): AuthPayload!
+    verifyEmail(input: VerifyEmailInput!): AuthPayload!
+    refreshToken(token: String!): AuthPayload!
+    terminateAllOtherSessions: Boolean!
+    terminateSession(id: ID!): Boolean!
+    logout: Boolean!
 }

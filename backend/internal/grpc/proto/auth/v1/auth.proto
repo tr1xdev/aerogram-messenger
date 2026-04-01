@@ -53,6 +53,8 @@ message SignUpRequest {
 
 message SignUpResponse {
   string user_id = 1;
+  optional string access_token = 2; // returned only if 2fa is bypassed
+  optional string refresh_token = 3; // returned only if 2fa is bypassed
 }
 
 message LoginRequest {
@@ -62,6 +64,8 @@ message LoginRequest {
 
 message LoginResponse {
   string user_id = 1;
+  optional string access_token = 2; // returned only if 2fa is bypassed
+  optional string refresh_token = 3; // returned only if 2fa is bypassed
 }
 
 message VerifyEmailRequest {

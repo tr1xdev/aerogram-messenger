@@ -49,7 +49,10 @@ type SendMessageResult interface {
 }
 
 type AuthPayload struct {
-	UserID *string `json:"userId,omitempty"`
+	UserID               string  `json:"userId"`
+	AccessToken          *string `json:"accessToken,omitempty"`
+	RefreshToken         *string `json:"refreshToken,omitempty"`
+	RequiresVerification bool    `json:"requiresVerification"`
 }
 
 type Chat struct {
@@ -247,11 +250,6 @@ func (ValidationError) IsCreateBotResult() {}
 type VerifyEmailInput struct {
 	UserID string `json:"userID"`
 	Code   string `json:"code"`
-}
-
-type VerifyEmailPayload struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
 }
 
 type ChatType string
