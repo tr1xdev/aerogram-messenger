@@ -16,6 +16,7 @@ type Config struct {
 	App      AppConfig
 	Server   ServerConfig
 	Database DatabaseConfig
+	Auth     AuthConfig
 	JWT      JWTConfig
 	Resend   ResendConfig
 }
@@ -59,6 +60,16 @@ type RedisConfig struct {
 	Port     int
 	Password string
 	DB       int
+}
+
+type AuthConfig struct {
+	TwoFA TwoFAConfig `mapstructure:"2fa"`
+}
+
+type TwoFAConfig struct {
+	Enabled  bool `mapstructure:"enabled"`
+	OnSignUp bool `mapstructure:"on_sign_up"`
+	OnSignIn bool `mapstructure:"on_sign_in"`
 }
 
 type JWTConfig struct {

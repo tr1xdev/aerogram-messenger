@@ -22,5 +22,11 @@ database:
         port: ${REDIS_PORT:-6379} # Redis port (default 6379)
         db: ${REDIS_DB:-0} # Redis database index (0-15)
 
+auth:
+    2fa:
+        enabled: ${ENABLE_2FA:-false} # Master boolean flag for 2FA availability
+        on_sign_up: ${2FA_ON_SIGN_UP:-false} # Boolean flag to trigger 2FA during registration
+        on_sign_in: ${2FA_ON_SIGN_IN:-false} # Boolean flag to trigger 2FA during login
+
 jwt:
     ttl_minutes: ${JWT_TTL:-60} # JWT token lifetime in minutes
