@@ -16,8 +16,10 @@ import { REFRESH_TOKEN_MUTATION } from "@/features/auth/api/auth.gql";
 import { useAuthStore } from "@/store/auth-store";
 import { useConnectionStore } from "@/store/connection";
 
-const endpoint = import.meta.env.VITE_API_URL || "http://localhost:8080/query";
-const wsEndpoint = import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
+const endpoint: string =
+  import.meta.env.VITE_API_URL || "http://localhost:8080/query";
+const wsEndpoint: string =
+  import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
 
 interface RefreshTokenResponse {
   refreshToken: {
@@ -41,7 +43,7 @@ let pendingRequests: PendingRequestCallback[] = [];
 const authChannel: BroadcastChannel = new BroadcastChannel("auth_sync");
 
 const resolvePendingRequests = (): void => {
-  pendingRequests.forEach((callback) => callback());
+  pendingRequests.forEach((callback: PendingRequestCallback) => callback());
   pendingRequests = [];
 };
 
@@ -72,17 +74,19 @@ const httpLink: HttpLink = new HttpLink({
   uri: endpoint,
 });
 
-const authLink: SetContextLink = new SetContextLink((prevContext) => {
-  const token = useAuthStore.getState().accessToken;
-  const prevHeaders: Record<string, string> =
-    (prevContext.headers as Record<string, string>) || {};
-  return {
-    headers: {
-      ...prevHeaders,
-      authorization: token ? `Bearer ${token}` : "",
-    },
-  };
-});
+const authLink: SetContextLink = new SetContextLink(
+  (prevContext: Record<string, unknown>) => {
+    const token: string | null = useAuthStore.getState().accessToken;
+    const prevHeaders: Record<string, string> =
+      (prevContext.headers as Record<string, string>) || {};
+    return {
+      headers: {
+        ...prevHeaders,
+        authorization: token ? `Bearer ${token}` : "",
+      },
+    };
+  },
+);
 
 const interceptorLink: ApolloLink = new ApolloLink(
   (operation: Operation, forward) => {
@@ -108,7 +112,7 @@ const interceptorLink: ApolloLink = new ApolloLink(
               return;
             }
 
-            const refresh = useAuthStore.getState().refreshToken;
+            const refresh: string | null = useAuthStore.getState().refreshToken;
             if (!refresh) {
               logoutAll();
               observer.next(response);
@@ -148,7 +152,8 @@ const interceptorLink: ApolloLink = new ApolloLink(
             }
 
             pendingRequests.push(() => {
-              const newToken = useAuthStore.getState().accessToken;
+              const newToken: string | null =
+                useAuthStore.getState().accessToken;
               operation.setContext((prev: Record<string, unknown>) => ({
                 ...prev,
                 headers: {
@@ -189,18 +194,21 @@ const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
     url: wsEndpoint,
-    lazy: true,
+    lazy: false,
     connectionParams: async () => {
       if (isRefreshing) {
-        await new Promise<void>((resolve) => pendingRequests.push(resolve));
+        await new Promise<void>(
+          (resolve: (value: void | PromiseLike<void>) => void) =>
+            pendingRequests.push(resolve),
+        );
       }
-      const token = useAuthStore.getState().accessToken;
+      const token: string | null = useAuthStore.getState().accessToken;
       return { Authorization: token ? `Bearer ${token}` : "" };
     },
     keepAlive: 10000,
     connectionAckWaitTimeout: 15000,
-    shouldRetry: (err) => {
-      const event = err as CloseEvent;
+    shouldRetry: (err: unknown) => {
+      const event: CloseEvent = err as CloseEvent;
       return event?.code !== 1000 && event?.reason !== "terminated";
     },
     retryAttempts: Infinity,
@@ -208,7 +216,9 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
       const delay: number =
         retries < 5 ? 1000 : Math.min(1000 * Math.pow(2, retries - 5), 30000);
       const jitter: number = Math.random() * 0.2 * delay;
-      await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+      await new Promise((resolve: (value: void | PromiseLike<void>) => void) =>
+        setTimeout(resolve, delay + jitter),
+      );
     },
     on: {
       opened: () =>
@@ -275,7 +285,7 @@ export const client: ApolloClient = new ApolloClient({
       Query: {
         fields: {
           myChats: {
-            merge(_, incoming) {
+            merge(_: unknown, incoming: Reference[]) {
               return incoming;
             },
           },
@@ -286,7 +296,10 @@ export const client: ApolloClient = new ApolloClient({
               incoming: MessageConnection,
               { readField },
             ): MessageConnection {
-              const mergedMap = new Map<string, Reference>();
+              const mergedMap: Map<string, Reference> = new Map<
+                string,
+                Reference
+              >();
 
               if (existing?.messages) {
                 existing.messages.forEach((ref: Reference) => {

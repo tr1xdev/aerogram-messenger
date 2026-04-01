@@ -412,6 +412,8 @@ func (x *SignUpRequest) GetUsername() string {
 type SignUpResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	AccessToken   *string                `protobuf:"bytes,2,opt,name=access_token,json=accessToken,proto3,oneof" json:"access_token,omitempty"`    // returned only if 2fa is bypassed
+	RefreshToken  *string                `protobuf:"bytes,3,opt,name=refresh_token,json=refreshToken,proto3,oneof" json:"refresh_token,omitempty"` // returned only if 2fa is bypassed
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -449,6 +451,20 @@ func (*SignUpResponse) Descriptor() ([]byte, []int) {
 func (x *SignUpResponse) GetUserId() string {
 	if x != nil {
 		return x.UserId
+	}
+	return ""
+}
+
+func (x *SignUpResponse) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
+}
+
+func (x *SignUpResponse) GetRefreshToken() string {
+	if x != nil && x.RefreshToken != nil {
+		return *x.RefreshToken
 	}
 	return ""
 }
@@ -508,6 +524,8 @@ func (x *LoginRequest) GetPassword() string {
 type LoginResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	AccessToken   *string                `protobuf:"bytes,2,opt,name=access_token,json=accessToken,proto3,oneof" json:"access_token,omitempty"`    // returned only if 2fa is bypassed
+	RefreshToken  *string                `protobuf:"bytes,3,opt,name=refresh_token,json=refreshToken,proto3,oneof" json:"refresh_token,omitempty"` // returned only if 2fa is bypassed
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -545,6 +563,20 @@ func (*LoginResponse) Descriptor() ([]byte, []int) {
 func (x *LoginResponse) GetUserId() string {
 	if x != nil {
 		return x.UserId
+	}
+	return ""
+}
+
+func (x *LoginResponse) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
+}
+
+func (x *LoginResponse) GetRefreshToken() string {
+	if x != nil && x.RefreshToken != nil {
+		return *x.RefreshToken
 	}
 	return ""
 }
@@ -689,14 +721,22 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\busername\x18\x05 \x01(\tH\x01R\busername\x88\x01\x01B\f\n" +
 	"\n" +
 	"_last_nameB\v\n" +
-	"\t_username\")\n" +
+	"\t_username\"\x9e\x01\n" +
 	"\x0eSignUpResponse\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"@\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12&\n" +
+	"\faccess_token\x18\x02 \x01(\tH\x00R\vaccessToken\x88\x01\x01\x12(\n" +
+	"\rrefresh_token\x18\x03 \x01(\tH\x01R\frefreshToken\x88\x01\x01B\x0f\n" +
+	"\r_access_tokenB\x10\n" +
+	"\x0e_refresh_token\"@\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"(\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"\x9d\x01\n" +
 	"\rLoginResponse\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"A\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12&\n" +
+	"\faccess_token\x18\x02 \x01(\tH\x00R\vaccessToken\x88\x01\x01\x12(\n" +
+	"\rrefresh_token\x18\x03 \x01(\tH\x01R\frefreshToken\x88\x01\x01B\x0f\n" +
+	"\r_access_tokenB\x10\n" +
+	"\x0e_refresh_token\"A\n" +
 	"\x12VerifyEmailRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\"]\n" +
@@ -765,6 +805,8 @@ func file_auth_v1_auth_proto_init() {
 	}
 	file_auth_v1_auth_proto_msgTypes[3].OneofWrappers = []any{}
 	file_auth_v1_auth_proto_msgTypes[6].OneofWrappers = []any{}
+	file_auth_v1_auth_proto_msgTypes[7].OneofWrappers = []any{}
+	file_auth_v1_auth_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

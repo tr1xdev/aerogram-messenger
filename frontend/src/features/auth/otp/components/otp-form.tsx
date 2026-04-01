@@ -71,6 +71,7 @@ export function OtpForm({ className, userId, ...props }: OtpFormProps) {
                   pattern={REGEXP_ONLY_DIGITS}
                   disabled={isPending}
                   {...field}
+                  onComplete={() => form.handleSubmit(onSubmit)()}
                 >
                   <InputOTPGroup>
                     <InputOTPSlot index={0} />

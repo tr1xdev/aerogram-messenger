@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"os"
 	"testing"
 	"time"
 
@@ -72,75 +73,25 @@ func (db *DB) Close() error {
 	return db.Conn.Close()
 }
 
-func StringToNullString(s string) sql.NullString {
-	if s == "" {
-		return sql.NullString{Valid: false}
-	}
-	return sql.NullString{String: s, Valid: true}
-}
-
-func UUIDToNullUUID(id uuid.UUID) uuid.NullUUID {
-	return uuid.NullUUID{
-		UUID:  id,
-		Valid: id != uuid.Nil,
-	}
-}
-
-func ToNullUUID(s string) uuid.NullUUID {
-	uid, err := uuid.Parse(s)
-	if err != nil {
-		return uuid.NullUUID{Valid: false}
-	}
-	return uuid.NullUUID{UUID: uid, Valid: true}
-}
-
-func ToNullUUIDPtr(s *string) uuid.NullUUID {
-	if s == nil || *s == "" {
-		return uuid.NullUUID{Valid: false}
-	}
-	return ToNullUUID(*s)
-}
-
-func ToNullString(s *string) sql.NullString {
-	if s == nil {
-		return sql.NullString{Valid: false}
-	}
-	return sql.NullString{String: *s, Valid: true}
-}
-
-func ToNullTime(t *time.Time) sql.NullTime {
-	if t == nil {
-		return sql.NullTime{Valid: false}
-	}
-	return sql.NullTime{Time: *t, Valid: true}
-}
-
-func TimeToNullTime(t time.Time) sql.NullTime {
-	if t.IsZero() {
-		return sql.NullTime{Valid: false}
-	}
-	return sql.NullTime{
-		Time:  t,
-		Valid: true,
-	}
-}
-
-func ToNullTimePtr(t *time.Time) sql.NullTime {
-	if t == nil {
-		return sql.NullTime{Valid: false}
-	}
-	return sql.NullTime{Time: *t, Valid: true}
-}
-
-func UUIDToNullUUIDPtr(id *uuid.UUID) uuid.NullUUID {
-	if id == nil {
-		return uuid.NullUUID{Valid: false}
-	}
-	return uuid.NullUUID{UUID: *id, Valid: true}
-}
-
 func SetupTestDB(t *testing.T) *DB {
-	dsn := "postgres://postgres:postgres@localhost:5432/aerogram_test?sslmode=disable"
+	user := os.Getenv("DB_USER")
+	if user == "" {
+		user = "admin"
+	}
+	pass := os.Getenv("POSTGRES_PASSWORD")
+	if pass == "" {
+		pass = "admin"
+	}
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "aerogram_test"
+	}
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", user, pass, host, dbName)
 
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
@@ -151,7 +102,6 @@ func SetupTestDB(t *testing.T) *DB {
 		SET client_min_messages TO WARNING;
 		DROP SCHEMA IF EXISTS public CASCADE;
 		CREATE SCHEMA public;
-		GRANT ALL ON SCHEMA public TO postgres;
 		GRANT ALL ON SCHEMA public TO public;
 	`)
 	if err != nil {
@@ -184,4 +134,42 @@ func (db *DB) TruncateTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to truncate tables: %v", err)
 	}
+}
+
+func StringToNullString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: s != ""}
+}
+
+func UUIDToNullUUID(id uuid.UUID) uuid.NullUUID {
+	return uuid.NullUUID{UUID: id, Valid: id != uuid.Nil}
+}
+
+func ToNullUUID(s string) uuid.NullUUID {
+	uid, err := uuid.Parse(s)
+	return uuid.NullUUID{UUID: uid, Valid: err == nil}
+}
+
+func ToNullUUIDPtr(s *string) uuid.NullUUID {
+	if s == nil {
+		return uuid.NullUUID{Valid: false}
+	}
+	return ToNullUUID(*s)
+}
+
+func ToNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{Valid: false}
+	}
+	return sql.NullString{String: *s, Valid: true}
+}
+
+func TimeToNullTime(t time.Time) sql.NullTime {
+	return sql.NullTime{Time: t, Valid: !t.IsZero()}
+}
+
+func ToNullTime(t *time.Time) sql.NullTime {
+	if t == nil {
+		return sql.NullTime{Valid: false}
+	}
+	return sql.NullTime{Time: *t, Valid: true}
 }
