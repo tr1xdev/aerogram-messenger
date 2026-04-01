@@ -23,11 +23,9 @@ export const parseApiError = (error: unknown): string => {
 
 interface AuthPayload {
   userId: string;
-}
-
-interface VerifyPayload {
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
+  requiresVerification: boolean;
 }
 
 interface LoginInput {
@@ -50,6 +48,8 @@ interface VerifyEmailInput {
 
 export const useLogin = () => {
   const navigate = useNavigate();
+  const setTokens = useAuthStore((state) => state.setTokens);
+
   return useMutation({
     mutationFn: async (variables: { input: LoginInput }) => {
       const response = await gqlClient.request<{ login: AuthPayload }>(
@@ -59,16 +59,23 @@ export const useLogin = () => {
       return response.login;
     },
     onSuccess: (data) => {
-      navigate({
-        to: "/otp",
-        search: { userId: data.userId },
-      });
+      if (data.requiresVerification) {
+        navigate({
+          to: "/otp",
+          search: { userId: data.userId },
+        });
+      } else if (data.accessToken && data.refreshToken) {
+        setTokens(data.accessToken, data.refreshToken);
+        navigate({ to: "/" });
+      }
     },
   });
 };
 
 export const useSignUp = () => {
   const navigate = useNavigate();
+  const setTokens = useAuthStore((state) => state.setTokens);
+
   return useMutation({
     mutationFn: async (variables: { input: SignUpInput }) => {
       const response = await gqlClient.request<{ signUp: AuthPayload }>(
@@ -78,10 +85,15 @@ export const useSignUp = () => {
       return response.signUp;
     },
     onSuccess: (data) => {
-      navigate({
-        to: "/otp",
-        search: { userId: data.userId },
-      });
+      if (data.requiresVerification) {
+        navigate({
+          to: "/otp",
+          search: { userId: data.userId },
+        });
+      } else if (data.accessToken && data.refreshToken) {
+        setTokens(data.accessToken, data.refreshToken);
+        navigate({ to: "/" });
+      }
     },
   });
 };
@@ -92,15 +104,17 @@ export const useVerifyEmail = () => {
 
   return useMutation({
     mutationFn: async (variables: { input: VerifyEmailInput }) => {
-      const response = await gqlClient.request<{ verifyEmail: VerifyPayload }>(
+      const response = await gqlClient.request<{ verifyEmail: AuthPayload }>(
         VERIFY_EMAIL_MUTATION,
         variables,
       );
       return response.verifyEmail;
     },
     onSuccess: (data) => {
-      setTokens(data.accessToken, data.refreshToken);
-      navigate({ to: "/" });
+      if (data.accessToken && data.refreshToken) {
+        setTokens(data.accessToken, data.refreshToken);
+        navigate({ to: "/" });
+      }
     },
   });
 };
