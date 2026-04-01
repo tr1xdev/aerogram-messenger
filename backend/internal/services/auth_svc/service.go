@@ -117,6 +117,32 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 		return nil, status.Error(codes.Internal, "storage error")
 	}
 
+	if !s.cfg.Auth.TwoFA.Enabled || !s.cfg.Auth.TwoFA.OnSignUp {
+		ip, ua := s.getMetadata(ctx)
+		sid := uuid.New()
+
+		_, err = s.db.Queries.CreateSession(ctx, dbgen.CreateSessionParams{
+			ID:        sid,
+			UserID:    newID,
+			IpAddress: ip,
+			Device:    ua,
+		})
+		if err != nil {
+			return nil, status.Error(codes.Internal, "session creation failed")
+		}
+
+		token, err := s.createAccessToken(newID.String(), sid.String(), true, false)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "token error")
+		}
+
+		return &authpb.SignUpResponse{
+			UserId:       newID.String(),
+			AccessToken:  &token,
+			RefreshToken: &[]string{sid.String()}[0],
+		}, nil
+	}
+
 	verID := uuid.NewString()
 	targetEmail := req.Email
 	if os.Getenv("APP_ENV") == "development" {
@@ -150,7 +176,39 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
+	if !s.cfg.Auth.TwoFA.Enabled || !s.cfg.Auth.TwoFA.OnSignIn {
+		ip, ua := s.getMetadata(ctx)
+		sid := uuid.New()
+
+		_, err = s.db.Queries.CreateSession(ctx, dbgen.CreateSessionParams{
+			ID:        sid,
+			UserID:    user.ID,
+			IpAddress: ip,
+			Device:    ua,
+		})
+		if err != nil {
+			return nil, status.Error(codes.Internal, "session creation failed")
+		}
+
+		token, err := s.createAccessToken(user.ID.String(), sid.String(), true, false)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "token error")
+		}
+
+		return &authpb.LoginResponse{
+			UserId:       user.ID.String(),
+			AccessToken:  &token,
+			RefreshToken: &[]string{sid.String()}[0],
+		}, nil
+	}
+
 	verID := uuid.NewString()
+	targetEmail := user.Email.String
+	if os.Getenv("APP_ENV") == "development" {
+		if testEmail := os.Getenv("TEST_EMAIL"); testEmail != "" {
+			targetEmail = testEmail
+		}
+	}
 
 	go func(vID, uID, email, name string) {
 		asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -158,7 +216,7 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 		if err := s.authRepo.StoreAndSendCode(asyncCtx, vID, uID, email, name); err != nil {
 			fmt.Printf("ASYNC MAIL ERROR: %v\n", err)
 		}
-	}(verID, user.ID.String(), user.Email.String, user.FirstName)
+	}(verID, user.ID.String(), targetEmail, user.FirstName)
 
 	return &authpb.LoginResponse{UserId: verID}, nil
 }

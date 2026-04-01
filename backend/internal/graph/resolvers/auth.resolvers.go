@@ -35,7 +35,10 @@ func (r *mutationResolver) SignUp(ctx context.Context, input model.SignUpInput) 
 	}
 
 	return &model.AuthPayload{
-		UserID: &resp.UserId,
+		UserID:               resp.UserId,
+		AccessToken:          resp.AccessToken,
+		RefreshToken:         resp.RefreshToken,
+		RequiresVerification: resp.AccessToken == nil,
 	}, nil
 }
 
@@ -50,12 +53,15 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	}
 
 	return &model.AuthPayload{
-		UserID: &resp.UserId,
+		UserID:               resp.UserId,
+		AccessToken:          resp.AccessToken,
+		RefreshToken:         resp.RefreshToken,
+		RequiresVerification: resp.AccessToken == nil,
 	}, nil
 }
 
 // VerifyEmail is the resolver for the verifyEmail field.
-func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (*model.VerifyEmailPayload, error) {
+func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (*model.AuthPayload, error) {
 	resp, err := r.AuthClient.VerifyEmail(ctx, &authv1.VerifyEmailRequest{
 		UserId: input.UserID,
 		Code:   input.Code,
@@ -64,14 +70,16 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEm
 		return nil, helpers.MapGRPCError(err)
 	}
 
-	return &model.VerifyEmailPayload{
-		AccessToken:  resp.AccessToken,
-		RefreshToken: resp.RefreshToken,
+	return &model.AuthPayload{
+		UserID:               input.UserID,
+		AccessToken:          &resp.AccessToken,
+		RefreshToken:         &resp.RefreshToken,
+		RequiresVerification: false,
 	}, nil
 }
 
 // RefreshToken is the resolver for the refreshToken field.
-func (r *mutationResolver) RefreshToken(ctx context.Context, token string) (*model.VerifyEmailPayload, error) {
+func (r *mutationResolver) RefreshToken(ctx context.Context, token string) (*model.AuthPayload, error) {
 	resp, err := r.AuthClient.RefreshToken(ctx, &authv1.RefreshTokenRequest{
 		RefreshToken: token,
 	})
@@ -79,9 +87,10 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, token string) (*mod
 		return nil, helpers.MapGRPCError(err)
 	}
 
-	return &model.VerifyEmailPayload{
-		AccessToken:  resp.AccessToken,
-		RefreshToken: resp.RefreshToken,
+	return &model.AuthPayload{
+		AccessToken:          &resp.AccessToken,
+		RefreshToken:         &resp.RefreshToken,
+		RequiresVerification: false,
 	}, nil
 }
 
