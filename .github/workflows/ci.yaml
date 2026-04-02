@@ -64,11 +64,12 @@ jobs:
                   JWT_SECRET: ci_test_secret_key
 
             - name: Lint Go code
-              uses: golangci/golangci-lint-action@v6
-              with:
-                  version: latest
-                  working-directory: backend
-                  args: --timeout=10m --go=1.24
+              working-directory: backend
+              run: |
+                  sed -i 's/go 1.25.5/go 1.24/' go.mod
+                  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+                  $(go env GOPATH)/bin/golangci-lint run --timeout=10m
+                  git checkout go.mod
               env:
                   GOWORK: off
 
@@ -77,22 +78,18 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
-
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
                   node-version: 22
                   cache: "npm"
                   cache-dependency-path: frontend/package-lock.json
-
             - name: Install Frontend Dependencies
               working-directory: frontend
               run: npm ci
-
             - name: Lint Frontend
               working-directory: frontend
               run: npm run lint
-
             - name: Type Check
               working-directory: frontend
               run: npx tsc --noEmit
@@ -109,4 +106,4 @@ jobs:
                   JWT_SECRET: dummy_secret
                   RESEND_API_KEY: dummy_key
                   VITE_API_URL: http://localhost:8080
-                  VITE_WS_URL: ws://localhost:8080ы
+                  VITE_WS_URL: ws://localhost:8080
