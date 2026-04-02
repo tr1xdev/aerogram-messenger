@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
@@ -44,9 +45,14 @@ func setupTest(t *testing.T, twoFAEnabled bool, onSignUp bool, onSignIn bool) (*
 	authLimiter := limiter.NewRedisLimiter(rdb)
 
 	cfg := &config.Config{
-		App: config.AppConfig{Env: "development"},
-		JWT: config.JWTConfig{Secret: "test_secret_123", TTLMinutes: 60},
+		App: config.AppConfig{
+			Env: "development",
+		},
 		Auth: config.AuthConfig{
+			JWT: config.JWTConfig{
+				Secret:    "test_secret_123",
+				AccessTTL: 60 * time.Minute,
+			},
 			TwoFA: config.TwoFAConfig{
 				Enabled:  twoFAEnabled,
 				OnSignUp: onSignUp,
