@@ -30,17 +30,17 @@ export function ProfileContent({
   const [logoutMutation] = useMutation(LOGOUT);
 
   const handleLogout = async (): Promise<void> => {
+    onActionComplete?.();
     try {
-      await logoutMutation();
-    } catch (e) {
-      console.error(e);
+      await logoutMutation().catch((): void => {});
     } finally {
-      onActionComplete?.();
-      await logoutAll();
+      logoutAll();
     }
   };
 
-  const initial = (user?.firstName || user?.username || "?")[0].toUpperCase();
+  const initial: string = (user?.firstName ||
+    user?.username ||
+    "?")[0].toUpperCase();
 
   return (
     <div className="space-y-6 py-6 outline-none">
