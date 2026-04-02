@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -36,7 +35,7 @@ func NewServer(db *database.DB, authLimiter limiter.RateLimiter, rdb *redis.Clie
 	return &Server{
 		db:          db,
 		authLimiter: authLimiter,
-		authRepo:    repositories.NewAuthRepository(db, rdb, mailer, 10*time.Minute),
+		authRepo:    repositories.NewAuthRepository(db, rdb, mailer, cfg.Auth.TwoFA.CodeTTL),
 		userRepo:    repositories.NewUserRepository(db),
 		cfg:         cfg,
 	}
@@ -64,7 +63,7 @@ func (s *Server) createAccessToken(userID, sessionID string, verified bool, isBo
 	if isBot {
 		ttl = time.Hour * 24 * 365
 	} else {
-		ttl = s.cfg.JWT.TTL()
+		ttl = s.cfg.Auth.JWT.AccessTTL
 		if ttl == 0 {
 			ttl = time.Hour * 24
 		}
@@ -83,12 +82,14 @@ func (s *Server) createAccessToken(userID, sessionID string, verified bool, isBo
 	}
 
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString([]byte(s.cfg.JWT.Secret))
+	return t.SignedString([]byte(s.cfg.Auth.JWT.Secret))
 }
 
 func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb.SignUpResponse, error) {
 	ip, _ := s.getMetadata(ctx)
-	allowed, err := s.authLimiter.Allow(ctx, "limit:signup:"+ip, 5, time.Hour)
+
+	limitCfg := s.cfg.RateLimit.Auth.SignUp
+	allowed, err := s.authLimiter.Allow(ctx, "limit:signup:"+ip, limitCfg.Limit, limitCfg.Window)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "limiter error")
 	}
@@ -155,10 +156,8 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 
 	verID := uuid.NewString()
 	targetEmail := req.Email
-	if os.Getenv("APP_ENV") == "development" {
-		if testEmail := os.Getenv("TEST_EMAIL"); testEmail != "" {
-			targetEmail = testEmail
-		}
+	if s.cfg.App.Env == "development" && s.cfg.App.TestEmail != "" {
+		targetEmail = s.cfg.App.TestEmail
 	}
 
 	go func(vID, uID, email, name string) {
@@ -173,7 +172,8 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 }
 
 func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
-	allowed, err := s.authLimiter.Allow(ctx, "limit:login:"+req.Email, 5, 15*time.Minute)
+	limitCfg := s.cfg.RateLimit.Auth.Login
+	allowed, err := s.authLimiter.Allow(ctx, "limit:login:"+req.Email, limitCfg.Limit, limitCfg.Window)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "limiter error")
 	}
@@ -222,10 +222,8 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 
 	verID := uuid.NewString()
 	targetEmail := user.Email.String
-	if os.Getenv("APP_ENV") == "development" {
-		if testEmail := os.Getenv("TEST_EMAIL"); testEmail != "" {
-			targetEmail = testEmail
-		}
+	if s.cfg.App.Env == "development" && s.cfg.App.TestEmail != "" {
+		targetEmail = s.cfg.App.TestEmail
 	}
 
 	go func(vID, uID, email, name string) {
@@ -240,7 +238,8 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 }
 
 func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest) (*authpb.VerifyEmailResponse, error) {
-	allowed, err := s.authLimiter.Allow(ctx, "limit:verify:"+req.UserId, 3, 5*time.Minute)
+	limitCfg := s.cfg.RateLimit.Auth.Verify
+	allowed, err := s.authLimiter.Allow(ctx, "limit:verify:"+req.UserId, limitCfg.Limit, limitCfg.Window)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "limiter error")
 	}
