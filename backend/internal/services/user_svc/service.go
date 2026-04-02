@@ -4,16 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"
+	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	errorspb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/errors/v1"
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -22,16 +24,35 @@ type Server struct {
 	userpb.UnimplementedUserServiceServer
 	userRepo *repositories.UserRepository
 	db       *database.DB
+	limiter  limiter.RateLimiter
+	cfg      *config.Config
 }
 
-func NewServer(db *database.DB) *Server {
+func NewServer(db *database.DB, l limiter.RateLimiter, cfg *config.Config) *Server {
 	return &Server{
 		db:       db,
 		userRepo: repositories.NewUserRepository(db),
+		limiter:  l,
+		cfg:      cfg,
 	}
 }
 
+func (s *Server) getUserID(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		if ids := md.Get("user-id"); len(ids) > 0 {
+			return ids[0]
+		}
+	}
+	return ""
+}
+
 func (s *Server) UserInfo(ctx context.Context, req *userpb.UserInfoRequest) (*userpb.UserInfoResponse, error) {
+	callerID := s.getUserID(ctx)
+	if err := s.limiter.Check(ctx, "user:info:"+callerID, s.cfg.RateLimit.User.Search.Limit, s.cfg.RateLimit.User.Search.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many requests")
+	}
+
 	var u dbgen.User
 	var err error
 
@@ -93,6 +114,11 @@ func (s *Server) GetUsers(ctx context.Context, req *userpb.GetUsersRequest) (*us
 }
 
 func (s *Server) SearchUsers(ctx context.Context, req *userpb.SearchUsersRequest) (*userpb.SearchUsersResponse, error) {
+	callerID := s.getUserID(ctx)
+	if err := s.limiter.Check(ctx, "user:search:"+callerID, s.cfg.RateLimit.User.Search.Limit, s.cfg.RateLimit.User.Search.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "search limit exceeded")
+	}
+
 	var users []dbgen.User
 	var err error
 
@@ -115,6 +141,10 @@ func (s *Server) SearchUsers(ctx context.Context, req *userpb.SearchUsersRequest
 }
 
 func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) (*userpb.UpdateUserResponse, error) {
+	if err := s.limiter.Check(ctx, "user:update:"+req.Id, s.cfg.RateLimit.User.Update.Limit, s.cfg.RateLimit.User.Update.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many update attempts")
+	}
+
 	uid, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid user id")
@@ -152,9 +182,22 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 }
 
 func (s *Server) CreateBot(ctx context.Context, req *userpb.CreateBotRequest) (*userpb.CreateBotResponse, error) {
+	if err := s.limiter.Check(ctx, "user:create_bot:"+req.OwnerId, s.cfg.RateLimit.User.CreateBot.Limit, s.cfg.RateLimit.User.CreateBot.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "Too many requests. Please wait before creating another bot.")
+	}
+
 	ownerID, err := uuid.Parse(req.OwnerId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid owner id")
+	}
+
+	count, err := s.userRepo.CountBotsByOwnerID(ctx, ownerID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to verify bot quota: %v", err)
+	}
+
+	if int(count) >= s.cfg.UserService.MaxBotsPerUser {
+		return nil, status.Error(codes.FailedPrecondition, "maximum bot limit reached")
 	}
 
 	params := dbgen.CreateBotParams{
@@ -175,7 +218,6 @@ func (s *Server) CreateBot(ctx context.Context, req *userpb.CreateBotRequest) (*
 
 	bot, err := s.userRepo.CreateBot(ctx, params)
 	if err != nil {
-		fmt.Printf("DB Error: %v\n", err)
 		return nil, status.Errorf(codes.Internal, "failed to create bot: %v", err)
 	}
 

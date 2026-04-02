@@ -200,7 +200,8 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 
 	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
 	presencev1.RegisterPresenceServiceServer(s, pSvc)
-	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
+
+	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db, authLimiter, cfg))
 }
 
 func initGraphQL(

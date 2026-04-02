@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	errorspb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/errors/v1"
@@ -16,6 +18,16 @@ import (
 )
 
 var testDB *database.DB
+
+type mockLimiter struct{}
+
+func (m *mockLimiter) Check(ctx context.Context, key string, limit int, window time.Duration) error {
+	return nil
+}
+
+func (m *mockLimiter) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
+	return true, nil
+}
 
 func TestMain(m *testing.M) {
 	db, cleanup := database.SetupGlobalTestDB()
@@ -30,7 +42,21 @@ func TestMain(m *testing.M) {
 func setupUserTest(t *testing.T) (*Server, context.Context) {
 	t.Helper()
 	testDB.TruncateTables(t)
-	return NewServer(testDB), context.Background()
+
+	cfg := &config.Config{
+		RateLimit: config.RateLimitConfig{
+			User: config.UserLimitConfig{
+				Update:    config.LimitEntry{Limit: 100, Window: time.Minute},
+				Search:    config.LimitEntry{Limit: 100, Window: time.Minute},
+				CreateBot: config.LimitEntry{Limit: 100, Window: time.Minute},
+			},
+		},
+		UserService: config.UserServiceConfig{
+			MaxBotsPerUser: 20,
+		},
+	}
+
+	return NewServer(testDB, &mockLimiter{}, cfg), context.Background()
 }
 
 func TestUserInfo(t *testing.T) {
