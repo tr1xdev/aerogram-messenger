@@ -24,7 +24,7 @@ import { useConnectionStore } from "@/store/connection";
 const endpoint: string =
   import.meta.env.VITE_API_URL || "http://localhost:8080/query";
 const wsEndpoint: string =
-  import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
+  import.meta.env.VITE_WS_URL || "ws://localhost:8080/query";
 
 interface RefreshTokenResponse {
   refreshToken: {
@@ -251,7 +251,7 @@ const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
     url: wsEndpoint,
-    lazy: true,
+    lazy: false,
     connectionParams: async () => {
       if (isRefreshing) {
         await new Promise<void>((resolve: (value: void) => void): void => {
@@ -259,7 +259,7 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
         });
       }
       const token: string | null = useAuthStore.getState().accessToken;
-      return { Authorization: token ? `Bearer ${token}` : "" };
+      return { authorization: token ? `Bearer ${token}` : "" };
     },
     keepAlive: 10000,
     connectionAckWaitTimeout: 15000,
