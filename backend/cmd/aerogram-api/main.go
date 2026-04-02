@@ -57,28 +57,19 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	rdb := database.NewRedis(cfg.RedisAddr(), cfg.RedisPassword(), 0)
+	rdb := database.NewRedis(cfg.RedisAddr(), cfg.Database.Redis.Password, cfg.Database.Redis.DB)
 	defer rdb.Close()
 
 	pRepo := repositories.NewPresenceRepository(rdb)
 	pSvc := presence_svc.NewServer(pRepo)
 
-	templatePath := os.Getenv("VERIFICATION_TEMPLATE_PATH")
-	if templatePath == "" {
-		templatePath = "internal/templates/verification.html"
-	}
-
-	emailSvc, err := mailer.NewResendService(cfg.Resend.Token, cfg.Resend.From, templatePath)
+	templatePath := "internal/templates/verification.html"
+	emailSvc, err := mailer.NewResendService(cfg.Auth.JWT.Secret, cfg.App.TestEmail, templatePath)
 	if err != nil {
 		log.Printf("Warning: mailer init error: %v", err)
 	}
 
-	geoPath := os.Getenv("GEOIP_PATH")
-	if geoPath == "" {
-		geoPath = "assets/GeoLite2-City.mmdb"
-	}
-
-	geoSvc := geo_svc.New(geoPath)
+	geoSvc := geo_svc.New("assets/GeoLite2-City.mmdb")
 	defer geoSvc.Close()
 	uaSvc := ua_svc.New()
 
@@ -115,21 +106,17 @@ func main() {
 		PresenceClient: presencev1.NewPresenceServiceClient(conn),
 	})
 
-	certPath := os.Getenv("CERT_PATH")
-	keyPath := os.Getenv("KEY_PATH")
-	if certPath == "" || keyPath == "" {
-		certPath = "certs/localhost+2.pem"
-		keyPath = "certs/localhost+2-key.pem"
-	}
-
-	tlsConfig := internal_tls.LoadServerConfig(certPath, keyPath)
+	tlsConfig := internal_tls.LoadServerConfig("certs/localhost+2.pem", "certs/localhost+2-key.pem")
 
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 
 	httpServer := &http.Server{
-		Addr:      httpAddr,
-		Handler:   router,
-		TLSConfig: tlsConfig,
+		Addr:         httpAddr,
+		Handler:      router,
+		TLSConfig:    tlsConfig,
+		ReadTimeout:  cfg.Server.HTTP.Timeout.Read,
+		WriteTimeout: cfg.Server.HTTP.Timeout.Write,
+		IdleTimeout:  cfg.Server.HTTP.Timeout.Idle,
 	}
 
 	h3Server := &http3.Server{
