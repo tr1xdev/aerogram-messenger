@@ -61,7 +61,7 @@ func AuthMiddleware(cfg *config.Config, db *database.DB) func(http.Handler) http
 			ctx = context.WithValue(ctx, UserAgentKey, r.Header.Get("User-Agent"))
 
 			if tokenString != "" {
-				token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 						return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 					}
