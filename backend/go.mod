@@ -30,6 +30,8 @@ require (
 	gorm.io/gorm v1.31.1
 )
 
+require github.com/go-redis/redis_rate/v10 v10.0.1 // indirect
+
 require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

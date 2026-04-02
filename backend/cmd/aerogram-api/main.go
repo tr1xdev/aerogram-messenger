@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
@@ -23,11 +21,9 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	graph_api "github.com/tr1xdev/aerogram-messenger/internal/graph/api"
-	"github.com/tr1xdev/aerogram-messenger/internal/graph/loaders"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
 	internal_tls "github.com/tr1xdev/aerogram-messenger/internal/infrastructure/tls"
-	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/auth_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/chat_svc"
@@ -107,11 +103,16 @@ func main() {
 	}
 	defer conn.Close()
 
-	router := chi.NewRouter()
-	applyMiddleware(router, cfg, db, conn, rdb)
-
 	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc)
-	api.SetupRoutes(router, gqlServer)
+
+	router := api.NewRouter(api.RouterConfig{
+		Cfg:            cfg,
+		DB:             db,
+		RDB:            rdb,
+		GQLServer:      gqlServer,
+		UserClient:     userv1.NewUserServiceClient(conn),
+		PresenceClient: presencev1.NewPresenceServiceClient(conn),
+	})
 
 	certPath := os.Getenv("CERT_PATH")
 	keyPath := os.Getenv("KEY_PATH")
@@ -203,26 +204,6 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
 	presencev1.RegisterPresenceServiceServer(s, pSvc)
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
-}
-
-func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn, rdb *redis.Client) {
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"https://localhost:3443",
-			"https://localhost:3000",
-			"http://localhost:3000",
-			"http://localhost:5173",
-			"https://localhost:5173",
-		},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight", "Upgrade", "Connection"},
-		AllowCredentials: true,
-	}))
-
-	userClient := userv1.NewUserServiceClient(conn)
-	presenceClient := presencev1.NewPresenceServiceClient(conn)
-	r.Use(loaders.LoaderMiddleware(userClient, presenceClient, db.Queries))
-	r.Use(middleware.AuthMiddleware(cfg, db))
 }
 
 func initGraphQL(
