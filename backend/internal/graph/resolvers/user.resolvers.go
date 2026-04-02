@@ -15,14 +15,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"
-	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/loaders"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	authv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	userv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // UpdateUser is the resolver for the updateUser field.
@@ -70,61 +72,49 @@ func (r *mutationResolver) CreateBot(ctx context.Context, username string, first
 		return &model.ForbiddenError{Message: "Unauthorized"}, nil
 	}
 
-	trimmedUsername := strings.TrimSpace(username)
-	if !strings.HasSuffix(strings.ToLower(trimmedUsername), "bot") {
-		field := "username"
-		return &model.ValidationError{
-			Field:   &field,
-			Message: "Username must end with 'bot'",
-		}, nil
-	}
+	resp, err := r.UserClient.CreateBot(ctx, &userv1.CreateBotRequest{
+		OwnerId:     authID,
+		Username:    username,
+		FirstName:   firstName,
+		LastName:    lastName,
+		Description: description,
+		Commands:    commands,
+	})
 
-	ownerUUID, err := uuid.Parse(authID)
 	if err != nil {
-		return &model.InternalError{Message: "Invalid session owner ID"}, nil
-	}
-
-	botID := uuid.New()
-	params := dbgen.CreateUserParams{
-		ID:             botID,
-		Username:       database.ToNullString(&trimmedUsername),
-		FirstName:      strings.TrimSpace(firstName),
-		LastName:       database.ToNullString(lastName),
-		Password:       sql.NullString{Valid: false},
-		Status:         "OFFLINE",
-		IsBot:          true,
-		BotDescription: database.ToNullString(description),
-		BotOwnerID:     uuid.NullUUID{UUID: ownerUUID, Valid: true},
-	}
-
-	if commands != nil && *commands != "" {
-		params.BotCommands = pqtype.NullRawMessage{
-			RawMessage: json.RawMessage(*commands),
-			Valid:      true,
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.ResourceExhausted:
+				return &model.InternalError{Message: "Limit exceeded: " + st.Message()}, nil
+			case codes.FailedPrecondition:
+				return &model.InternalError{Message: st.Message()}, nil
+			case codes.InvalidArgument:
+				field := "input"
+				return &model.ValidationError{Field: &field, Message: st.Message()}, nil
+			}
 		}
+		return &model.InternalError{Message: "Service error"}, nil
 	}
 
-	botUser, err := r.Store.CreateUser(ctx, params)
-	if err != nil {
-		if strings.Contains(err.Error(), "unique") {
-			field := "username"
-			return &model.ValidationError{
-				Field:   &field,
-				Message: "Username already taken",
-			}, nil
-		}
-		return &model.InternalError{Message: "Failed to create bot entry"}, nil
+	botProto := resp.GetUser()
+	botID, _ := uuid.Parse(botProto.Id)
+
+	botUser := dbgen.User{
+		ID:        botID,
+		FirstName: botProto.FirstName,
+		IsBot:     true,
 	}
 
-	resp, err := r.AuthClient.CreateBotToken(ctx, &authv1.CreateBotTokenRequest{
-		BotId: botID.String(),
+	tokenResp, err := r.AuthClient.CreateBotToken(ctx, &authv1.CreateBotTokenRequest{
+		BotId: botProto.Id,
 	})
 	if err != nil {
 		return &model.InternalError{Message: "Failed to generate bot token"}, nil
 	}
 
 	return &model.CreateBotPayload{
-		BotToken: resp.AccessToken,
+		BotToken: tokenResp.AccessToken,
 		User:     &botUser,
 	}, nil
 }

@@ -208,7 +208,6 @@ export const BotDetailView: React.FC = () => {
           </div>
           <div className="flex flex-col">
             <h1 className="text-xl font-bold tracking-tight leading-none">
-              // eslint-disable-next-line react-hooks/incompatible-library
               {form.watch("firstName") || "Untitled Bot"}
             </h1>
             <p className="text-[12px] font-mono text-muted-foreground/50 mt-1.5">
