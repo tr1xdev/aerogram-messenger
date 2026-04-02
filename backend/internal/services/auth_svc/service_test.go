@@ -14,6 +14,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 )
 
 type mockMailer struct{}
@@ -24,7 +25,6 @@ func setupTest(t *testing.T, twoFAEnabled bool, onSignUp bool, onSignIn bool) (*
 	os.Setenv("DB_USER", "admin")
 	os.Setenv("POSTGRES_PASSWORD", "admin")
 	os.Setenv("DB_NAME", "aerogram_test")
-
 	os.Setenv("JWT_SECRET", "test_secret_123")
 	os.Setenv("APP_ENV", "development")
 
@@ -41,6 +41,8 @@ func setupTest(t *testing.T, twoFAEnabled bool, onSignUp bool, onSignIn bool) (*
 	mr, _ := miniredis.Run()
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 
+	authLimiter := limiter.NewRedisLimiter(rdb)
+
 	cfg := &config.Config{
 		App: config.AppConfig{Env: "development"},
 		JWT: config.JWTConfig{Secret: "test_secret_123", TTLMinutes: 60},
@@ -53,7 +55,7 @@ func setupTest(t *testing.T, twoFAEnabled bool, onSignUp bool, onSignIn bool) (*
 		},
 	}
 
-	return NewServer(sqlDB, rdb, &mockMailer{}, cfg), mr
+	return NewServer(sqlDB, authLimiter, rdb, &mockMailer{}, cfg), mr
 }
 
 func TestAuthServer_SignUp(t *testing.T) {

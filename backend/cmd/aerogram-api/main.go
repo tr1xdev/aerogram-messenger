@@ -22,6 +22,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	graph_api "github.com/tr1xdev/aerogram-messenger/internal/graph/api"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
 	internal_tls "github.com/tr1xdev/aerogram-messenger/internal/infrastructure/tls"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
@@ -199,7 +200,8 @@ func main() {
 }
 
 func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pSvc *presence_svc.Server) {
-	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, rdb, mailer, cfg))
+	authLimiter := limiter.NewRedisLimiter(rdb)
+	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, authLimiter, rdb, mailer, cfg))
 	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(db, rdb))
 	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
 	presencev1.RegisterPresenceServiceServer(s, pSvc)
