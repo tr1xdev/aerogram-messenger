@@ -20,9 +20,13 @@ import (
 
 type mockMailer struct{}
 
-func (m *mockMailer) SendCode(ctx context.Context, to, code, name string) error { return nil }
+func (m *mockMailer) SendCode(ctx context.Context, to string, code string, name string) error {
+	return nil
+}
 
-func setupTest(t *testing.T, twoFAEnabled bool, onSignUp bool, onSignIn bool) (*Server, *miniredis.Miniredis) {
+func setupTest(t *testing.T, twoFAEnabled bool, onSignUp bool, onSignIn bool) *Server {
+	t.Helper()
+
 	os.Setenv("DB_USER", "admin")
 	os.Setenv("POSTGRES_PASSWORD", "admin")
 	os.Setenv("DB_NAME", "aerogram_test")
@@ -39,8 +43,17 @@ func setupTest(t *testing.T, twoFAEnabled bool, onSignUp bool, onSignIn bool) (*
 	})
 
 	sqlDB := database.SetupTestDB(t)
-	mr, _ := miniredis.Run()
-	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+
+	t.Cleanup(func() {
+		_ = rdb.Close()
+		mr.Close()
+	})
 
 	authLimiter := limiter.NewRedisLimiter(rdb)
 
@@ -57,19 +70,26 @@ func setupTest(t *testing.T, twoFAEnabled bool, onSignUp bool, onSignIn bool) (*
 				Enabled:  twoFAEnabled,
 				OnSignUp: onSignUp,
 				OnSignIn: onSignIn,
+				CodeTTL:  10 * time.Minute,
+			},
+		},
+		RateLimit: config.RateLimitConfig{
+			Auth: config.AuthLimitConfig{
+				SignUp: config.LimitEntry{Limit: 1000, Window: time.Hour},
+				Login:  config.LimitEntry{Limit: 1000, Window: time.Hour},
+				Verify: config.LimitEntry{Limit: 1000, Window: time.Hour},
 			},
 		},
 	}
 
-	return NewServer(sqlDB, authLimiter, rdb, &mockMailer{}, cfg), mr
+	return NewServer(sqlDB, authLimiter, rdb, &mockMailer{}, cfg)
 }
 
 func TestAuthServer_SignUp(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("SignUp_2FA_Disabled_Returns_Tokens", func(t *testing.T) {
-		server, mr := setupTest(t, false, false, false)
-		defer mr.Close()
+		server := setupTest(t, false, false, false)
 
 		req := &authpb.SignUpRequest{
 			Email:     "no2fa@test.com",
@@ -84,8 +104,7 @@ func TestAuthServer_SignUp(t *testing.T) {
 	})
 
 	t.Run("SignUp_2FA_Enabled_Returns_No_Tokens", func(t *testing.T) {
-		server, mr := setupTest(t, true, true, false)
-		defer mr.Close()
+		server := setupTest(t, true, true, false)
 
 		req := &authpb.SignUpRequest{
 			Email:     "2fa@test.com",
@@ -104,15 +123,15 @@ func TestAuthServer_Login(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Login_2FA_Disabled_Returns_Tokens", func(t *testing.T) {
-		server, mr := setupTest(t, false, false, false)
-		defer mr.Close()
+		server := setupTest(t, false, false, false)
 
 		email := "login_no2fa@test.com"
 		password := "password123"
 
-		_, _ = server.SignUp(ctx, &authpb.SignUpRequest{
+		_, err := server.SignUp(ctx, &authpb.SignUpRequest{
 			Email: email, FirstName: "Test", Password: password,
 		})
+		require.NoError(t, err)
 
 		res, err := server.Login(ctx, &authpb.LoginRequest{
 			Email: email, Password: password,
@@ -122,15 +141,15 @@ func TestAuthServer_Login(t *testing.T) {
 	})
 
 	t.Run("Login_2FA_Enabled_Returns_No_Tokens", func(t *testing.T) {
-		server, mr := setupTest(t, true, false, true)
-		defer mr.Close()
+		server := setupTest(t, true, false, true)
 
 		email := "login_2fa@test.com"
 		password := "password123"
 
-		_, _ = server.SignUp(ctx, &authpb.SignUpRequest{
+		_, err := server.SignUp(ctx, &authpb.SignUpRequest{
 			Email: email, FirstName: "Test", Password: password,
 		})
+		require.NoError(t, err)
 
 		res, err := server.Login(ctx, &authpb.LoginRequest{
 			Email: email, Password: password,
