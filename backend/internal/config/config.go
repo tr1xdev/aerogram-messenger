@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,73 +12,105 @@ import (
 )
 
 type Config struct {
-	App      AppConfig
-	Server   ServerConfig
-	Database DatabaseConfig
-	Auth     AuthConfig
-	JWT      JWTConfig
-	Resend   ResendConfig
+	App       AppConfig       `mapstructure:"app"`
+	Server    ServerConfig    `mapstructure:"server"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	Auth      AuthConfig      `mapstructure:"auth"`
+	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
 }
 
 type AppConfig struct {
-	Env       string
-	TestEmail string
+	Env       string `mapstructure:"env"`
+	TestEmail string `mapstructure:"test_email"`
+	Debug     bool   `mapstructure:"debug"`
 }
 
 type ServerConfig struct {
-	HTTP HTTPConfig
-	GRPC GRPCConfig
+	HTTP HTTPConfig `mapstructure:"http"`
+	GRPC GRPCConfig `mapstructure:"grpc"`
 }
 
 type HTTPConfig struct {
-	Host string
-	Port int
+	Host    string        `mapstructure:"host"`
+	Port    int           `mapstructure:"port"`
+	Timeout TimeoutConfig `mapstructure:"timeout"`
+}
+
+type TimeoutConfig struct {
+	Read  time.Duration `mapstructure:"read"`
+	Write time.Duration `mapstructure:"write"`
+	Idle  time.Duration `mapstructure:"idle"`
 }
 
 type GRPCConfig struct {
-	Host string
-	Port int
+	Host              string        `mapstructure:"host"`
+	Port              int           `mapstructure:"port"`
+	MaxConnectionIdle time.Duration `mapstructure:"max_connection_idle"`
 }
 
 type DatabaseConfig struct {
-	Postgres PostgresConfig
-	Redis    RedisConfig
+	Postgres PostgresConfig `mapstructure:"postgres"`
+	Redis    RedisConfig    `mapstructure:"redis"`
 }
 
 type PostgresConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host            string        `mapstructure:"host"`
+	Port            int           `mapstructure:"port"`
+	User            string        `mapstructure:"user"`
+	Password        string        `mapstructure:"password"`
+	DBName          string        `mapstructure:"dbname"`
+	SSLMode         string        `mapstructure:"sslmode"`
+	MaxOpenConns    int           `mapstructure:"max_open_conns"`
+	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
 }
 
 type RedisConfig struct {
-	Host     string
-	Port     int
-	Password string
-	DB       int
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	DB       int    `mapstructure:"db"`
+	Password string `mapstructure:"password"`
+	PoolSize int    `mapstructure:"pool_size"`
 }
 
 type AuthConfig struct {
-	TwoFA TwoFAConfig `mapstructure:"2fa"`
-}
-
-type TwoFAConfig struct {
-	Enabled  bool `mapstructure:"enabled"`
-	OnSignUp bool `mapstructure:"on_sign_up"`
-	OnSignIn bool `mapstructure:"on_sign_in"`
+	JWT   JWTConfig   `mapstructure:"jwt"`
+	TwoFA TwoFAConfig `mapstructure:"two_fa"`
 }
 
 type JWTConfig struct {
-	Secret     string
-	TTLMinutes int
+	Secret     string        `mapstructure:"secret"`
+	AccessTTL  time.Duration `mapstructure:"access_ttl"`
+	RefreshTTL time.Duration `mapstructure:"refresh_ttl"`
 }
 
-type ResendConfig struct {
-	Token string
-	From  string
+type TwoFAConfig struct {
+	Enabled  bool          `mapstructure:"enabled"`
+	OnSignUp bool          `mapstructure:"on_sign_up"`
+	OnSignIn bool          `mapstructure:"on_sign_in"`
+	CodeTTL  time.Duration `mapstructure:"code_ttl"`
+}
+
+type RateLimitConfig struct {
+	Global GlobalLimitConfig `mapstructure:"global"`
+	Auth   AuthLimitConfig   `mapstructure:"auth"`
+}
+
+type GlobalLimitConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+	RPS     int  `mapstructure:"rps"`
+	Burst   int  `mapstructure:"burst"`
+}
+
+type AuthLimitConfig struct {
+	SignUp LimitEntry `mapstructure:"signup"`
+	Login  LimitEntry `mapstructure:"login"`
+	Verify LimitEntry `mapstructure:"verify"`
+}
+
+type LimitEntry struct {
+	Limit  int           `mapstructure:"limit"`
+	Window time.Duration `mapstructure:"window"`
 }
 
 func Load() (*Config, error) {
@@ -98,8 +129,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config file not found")
 	}
 
-	configDir := filepath.Dir(configPath)
-	_ = godotenv.Load(filepath.Join(configDir, ".env"))
 	_ = godotenv.Load()
 
 	content, err := os.ReadFile(configPath)
@@ -109,7 +138,7 @@ func Load() (*Config, error) {
 
 	expandedContent := os.Expand(string(content), func(s string) string {
 		if strings.Contains(s, ":-") {
-			parts := strings.Split(s, ":-")
+			parts := strings.SplitN(s, ":-", 2)
 			if val := os.Getenv(parts[0]); val != "" {
 				return val
 			}
@@ -123,25 +152,10 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}
-
-	cfg.App.Env = os.Getenv("APP_ENV")
-	if cfg.App.Env == "" {
-		cfg.App.Env = viper.GetString("app.env")
-	}
-	cfg.App.TestEmail = os.Getenv("TEST_EMAIL")
-	cfg.Database.Postgres.Password = os.Getenv("POSTGRES_PASSWORD")
-	cfg.Database.Redis.Password = os.Getenv("REDIS_PASSWORD")
-	cfg.JWT.Secret = os.Getenv("JWT_SECRET")
-
-	cfg.Resend.Token = os.Getenv("RESEND_TOKEN")
-	cfg.Resend.From = viper.GetString("resend.from")
 
 	return &cfg, nil
 }
@@ -153,14 +167,5 @@ func (c *Config) PostgresDSN() string {
 }
 
 func (c *Config) RedisAddr() string {
-	r := c.Database.Redis
-	return fmt.Sprintf("%s:%d", r.Host, r.Port)
-}
-
-func (c *Config) RedisPassword() string {
-	return c.Database.Redis.Password
-}
-
-func (j JWTConfig) TTL() time.Duration {
-	return time.Duration(j.TTLMinutes) * time.Minute
+	return fmt.Sprintf("%s:%d", c.Database.Redis.Host, c.Database.Redis.Port)
 }
