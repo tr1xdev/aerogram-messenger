@@ -47,8 +47,8 @@ func AuthMiddleware(cfg *config.Config, db *database.DB) func(http.Handler) http
 			authHeader := r.Header.Get("Authorization")
 			tokenString := ""
 
-			if strings.HasPrefix(authHeader, "Bearer ") {
-				tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+			if after, ok := strings.CutPrefix(authHeader, "Bearer "); ok {
+				tokenString = after
 			}
 
 			ip, _, _ := net.SplitHostPort(r.RemoteAddr)
