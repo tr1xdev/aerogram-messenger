@@ -14,114 +14,162 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-func setupTest(t *testing.T) (*Server, *miniredis.Miniredis) {
-	db := database.SetupTestDB(t)
+type testEnv struct {
+	server *Server
+	mr     *miniredis.Miniredis
+	rdb    *redis.Client
+	db     *database.DB
+}
 
+func setupTest(t *testing.T) *testEnv {
+	t.Helper()
+	db := database.SetupTestDB(t)
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
 
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	server := NewServer(db, rdb)
 
-	return server, mr
+	return &testEnv{
+		server: server,
+		mr:     mr,
+		rdb:    rdb,
+		db:     db,
+	}
 }
 
-func TestMessagesServer(t *testing.T) {
-	server, mr := setupTest(t)
-	defer mr.Close()
-
-	ctx := context.Background()
-	chatID := uuid.New()
-	userID := uuid.New()
-
-	_, err := server.db.Queries.CreateUser(ctx, dbgen.CreateUserParams{
-		ID:        userID,
-		Username:  database.ToNullString(ptrStr("testuser")),
+func seedUser(t *testing.T, db *database.DB, id uuid.UUID, username string) {
+	t.Helper()
+	_, err := db.Queries.CreateUser(context.Background(), dbgen.CreateUserParams{
+		ID:        id,
+		Username:  sql.NullString{String: username, Valid: true},
 		FirstName: "Test",
-		Email:     sql.NullString{String: "test@aerogram.com", Valid: true},
-		Password:  sql.NullString{String: "hash", Valid: true},
+		Email:     sql.NullString{String: username + "@aerogram.com", Valid: true},
+		Password:  sql.NullString{String: "hash_satisfy_check", Valid: true},
 		Status:    "online",
 	})
 	require.NoError(t, err)
+}
 
-	_, err = server.db.Queries.CreateDialog(ctx, dbgen.CreateDialogParams{
-		ID:          chatID,
-		Type:        "private",
-		IsActive:    true,
-		Name:        sql.NullString{String: "Test Chat", Valid: true},
-		Username:    sql.NullString{Valid: false},
-		PhotoUrl:    sql.NullString{Valid: false},
-		Bio:         sql.NullString{Valid: false},
-		Description: sql.NullString{Valid: false},
-		InviteLink:  sql.NullString{Valid: false},
-		CreatorID:   uuid.NullUUID{UUID: userID, Valid: true},
+func seedChat(t *testing.T, db *database.DB, chatID, userID uuid.UUID) {
+	t.Helper()
+	_, err := db.Queries.CreateDialog(context.Background(), dbgen.CreateDialogParams{
+		ID:        chatID,
+		Type:      "private",
+		IsActive:  true,
+		CreatorID: uuid.NullUUID{UUID: userID, Valid: true},
 	})
 	require.NoError(t, err)
 
-	err = server.db.Queries.AddDialogMember(ctx, dbgen.AddDialogMemberParams{
+	err = db.Queries.AddDialogMember(context.Background(), dbgen.AddDialogMemberParams{
 		DialogID: chatID,
 		UserID:   userID,
 		Role:     "member",
 	})
 	require.NoError(t, err)
+}
 
-	t.Run("SendMessage_And_Sequence_Increment", func(t *testing.T) {
-		pubsub := server.rdb.Subscribe(ctx, "chat:"+chatID.String())
+func TestMessagesServer_SendMessage(t *testing.T) {
+	env := setupTest(t)
+	defer env.mr.Close()
+
+	ctx := context.Background()
+	chatID := uuid.New()
+	userID := uuid.New()
+
+	seedUser(t, env.db, userID, "sender")
+	seedChat(t, env.db, chatID, userID)
+
+	t.Run("success_increment_sequence", func(t *testing.T) {
+		req := &messagespb.SendMessageRequest{
+			ChatId:   chatID.String(),
+			SenderId: userID.String(),
+			Text:     "First",
+		}
+
+		res1, err := env.server.SendMessage(ctx, req)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), res1.Message.Sequence)
+
+		req.Text = "Second"
+		res2, err := env.server.SendMessage(ctx, req)
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), res2.Message.Sequence)
+	})
+
+	t.Run("publish_to_redis", func(t *testing.T) {
+		pubsub := env.rdb.Subscribe(ctx, "chat:"+chatID.String())
 		defer pubsub.Close()
 
 		req := &messagespb.SendMessageRequest{
 			ChatId:   chatID.String(),
 			SenderId: userID.String(),
-			Text:     "First message",
+			Text:     "Redis check",
 		}
 
-		res1, err := server.SendMessage(ctx, req)
+		res, err := env.server.SendMessage(ctx, req)
 		require.NoError(t, err)
-		assert.Equal(t, int64(1), res1.Message.Sequence)
-
-		req.Text = "Second message"
-		res2, err := server.SendMessage(ctx, req)
-		require.NoError(t, err)
-		assert.Equal(t, int64(2), res2.Message.Sequence)
 
 		msg, err := pubsub.ReceiveMessage(ctx)
-		assert.NoError(t, err)
-		var receivedMsg messagespb.Message
-		err = json.Unmarshal([]byte(msg.Payload), &receivedMsg)
-		assert.NoError(t, err)
-		assert.Equal(t, res1.Message.Id, receivedMsg.Id)
+		require.NoError(t, err)
+
+		var received messagespb.Message
+		err = json.Unmarshal([]byte(msg.Payload), &received)
+		require.NoError(t, err)
+		assert.Equal(t, res.Message.Id, received.Id)
 	})
 
-	t.Run("SendMessage_Forbidden", func(t *testing.T) {
+	t.Run("error_invalid_author", func(t *testing.T) {
+		invalidUserID := uuid.New()
 		req := &messagespb.SendMessageRequest{
 			ChatId:   chatID.String(),
-			SenderId: uuid.New().String(),
-			Text:     "I am not in this chat",
+			SenderId: invalidUserID.String(),
+			Text:     "I don't exist in users table",
 		}
 
-		res, err := server.SendMessage(ctx, req)
+		res, err := env.server.SendMessage(ctx, req)
 		assert.Error(t, err)
 		assert.Nil(t, res)
-	})
 
-	t.Run("GetHistory", func(t *testing.T) {
-		req := &messagespb.GetHistoryRequest{
-			ChatId: chatID.String(),
-			Limit:  10,
-			Offset: 0,
-		}
-
-		res, err := server.GetHistory(ctx, req)
-		assert.NoError(t, err)
-		assert.NotEmpty(t, res.Messages)
-		if len(res.Messages) >= 2 {
-			assert.True(t, res.Messages[0].Sequence > res.Messages[1].Sequence)
-		}
+		st, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.Internal, st.Code())
 	})
 }
 
-func ptrStr(s string) *string {
-	return &s
+func TestMessagesServer_GetHistory(t *testing.T) {
+	env := setupTest(t)
+	defer env.mr.Close()
+
+	ctx := context.Background()
+	chatID := uuid.New()
+	userID := uuid.New()
+
+	seedUser(t, env.db, userID, "history_user")
+	seedChat(t, env.db, chatID, userID)
+
+	for i := 0; i < 3; i++ {
+		_, err := env.server.SendMessage(ctx, &messagespb.SendMessageRequest{
+			ChatId:   chatID.String(),
+			SenderId: userID.String(),
+			Text:     "msg",
+		})
+		require.NoError(t, err)
+	}
+
+	t.Run("fetch_descending", func(t *testing.T) {
+		req := &messagespb.GetHistoryRequest{
+			ChatId: chatID.String(),
+			Limit:  10,
+		}
+
+		res, err := env.server.GetHistory(ctx, req)
+		require.NoError(t, err)
+		assert.Len(t, res.Messages, 3)
+		assert.True(t, res.Messages[0].Sequence > res.Messages[1].Sequence)
+	})
 }
