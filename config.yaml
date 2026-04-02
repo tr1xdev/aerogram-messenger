@@ -49,3 +49,10 @@ ratelimit:
         verify:
             limit: 3 # Requests allowed
             window: 5m # Time window
+    chat:
+        create:
+            limit: ${CHAT_CREATE_LIMIT:-10} # Requests allowed for chat creation
+            window: 10m # Time window
+        delete:
+            limit: ${CHAT_DELETE_LIMIT:-5} # Requests allowed for chat deletion
+            window: 5m # Time window

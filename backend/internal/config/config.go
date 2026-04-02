@@ -94,6 +94,7 @@ type TwoFAConfig struct {
 type RateLimitConfig struct {
 	Global GlobalLimitConfig `mapstructure:"global"`
 	Auth   AuthLimitConfig   `mapstructure:"auth"`
+	Chat   ChatLimitConfig   `mapstructure:"chat"`
 }
 
 type GlobalLimitConfig struct {
@@ -106,6 +107,11 @@ type AuthLimitConfig struct {
 	SignUp LimitEntry `mapstructure:"signup"`
 	Login  LimitEntry `mapstructure:"login"`
 	Verify LimitEntry `mapstructure:"verify"`
+}
+
+type ChatLimitConfig struct {
+	Create LimitEntry `mapstructure:"create"`
+	Delete LimitEntry `mapstructure:"delete"`
 }
 
 type LimitEntry struct {

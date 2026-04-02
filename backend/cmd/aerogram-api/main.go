@@ -188,8 +188,16 @@ func main() {
 
 func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pSvc *presence_svc.Server) {
 	authLimiter := limiter.NewRedisLimiter(rdb)
+
 	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, authLimiter, rdb, mailer, cfg))
-	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(db, rdb))
+
+	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(
+		db,
+		rdb,
+		authLimiter,
+		cfg.RateLimit.Chat,
+	))
+
 	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
 	presencev1.RegisterPresenceServiceServer(s, pSvc)
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
