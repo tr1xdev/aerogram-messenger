@@ -43,7 +43,7 @@ func GetSessionID(ctx context.Context) string {
 func AuthMiddleware(cfg *config.Config, db *database.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			secret := cfg.JWT.Secret
+			secret := cfg.Auth.JWT.Secret
 			authHeader := r.Header.Get("Authorization")
 			tokenString := ""
 
