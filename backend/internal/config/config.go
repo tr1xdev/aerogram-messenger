@@ -12,11 +12,12 @@ import (
 )
 
 type Config struct {
-	App       AppConfig       `mapstructure:"app"`
-	Server    ServerConfig    `mapstructure:"server"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Auth      AuthConfig      `mapstructure:"auth"`
-	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
+	App         AppConfig         `mapstructure:"app"`
+	Server      ServerConfig      `mapstructure:"server"`
+	Database    DatabaseConfig    `mapstructure:"database"`
+	Auth        AuthConfig        `mapstructure:"auth"`
+	RateLimit   RateLimitConfig   `mapstructure:"ratelimit"`
+	UserService UserServiceConfig `mapstructure:"user_service"`
 }
 
 type AppConfig struct {
@@ -95,6 +96,7 @@ type RateLimitConfig struct {
 	Global GlobalLimitConfig `mapstructure:"global"`
 	Auth   AuthLimitConfig   `mapstructure:"auth"`
 	Chat   ChatLimitConfig   `mapstructure:"chat"`
+	User   UserLimitConfig   `mapstructure:"user"`
 }
 
 type GlobalLimitConfig struct {
@@ -114,9 +116,19 @@ type ChatLimitConfig struct {
 	Delete LimitEntry `mapstructure:"delete"`
 }
 
+type UserLimitConfig struct {
+	Update    LimitEntry `mapstructure:"update"`
+	Search    LimitEntry `mapstructure:"search"`
+	CreateBot LimitEntry `mapstructure:"create_bot"`
+}
+
 type LimitEntry struct {
 	Limit  int           `mapstructure:"limit"`
 	Window time.Duration `mapstructure:"window"`
+}
+
+type UserServiceConfig struct {
+	MaxBotsPerUser int `mapstructure:"max_bots_per_user"`
 }
 
 func Load() (*Config, error) {

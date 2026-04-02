@@ -27,21 +27,26 @@ func NewRedisLimiter(rdb *redis.Client) RateLimiter {
 }
 
 func (l *redisLimiter) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
+	if limit <= 0 {
+		return true, nil
+	}
+
 	res, err := l.limiter.Allow(ctx, key, redis_rate.Limit{
 		Rate:   limit,
 		Burst:  limit,
 		Period: window,
 	})
 	if err != nil {
-		return true, err
+		return false, err
 	}
+
 	return res.Allowed > 0, nil
 }
 
 func (l *redisLimiter) Check(ctx context.Context, key string, limit int, window time.Duration) error {
 	allowed, err := l.Allow(ctx, key, limit, window)
 	if err != nil {
-		return nil
+		return err
 	}
 	if !allowed {
 		return ErrRateLimitExceeded

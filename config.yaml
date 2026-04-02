@@ -41,18 +41,32 @@ auth:
 ratelimit:
     auth:
         signup:
-            limit: 5 # Requests allowed
+            limit: 5 # Allowed registration attempts
             window: 1h # Time window (e.g., 1h, 15m)
         login:
-            limit: 5 # Requests allowed
+            limit: 5 # Allowed login attempts
             window: 15m # Time window
         verify:
-            limit: 3 # Requests allowed
+            limit: 3 # 2FA/Email verification attempts
             window: 5m # Time window
     chat:
         create:
-            limit: ${CHAT_CREATE_LIMIT:-10} # Requests allowed for chat creation
+            limit: ${CHAT_CREATE_LIMIT:-10} # Allowed chat creation attempts
             window: 10m # Time window
         delete:
-            limit: ${CHAT_DELETE_LIMIT:-5} # Requests allowed for chat deletion
+            limit: ${CHAT_DELETE_LIMIT:-5} # Allowed chat deletion attempts
             window: 5m # Time window
+    user:
+        update:
+            limit: ${USER_UPDATE_LIMIT:-5} # Allowed profile update attempts
+            window: 1m # Time window
+        search:
+            limit: ${USER_SEARCH_LIMIT:-20} # Allowed user search attempts
+            window: 1m # Time window
+        create_bot:
+            limit: ${BOT_CREATE_LIMIT:-2} # Allowed bot creation attempts
+            window: 1h # Time window
+
+# User service business constraints (Quotas)
+user_service:
+    max_bots_per_user: ${MAX_BOTS_PER_USER:-10} # Total bots one account can own
