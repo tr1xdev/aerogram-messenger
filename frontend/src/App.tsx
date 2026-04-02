@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router } from "@/app/router";
 import { useThemeStore } from "./store/theme";
 import { useEffect } from "react";
-import { Toaster } from "@/components/ui/sonner";
 
 export default function App() {
   const queryClient = useQueryClient();
@@ -18,7 +17,6 @@ export default function App() {
   return (
     <>
       <RouterProvider router={router} context={{ queryClient }} />
-      <Toaster />
     </>
   );
 }

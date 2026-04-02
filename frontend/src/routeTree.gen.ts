@@ -15,7 +15,6 @@ import { Route as AuthenticatedIndexRouteImport } from './app/routes/_authentica
 import { Route as publicV1OtpRouteImport } from './app/routes/(public)/v1-otp'
 import { Route as publicSignupRouteImport } from './app/routes/(public)/signup'
 import { Route as publicLoginRouteImport } from './app/routes/(public)/login'
-import { Route as protectedLayoutRouteImport } from './app/routes/(protected)/_layout'
 import { Route as errors503RouteImport } from './app/routes/(errors)/503'
 import { Route as errors500RouteImport } from './app/routes/(errors)/500'
 import { Route as errors404RouteImport } from './app/routes/(errors)/404'
@@ -58,10 +57,6 @@ const publicSignupRoute = publicSignupRouteImport.update({
 const publicLoginRoute = publicLoginRouteImport.update({
   id: '/(public)/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const protectedLayoutRoute = protectedLayoutRouteImport.update({
-  id: '/(protected)/_layout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const errors503Route = errors503RouteImport.update({
@@ -197,7 +192,6 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
-  '/(protected)/_layout': typeof protectedLayoutRoute
   '/(public)/login': typeof publicLoginRoute
   '/(public)/signup': typeof publicSignupRoute
   '/(public)/v1-otp': typeof publicV1OtpRoute
@@ -265,7 +259,6 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
-    | '/(protected)/_layout'
     | '/(public)/login'
     | '/(public)/signup'
     | '/(public)/v1-otp'
@@ -286,7 +279,6 @@ export interface RootRouteChildren {
   errors404Route: typeof errors404Route
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
-  protectedLayoutRoute: typeof protectedLayoutRoute
   publicLoginRoute: typeof publicLoginRoute
   publicSignupRoute: typeof publicSignupRoute
   publicV1OtpRoute: typeof publicV1OtpRoute
@@ -334,13 +326,6 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof publicLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(protected)/_layout': {
-      id: '/(protected)/_layout'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof protectedLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(errors)/503': {
@@ -500,7 +485,6 @@ const rootRouteChildren: RootRouteChildren = {
   errors404Route: errors404Route,
   errors500Route: errors500Route,
   errors503Route: errors503Route,
-  protectedLayoutRoute: protectedLayoutRoute,
   publicLoginRoute: publicLoginRoute,
   publicSignupRoute: publicSignupRoute,
   publicV1OtpRoute: publicV1OtpRoute,

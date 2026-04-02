@@ -69,7 +69,7 @@ const botSchema = z.object({
 
 type BotFormValues = z.infer<typeof botSchema>;
 
-export const BotCreationView: React.FC = () => {
+export const BotCreationView: React.FC = (): React.JSX.Element => {
   const navigate = useNavigate();
   const [tokenToShow, setTokenToShow] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState<boolean>(false);
@@ -164,7 +164,7 @@ export const BotCreationView: React.FC = () => {
                   <FormField
                     control={form.control}
                     name="firstName"
-                    render={({ field }) => (
+                    render={({ field }): React.JSX.Element => (
                       <FormItem>
                         <FormLabel className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
                           Display Name
@@ -184,7 +184,7 @@ export const BotCreationView: React.FC = () => {
                   <FormField
                     control={form.control}
                     name="lastName"
-                    render={({ field }) => (
+                    render={({ field }): React.JSX.Element => (
                       <FormItem>
                         <FormLabel className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex justify-between">
                           Surname{" "}
@@ -209,7 +209,7 @@ export const BotCreationView: React.FC = () => {
                 <FormField
                   control={form.control}
                   name="username"
-                  render={({ field }) => (
+                  render={({ field }): React.JSX.Element => (
                     <FormItem>
                       <FormLabel className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
                         Operational Handle
@@ -239,7 +239,7 @@ export const BotCreationView: React.FC = () => {
                 <FormField
                   control={form.control}
                   name="description"
-                  render={({ field }) => (
+                  render={({ field }): React.JSX.Element => (
                     <FormItem>
                       <div className="flex items-center justify-between">
                         <FormLabel className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
@@ -311,8 +311,11 @@ export const BotCreationView: React.FC = () => {
 
       <Dialog
         open={!!tokenToShow}
-        onOpenChange={(): void => {
-          if (!tokenToShow) navigate({ to: "/bots" });
+        onOpenChange={(open: boolean): void => {
+          if (!open) {
+            setTokenToShow(null);
+            navigate({ to: "/bots" });
+          }
         }}
       >
         <DialogContent className="sm:max-w-md rounded-[24px] border-none bg-card p-6">
