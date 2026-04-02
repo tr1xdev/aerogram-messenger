@@ -25,6 +25,18 @@ func (q *Queries) CheckUserExists(ctx context.Context, id uuid.UUID) (bool, erro
 	return exists, err
 }
 
+const countBotsByOwnerID = `-- name: CountBotsByOwnerID :one
+SELECT COUNT(*) FROM users
+WHERE bot_owner_id = $1 AND is_bot = TRUE AND deleted_at IS NULL
+`
+
+func (q *Queries) CountBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countBotsByOwnerID, botOwnerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createBot = `-- name: CreateBot :one
 INSERT INTO users (
     id, username, first_name, last_name, is_bot, bot_token_hash,
