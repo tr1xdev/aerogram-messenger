@@ -10,7 +10,7 @@ Aerogram is a high-performance, open-source real-time messaging platform built w
 
 The following environments are required for local development and have been tested for compatibility:
 
-* **Go:** `v1.25.5` or higher (**Required**)
+* **Go:** `v1.24` or higher (**Required**)
 * **Docker:** `v29.3.1`+ with Compose
 * **Node.js & npm:** `v24.14.0`+ / `v11.12.0`+
 * **PostgreSQL:** `v16.13`+ (psql client)
