@@ -3,6 +3,7 @@ package user_svc
 import (
 	"context"
 	"database/sql"
+	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,11 +15,26 @@ import (
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 )
 
-func TestUserInfo(t *testing.T) {
-	db := database.SetupTestDB(t)
-	server := NewServer(db)
-	ctx := context.Background()
+var testDB *database.DB
 
+func TestMain(m *testing.M) {
+	db, cleanup := database.SetupGlobalTestDB()
+	testDB = db
+
+	code := m.Run()
+
+	cleanup()
+	os.Exit(code)
+}
+
+func setupUserTest(t *testing.T) (*Server, context.Context) {
+	t.Helper()
+	testDB.TruncateTables(t)
+	return NewServer(testDB), context.Background()
+}
+
+func TestUserInfo(t *testing.T) {
+	server, ctx := setupUserTest(t)
 	userID := uuid.New()
 	username := "alice_hub"
 
@@ -57,11 +73,9 @@ func TestUserInfo(t *testing.T) {
 }
 
 func TestUpdateUser(t *testing.T) {
-	db := database.SetupTestDB(t)
-	server := NewServer(db)
-	ctx := context.Background()
-
+	server, ctx := setupUserTest(t)
 	userID := uuid.New()
+
 	_, err := server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
 		ID:        userID,
 		FirstName: "OldName",
@@ -90,12 +104,8 @@ func TestUpdateUser(t *testing.T) {
 }
 
 func TestGetUsers(t *testing.T) {
-	db := database.SetupTestDB(t)
-	server := NewServer(db)
-	ctx := context.Background()
-
-	u1 := uuid.New()
-	u2 := uuid.New()
+	server, ctx := setupUserTest(t)
+	u1, u2 := uuid.New(), uuid.New()
 
 	_, _ = server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
 		ID:        u1,
@@ -120,11 +130,9 @@ func TestGetUsers(t *testing.T) {
 }
 
 func TestSearchUsers(t *testing.T) {
-	db := database.SetupTestDB(t)
-	server := NewServer(db)
-	ctx := context.Background()
-
+	server, ctx := setupUserTest(t)
 	searchID := uuid.New()
+
 	_, err := server.userRepo.CreateUser(ctx, dbgen.CreateUserParams{
 		ID:        searchID,
 		Username:  sql.NullString{String: "search_me", Valid: true},

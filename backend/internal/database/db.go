@@ -136,6 +136,42 @@ func (db *DB) TruncateTables(t *testing.T) {
 	}
 }
 
+func SetupGlobalTestDB() (*DB, func()) {
+	user := os.Getenv("DB_USER")
+	if user == "" {
+		user = "admin"
+	}
+	pass := os.Getenv("POSTGRES_PASSWORD")
+	if pass == "" {
+		pass = "admin"
+	}
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "aerogram_test"
+	}
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", user, pass, host, dbName)
+
+	db, err := NewPostgres(dsn)
+	if err != nil {
+		panic(fmt.Sprintf("failed to init global test db: %v", err))
+	}
+
+	if err := db.RunMigrations(); err != nil {
+		panic(fmt.Sprintf("failed to run global test migrations: %v", err))
+	}
+
+	cleanup := func() {
+		db.Close()
+	}
+
+	return db, cleanup
+}
+
 func StringToNullString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: s != ""}
 }
