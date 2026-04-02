@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 RUN sed -i 's/https/http/g' /etc/apk/repositories && \
     apk add --no-cache make git gcc musl-dev
