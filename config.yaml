@@ -66,6 +66,19 @@ ratelimit:
         create_bot:
             limit: ${BOT_CREATE_LIMIT:-2} # Allowed bot creation attempts
             window: 1h # Time window
+    messages:
+        send:
+            limit: ${MSG_SEND_LIMIT:-5} # Allowed message sending attempts
+            window: 5s # Time window for sending messages
+        history:
+            limit: ${MSG_HISTORY_LIMIT:-20} # Allowed chat history fetch attempts
+            window: 10s # Time window for history fetching
+        update:
+            limit: ${MSG_UPDATE_LIMIT:-5} # Allowed message update attempts
+            window: 5s # Time window for updates
+        delete:
+            limit: ${MSG_DELETE_LIMIT:-5} # Allowed message deletion attempts
+            window: 5s # Time window for deletions
 
 # User service business constraints (Quotas)
 user_service:

@@ -198,7 +198,7 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 		cfg.RateLimit.Chat,
 	))
 
-	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
+	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb, authLimiter, cfg.RateLimit.Messages))
 	presencev1.RegisterPresenceServiceServer(s, pSvc)
 
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db, authLimiter, cfg))

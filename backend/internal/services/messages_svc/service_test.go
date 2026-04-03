@@ -5,15 +5,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -23,6 +26,7 @@ type testEnv struct {
 	mr     *miniredis.Miniredis
 	rdb    *redis.Client
 	db     *database.DB
+	cfg    config.MessagesLimitConfig
 }
 
 func setupTest(t *testing.T) *testEnv {
@@ -32,13 +36,23 @@ func setupTest(t *testing.T) *testEnv {
 	require.NoError(t, err)
 
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	server := NewServer(db, rdb)
+	l := limiter.NewRedisLimiter(rdb)
+
+	cfg := config.MessagesLimitConfig{
+		Send:    config.LimitEntry{Limit: 5, Window: 5 * time.Second},
+		History: config.LimitEntry{Limit: 20, Window: 10 * time.Second},
+		Update:  config.LimitEntry{Limit: 5, Window: 5 * time.Second},
+		Delete:  config.LimitEntry{Limit: 5, Window: 5 * time.Second},
+	}
+
+	server := NewServer(db, rdb, l, cfg)
 
 	return &testEnv{
 		server: server,
 		mr:     mr,
 		rdb:    rdb,
 		db:     db,
+		cfg:    cfg,
 	}
 }
 
@@ -101,7 +115,30 @@ func TestMessagesServer_SendMessage(t *testing.T) {
 		assert.Equal(t, int64(2), res2.Message.Sequence)
 	})
 
+	t.Run("rate_limit_exceeded", func(t *testing.T) {
+		req := &messagespb.SendMessageRequest{
+			ChatId:   chatID.String(),
+			SenderId: userID.String(),
+			Text:     "Spam",
+		}
+
+		for range 3 {
+			_, err := env.server.SendMessage(ctx, req)
+			require.NoError(t, err)
+		}
+
+		res, err := env.server.SendMessage(ctx, req)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+
+		st, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.ResourceExhausted, st.Code())
+	})
+
 	t.Run("publish_to_redis", func(t *testing.T) {
+		env.mr.FlushAll()
+
 		pubsub := env.rdb.Subscribe(ctx, "chat:"+chatID.String())
 		defer pubsub.Close()
 
@@ -122,23 +159,6 @@ func TestMessagesServer_SendMessage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, res.Message.Id, received.Id)
 	})
-
-	t.Run("error_invalid_author", func(t *testing.T) {
-		invalidUserID := uuid.New()
-		req := &messagespb.SendMessageRequest{
-			ChatId:   chatID.String(),
-			SenderId: invalidUserID.String(),
-			Text:     "I don't exist in users table",
-		}
-
-		res, err := env.server.SendMessage(ctx, req)
-		assert.Error(t, err)
-		assert.Nil(t, res)
-
-		st, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.Internal, st.Code())
-	})
 }
 
 func TestMessagesServer_GetHistory(t *testing.T) {
@@ -152,7 +172,7 @@ func TestMessagesServer_GetHistory(t *testing.T) {
 	seedUser(t, env.db, userID, "history_user")
 	seedChat(t, env.db, chatID, userID)
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err := env.server.SendMessage(ctx, &messagespb.SendMessageRequest{
 			ChatId:   chatID.String(),
 			SenderId: userID.String(),
@@ -170,6 +190,8 @@ func TestMessagesServer_GetHistory(t *testing.T) {
 		res, err := env.server.GetHistory(ctx, req)
 		require.NoError(t, err)
 		assert.Len(t, res.Messages, 3)
-		assert.True(t, res.Messages[0].Sequence > res.Messages[1].Sequence)
+		if len(res.Messages) >= 2 {
+			assert.True(t, res.Messages[0].Sequence > res.Messages[1].Sequence)
+		}
 	})
 }

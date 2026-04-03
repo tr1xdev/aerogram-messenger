@@ -93,10 +93,11 @@ type TwoFAConfig struct {
 }
 
 type RateLimitConfig struct {
-	Global GlobalLimitConfig `mapstructure:"global"`
-	Auth   AuthLimitConfig   `mapstructure:"auth"`
-	Chat   ChatLimitConfig   `mapstructure:"chat"`
-	User   UserLimitConfig   `mapstructure:"user"`
+	Global   GlobalLimitConfig   `mapstructure:"global"`
+	Auth     AuthLimitConfig     `mapstructure:"auth"`
+	Chat     ChatLimitConfig     `mapstructure:"chat"`
+	User     UserLimitConfig     `mapstructure:"user"`
+	Messages MessagesLimitConfig `mapstructure:"messages"`
 }
 
 type GlobalLimitConfig struct {
@@ -120,6 +121,13 @@ type UserLimitConfig struct {
 	Update    LimitEntry `mapstructure:"update"`
 	Search    LimitEntry `mapstructure:"search"`
 	CreateBot LimitEntry `mapstructure:"create_bot"`
+}
+
+type MessagesLimitConfig struct {
+	Send    LimitEntry `mapstructure:"send"`
+	History LimitEntry `mapstructure:"history"`
+	Update  LimitEntry `mapstructure:"update"`
+	Delete  LimitEntry `mapstructure:"delete"`
 }
 
 type LimitEntry struct {
