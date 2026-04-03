@@ -5,23 +5,27 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func ptr[T any](v T) *T {
 	return &v
 }
 
-// nullStr — хелпер для создания валидных NullString
 func nullStr(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: s != ""}
 }
@@ -35,7 +39,13 @@ func setupTest(t *testing.T) (*Server, *miniredis.Miniredis) {
 	})
 
 	db := database.SetupTestDB(t)
-	return NewServer(db, rdb), mr
+	l := limiter.NewRedisLimiter(rdb)
+	cfg := config.ChatLimitConfig{
+		Create: config.LimitEntry{Limit: 100, Window: time.Minute},
+		Delete: config.LimitEntry{Limit: 100, Window: time.Minute},
+	}
+
+	return NewServer(db, rdb, l, cfg), mr
 }
 
 func createUser(t *testing.T, s *Server, id string) {
@@ -83,6 +93,32 @@ func TestChatServer(t *testing.T) {
 		assert.Equal(t, "Private Chat", res.Chat.Title)
 	})
 
+	t.Run("CreateChat_RateLimitExceeded", func(t *testing.T) {
+		server.cfg.Create.Limit = 1
+		uID := uuid.New().String()
+		pID := uuid.New().String()
+
+		createUser(t, server, uID)
+		createUser(t, server, pID)
+
+		req := &chatpb.CreateChatRequest{
+			CreatorId:      uID,
+			ParticipantIds: []string{uID, pID},
+			Type:           chatpb.ChatType_CHAT_TYPE_PRIVATE,
+		}
+
+		_, err := server.CreateChat(ctx, req)
+		require.NoError(t, err)
+
+		_, err = server.CreateChat(ctx, req)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.ResourceExhausted, st.Code())
+
+		server.cfg.Create.Limit = 100
+	})
+
 	t.Run("GetMyChats", func(t *testing.T) {
 		uID := uuid.New().String()
 		createUser(t, server, uID)
@@ -102,16 +138,12 @@ func TestChatServer(t *testing.T) {
 		uUUID := uuid.MustParse(uID)
 
 		_, err := server.db.Queries.CreateDialog(ctx, dbgen.CreateDialogParams{
-			ID:          chatID,
-			Type:        "private",
-			IsActive:    true,
-			Name:        nullStr("Test Chat"),
-			Username:    sql.NullString{Valid: false},
-			PhotoUrl:    sql.NullString{Valid: false},
-			Bio:         sql.NullString{Valid: false},
-			Description: sql.NullString{Valid: false},
-			InviteLink:  sql.NullString{Valid: false},
-			CreatorID:   uuid.NullUUID{UUID: uUUID, Valid: true},
+			ID:           chatID,
+			Type:         "private",
+			IsActive:     true,
+			Name:         nullStr("Test Chat"),
+			CreatorID:    uuid.NullUUID{UUID: uUUID, Valid: true},
+			MembersCount: 1,
 		})
 		require.NoError(t, err)
 

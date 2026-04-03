@@ -6,6 +6,10 @@ server:
     http:
         host: "0.0.0.0" # IP address to bind (0.0.0.0 for all interfaces)
         port: ${HTTP_PORT:-8080} # HTTP server port
+        timeout:
+            read: 5s # Max duration for reading the request
+            write: 10s # Max duration for writing the response
+            idle: 120s # Max time to wait for the next request
     grpc:
         host: "0.0.0.0" # IP address to bind
         port: ${GRPC_PORT:-50051} # gRPC server port
@@ -13,20 +17,69 @@ server:
 database:
     postgres:
         host: ${DB_HOST:-localhost} # PostgreSQL host
-        port: ${DB_PORT:-5432} # PostgreSQL port (default 5432)
-        user: ${DB_USER:-your_user} # database user
-        dbname: ${DB_NAME:-your_db} # database name
+        port: ${DB_PORT:-5432} # PostgreSQL port
+        user: ${DB_USER:-your_user} # Database user
+        password: ${DB_PASSWORD} # Database password (from .env)
+        dbname: ${DB_NAME:-your_db} # Database name
         sslmode: ${DB_SSL:-disable} # SSL mode: disable, require, verify-full
+        max_open_conns: ${DB_MAX_OPEN:-25} # Max active connections
     redis:
         host: ${REDIS_HOST:-localhost} # Redis host
-        port: ${REDIS_PORT:-6379} # Redis port (default 6379)
+        port: ${REDIS_PORT:-6379} # Redis port
         db: ${REDIS_DB:-0} # Redis database index (0-15)
+        password: ${REDIS_PASSWORD} # Redis password (from .env)
 
 auth:
-    2fa:
-        enabled: ${ENABLE_2FA:-false} # Master boolean flag for 2FA availability
-        on_sign_up: ${2FA_ON_SIGN_UP:-false} # Boolean flag to trigger 2FA during registration
-        on_sign_in: ${2FA_ON_SIGN_IN:-false} # Boolean flag to trigger 2FA during login
+    jwt:
+        secret: ${JWT_SECRET} # Secret for signing (from .env)
+        ttl_minutes: ${JWT_TTL:-60} # Access token lifetime in minutes
+    two_fa:
+        enabled: ${ENABLE_2FA:-false} # Master flag for 2FA availability
+        on_sign_up: ${2FA_ON_SIGN_UP:-false} # Trigger 2FA during registration
+        on_sign_in: ${2FA_ON_SIGN_IN:-false} # Trigger 2FA during login
 
-jwt:
-    ttl_minutes: ${JWT_TTL:-60} # JWT token lifetime in minutes
+ratelimit:
+    auth:
+        signup:
+            limit: 5 # Allowed registration attempts
+            window: 1h # Time window (e.g., 1h, 15m)
+        login:
+            limit: 5 # Allowed login attempts
+            window: 15m # Time window
+        verify:
+            limit: 3 # 2FA/Email verification attempts
+            window: 5m # Time window
+    chat:
+        create:
+            limit: ${CHAT_CREATE_LIMIT:-10} # Allowed chat creation attempts
+            window: 10m # Time window
+        delete:
+            limit: ${CHAT_DELETE_LIMIT:-5} # Allowed chat deletion attempts
+            window: 5m # Time window
+    user:
+        update:
+            limit: ${USER_UPDATE_LIMIT:-5} # Allowed profile update attempts
+            window: 1m # Time window
+        search:
+            limit: ${USER_SEARCH_LIMIT:-20} # Allowed user search attempts
+            window: 1m # Time window
+        create_bot:
+            limit: ${BOT_CREATE_LIMIT:-2} # Allowed bot creation attempts
+            window: 1h # Time window
+    messages:
+        send:
+            limit: ${MSG_SEND_LIMIT:-5} # Allowed message sending attempts
+            window: 5s # Time window for sending messages
+        history:
+            limit: ${MSG_HISTORY_LIMIT:-20} # Allowed chat history fetch attempts
+            window: 10s # Time window for history fetching
+        update:
+            limit: ${MSG_UPDATE_LIMIT:-5} # Allowed message update attempts
+            window: 5s # Time window for updates
+        delete:
+            limit: ${MSG_DELETE_LIMIT:-5} # Allowed message deletion attempts
+            window: 5s # Time window for deletions
+
+# User service business constraints (Quotas)
+user_service:
+    max_bots_per_user: ${MAX_BOTS_PER_USER:-10} # Total bots one account can own

@@ -49,6 +49,10 @@ func (r *UserRepository) GetBotsByOwner(ctx context.Context, ownerID uuid.UUID) 
 	return r.db.Queries.GetBotsByOwnerID(ctx, uuid.NullUUID{UUID: ownerID, Valid: true})
 }
 
+func (r *UserRepository) CountBotsByOwnerID(ctx context.Context, ownerID uuid.UUID) (int64, error) {
+	return r.db.Queries.CountBotsByOwnerID(ctx, uuid.NullUUID{UUID: ownerID, Valid: true})
+}
+
 func (r *UserRepository) SearchByUsername(ctx context.Context, query string) ([]dbgen.User, error) {
 	return r.db.Queries.SearchUsersByUsername(ctx, query)
 }

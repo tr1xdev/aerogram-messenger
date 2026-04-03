@@ -16,6 +16,22 @@ import type {
   ChatMember,
 } from "@/entities/chat/model/types";
 
+interface ValidationError {
+  __typename: "ValidationError";
+  message: string;
+  field?: string;
+}
+
+type MessageWithTypename = Message & { __typename: "Message" };
+
+interface SendMutationResult {
+  sendMessage: MessageWithTypename | ValidationError;
+}
+
+interface UpdateMutationResult {
+  updateMessage: MessageWithTypename | ValidationError;
+}
+
 interface SendMessageVariables {
   chatId: string;
   text: string;
@@ -24,28 +40,16 @@ interface SendMessageVariables {
   replyToId?: string;
 }
 
-interface SendMutationResult {
-  sendMessage: Message;
-}
-
 interface SendMessageOptions {
   variables?: Partial<SendMessageVariables>;
-  optimisticResponse?:
-    | SendMutationResult
-    | ((vars: SendMessageVariables) => SendMutationResult);
+  optimisticResponse?: SendMutationResult;
   update?: (
     cache: ApolloCache,
     result: { data?: SendMutationResult | null },
   ) => void;
 }
 
-export function useMessageActions(chatId: string): {
-  sendMessage: (text: string, options?: SendMessageOptions) => Promise<void>;
-  editMessage: (id: string, text: string) => Promise<void>;
-  decryptMessage: (message: Message) => Promise<string>;
-  markAsRead: () => void;
-  isSending: boolean;
-} {
+export function useMessageActions(chatId: string) {
   const { data: meData } = useMe();
   const { data: chatData } = useChatDetails(chatId);
 
@@ -55,7 +59,7 @@ export function useMessageActions(chatId: string): {
   >(SEND_MESSAGE);
 
   const [edit] = useMutation<
-    { editMessage: Message },
+    UpdateMutationResult,
     { id: string; text: string }
   >(EDIT_MESSAGE);
 
@@ -69,12 +73,14 @@ export function useMessageActions(chatId: string): {
     }
     const me: User = meData.me;
     const chat: Chat | undefined = chatData?.chat;
-    const peer: User | undefined = chat?.members?.find(
-      (m: ChatMember): boolean => m.user.id !== me.id,
+    const peer = chat?.members?.find(
+      (m: ChatMember) => m.user.id !== me.id,
     )?.user;
+
     if (!peer?.publicKey) return message.text;
+
     try {
-      const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
+      const myPrivKeyObj = await getPrivateKey(me.id);
       if (!myPrivKeyObj) return message.text;
       return await decryptText(
         message.text,
@@ -91,21 +97,24 @@ export function useMessageActions(chatId: string): {
     text: string,
     options?: SendMessageOptions,
   ): Promise<void> => {
-    const me: User | undefined = meData?.me;
-    const chat: Chat | undefined = chatData?.chat;
+    const me = meData?.me;
+    const chat = chatData?.chat;
     if (!me || !chat) return;
-    const peer: User | undefined = chat.members?.find(
-      (m: ChatMember): boolean => m.user.id !== me.id,
+
+    const peer = chat.members?.find(
+      (m: ChatMember) => m.user.id !== me.id,
     )?.user;
+
     let finalVariables: SendMessageVariables = {
       chatId,
       text,
       isEncrypted: false,
       ...options?.variables,
     };
+
     if (chat.type === "PRIVATE" && peer?.publicKey) {
       try {
-        const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
+        const myPrivKeyObj = await getPrivateKey(me.id);
         if (myPrivKeyObj) {
           const encrypted = await encryptText(
             text,
@@ -123,22 +132,27 @@ export function useMessageActions(chatId: string): {
         console.error(err);
       }
     }
+
     await send({
       ...options,
       variables: finalVariables,
       update: (cache: ApolloCache, { data: mutationData }): void => {
-        const newMessage: Message | undefined = mutationData?.sendMessage;
-        if (!newMessage) return;
+        const result = mutationData?.sendMessage;
+        if (!result || result.__typename !== "Message") return;
+
+        const newMessage = result as MessageWithTypename;
         const chatRef = cache.identify({ __typename: "Chat", id: chatId });
+
         if (chatRef) {
           cache.modify({
             id: chatRef,
             fields: {
-              lastMessage: (): Message => newMessage,
-              unreadCount: (): number => 0,
+              lastMessage: () => newMessage,
+              unreadCount: () => 0,
             },
           });
         }
+
         const queryData = cache.readQuery<MyChatsResponse>({
           query: GET_MY_CHATS,
         });
@@ -147,6 +161,7 @@ export function useMessageActions(chatId: string): {
           const filteredChats = existingChats.filter((c) => c.id !== chatId);
           const targetChat =
             existingChats.find((c) => c.id === chatId) || chatData?.chat;
+
           if (targetChat) {
             cache.writeQuery<MyChatsResponse>({
               query: GET_MY_CHATS,
@@ -168,12 +183,13 @@ export function useMessageActions(chatId: string): {
   };
 
   const editMessage = async (id: string, text: string): Promise<void> => {
-    const me: User | undefined = meData?.me;
+    const me = meData?.me;
     if (!me) return;
+
     await edit({
       variables: { id, text },
       optimisticResponse: {
-        editMessage: {
+        updateMessage: {
           __typename: "Message",
           id,
           chatId,
@@ -183,7 +199,7 @@ export function useMessageActions(chatId: string): {
           isEdited: true,
           isEncrypted: false,
           sender: me,
-        } as Message,
+        } as MessageWithTypename,
       },
     });
   };
@@ -198,7 +214,7 @@ export function useMessageActions(chatId: string): {
           cache.modify({
             id: chatRef,
             fields: {
-              unreadCount: (): number => 0,
+              unreadCount: () => 0,
             },
           });
         }

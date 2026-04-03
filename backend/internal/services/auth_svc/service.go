@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
@@ -24,18 +24,20 @@ import (
 
 type Server struct {
 	authpb.UnimplementedAuthServiceServer
-	authRepo *repositories.AuthRepository
-	userRepo *repositories.UserRepository
-	cfg      *config.Config
-	db       *database.DB
+	authRepo    *repositories.AuthRepository
+	authLimiter limiter.RateLimiter
+	userRepo    *repositories.UserRepository
+	cfg         *config.Config
+	db          *database.DB
 }
 
-func NewServer(db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config) *Server {
+func NewServer(db *database.DB, authLimiter limiter.RateLimiter, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config) *Server {
 	return &Server{
-		db:       db,
-		authRepo: repositories.NewAuthRepository(db, rdb, mailer, 10*time.Minute),
-		userRepo: repositories.NewUserRepository(db),
-		cfg:      cfg,
+		db:          db,
+		authLimiter: authLimiter,
+		authRepo:    repositories.NewAuthRepository(db, rdb, mailer, cfg.Auth.TwoFA.CodeTTL),
+		userRepo:    repositories.NewUserRepository(db),
+		cfg:         cfg,
 	}
 }
 
@@ -61,7 +63,7 @@ func (s *Server) createAccessToken(userID, sessionID string, verified bool, isBo
 	if isBot {
 		ttl = time.Hour * 24 * 365
 	} else {
-		ttl = s.cfg.JWT.TTL()
+		ttl = s.cfg.Auth.JWT.AccessTTL
 		if ttl == 0 {
 			ttl = time.Hour * 24
 		}
@@ -80,10 +82,21 @@ func (s *Server) createAccessToken(userID, sessionID string, verified bool, isBo
 	}
 
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString([]byte(s.cfg.JWT.Secret))
+	return t.SignedString([]byte(s.cfg.Auth.JWT.Secret))
 }
 
 func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb.SignUpResponse, error) {
+	ip, _ := s.getMetadata(ctx)
+
+	limitCfg := s.cfg.RateLimit.Auth.SignUp
+	allowed, err := s.authLimiter.Allow(ctx, "limit:signup:"+ip, limitCfg.Limit, limitCfg.Window)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "limiter error")
+	}
+	if !allowed {
+		return nil, status.Error(codes.ResourceExhausted, "too many registration attempts from this IP")
+	}
+
 	if req.Email == "" || req.FirstName == "" || req.Password == "" {
 		return nil, status.Error(codes.InvalidArgument, "required fields missing")
 	}
@@ -118,14 +131,12 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 	}
 
 	if !s.cfg.Auth.TwoFA.Enabled || !s.cfg.Auth.TwoFA.OnSignUp {
-		ip, ua := s.getMetadata(ctx)
 		sid := uuid.New()
-
 		_, err = s.db.Queries.CreateSession(ctx, dbgen.CreateSessionParams{
 			ID:        sid,
 			UserID:    newID,
 			IpAddress: ip,
-			Device:    ua,
+			Device:    "unknown",
 		})
 		if err != nil {
 			return nil, status.Error(codes.Internal, "session creation failed")
@@ -145,10 +156,8 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 
 	verID := uuid.NewString()
 	targetEmail := req.Email
-	if os.Getenv("APP_ENV") == "development" {
-		if testEmail := os.Getenv("TEST_EMAIL"); testEmail != "" {
-			targetEmail = testEmail
-		}
+	if s.cfg.App.Env == "development" && s.cfg.App.TestEmail != "" {
+		targetEmail = s.cfg.App.TestEmail
 	}
 
 	go func(vID, uID, email, name string) {
@@ -163,6 +172,15 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 }
 
 func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
+	limitCfg := s.cfg.RateLimit.Auth.Login
+	allowed, err := s.authLimiter.Allow(ctx, "limit:login:"+req.Email, limitCfg.Limit, limitCfg.Window)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "limiter error")
+	}
+	if !allowed {
+		return nil, status.Error(codes.ResourceExhausted, "too many login attempts, please try again later")
+	}
+
 	if req.Email == "" || req.Password == "" {
 		return nil, status.Error(codes.InvalidArgument, "email and password required")
 	}
@@ -204,10 +222,8 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 
 	verID := uuid.NewString()
 	targetEmail := user.Email.String
-	if os.Getenv("APP_ENV") == "development" {
-		if testEmail := os.Getenv("TEST_EMAIL"); testEmail != "" {
-			targetEmail = testEmail
-		}
+	if s.cfg.App.Env == "development" && s.cfg.App.TestEmail != "" {
+		targetEmail = s.cfg.App.TestEmail
 	}
 
 	go func(vID, uID, email, name string) {
@@ -222,6 +238,15 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 }
 
 func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest) (*authpb.VerifyEmailResponse, error) {
+	limitCfg := s.cfg.RateLimit.Auth.Verify
+	allowed, err := s.authLimiter.Allow(ctx, "limit:verify:"+req.UserId, limitCfg.Limit, limitCfg.Window)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "limiter error")
+	}
+	if !allowed {
+		return nil, status.Error(codes.ResourceExhausted, "too many verification attempts, code invalidated")
+	}
+
 	realUserIDStr, err := s.authRepo.VerifyCode(ctx, req.UserId, req.Code)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())

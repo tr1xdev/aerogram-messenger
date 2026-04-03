@@ -8,10 +8,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -23,13 +25,17 @@ type Server struct {
 	db         *database.DB
 	rdb        *redis.Client
 	dialogRepo *repositories.DialogRepository
+	limiter    limiter.RateLimiter
+	cfg        config.ChatLimitConfig
 }
 
-func NewServer(db *database.DB, rdb *redis.Client) *Server {
+func NewServer(db *database.DB, rdb *redis.Client, l limiter.RateLimiter, cfg config.ChatLimitConfig) *Server {
 	return &Server{
 		db:         db,
 		rdb:        rdb,
 		dialogRepo: repositories.NewDialogRepository(db),
+		limiter:    l,
+		cfg:        cfg,
 	}
 }
 
@@ -73,6 +79,10 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
 	}
 
+	if err := s.limiter.Check(ctx, "chat:delete:"+userID, s.cfg.Delete.Limit, s.cfg.Delete.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many chat deletion requests")
+	}
+
 	uid, _ := uuid.Parse(userID)
 	did, _ := uuid.Parse(req.ChatId)
 
@@ -114,6 +124,10 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	creatorIDStr := s.getUserID(ctx, req.CreatorId)
 	if creatorIDStr == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
+
+	if err := s.limiter.Check(ctx, "chat:create:"+creatorIDStr, s.cfg.Create.Limit, s.cfg.Create.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many chat creation requests")
 	}
 
 	if req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {

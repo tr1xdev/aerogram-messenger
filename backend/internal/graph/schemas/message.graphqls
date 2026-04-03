@@ -23,17 +23,9 @@ type MessageConnection {
     hasMore: Boolean!
 }
 
-union SendMessageResult =
-    | Message
-    | ForbiddenError
-    | ValidationError
-    | InternalError
+union SendMessageResult = Message | ValidationError
 
-union MessageHistoryResult =
-    | MessageConnection
-    | ForbiddenError
-    | NotFoundError
-    | InternalError
+union MessageHistoryResult = MessageConnection | NotFoundError
 
 extend type Query {
     messageHistory(

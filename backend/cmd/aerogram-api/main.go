@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
@@ -23,11 +21,10 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	graph_api "github.com/tr1xdev/aerogram-messenger/internal/graph/api"
-	"github.com/tr1xdev/aerogram-messenger/internal/graph/loaders"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
 	internal_tls "github.com/tr1xdev/aerogram-messenger/internal/infrastructure/tls"
-	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/auth_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/chat_svc"
@@ -60,28 +57,19 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	rdb := database.NewRedis(cfg.RedisAddr(), cfg.RedisPassword(), 0)
+	rdb := database.NewRedis(cfg.RedisAddr(), cfg.Database.Redis.Password, cfg.Database.Redis.DB)
 	defer rdb.Close()
 
 	pRepo := repositories.NewPresenceRepository(rdb)
 	pSvc := presence_svc.NewServer(pRepo)
 
-	templatePath := os.Getenv("VERIFICATION_TEMPLATE_PATH")
-	if templatePath == "" {
-		templatePath = "internal/templates/verification.html"
-	}
-
-	emailSvc, err := mailer.NewResendService(cfg.Resend.Token, cfg.Resend.From, templatePath)
+	templatePath := "internal/templates/verification.html"
+	emailSvc, err := mailer.NewResendService(cfg.Auth.JWT.Secret, cfg.App.TestEmail, templatePath)
 	if err != nil {
 		log.Printf("Warning: mailer init error: %v", err)
 	}
 
-	geoPath := os.Getenv("GEOIP_PATH")
-	if geoPath == "" {
-		geoPath = "assets/GeoLite2-City.mmdb"
-	}
-
-	geoSvc := geo_svc.New(geoPath)
+	geoSvc := geo_svc.New("assets/GeoLite2-City.mmdb")
 	defer geoSvc.Close()
 	uaSvc := ua_svc.New()
 
@@ -107,27 +95,28 @@ func main() {
 	}
 	defer conn.Close()
 
-	router := chi.NewRouter()
-	applyMiddleware(router, cfg, db, conn, rdb)
-
 	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc)
-	api.SetupRoutes(router, gqlServer)
 
-	certPath := os.Getenv("CERT_PATH")
-	keyPath := os.Getenv("KEY_PATH")
-	if certPath == "" || keyPath == "" {
-		certPath = "certs/localhost+2.pem"
-		keyPath = "certs/localhost+2-key.pem"
-	}
+	router := api.NewRouter(api.RouterConfig{
+		Cfg:            cfg,
+		DB:             db,
+		RDB:            rdb,
+		GQLServer:      gqlServer,
+		UserClient:     userv1.NewUserServiceClient(conn),
+		PresenceClient: presencev1.NewPresenceServiceClient(conn),
+	})
 
-	tlsConfig := internal_tls.LoadServerConfig(certPath, keyPath)
+	tlsConfig := internal_tls.LoadServerConfig("certs/localhost+2.pem", "certs/localhost+2-key.pem")
 
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 
 	httpServer := &http.Server{
-		Addr:      httpAddr,
-		Handler:   router,
-		TLSConfig: tlsConfig,
+		Addr:         httpAddr,
+		Handler:      router,
+		TLSConfig:    tlsConfig,
+		ReadTimeout:  cfg.Server.HTTP.Timeout.Read,
+		WriteTimeout: cfg.Server.HTTP.Timeout.Write,
+		IdleTimeout:  cfg.Server.HTTP.Timeout.Idle,
 	}
 
 	h3Server := &http3.Server{
@@ -198,31 +187,21 @@ func main() {
 }
 
 func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pSvc *presence_svc.Server) {
-	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, rdb, mailer, cfg))
-	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(db, rdb))
-	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb))
+	authLimiter := limiter.NewRedisLimiter(rdb)
+
+	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, authLimiter, rdb, mailer, cfg))
+
+	chatv1.RegisterChatServiceServer(s, chat_svc.NewServer(
+		db,
+		rdb,
+		authLimiter,
+		cfg.RateLimit.Chat,
+	))
+
+	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb, authLimiter, cfg.RateLimit.Messages))
 	presencev1.RegisterPresenceServiceServer(s, pSvc)
-	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db))
-}
 
-func applyMiddleware(r *chi.Mux, cfg *config.Config, db *database.DB, conn *grpc.ClientConn, rdb *redis.Client) {
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"https://localhost:3443",
-			"https://localhost:3000",
-			"http://localhost:3000",
-			"http://localhost:5173",
-			"https://localhost:5173",
-		},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Apollo-Operation-Name", "Apollo-Require-Preflight", "Upgrade", "Connection"},
-		AllowCredentials: true,
-	}))
-
-	userClient := userv1.NewUserServiceClient(conn)
-	presenceClient := presencev1.NewPresenceServiceClient(conn)
-	r.Use(loaders.LoaderMiddleware(userClient, presenceClient, db.Queries))
-	r.Use(middleware.AuthMiddleware(cfg, db))
+	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db, authLimiter, cfg))
 }
 
 func initGraphQL(

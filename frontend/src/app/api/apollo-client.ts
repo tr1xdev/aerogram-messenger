@@ -20,11 +20,12 @@ import { getMainDefinition } from "@apollo/client/utilities";
 import { REFRESH_TOKEN_MUTATION } from "@/features/auth/api/auth.gql";
 import { useAuthStore } from "@/store/auth-store";
 import { useConnectionStore } from "@/store/connection";
+import { toast } from "sonner";
 
 const endpoint: string =
   import.meta.env.VITE_API_URL || "http://localhost:8080/query";
 const wsEndpoint: string =
-  import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
+  import.meta.env.VITE_WS_URL || "ws://localhost:8080/query";
 
 interface RefreshTokenResponse {
   refreshToken: {
@@ -131,6 +132,18 @@ const interceptorLink: ApolloLink = new ApolloLink(
 
       const subscription = forward(operation).subscribe({
         next: (response: FetchResult) => {
+          const hasRateLimitError: boolean = !!response.errors?.some(
+            (err) =>
+              err.extensions?.code === "RESOURCE_EXHAUSTED" ||
+              err.message.toLowerCase().includes("rate limit"),
+          );
+
+          if (hasRateLimitError) {
+            toast.error("Too many requests. Please wait a moment.", {
+              id: "rate-limit-toast",
+            });
+          }
+
           const hasFatalAuthError: boolean = !!response.errors?.some((err) =>
             err.message.toLowerCase().includes("session terminated"),
           );
@@ -227,6 +240,12 @@ const interceptorLink: ApolloLink = new ApolloLink(
           const statusCode: number | undefined = extractStatusCode(err);
           const msg: string = err.message.toLowerCase();
 
+          if (statusCode === 429 || msg.includes("rate limit")) {
+            toast.error("Rate limit exceeded. Please try again later.", {
+              id: "rate-limit-toast",
+            });
+          }
+
           if (msg.includes("session terminated") || statusCode === 401) {
             logoutAll();
             return;
@@ -251,7 +270,7 @@ const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
     url: wsEndpoint,
-    lazy: true,
+    lazy: false,
     connectionParams: async () => {
       if (isRefreshing) {
         await new Promise<void>((resolve: (value: void) => void): void => {
@@ -259,7 +278,7 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
         });
       }
       const token: string | null = useAuthStore.getState().accessToken;
-      return { Authorization: token ? `Bearer ${token}` : "" };
+      return { authorization: token ? `Bearer ${token}` : "" };
     },
     keepAlive: 10000,
     connectionAckWaitTimeout: 15000,
@@ -312,7 +331,7 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
       message: (msg: unknown): void => {
         const type: string = (msg as WsMessage).type || "data";
         console.groupCollapsed(
-          `%c[WS]%c message: ${type}`,
+          `` + `%c[WS]%c message: ${type}`,
           logStyle("#ffca28"),
           dimStyle,
         );

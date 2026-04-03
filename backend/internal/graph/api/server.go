@@ -39,7 +39,7 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 
 			tokenStr := strings.TrimPrefix(auth, "Bearer ")
 			token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-				return []byte(cfg.JWT.Secret), nil
+				return []byte(cfg.Auth.JWT.Secret), nil
 			})
 
 			if err != nil || !token.Valid {

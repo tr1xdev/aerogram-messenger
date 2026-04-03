@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"io/fs"
 	"os"
 	"testing"
 	"time"
@@ -42,28 +41,23 @@ func NewPostgres(dsn string) (*DB, error) {
 }
 
 func (db *DB) RunMigrations() error {
-	subFS, err := fs.Sub(migrationsFS, "sqlc/migrations")
+	d, err := iofs.New(migrationsFS, "sqlc/migrations")
 	if err != nil {
-		return fmt.Errorf("failed to create subfs: %w", err)
-	}
-
-	d, err := iofs.New(subFS, ".")
-	if err != nil {
-		return err
+		return fmt.Errorf("iofs error: %w", err)
 	}
 
 	driver, err := pgx.WithInstance(db.Conn, &pgx.Config{})
 	if err != nil {
-		return err
+		return fmt.Errorf("driver error: %w", err)
 	}
 
 	m, err := migrate.NewWithInstance("iofs", d, "pgx", driver)
 	if err != nil {
-		return err
+		return fmt.Errorf("migrate instance error: %w", err)
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return err
+		return fmt.Errorf("migration up error: %w", err)
 	}
 
 	return nil
@@ -93,21 +87,6 @@ func SetupTestDB(t *testing.T) *DB {
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", user, pass, host, dbName)
 
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
-
-	_, err = db.Exec(`
-		SET client_min_messages TO WARNING;
-		DROP SCHEMA IF EXISTS public CASCADE;
-		CREATE SCHEMA public;
-		GRANT ALL ON SCHEMA public TO public;
-	`)
-	if err != nil {
-		t.Fatalf("failed to reset schema: %v", err)
-	}
-
 	inst, err := NewPostgres(dsn)
 	if err != nil {
 		t.Fatalf("failed to init db instance: %v", err)
@@ -117,23 +96,62 @@ func SetupTestDB(t *testing.T) *DB {
 		t.Fatalf("failed to run test migrations: %v", err)
 	}
 
+	inst.TruncateTables(t)
+
 	return inst
 }
 
 func (db *DB) TruncateTables(t *testing.T) {
+	t.Helper()
 	_, err := db.Conn.Exec(`
 		DO $$
 		DECLARE
 			r RECORD;
 		BEGIN
 			FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename != 'schema_migrations') LOOP
-				EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' CASCADE';
+				EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
 			END LOOP;
 		END $$;
 	`)
 	if err != nil {
 		t.Fatalf("failed to truncate tables: %v", err)
 	}
+}
+
+func SetupGlobalTestDB() (*DB, func()) {
+	user := os.Getenv("DB_USER")
+	if user == "" {
+		user = "admin"
+	}
+	pass := os.Getenv("POSTGRES_PASSWORD")
+	if pass == "" {
+		pass = "admin"
+	}
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "aerogram_test"
+	}
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", user, pass, host, dbName)
+
+	db, err := NewPostgres(dsn)
+	if err != nil {
+		panic(fmt.Sprintf("failed to init global test db: %v", err))
+	}
+
+	if err := db.RunMigrations(); err != nil {
+		panic(fmt.Sprintf("failed to run global test migrations: %v", err))
+	}
+
+	cleanup := func() {
+		db.Close()
+	}
+
+	return db, cleanup
 }
 
 func StringToNullString(s string) sql.NullString {

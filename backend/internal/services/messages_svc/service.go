@@ -3,18 +3,20 @@ package messages_svc
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -24,32 +26,55 @@ type Server struct {
 	rdb         *redis.Client
 	messageRepo *repositories.MessageRepository
 	dialogRepo  *repositories.DialogRepository
+	limiter     limiter.RateLimiter
+	cfg         config.MessagesLimitConfig
 }
 
-func NewServer(db *database.DB, rdb *redis.Client) *Server {
+func NewServer(db *database.DB, rdb *redis.Client, l limiter.RateLimiter, cfg config.MessagesLimitConfig) *Server {
 	return &Server{
 		db:          db,
 		rdb:         rdb,
 		messageRepo: repositories.NewMessageRepository(db),
 		dialogRepo:  repositories.NewDialogRepository(db),
+		limiter:     l,
+		cfg:         cfg,
 	}
 }
 
+func (s *Server) getUserID(ctx context.Context, reqID string) string {
+	if reqID != "" {
+		return reqID
+	}
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		if ids := md.Get("user-id"); len(ids) > 0 {
+			return ids[0]
+		}
+	}
+	return ""
+}
+
 func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageRequest) (*messagespb.SendMessageResponse, error) {
+	senderIDStr := s.getUserID(ctx, req.SenderId)
+	if senderIDStr == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
+
+	if err := s.limiter.Check(ctx, "msg:send:"+senderIDStr, s.cfg.Send.Limit, s.cfg.Send.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many messages")
+	}
+
 	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
-		log.Printf("[SVC_ERR] Invalid ChatId: %s", req.ChatId)
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
-	senderID, err := uuid.Parse(req.SenderId)
+	senderID, err := uuid.Parse(senderIDStr)
 	if err != nil {
-		log.Printf("[SVC_ERR] Invalid SenderId: %s", req.SenderId)
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
 
 	tx, err := s.db.Conn.BeginTx(ctx, nil)
 	if err != nil {
-		log.Printf("[ERROR] SendMessage: failed to begin tx: %v", err)
 		return nil, status.Error(codes.Internal, "failed to begin transaction")
 	}
 	defer func() {
@@ -69,28 +94,22 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		IsSystem:     false,
 	})
 	if err != nil {
-		log.Printf("[ERROR] SendMessage: failed to save message: %v. Params: ChatID=%s, SenderID=%s", err, chatID, senderID)
 		return nil, status.Error(codes.Internal, "failed to save message")
 	}
 
-	err = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
+	_ = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
 		ID:            chatID,
 		LastMessageID: database.UUIDToNullUUID(msg.ID),
 		LastMessageAt: database.TimeToNullTime(msg.CreatedAt),
 	})
-	if err != nil {
-		log.Printf("[WARN] SendMessage: failed to update last message: %v", err)
-	}
 
 	_ = qtx.UnhideDialogForMembers(ctx, chatID)
 
 	if err := tx.Commit(); err != nil {
-		log.Printf("[ERROR] SendMessage: failed to commit tx: %v", err)
 		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
 	protoMsg := s.mapDBToProto(msg)
-
 	msgPayload, _ := json.Marshal(protoMsg)
 	_ = s.rdb.Publish(ctx, "chat:"+req.ChatId, msgPayload)
 
@@ -114,17 +133,17 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 			for _, m := range members {
 				_ = s.rdb.Publish(ctx, "user_chats:"+m.UserID.String(), chatJson)
 			}
-		} else {
-			log.Printf("[WARN] SendMessage: failed to get members for notification: %v", err)
 		}
-	} else {
-		log.Printf("[WARN] SendMessage: failed to get dialog for notification: %v", err)
 	}
 
 	return &messagespb.SendMessageResponse{Message: protoMsg}, nil
 }
 
 func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
+	if err := s.limiter.Check(ctx, "msg:history:"+req.ChatId, s.cfg.History.Limit, s.cfg.History.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many history requests")
+	}
+
 	cid, err := uuid.Parse(req.ChatId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
@@ -149,11 +168,16 @@ func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryReque
 }
 
 func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadRequest) (*messagespb.MarkAsReadResponse, error) {
+	userIDStr := s.getUserID(ctx, req.UserId)
+	if userIDStr == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
+
 	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
-	userID, err := uuid.Parse(req.UserId)
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid user id")
 	}
@@ -180,11 +204,20 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 }
 
 func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessageRequest) (*messagespb.UpdateMessageResponse, error) {
+	senderIDStr := s.getUserID(ctx, req.SenderId)
+	if senderIDStr == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
+
+	if err := s.limiter.Check(ctx, "msg:update:"+senderIDStr, s.cfg.Update.Limit, s.cfg.Update.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many update requests")
+	}
+
 	id, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid message id")
 	}
-	sid, err := uuid.Parse(req.SenderId)
+	sid, err := uuid.Parse(senderIDStr)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
@@ -203,11 +236,20 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 }
 
 func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessageRequest) (*messagespb.DeleteMessageResponse, error) {
+	senderIDStr := s.getUserID(ctx, req.SenderId)
+	if senderIDStr == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
+
+	if err := s.limiter.Check(ctx, "msg:delete:"+senderIDStr, s.cfg.Delete.Limit, s.cfg.Delete.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many delete requests")
+	}
+
 	id, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid message id")
 	}
-	sid, err := uuid.Parse(req.SenderId)
+	sid, err := uuid.Parse(senderIDStr)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}

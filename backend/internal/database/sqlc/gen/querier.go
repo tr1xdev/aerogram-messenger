@@ -14,6 +14,7 @@ import (
 type Querier interface {
 	AddDialogMember(ctx context.Context, arg AddDialogMemberParams) error
 	CheckUserExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CountBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) (int64, error)
 	CountPinnedDialogs(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUnreadMessages(ctx context.Context, arg CountUnreadMessagesParams) (int64, error)
 	CreateBot(ctx context.Context, arg CreateBotParams) (User, error)

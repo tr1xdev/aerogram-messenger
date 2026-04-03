@@ -52,6 +52,10 @@ WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL;
 SELECT * FROM users
 WHERE bot_owner_id = $1 AND is_bot = TRUE AND deleted_at IS NULL;
 
+-- name: CountBotsByOwnerID :one
+SELECT COUNT(*) FROM users
+WHERE bot_owner_id = $1 AND is_bot = TRUE AND deleted_at IS NULL;
+
 -- name: SearchUsersByUsername :many
 SELECT * FROM users
 WHERE username ILIKE $1::text || '%' AND username != '' AND deleted_at IS NULL

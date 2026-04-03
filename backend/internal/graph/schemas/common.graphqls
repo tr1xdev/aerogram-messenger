@@ -1,26 +1,26 @@
 scalar Long
 
 interface Error {
-   message: String!
+    message: String!
 }
 
 type InternalError implements Error {
-   message: String!
+    message: String!
 }
 
 type ForbiddenError implements Error {
-   message: String!
+    message: String!
 }
 
 type NotFoundError implements Error {
-   message: String!
+    message: String!
 }
 
 type ValidationError implements Error {
-   message: String!
-   field: String
+    message: String!
+    field: String
 }
 
 type SuccessResult {
-   success: Boolean!
+    success: Boolean!
 }

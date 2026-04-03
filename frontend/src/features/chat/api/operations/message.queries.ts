@@ -11,13 +11,7 @@ export const GET_MESSAGE_HISTORY = gql`
         }
         hasMore
       }
-      ... on ForbiddenError {
-        message
-      }
       ... on NotFoundError {
-        message
-      }
-      ... on InternalError {
         message
       }
     }
