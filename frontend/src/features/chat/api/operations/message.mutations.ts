@@ -20,15 +20,9 @@ export const SEND_MESSAGE = gql`
       ... on Message {
         ...MessageFields
       }
-      ... on ForbiddenError {
-        message
-      }
       ... on ValidationError {
         message
         field
-      }
-      ... on InternalError {
-        message
       }
     }
   }
@@ -44,11 +38,9 @@ export const UPDATE_MESSAGE = gql`
         text
         isEdited
       }
-      ... on ForbiddenError {
+      ... on ValidationError {
         message
-      }
-      ... on InternalError {
-        message
+        field
       }
     }
   }

@@ -18,6 +18,7 @@ export interface User {
 }
 
 export interface Message {
+  __typename?: "Message";
   id: string;
   chatId: string;
   text: string;
