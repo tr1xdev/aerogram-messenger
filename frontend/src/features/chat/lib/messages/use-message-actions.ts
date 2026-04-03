@@ -1,5 +1,10 @@
 import { useMutation } from "@apollo/client/react/index.js";
-import { type ApolloCache } from "@apollo/client/index.js";
+import {
+  type ApolloCache,
+  type Reference,
+  type StoreObject,
+  gql,
+} from "@apollo/client/index.js";
 import {
   SEND_MESSAGE,
   EDIT_MESSAGE,
@@ -71,24 +76,27 @@ export function useMessageActions(chatId: string) {
     if (!message.isEncrypted || !message.encryptionIv || !meData?.me) {
       return message.text;
     }
+
     const me: User = meData.me;
     const chat: Chat | undefined = chatData?.chat;
-    const peer = chat?.members?.find(
-      (m: ChatMember) => m.user.id !== me.id,
+    const peer: User | undefined = chat?.members?.find(
+      (m: ChatMember): boolean => m.user.id !== me.id,
     )?.user;
 
     if (!peer?.publicKey) return message.text;
 
     try {
-      const myPrivKeyObj = await getPrivateKey(me.id);
+      const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
       if (!myPrivKeyObj) return message.text;
+
       return await decryptText(
         message.text,
         message.encryptionIv,
         peer.publicKey,
         myPrivKeyObj,
       );
-    } catch {
+    } catch (error: unknown) {
+      console.error(error);
       return "[Decryption Error]";
     }
   };
@@ -97,12 +105,13 @@ export function useMessageActions(chatId: string) {
     text: string,
     options?: SendMessageOptions,
   ): Promise<void> => {
-    const me = meData?.me;
-    const chat = chatData?.chat;
+    const me: User | undefined = meData?.me;
+    const chat: Chat | undefined = chatData?.chat;
+
     if (!me || !chat) return;
 
-    const peer = chat.members?.find(
-      (m: ChatMember) => m.user.id !== me.id,
+    const peer: User | undefined = chat.members?.find(
+      (m: ChatMember): boolean => m.user.id !== me.id,
     )?.user;
 
     let finalVariables: SendMessageVariables = {
@@ -114,13 +123,10 @@ export function useMessageActions(chatId: string) {
 
     if (chat.type === "PRIVATE" && peer?.publicKey) {
       try {
-        const myPrivKeyObj = await getPrivateKey(me.id);
+        const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
         if (myPrivKeyObj) {
-          const encrypted = await encryptText(
-            text,
-            peer.publicKey,
-            myPrivKeyObj,
-          );
+          const encrypted: { ciphertext: string; iv: string } =
+            await encryptText(text, peer.publicKey, myPrivKeyObj);
           finalVariables = {
             ...finalVariables,
             text: encrypted.ciphertext,
@@ -128,7 +134,7 @@ export function useMessageActions(chatId: string) {
             encryptionIv: encrypted.iv,
           };
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error(err);
       }
     }
@@ -136,40 +142,108 @@ export function useMessageActions(chatId: string) {
     await send({
       ...options,
       variables: finalVariables,
-      update: (cache: ApolloCache, { data: mutationData }): void => {
-        const result = mutationData?.sendMessage;
+      update: (
+        cache: ApolloCache,
+        { data: mutationData }: { data?: SendMutationResult | null },
+      ): void => {
+        const result: MessageWithTypename | ValidationError | undefined =
+          mutationData?.sendMessage;
+
         if (!result || result.__typename !== "Message") return;
 
-        const newMessage = result as MessageWithTypename;
-        const chatRef = cache.identify({ __typename: "Chat", id: chatId });
+        const newMessage: MessageWithTypename = result as MessageWithTypename;
+
+        const chatRef: string | undefined = cache.identify({
+          __typename: "Chat",
+          id: chatId,
+        });
 
         if (chatRef) {
           cache.modify({
             id: chatRef,
             fields: {
-              lastMessage: () => newMessage,
-              unreadCount: () => 0,
+              lastMessage: (
+                existing: Reference | Message | undefined,
+                {
+                  readField,
+                }: {
+                  readField: (
+                    fieldName: string,
+                    obj: Reference | StoreObject,
+                  ) => unknown;
+                },
+              ): Reference | Message | undefined => {
+                const existingSeq: number =
+                  (readField(
+                    "sequence",
+                    existing as unknown as StoreObject,
+                  ) as number) ?? 0;
+                const newSeq: number = newMessage.sequence ?? 0;
+
+                if (existing && existingSeq > newSeq) {
+                  return existing;
+                }
+                return newMessage as unknown as Reference;
+              },
+              unreadCount: (): number => 0,
             },
           });
         }
 
-        const queryData = cache.readQuery<MyChatsResponse>({
-          query: GET_MY_CHATS,
-        });
+        const queryData: MyChatsResponse | null =
+          cache.readQuery<MyChatsResponse>({
+            query: GET_MY_CHATS,
+          });
+
         if (queryData?.myChats?.chats) {
-          const existingChats = queryData.myChats.chats;
-          const filteredChats = existingChats.filter((c) => c.id !== chatId);
-          const targetChat =
-            existingChats.find((c) => c.id === chatId) || chatData?.chat;
+          const existingChats: Chat[] = queryData.myChats.chats;
+          const filteredChats: Chat[] = existingChats.filter(
+            (c: Chat): boolean => c.id !== chatId,
+          );
+          const targetChat: Chat | undefined =
+            existingChats.find((c: Chat): boolean => c.id === chatId) ||
+            chatData?.chat;
 
           if (targetChat) {
+            const currentLastMessage: Message | Reference | undefined | null =
+              targetChat.lastMessage;
+
+            let finalLastMessage: Message | Reference = newMessage;
+
+            if (currentLastMessage) {
+              const currentId: string | undefined = cache.identify(
+                currentLastMessage as unknown as StoreObject,
+              );
+
+              const existingSeq: number = currentId
+                ? (cache.readFragment<{ sequence: number }>({
+                    id: currentId,
+                    fragment: gql`
+                      fragment MsgSeq on Message {
+                        sequence
+                      }
+                    `,
+                  })?.sequence ?? 0)
+                : 0;
+
+              const newSeq: number = newMessage.sequence ?? 0;
+
+              if (existingSeq > newSeq) {
+                finalLastMessage = currentLastMessage;
+              }
+            }
+
             cache.writeQuery<MyChatsResponse>({
               query: GET_MY_CHATS,
               data: {
                 myChats: {
                   ...queryData.myChats,
                   chats: [
-                    { ...targetChat, lastMessage: newMessage, unreadCount: 0 },
+                    {
+                      ...targetChat,
+                      lastMessage: finalLastMessage as Message,
+                      unreadCount: 0,
+                    },
                     ...filteredChats,
                   ],
                 },
@@ -177,13 +251,16 @@ export function useMessageActions(chatId: string) {
             });
           }
         }
-        options?.update?.(cache, { data: mutationData });
+
+        if (options?.update) {
+          options.update(cache, { data: mutationData });
+        }
       },
     });
   };
 
   const editMessage = async (id: string, text: string): Promise<void> => {
-    const me = meData?.me;
+    const me: User | undefined = meData?.me;
     if (!me) return;
 
     await edit({
@@ -209,12 +286,15 @@ export function useMessageActions(chatId: string) {
       variables: { chatId },
       optimisticResponse: { markDialogAsRead: true },
       update: (cache: ApolloCache): void => {
-        const chatRef = cache.identify({ __typename: "Chat", id: chatId });
+        const chatRef: string | undefined = cache.identify({
+          __typename: "Chat",
+          id: chatId,
+        });
         if (chatRef) {
           cache.modify({
             id: chatRef,
             fields: {
-              unreadCount: () => 0,
+              unreadCount: (): number => 0,
             },
           });
         }
@@ -222,5 +302,11 @@ export function useMessageActions(chatId: string) {
     });
   };
 
-  return { sendMessage, editMessage, decryptMessage, markAsRead, isSending };
+  return {
+    sendMessage,
+    editMessage,
+    decryptMessage,
+    markAsRead,
+    isSending,
+  };
 }

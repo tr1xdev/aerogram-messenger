@@ -3,6 +3,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  type MutableRefObject,
   useRef,
   type ReactNode,
 } from "react";
@@ -18,6 +19,7 @@ import {
   useTypingSubscription,
   useMessageActions,
   useSendTyping,
+  type MyChatsResponse,
 } from "@/features/chat/lib";
 import { useMarkDialog } from "@/features/chat/lib";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
@@ -59,7 +61,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
 
   const { input, setInput, resetInput, setActiveChatId } = useChatStore();
-  const inputRef = useRef<string>(input);
+  const inputRef: MutableRefObject<string> = useRef<string>(input);
 
   useEffect((): void => {
     inputRef.current = input;
@@ -87,7 +89,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     useMessageActions(chatId);
   const { sendTyping } = useSendTyping(chatId);
 
-  const { data: chatsData } = useMyChats();
+  const { data: chatsData } = useMyChats() as {
+    data: MyChatsResponse | undefined;
+  };
 
   const isInitialLoading: boolean =
     (!chat && chatLoading) || (historyLoading && isFirstLoad);
@@ -97,7 +101,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   useEffect((): void | (() => void) => {
     if (!historyLoading && !chatLoading && chat) {
-      const timer: ReturnType<typeof setTimeout> = setTimeout((): void => {
+      const timer = setTimeout((): void => {
         setIsFirstLoad(false);
       }, 100);
       return (): void => clearTimeout(timer);
@@ -158,7 +162,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const typingUser = useMemo((): User | undefined => {
     if (!chat?.members || !me) return undefined;
     if (typingFromSub?.isTyping && typingFromSub.id !== me.id) {
-      const subUser = chat.members.find(
+      const subUser: User | undefined = chat.members.find(
         (m: ChatMember): boolean => m.user.id === typingFromSub.id,
       )?.user;
       if (subUser) return subUser;
@@ -172,7 +176,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   const isBotChat = useMemo((): boolean => {
     if (!chat?.members || !me) return false;
-    const otherMember = chat.members.find(
+    const otherMember: ChatMember | undefined = chat.members.find(
       (m: ChatMember): boolean => m.user.id !== me.id,
     );
     return otherMember?.user.isBot ?? false;
@@ -255,14 +259,18 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         try {
           await editMessage(editingMessage.id, val);
           cancelAction();
-        } catch {
-          /* error handled by hook */
+        } catch (err: unknown) {
+          console.error(err);
         }
         return;
       }
 
       const nowTime: number = Date.now();
-      const tempId: string = crypto.randomUUID();
+      const tempId: string =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : Math.random().toString(36).substring(2, 15);
+
       const currentReplyId: string | undefined = replyingTo?.id;
       const originalReply: Message | null = replyingTo;
 
@@ -295,7 +303,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
       try {
         await sendMessage(val, { variables: { replyToId: currentReplyId } });
-      } catch {
+      } catch (err: unknown) {
+        console.error(err);
         setInput(val);
         if (originalReply) setReplyingTo(originalReply);
         setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] =>

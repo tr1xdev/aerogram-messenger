@@ -9,7 +9,6 @@ import {
 } from "@apollo/client";
 import type {
   Reference,
-  FetchResult,
   Operation,
   FieldFunctionOptions,
 } from "@apollo/client";
@@ -39,6 +38,26 @@ interface MessageConnection {
   hasMore: boolean;
   __typename: string;
 }
+
+interface ApolloExecutionResult {
+  data?: Record<string, unknown> | null;
+  errors?: readonly {
+    message: string;
+    extensions?: Record<string, unknown>;
+  }[];
+}
+
+type WsNextMessage = {
+  type: "next";
+  payload: {
+    data: {
+      messageAdded: {
+        text: string;
+        sequence: number;
+      };
+    };
+  };
+};
 
 type PendingRequestCallback = () => void;
 
@@ -125,13 +144,29 @@ const authLink: SetContextLink = new SetContextLink(
   },
 );
 
+const logStyle = (color: string): string =>
+  `color: ${color}; font-weight: bold; font-family: "JetBrains Mono", monospace;`;
+const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;`;
+
 const interceptorLink: ApolloLink = new ApolloLink(
   (operation: Operation, forward) => {
-    return new Observable<FetchResult>((observer) => {
+    return new Observable((observer) => {
       let handle: { unsubscribe: () => void } | null = null;
 
       const subscription = forward(operation).subscribe({
-        next: (response: FetchResult) => {
+        next: (rawResponse: unknown) => {
+          const response: ApolloExecutionResult =
+            rawResponse as ApolloExecutionResult;
+
+          if (operation.operationName === "SendMessage") {
+            console.log(
+              `%c[HTTP][SendMessage]%c Response received:`,
+              logStyle("#4caf50"),
+              "color: inherit;",
+              response.data,
+            );
+          }
+
           const hasRateLimitError: boolean = !!response.errors?.some(
             (err) =>
               err.extensions?.code === "RESOURCE_EXHAUSTED" ||
@@ -184,11 +219,15 @@ const interceptorLink: ApolloLink = new ApolloLink(
               isRefreshing = true;
 
               client
-                .mutate<RefreshTokenResponse>({
+                .mutate({
                   mutation: REFRESH_TOKEN_MUTATION,
                   variables: { token: refresh },
                 })
-                .then(({ data }: FetchResult<RefreshTokenResponse>) => {
+                .then((rawResult: unknown): void => {
+                  const result: ApolloExecutionResult =
+                    rawResult as ApolloExecutionResult;
+                  const data: RefreshTokenResponse | null =
+                    result.data as unknown as RefreshTokenResponse | null;
                   if (data?.refreshToken) {
                     useAuthStore
                       .getState()
@@ -223,7 +262,8 @@ const interceptorLink: ApolloLink = new ApolloLink(
               }));
 
               const retrySub = forward(operation).subscribe({
-                next: (val: FetchResult) => observer.next(val),
+                next: (val: unknown) =>
+                  observer.next(val as ApolloExecutionResult),
                 error: (err: Error) => observer.error(err),
                 complete: () => observer.complete(),
               });
@@ -263,17 +303,13 @@ const interceptorLink: ApolloLink = new ApolloLink(
   },
 );
 
-const logStyle = (color: string): string =>
-  `color: ${color}; font-weight: bold; font-family: "JetBrains Mono", monospace;`;
-const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;`;
-
 const wsLink: GraphQLWsLink = new GraphQLWsLink(
   createClient({
     url: wsEndpoint,
     lazy: false,
     connectionParams: async () => {
       if (isRefreshing) {
-        await new Promise<void>((resolve: (value: void) => void): void => {
+        await new Promise((resolve: (value: void) => void): void => {
           pendingRequests.push(resolve);
         });
       }
@@ -329,9 +365,23 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
       },
 
       message: (msg: unknown): void => {
-        const type: string = (msg as WsMessage).type || "data";
+        const wsMsg: WsMessage = msg as WsMessage;
+        const type: string = wsMsg.type || "data";
+
+        if (type === "next") {
+          const nextMsg: WsNextMessage = wsMsg as unknown as WsNextMessage;
+          const added = nextMsg.payload?.data?.messageAdded;
+          if (added) {
+            console.log(
+              `%c[WS][messageAdded]%c Received: "${added.text}" | Seq: ${added.sequence}`,
+              logStyle("#ffca28"),
+              "color: inherit;",
+            );
+          }
+        }
+
         console.groupCollapsed(
-          `` + `%c[WS]%c message: ${type}`,
+          "" + `%c[WS]%c message: ${type}`,
           logStyle("#ffca28"),
           dimStyle,
         );
@@ -360,11 +410,16 @@ export const client: ApolloClient = new ApolloClient({
       Query: {
         fields: {
           myChats: {
+            keyArgs: false,
             merge(
-              _: Reference[] | undefined,
-              incoming: Reference[],
-            ): Reference[] {
-              return incoming;
+              existing: { chats: Reference[] } | undefined,
+              incoming: { chats: Reference[] },
+            ): { chats: Reference[] } {
+              if (!existing) return incoming;
+              return {
+                ...incoming,
+                chats: incoming.chats,
+              };
             },
           },
           messageHistory: {
@@ -374,37 +429,61 @@ export const client: ApolloClient = new ApolloClient({
               incoming: MessageConnection,
               { readField }: FieldFunctionOptions,
             ): MessageConnection {
-              const mergedMap: Map<string, Reference> = new Map<
-                string,
-                Reference
-              >();
+              const mergedMap: Map<string, Reference> = new Map();
 
               if (existing?.messages) {
                 existing.messages.forEach((ref: Reference): void => {
-                  const id: string | undefined = readField<string>("id", ref);
+                  const id: string | undefined = readField("id", ref) as
+                    | string
+                    | undefined;
                   if (id) mergedMap.set(id, ref);
                 });
               }
 
               if (incoming.messages) {
                 incoming.messages.forEach((ref: Reference): void => {
-                  const id: string | undefined = readField<string>("id", ref);
+                  const id: string | undefined = readField("id", ref) as
+                    | string
+                    | undefined;
                   if (id) mergedMap.set(id, ref);
                 });
               }
 
+              const sortedMessages: Reference[] = Array.from(
+                mergedMap.values(),
+              ).sort((a: Reference, b: Reference): number => {
+                const seqA: number = (readField("sequence", a) as number) || 0;
+                const seqB: number = (readField("sequence", b) as number) || 0;
+                return seqA - seqB;
+              });
+
+              console.log(
+                `%c[CACHE][messageHistory]%c Merged ${sortedMessages.length} messages.`,
+                logStyle("#9c27b0"),
+                "color: inherit;",
+              );
+
               return {
                 ...incoming,
-                messages: Array.from(mergedMap.values()),
+                messages: sortedMessages,
               };
             },
           },
         },
       },
-      ChatList: {
-        keyFields: false,
-      },
       Chat: {
+        keyFields: ["id"],
+        fields: {
+          unreadCount: {
+            merge: (existing: number, incoming: number): number =>
+              incoming !== undefined ? incoming : existing,
+          },
+        },
+      },
+      User: {
+        keyFields: ["id"],
+      },
+      Message: {
         keyFields: ["id"],
       },
     },
