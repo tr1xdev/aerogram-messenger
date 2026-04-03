@@ -34,6 +34,7 @@ auth:
         secret: ${JWT_SECRET} # Secret for signing (from .env)
         ttl_minutes: ${JWT_TTL:-60} # Access token lifetime in minutes
     two_fa:
+        code_ttl: ${2FA_CODE_TTL:-1m} # Time-to-live for 2FA codes
         enabled: ${ENABLE_2FA:-false} # Master flag for 2FA availability
         on_sign_up: ${2FA_ON_SIGN_UP:-false} # Trigger 2FA during registration
         on_sign_in: ${2FA_ON_SIGN_IN:-false} # Trigger 2FA during login

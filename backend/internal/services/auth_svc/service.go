@@ -3,6 +3,7 @@ package auth_svc
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -29,6 +30,15 @@ type Server struct {
 	userRepo    *repositories.UserRepository
 	cfg         *config.Config
 	db          *database.DB
+	rdb         *redis.Client
+}
+
+type pendingUser struct {
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name,omitempty"`
+	Username  string `json:"username,omitempty"`
+	Password  string `json:"password"`
 }
 
 func NewServer(db *database.DB, authLimiter limiter.RateLimiter, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config) *Server {
@@ -38,6 +48,7 @@ func NewServer(db *database.DB, authLimiter limiter.RateLimiter, rdb *redis.Clie
 		authRepo:    repositories.NewAuthRepository(db, rdb, mailer, cfg.Auth.TwoFA.CodeTTL),
 		userRepo:    repositories.NewUserRepository(db),
 		cfg:         cfg,
+		rdb:         rdb,
 	}
 }
 
@@ -101,36 +112,40 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 		return nil, status.Error(codes.InvalidArgument, "required fields missing")
 	}
 
+	_, err = s.userRepo.GetByEmail(ctx, req.Email)
+	if err == nil {
+		return nil, status.Error(codes.AlreadyExists, "email already registered")
+	}
+
 	pwHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to process password")
 	}
 
-	newID := uuid.New()
-	params := dbgen.CreateUserParams{
-		ID:        newID,
-		Email:     sql.NullString{String: req.Email, Valid: true},
-		FirstName: req.FirstName,
-		Password:  sql.NullString{String: string(pwHash), Valid: true},
-		Status:    "OFFLINE",
-		LastName:  database.ToNullString(req.LastName),
-		Username:  database.ToNullString(req.Username),
+	var lName, uName string
+	if req.LastName != nil {
+		lName = *req.LastName
 	}
-
-	if _, err := s.userRepo.CreateUser(ctx, params); err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "23505") || strings.Contains(errStr, "unique constraint") {
-			if strings.Contains(errStr, "email") {
-				return nil, status.Error(codes.AlreadyExists, "email already registered")
-			}
-			if strings.Contains(errStr, "username") {
-				return nil, status.Error(codes.AlreadyExists, "username already taken")
-			}
-		}
-		return nil, status.Error(codes.Internal, "storage error")
+	if req.Username != nil {
+		uName = *req.Username
 	}
 
 	if !s.cfg.Auth.TwoFA.Enabled || !s.cfg.Auth.TwoFA.OnSignUp {
+		newID := uuid.New()
+		params := dbgen.CreateUserParams{
+			ID:        newID,
+			Email:     sql.NullString{String: req.Email, Valid: true},
+			FirstName: req.FirstName,
+			Password:  sql.NullString{String: string(pwHash), Valid: true},
+			Status:    "OFFLINE",
+			LastName:  database.ToNullString(&lName),
+			Username:  database.ToNullString(&uName),
+		}
+
+		if _, err := s.userRepo.CreateUser(ctx, params); err != nil {
+			return nil, status.Error(codes.Internal, "storage error")
+		}
+
 		sid := uuid.New()
 		_, err = s.db.Queries.CreateSession(ctx, dbgen.CreateSessionParams{
 			ID:        sid,
@@ -155,18 +170,32 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 	}
 
 	verID := uuid.NewString()
+	pending := pendingUser{
+		Email:     req.Email,
+		FirstName: req.FirstName,
+		LastName:  lName,
+		Username:  uName,
+		Password:  string(pwHash),
+	}
+
+	data, _ := json.Marshal(pending)
+	err = s.rdb.Set(ctx, "pending_reg:"+verID, data, s.cfg.Auth.TwoFA.CodeTTL).Err()
+	if err != nil {
+		return nil, status.Error(codes.Internal, "cache error")
+	}
+
 	targetEmail := req.Email
 	if s.cfg.App.Env == "development" && s.cfg.App.TestEmail != "" {
 		targetEmail = s.cfg.App.TestEmail
 	}
 
-	go func(vID, uID, email, name string) {
+	go func(vID, email, name string) {
 		asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		if err := s.authRepo.StoreAndSendCode(asyncCtx, vID, uID, email, name); err != nil {
+		if err := s.authRepo.StoreAndSendCode(asyncCtx, vID, "PENDING", email, name); err != nil {
 			fmt.Printf("ASYNC MAIL ERROR: %v\n", err)
 		}
-	}(verID, newID.String(), targetEmail, req.FirstName)
+	}(verID, targetEmail, req.FirstName)
 
 	return &authpb.SignUpResponse{UserId: verID}, nil
 }
@@ -178,7 +207,7 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 		return nil, status.Error(codes.Internal, "limiter error")
 	}
 	if !allowed {
-		return nil, status.Error(codes.ResourceExhausted, "too many login attempts, please try again later")
+		return nil, status.Error(codes.ResourceExhausted, "too many login attempts")
 	}
 
 	if req.Email == "" || req.Password == "" {
@@ -244,32 +273,63 @@ func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest
 		return nil, status.Error(codes.Internal, "limiter error")
 	}
 	if !allowed {
-		return nil, status.Error(codes.ResourceExhausted, "too many verification attempts, code invalidated")
+		return nil, status.Error(codes.ResourceExhausted, "too many attempts")
 	}
 
-	realUserIDStr, err := s.authRepo.VerifyCode(ctx, req.UserId, req.Code)
+	storedID, err := s.authRepo.VerifyCode(ctx, req.UserId, req.Code)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
-	uid, err := uuid.Parse(realUserIDStr)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "invalid user identity")
-	}
-
+	var uid uuid.UUID
 	ip, ua := s.getMetadata(ctx)
 	sid := uuid.New()
+
+	if storedID == "PENDING" {
+		val, err := s.rdb.Get(ctx, "pending_reg:"+req.UserId).Result()
+		if err != nil {
+			return nil, status.Error(codes.DeadlineExceeded, "registration session expired")
+		}
+
+		var p pendingUser
+		if err := json.Unmarshal([]byte(val), &p); err != nil {
+			return nil, status.Error(codes.Internal, "internal data error")
+		}
+
+		newID := uuid.New()
+		params := dbgen.CreateUserParams{
+			ID:        newID,
+			Email:     sql.NullString{String: p.Email, Valid: true},
+			FirstName: p.FirstName,
+			Password:  sql.NullString{String: p.Password, Valid: true},
+			Status:    "OFFLINE",
+			LastName:  database.ToNullString(&p.LastName),
+			Username:  database.ToNullString(&p.Username),
+		}
+
+		if _, err := s.userRepo.CreateUser(ctx, params); err != nil {
+			if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "23505") {
+				return nil, status.Error(codes.AlreadyExists, "username or email already taken")
+			}
+			return nil, status.Error(codes.Internal, "failed to create user")
+		}
+		uid = newID
+		s.rdb.Del(ctx, "pending_reg:"+req.UserId)
+	} else {
+		parsed, err := uuid.Parse(storedID)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "invalid identity")
+		}
+		uid = parsed
+	}
 
 	tx, err := s.db.Conn.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "tx error")
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+	defer tx.Rollback()
 
 	qtx := s.db.Queries.WithTx(tx)
-
 	_, err = qtx.CreateSession(ctx, dbgen.CreateSessionParams{
 		ID:        sid,
 		UserID:    uid,
@@ -277,7 +337,7 @@ func (s *Server) VerifyEmail(ctx context.Context, req *authpb.VerifyEmailRequest
 		Device:    ua,
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "session creation failed")
+		return nil, status.Error(codes.Internal, "session error")
 	}
 
 	token, err := s.createAccessToken(uid.String(), sid.String(), true, false)
