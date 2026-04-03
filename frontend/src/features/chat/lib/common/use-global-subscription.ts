@@ -2,7 +2,11 @@ import {
   useSubscription,
   useApolloClient,
 } from "@apollo/client/react/index.js";
-import { type Reference, type ApolloCache } from "@apollo/client/index.js";
+import {
+  type Reference,
+  type ApolloCache,
+  type StoreObject,
+} from "@apollo/client/index.js";
 import {
   MESSAGE_SUBSCRIPTION,
   DIALOG_READ_SUBSCRIPTION,
@@ -78,6 +82,11 @@ export function useGlobalSubscriptions(
       const newMessage: Message | undefined = data.data?.messageAdded;
       if (!newMessage || !myId || !chatId) return;
 
+      console.log("--- [SUBSCRIPTION] New Message Received ---");
+      console.log("From Me:", newMessage.sender.id === myId);
+      console.log("Text:", newMessage.text);
+      console.log("Sequence:", newMessage.sequence);
+
       const cache: ApolloCache = client.cache;
       const isFromMe: boolean = newMessage.sender.id === myId;
       const historyVars: { chatId: string; limit: number; offset: number } = {
@@ -123,9 +132,37 @@ export function useGlobalSubscriptions(
         cache.modify({
           id: chatCacheId,
           fields: {
-            lastMessage: (): Message => newMessage,
-            unreadCount: (prev: number): number =>
-              isFromMe ? 0 : (prev || 0) + 1,
+            lastMessage: (
+              existing: Reference | Message | undefined,
+              { readField },
+            ): Reference | Message | undefined => {
+              const existingObj: Record<string, unknown> | undefined =
+                existing as unknown as Record<string, unknown>;
+
+              const existingSeq: number =
+                (readField(
+                  "sequence",
+                  existingObj as unknown as StoreObject,
+                ) as number) ?? 0;
+              const newSeq: number = newMessage.sequence ?? 0;
+
+              console.log(`[CACHE MODIFY] Chat: ${newMessage.chatId}`);
+              console.log(`Existing Seq: ${existingSeq}, New Seq: ${newSeq}`);
+
+              if (existing && existingSeq > newSeq) {
+                console.warn(
+                  "Rejected: Existing message is newer than subscription message.",
+                );
+                return existing;
+              }
+
+              console.log("Accepted: Updating lastMessage in cache.");
+              return newMessage;
+            },
+            unreadCount: (prev: number): number => {
+              if (newMessage.chatId === chatId) return 0;
+              return isFromMe ? 0 : (prev || 0) + 1;
+            },
           },
         });
 
@@ -222,7 +259,10 @@ export function useGlobalSubscriptions(
             myChats(
               existingData: MyChatsData | Reference,
               options: {
-                readField: (fieldName: string, obj?: Reference) => unknown;
+                readField: (
+                  fieldName: string,
+                  obj?: Reference | StoreObject,
+                ) => unknown;
               },
             ): MyChatsData | Reference {
               if (!existingData || !("chats" in existingData))
