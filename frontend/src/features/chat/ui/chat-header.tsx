@@ -74,25 +74,27 @@ export const ChatHeader = memo(function ChatHeader({
       rawStatus &&
       rawStatus !== "online" &&
       rawStatus !== "offline" &&
-      !isTyping
+      rawStatus !== "typing"
     ) {
-      const date = new Date(rawStatus);
+      const date: Date = new Date(rawStatus);
+      if (isNaN(date.getTime())) return (): void => {};
+
       const diffMin: number = differenceInMinutes(new Date(), date);
       const intervalTime: number = diffMin < 1 ? 1000 : 60000;
 
-      const interval = setInterval((): void => {
+      const interval: number = window.setInterval((): void => {
         setNow(Date.now());
       }, intervalTime);
 
       return (): void => clearInterval(interval);
     }
     return (): void => {};
-  }, [rawStatus, isTyping, now]);
+  }, [rawStatus, isTyping]);
 
   const statusText: string = useMemo((): string => {
     if (isTyping) return "typing";
     if (rawStatus === "online") return "online";
-    if (!rawStatus || rawStatus === "offline") return "offline";
+    if (!rawStatus) return "offline";
 
     return formatLastSeen(rawStatus, new Date(now));
   }, [rawStatus, isTyping, now]);

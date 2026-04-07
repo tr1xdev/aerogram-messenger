@@ -8,27 +8,25 @@ import {
 
 export function formatLastSeen(status: string, now: Date = new Date()): string {
   if (status === "online") return "online";
+  if (!status || status === "offline") return "offline";
 
-  const date = new Date(status);
+  const date: Date = new Date(status);
   if (isNaN(date.getTime())) return "offline";
 
-  const diffMin = differenceInMinutes(now, date);
-
-  if (diffMin < 1) {
-    return "last seen just now";
-  }
+  const diffMin: number = differenceInMinutes(now, date);
+  if (diffMin < 1) return "last seen just now";
 
   return `last seen ${formatDistanceToNowStrict(date, { addSuffix: true })}`;
 }
 
 export function formatDividerDate(date: string | Date): string {
-  const d = new Date(date);
+  const d: Date = new Date(date);
 
   if (isToday(d)) return "Today";
   if (isYesterday(d)) return "Yesterday";
 
-  const currentYear = new Date().getFullYear();
-  const dateYear = d.getFullYear();
+  const currentYear: number = new Date().getFullYear();
+  const dateYear: number = d.getFullYear();
 
   return format(d, dateYear !== currentYear ? "d MMMM yyyy" : "d MMMM");
 }

@@ -51,9 +51,19 @@ type WsNextMessage = {
   type: "next";
   payload: {
     data: {
-      messageAdded: {
+      messageAdded?: {
         text: string;
         sequence: number;
+      };
+      presenceUpdated?: {
+        userId: string;
+        status: string;
+        lastSeen?: string;
+      };
+      typingUpdated?: {
+        userId: string;
+        chatId: string;
+        isTyping: boolean;
       };
     };
   };
@@ -334,7 +344,6 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
     on: {
       opened: (): void =>
         console.log("%c[WS]%c socket opened", logStyle("#00d4ff"), dimStyle),
-
       connected: (): void => {
         console.log(
           "%c[WS]%c connected to server",
@@ -343,7 +352,6 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
         );
         useConnectionStore.getState().setIsWsConnected(true);
       },
-
       closed: (event: unknown): void => {
         console.log(
           "%c[WS]%c connection closed",
@@ -353,7 +361,6 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
         );
         useConnectionStore.getState().setIsWsConnected(false);
       },
-
       error: (err: unknown): void => {
         console.error(
           "%c[WS]%c error occurred",
@@ -363,18 +370,26 @@ const wsLink: GraphQLWsLink = new GraphQLWsLink(
         );
         useConnectionStore.getState().setIsWsConnected(false);
       },
-
       message: (msg: unknown): void => {
         const wsMsg: WsMessage = msg as WsMessage;
         const type: string = wsMsg.type || "data";
 
         if (type === "next") {
           const nextMsg: WsNextMessage = wsMsg as unknown as WsNextMessage;
-          const added = nextMsg.payload?.data?.messageAdded;
-          if (added) {
+          const payload = nextMsg.payload?.data;
+
+          if (payload?.messageAdded) {
             console.log(
-              `%c[WS][messageAdded]%c Received: "${added.text}" | Seq: ${added.sequence}`,
+              `%c[WS][messageAdded]%c Received: "${payload.messageAdded.text}" | Seq: ${payload.messageAdded.sequence}`,
               logStyle("#ffca28"),
+              "color: inherit;",
+            );
+          }
+
+          if (payload?.presenceUpdated) {
+            console.log(
+              `%c[WS][presenceUpdated]%c User: ${payload.presenceUpdated.userId} -> ${payload.presenceUpdated.status}`,
+              logStyle("#00bcd4"),
               "color: inherit;",
             );
           }
@@ -482,6 +497,20 @@ export const client: ApolloClient = new ApolloClient({
       },
       User: {
         keyFields: ["id"],
+        fields: {
+          status: {
+            merge: (existing: string, incoming: string): string =>
+              incoming !== undefined ? incoming : existing,
+          },
+          lastSeen: {
+            merge: (existing: string, incoming: string): string =>
+              incoming !== undefined ? incoming : existing,
+          },
+          isTyping: {
+            merge: (existing: boolean, incoming: boolean): boolean =>
+              incoming !== undefined ? incoming : existing,
+          },
+        },
       },
       Message: {
         keyFields: ["id"],

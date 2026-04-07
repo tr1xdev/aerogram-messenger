@@ -32,8 +32,14 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
-			auth, ok := initPayload["Authorization"].(string)
-			if !ok || auth == "" {
+			var auth string
+			if val, ok := initPayload["Authorization"].(string); ok {
+				auth = val
+			} else if val, ok := initPayload["authorization"].(string); ok {
+				auth = val
+			}
+
+			if auth == "" {
 				return ctx, nil, nil
 			}
 
@@ -53,21 +59,15 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 
 			uidStr, _ := claims["sub"].(string)
 			isBot, _ := claims["is_bot"].(bool)
-			uid, errUID := uuid.Parse(uidStr)
-			if errUID != nil {
-				return ctx, nil, nil
-			}
+			uid, _ := uuid.Parse(uidStr)
 
 			newCtx := context.WithValue(ctx, middleware.AuthUserIDKey, uidStr)
 
 			if !isBot {
 				sidStr, _ := claims["sid"].(string)
-				sid, errSID := uuid.Parse(sidStr)
-				if errSID != nil {
-					return ctx, nil, nil
-				}
+				sid, _ := uuid.Parse(sidStr)
 
-				checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				checkCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 				defer cancel()
 
 				_, err = db.Queries.GetActiveSession(checkCtx, dbgen.GetActiveSessionParams{
@@ -75,7 +75,7 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 					UserID: uid,
 				})
 				if err != nil {
-					return nil, nil, fmt.Errorf("session expired or invalid")
+					return nil, nil, fmt.Errorf("session expired")
 				}
 				newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sidStr)
 			}
@@ -87,20 +87,20 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 				ticker := time.NewTicker(20 * time.Second)
 				defer ticker.Stop()
 
-				_, _ = res.PresenceClient.SetOnline(context.Background(), &presencepb.SetOnlineRequest{
-					UserId: userID,
-				})
+				initialCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				res.PresenceClient.SetOnline(initialCtx, &presencepb.SetOnlineRequest{UserId: userID})
+				cancel()
 
 				for {
 					select {
 					case <-ticker.C:
-						_, _ = res.PresenceClient.SetOnline(context.Background(), &presencepb.SetOnlineRequest{
-							UserId: userID,
-						})
+						tCtx, tCancel := context.WithTimeout(context.Background(), 5*time.Second)
+						_, _ = res.PresenceClient.SetOnline(tCtx, &presencepb.SetOnlineRequest{UserId: userID})
+						tCancel()
 					case <-socketCtx.Done():
-						_, _ = res.PresenceClient.SetOffline(context.Background(), &presencepb.SetOfflineRequest{
-							UserId: userID,
-						})
+						offCtx, offCancel := context.WithTimeout(context.Background(), 5*time.Second)
+						_, _ = res.PresenceClient.SetOffline(offCtx, &presencepb.SetOfflineRequest{UserId: userID})
+						offCancel()
 						return
 					}
 				}

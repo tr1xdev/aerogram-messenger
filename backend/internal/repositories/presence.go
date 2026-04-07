@@ -66,7 +66,10 @@ func (r *PresenceRepository) SetOnline(ctx context.Context, userID uuid.UUID, tt
 
 func (r *PresenceRepository) SetOffline(ctx context.Context, userID uuid.UUID) error {
 	lastSeen := time.Now().Format(time.RFC3339)
-	_ = r.redis.Set(ctx, r.key(userID), lastSeen, 24*time.Hour).Err()
+	if err := r.redis.Set(ctx, r.key(userID), lastSeen, 24*time.Hour).Err(); err != nil {
+		return err
+	}
+
 	return r.PublishStatus(ctx, PresenceStatus{
 		UserID:   userID,
 		Status:   lastSeen,
@@ -82,6 +85,7 @@ func (r *PresenceRepository) GetStatus(ctx context.Context, userID uuid.UUID) (s
 	if err != nil {
 		return "offline", err
 	}
+
 	return val, nil
 }
 
@@ -89,14 +93,17 @@ func (r *PresenceRepository) GetStatuses(ctx context.Context, userIDs []uuid.UUI
 	if len(userIDs) == 0 {
 		return make(map[uuid.UUID]string), nil
 	}
+
 	keys := make([]string, len(userIDs))
 	for i, id := range userIDs {
 		keys[i] = r.key(id)
 	}
+
 	values, err := r.redis.MGet(ctx, keys...).Result()
 	if err != nil {
 		return nil, err
 	}
+
 	result := make(map[uuid.UUID]string)
 	for i, val := range values {
 		status := "offline"

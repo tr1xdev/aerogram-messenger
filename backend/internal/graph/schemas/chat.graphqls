@@ -1,32 +1,33 @@
 enum ChatType {
-   PRIVATE
-   GROUP
-   CHANNEL
+    PRIVATE
+    GROUP
+    CHANNEL
 }
 
 type ChatMember {
-   user: User!
-   lastReadSequence: Long!
+    user: User!
+    lastReadSequence: Long!
 }
 
 type Chat {
-   id: ID!
-   type: ChatType!
-   slug: String
-   title: String!
-   photoUrl: String
-   membersCount: Int!
-   unreadCount: Int!
-   isPinned: Boolean!
-   lastMessage: Message
-   lastReadSequence: Long!
-   members: [ChatMember!]
-   messages(limit: Int = 50, offset: Int = 0): [Message!]!
-   createdAt: String!
+    id: ID!
+    type: ChatType!
+    slug: String
+    title: String!
+    photoUrl: String
+    membersCount: Int!
+    unreadCount: Int!
+    myReadSequence: Long!
+    lastReadSequence: Long!
+    isPinned: Boolean!
+    lastMessage: Message
+    members: [ChatMember!]
+    messages(limit: Int = 50, offset: Int = 0): [Message!]!
+    createdAt: String!
 }
 
 type ChatList {
-   chats: [Chat!]!
+    chats: [Chat!]!
 }
 
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
@@ -36,30 +37,30 @@ union PinChatResult = SuccessResult | ForbiddenError | InternalError
 union DeleteChatResult = SuccessResult | ForbiddenError | InternalError
 
 extend type Query {
-   myChats: MyChatsResult!
-   chat(id: ID, slug: String): ChatResult!
+    myChats: MyChatsResult!
+    chat(id: ID, slug: String): ChatResult!
 }
 
 type TypingPayload {
-   userId: ID!
-   isTyping: Boolean!
+    userId: ID!
+    isTyping: Boolean!
 }
 
 extend type Mutation {
-   createChat(
-      type: ChatType!
-      participantIds: [ID!]
-      slug: String
-      title: String
-   ): CreateChatResult!
-   createDirectChat(userID: ID!): CreateChatResult!
-   pinChat(id: ID!, pinned: Boolean!): PinChatResult!
-   deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
-   sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
+    createChat(
+        type: ChatType!
+        participantIds: [ID!]
+        slug: String
+        title: String
+    ): CreateChatResult!
+    createDirectChat(userID: ID!): CreateChatResult!
+    pinChat(id: ID!, pinned: Boolean!): PinChatResult!
+    deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
+    sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
 }
 
 extend type Subscription {
-   chatCreated(userId: ID!): Chat!
-   chatDeleted(userId: ID!): ID!
-   userTyping(chatID: ID!): TypingPayload!
+    chatCreated(userId: ID!): Chat!
+    chatDeleted(userId: ID!): ID!
+    userTyping(chatID: ID!): TypingPayload!
 }

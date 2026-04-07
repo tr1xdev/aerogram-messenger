@@ -2,6 +2,7 @@ package loaders
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/graph-gophers/dataloader/v7"
@@ -11,29 +12,45 @@ import (
 func LoadPresence(ctx context.Context, id string) (string, error) {
 	l := ForContext(ctx)
 	if l == nil {
+		log.Printf("[LOADER-PRESENCE] Warning: No loader in context for user %s", id)
 		return "offline", nil
 	}
-	return l.PresenceLoader.Load(ctx, strings.ToLower(id))()
+
+	res, err := l.PresenceLoader.Load(ctx, strings.ToLower(id))()
+	if err != nil {
+		log.Printf("[LOADER-PRESENCE] Error loading for %s: %v", id, err)
+		return "offline", err
+	}
+	return res, nil
 }
 
 func newPresenceBatchFn(client presencepb.PresenceServiceClient) dataloader.BatchFunc[string, string] {
 	return func(ctx context.Context, keys []string) []*dataloader.Result[string] {
+		log.Printf("[BATCH-PRESENCE] Requesting bulk presence for %d users", len(keys))
+
 		output := make([]*dataloader.Result[string], len(keys))
 
 		res, err := client.GetBulk(ctx, &presencepb.GetBulkRequest{UserIds: keys})
 		if err != nil {
+			log.Printf("[BATCH-PRESENCE] gRPC GetBulk failed: %v", err)
 			for i := range output {
 				output[i] = &dataloader.Result[string]{Error: err}
 			}
 			return output
 		}
 
+		log.Printf("[BATCH-PRESENCE] Received %d statuses from gRPC", len(res.Statuses))
+
 		for i, id := range keys {
 			status := "offline"
 			lowerID := strings.ToLower(id)
+
 			if val, ok := res.Statuses[lowerID]; ok {
 				status = val
+			} else {
+				log.Printf("[BATCH-PRESENCE] No status found in gRPC response for user: %s", lowerID)
 			}
+
 			output[i] = &dataloader.Result[string]{Data: status}
 		}
 

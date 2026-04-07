@@ -84,12 +84,6 @@ func (s *Server) SetOnline(ctx context.Context, req *presencepb.SetOnlineRequest
 		return nil, status.Error(codes.Internal, "failed to set online")
 	}
 
-	payload, _ := json.Marshal(map[string]interface{}{
-		"userId": uid.String(),
-		"status": "online",
-	})
-	s.repo.GetRedisClient().Publish(ctx, "presence:updates", payload)
-
 	return &presencepb.SetOnlineResponse{Ok: true}, nil
 }
 
@@ -103,13 +97,6 @@ func (s *Server) SetOffline(ctx context.Context, req *presencepb.SetOfflineReque
 		return nil, status.Error(codes.Internal, "failed to set offline")
 	}
 
-	payload, _ := json.Marshal(map[string]interface{}{
-		"userId":   uid.String(),
-		"status":   "offline",
-		"lastSeen": time.Now().Format(time.RFC3339),
-	})
-	s.repo.GetRedisClient().Publish(ctx, "presence:updates", payload)
-
 	return &presencepb.SetOfflineResponse{Ok: true}, nil
 }
 
@@ -118,13 +105,9 @@ func (s *Server) IsOnline(ctx context.Context, req *presencepb.IsOnlineRequest) 
 	if err != nil {
 		return nil, err
 	}
-	statuses, err := s.repo.GetStatuses(ctx, []uuid.UUID{uid})
+	statusStr, err := s.repo.GetStatus(ctx, uid)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get status")
-	}
-	statusStr := "offline"
-	if val, ok := statuses[uid]; ok {
-		statusStr = val
 	}
 	return &presencepb.IsOnlineResponse{Status: statusStr}, nil
 }
