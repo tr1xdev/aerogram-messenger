@@ -33,14 +33,6 @@ import type {
   ChatMember,
 } from "@/entities/chat/model/types";
 
-interface SentCacheEntry {
-  id: string;
-  time: number;
-  text: string;
-}
-
-const MATCH_THRESHOLD_MS: number = 5000;
-
 export const Route = createFileRoute("/_authenticated/chat/$chatId")({
   component: ChatRoute,
 });
@@ -52,9 +44,6 @@ function ChatRoute(): ReactNode {
 
 export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const navigate = useNavigate();
-  const [optimisticMsgs, setOptimisticMsgs] = useState<Message[]>([]);
-  const [sentCache, setSentCache] = useState<SentCacheEntry[]>([]);
-  const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [decryptedReplyText, setDecryptedReplyText] = useState<string>("");
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
@@ -120,14 +109,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       decryptMessage(replyingTo).then((text: string): void =>
         setDecryptedReplyText(text),
       );
-    } else {
-      setDecryptedReplyText("");
     }
   }, [replyingTo, decryptMessage]);
 
   const cancelAction = useCallback((): void => {
     setReplyingTo(null);
     setEditingMessage(null);
+    setDecryptedReplyText("");
     resetInput();
   }, [resetInput]);
 
@@ -135,6 +123,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     (msg: Message): void => {
       setReplyingTo(null);
       setEditingMessage(msg);
+      setDecryptedReplyText("");
       setInput(msg.text);
     },
     [setInput],
@@ -172,7 +161,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         m.user.id !== me.id && m.user.isTyping === true,
     );
     return typingMember?.user;
-  }, [chat?.members, me, typingFromSub]);
+  }, [chat, me, typingFromSub]);
 
   const isBotChat = useMemo((): boolean => {
     if (!chat?.members || !me) return false;
@@ -180,55 +169,10 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       (m: ChatMember): boolean => m.user.id !== me.id,
     );
     return otherMember?.user.isBot ?? false;
-  }, [chat?.members, me]);
+  }, [chat, me]);
 
   const allMessages = useMemo((): Message[] => {
-    if (!me || !chatId) return messagesFromHistory;
-
-    const usedCacheIds: Set<string> = new Set<string>();
-    const serverIds: Set<string> = new Set(
-      messagesFromHistory.map((m: Message): string => m.id),
-    );
-
-    const patchedServerMessages: Message[] = messagesFromHistory.map(
-      (m: Message): Message => {
-        const isCurrentlySending: boolean = sendingIds.has(m.id);
-        if (m.sender.id === me.id && m.isEncrypted) {
-          const msgTime: number = new Date(m.sentAt).getTime();
-          const match: SentCacheEntry | undefined = sentCache.find(
-            (c: SentCacheEntry): boolean =>
-              !usedCacheIds.has(c.id) &&
-              Math.abs(c.time - msgTime) < MATCH_THRESHOLD_MS,
-          );
-          if (match) {
-            usedCacheIds.add(match.id);
-            return {
-              ...m,
-              isEncrypted: false,
-              text: match.text,
-              isSending: isCurrentlySending,
-            };
-          }
-        }
-        return isCurrentlySending ? { ...m, isSending: true } : m;
-      },
-    );
-
-    const filteredOptimistic: Message[] = optimisticMsgs.filter(
-      (om: Message): boolean => {
-        if (serverIds.has(om.id)) return false;
-        const omTime: number = new Date(om.sentAt).getTime();
-        return !messagesFromHistory.some(
-          (m: Message): boolean =>
-            m.sender.id === me.id &&
-            Math.abs(new Date(m.sentAt).getTime() - omTime) < 2000,
-        );
-      },
-    );
-
-    const result: Message[] = [...patchedServerMessages, ...filteredOptimistic];
-
-    return result.sort((a: Message, b: Message): number => {
+    return [...messagesFromHistory].sort((a: Message, b: Message): number => {
       const timeA: number = new Date(a.sentAt).getTime();
       const timeB: number = new Date(b.sentAt).getTime();
       if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
@@ -236,7 +180,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         return a.sequence - b.sequence;
       return timeA - timeB;
     });
-  }, [messagesFromHistory, optimisticMsgs, me, sentCache, sendingIds, chatId]);
+  }, [messagesFromHistory]);
 
   const { checkAndMarkRead } = useMarkDialog(
     chatId,
@@ -244,10 +188,24 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     me ?? undefined,
   );
 
-  useEffect((): void => {
-    if (allMessages.length > 0 && !isFirstLoad) {
-      checkAndMarkRead();
-    }
+  useEffect((): void | (() => void) => {
+    if (isFirstLoad || allMessages.length === 0) return;
+
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === "visible") {
+        checkAndMarkRead();
+      }
+    };
+
+    checkAndMarkRead();
+
+    window.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
+
+    return (): void => {
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+    };
   }, [allMessages.length, checkAndMarkRead, isFirstLoad]);
 
   const handleSend = useCallback(
@@ -265,65 +223,50 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         return;
       }
 
-      const nowTime: number = Date.now();
-      const tempId: string =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : Math.random().toString(36).substring(2, 15);
-
-      const currentReplyId: string | undefined = replyingTo?.id;
       const originalReply: Message | null = replyingTo;
-
-      const newMsg: Message = {
-        id: tempId,
-        chatId,
-        text: val,
-        sentAt: new Date(nowTime).toISOString(),
-        isRead: false,
-        isEdited: false,
-        isEncrypted: false,
-        isSending: true,
-        sender: me,
-        replyTo: originalReply || undefined,
-      };
-
-      setSendingIds(
-        (prev: Set<string>): Set<string> => new Set(prev).add(tempId),
-      );
-      setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] => {
-        const next: SentCacheEntry[] = [
-          ...prev,
-          { id: tempId, time: nowTime, text: val },
-        ];
-        return next.length > 50 ? next.slice(-50) : next;
-      });
-      setOptimisticMsgs((prev: Message[]): Message[] => [...prev, newMsg]);
+      const tempId: string = `temp-${Date.now()}`;
 
       cancelAction();
 
       try {
-        await sendMessage(val, { variables: { replyToId: currentReplyId } });
+        await sendMessage(val, {
+          variables: { replyToId: originalReply?.id },
+          optimisticResponse: {
+            sendMessage: {
+              __typename: "Message",
+              id: tempId,
+              chatId,
+              text: val,
+              sentAt: new Date().toISOString(),
+              isRead: false,
+              isEdited: false,
+              isEncrypted: false,
+              isSending: true,
+              sequence:
+                allMessages.length > 0
+                  ? (allMessages[allMessages.length - 1].sequence ?? 0) + 1
+                  : 1,
+              sender: {
+                ...me,
+              },
+              replyTo: originalReply
+                ? {
+                    ...originalReply,
+                  }
+                : undefined,
+            } as Message & { __typename: "Message" },
+          },
+        });
       } catch (err: unknown) {
         console.error(err);
         setInput(val);
         if (originalReply) setReplyingTo(originalReply);
-        setSentCache((prev: SentCacheEntry[]): SentCacheEntry[] =>
-          prev.filter((c: SentCacheEntry): boolean => c.id !== tempId),
-        );
-      } finally {
-        setSendingIds((prev: Set<string>): Set<string> => {
-          const next: Set<string> = new Set(prev);
-          next.delete(tempId);
-          return next;
-        });
-        setOptimisticMsgs((prev: Message[]): Message[] =>
-          prev.filter((m: Message): boolean => m.id !== tempId),
-        );
       }
     },
     [
-      chatId,
       me,
+      chatId,
+      allMessages,
       sendMessage,
       editMessage,
       editingMessage,
@@ -416,7 +359,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           setInput={setInput}
           onSend={handleSend}
           onTyping={handleTyping}
-          disabled={sendingIds.size > 0 && !editingMessage}
+          disabled={false}
           replyingTo={replyPreview}
           editingMessage={editingMessage}
           onCancelAction={cancelAction}

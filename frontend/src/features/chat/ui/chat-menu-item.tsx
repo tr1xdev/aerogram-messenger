@@ -15,7 +15,7 @@ import { LastMessageContent } from "./last-message-content";
 import { MessageStatus } from "./message-status";
 import { BsFillPinFill } from "react-icons/bs";
 import { Trash2, CheckCircle2, BellOff, PinOff } from "lucide-react";
-import { useChatActions, useMessageActions } from "../lib";
+import { useChatActions, useMessageActions } from "@/features/chat/lib";
 import { DeleteChatDialog } from "./delete-chat-dialog";
 import type {
   Chat,
@@ -152,13 +152,10 @@ export function ChatMenuItem({
                     {lastMessage && (
                       <div className="flex items-center gap-2 shrink-0 ml-2">
                         <MessageStatus
-                          isRead={
-                            (lastMessage.sequence ?? 0) <=
-                            (chat.lastReadSequence || 0)
-                          }
                           isMe={isMe}
                           sequence={lastMessage.sequence ?? 0}
                           lastReadSequence={chat.lastReadSequence}
+                          isSending={lastMessage.isSending}
                         />
                         <span className="text-xs font-medium text-muted-foreground/70 leading-none">
                           {new Date(lastMessage.sentAt).toLocaleTimeString([], {

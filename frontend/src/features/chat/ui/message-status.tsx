@@ -3,16 +3,14 @@ import { cn } from "@/lib/utils";
 
 interface MessageStatusProps {
   isSending?: boolean;
-  isRead: boolean;
   isMe: boolean;
-  sequence?: number;
-  lastReadSequence?: number;
+  sequence: number;
+  lastReadSequence: number;
   className?: string;
 }
 
 export function MessageStatus({
   isSending,
-  isRead,
   isMe,
   sequence,
   lastReadSequence,
@@ -20,11 +18,7 @@ export function MessageStatus({
 }: MessageStatusProps) {
   if (!isMe) return null;
 
-  const isActuallyRead: boolean =
-    isRead ||
-    (sequence !== undefined &&
-      lastReadSequence !== undefined &&
-      sequence <= lastReadSequence);
+  const isActuallyRead: boolean = sequence <= lastReadSequence;
 
   return (
     <div
