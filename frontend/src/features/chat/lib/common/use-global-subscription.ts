@@ -68,6 +68,13 @@ export function useGlobalSubscriptions(
         newMessage.chatId === activeChatId &&
         document.visibilityState === "visible";
 
+      console.log(`[SUBSCRIPTION:MESSAGE] New message ${newMessage.id}`, {
+        chatId: newMessage.chatId,
+        isFromMe,
+        isCurrentChatActive,
+        seq: newMessage.sequence,
+      });
+
       const historyVars = {
         chatId: newMessage.chatId,
         limit: 50,
@@ -125,29 +132,23 @@ export function useGlobalSubscriptions(
 
               return existing && existingSeq > newSeq ? existing : newMessage;
             },
-            unreadCount: (
-              prev: number | undefined,
-              { readField }: ModifierDetails,
-            ): number => {
+            unreadCount: (prev: number | undefined): number => {
               const currentCount: number = typeof prev === "number" ? prev : 0;
 
-              if (isFromMe || isCurrentChatActive) {
-                return 0;
-              }
+              if (isFromMe) return 0;
 
-              const myReadSeq: number =
-                (readField("myReadSequence") as number) ?? 0;
-              const newMessageSeq: number = newMessage.sequence ?? 0;
-
-              if (newMessageSeq > myReadSeq) {
+              if (isCurrentChatActive) {
+                console.log(
+                  `[CACHE:MODIFY] Unread incremented (active chat). useMarkDialog will handle reset.`,
+                );
                 return currentCount + 1;
               }
 
-              return currentCount;
+              return currentCount + 1;
             },
             myReadSequence: (prev: number | undefined): number => {
               const currentPrev: number = typeof prev === "number" ? prev : 0;
-              if (isFromMe || isCurrentChatActive) {
+              if (isFromMe) {
                 return Math.max(currentPrev, newMessage.sequence ?? 0);
               }
               return currentPrev;
@@ -192,6 +193,10 @@ export function useGlobalSubscriptions(
         data.data?.dialogRead;
       if (!payload) return;
 
+      console.log(
+        `[SUBSCRIPTION:READ] Event: User ${payload.userId} read seq ${payload.lastSequence}`,
+      );
+
       const chatRef: string | undefined = client.cache.identify({
         __typename: "Chat",
         id: payload.chatId,
@@ -203,18 +208,26 @@ export function useGlobalSubscriptions(
           fields: {
             lastReadSequence: (prev: number | undefined = 0): number => {
               const currentPrev: number = typeof prev === "number" ? prev : 0;
-              return payload.userId !== myId
-                ? Math.max(currentPrev, payload.lastSequence)
-                : currentPrev;
+              if (payload.userId !== myId) {
+                console.log(
+                  `[CACHE:MODIFY] Peer read: ${currentPrev} -> ${payload.lastSequence}`,
+                );
+                return Math.max(currentPrev, payload.lastSequence);
+              }
+              return currentPrev;
             },
             myReadSequence: (prev: number | undefined = 0): number => {
               const currentPrev: number = typeof prev === "number" ? prev : 0;
-              return payload.userId === myId
-                ? Math.max(currentPrev, payload.lastSequence)
-                : currentPrev;
+              if (payload.userId === myId) {
+                console.log(
+                  `[CACHE:MODIFY] I read: ${currentPrev} -> ${payload.lastSequence}`,
+                );
+                return Math.max(currentPrev, payload.lastSequence);
+              }
+              return currentPrev;
             },
             unreadCount: (prev: number | undefined = 0): number => {
-              if (payload.userId === myId || payload.chatId === activeChatId) {
+              if (payload.userId === myId) {
                 return 0;
               }
               return typeof prev === "number" ? prev : 0;

@@ -61,6 +61,14 @@ export function useMarkDialog(
     const currentReadSeq: number = cachedData?.myReadSequence ?? 0;
     const currentUnreadCount: number = cachedData?.unreadCount ?? 0;
 
+    console.log(`[useMarkDialog] Checking read status`, {
+      chatId,
+      currentUnreadCount,
+      currentReadSeq,
+      lastSeqInChat,
+      isPending: isPendingRef.current,
+    });
+
     if (currentUnreadCount === 0 && currentReadSeq >= lastSeqInChat) {
       return;
     }
@@ -68,12 +76,14 @@ export function useMarkDialog(
     isPendingRef.current = true;
 
     try {
+      console.log(`[useMarkDialog] Executing markDialog mutation`);
       await markDialog({
         variables: { chatId },
         optimisticResponse: { markDialogAsRead: true },
         onCompleted: (data: MarkReadResponse): void => {
           if (!data.markDialogAsRead) return;
 
+          console.log(`[useMarkDialog] Mutation completed, modifying cache`);
           cache.modify({
             id: chatCacheId,
             fields: {
@@ -116,7 +126,7 @@ export function useMarkDialog(
         },
       });
     } catch (error: unknown) {
-      console.error(error);
+      console.error(`[useMarkDialog] Error:`, error);
     } finally {
       isPendingRef.current = false;
     }

@@ -52,7 +52,6 @@ export const MessageBubble = memo(function MessageBubble({
   message,
   isMe,
   myId,
-  isRead,
   lastReadSequence,
   peerPublicKey,
   onDelete,
@@ -367,9 +366,8 @@ export const MessageBubble = memo(function MessageBubble({
                     <MessageStatus
                       isMe={isMe}
                       isSending={message.isSending}
-                      isRead={!!message.isRead || !!isRead}
-                      sequence={message.sequence}
-                      lastReadSequence={lastReadSequence}
+                      sequence={message.sequence ?? 0}
+                      lastReadSequence={lastReadSequence ?? 0}
                       className="w-3.5 h-3.5 ml-0.5"
                     />
                   )}
