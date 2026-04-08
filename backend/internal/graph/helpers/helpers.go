@@ -134,6 +134,7 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		LastMessage:      lastMsg,
 		UnreadCount:      int(uCount),
 		IsPinned:         isPinned,
+		MyReadSequence:   myReadSeq,
 		LastReadSequence: pReadSeq,
 		CreatedAt:        time.Now().Format(time.RFC3339),
 	}, nil
