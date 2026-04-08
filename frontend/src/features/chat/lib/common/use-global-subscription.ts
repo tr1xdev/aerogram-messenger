@@ -7,6 +7,8 @@ import {
   type ApolloCache,
   type StoreObject,
 } from "@apollo/client/index.js";
+import { type ModifierDetails } from "@apollo/client/cache/index.js";
+import { useParams } from "@tanstack/react-router";
 import {
   MESSAGE_SUBSCRIPTION,
   DIALOG_READ_SUBSCRIPTION,
@@ -26,7 +28,7 @@ interface StatusChanged {
 }
 
 interface DialogReadData {
-  dialogRead: { chatId: string; userId: string };
+  dialogRead: { chatId: string; userId: string; lastSequence: number };
 }
 
 interface ChatDeletedData {
@@ -50,52 +52,29 @@ export function useGlobalSubscriptions(
   myId: string | undefined,
 ): void {
   const client: ReturnType<typeof useApolloClient> = useApolloClient();
-
-  useSubscription<TypingData>(USER_TYPING_SUBSCRIPTION, {
-    variables: { chatID: chatId ?? "" },
-    skip: !chatId,
-    onData({ data }): void {
-      const payload: TypingData["userTyping"] | undefined =
-        data.data?.userTyping;
-      if (!payload || payload.userId === myId) return;
-
-      const userRef: string | undefined = client.cache.identify({
-        __typename: "User",
-        id: payload.userId,
-      });
-
-      if (userRef) {
-        client.cache.modify({
-          id: userRef,
-          fields: {
-            isTyping: (): boolean => payload.isTyping,
-          },
-        });
-      }
-    },
-  });
+  const params: { chatId?: string } = useParams({ strict: false });
+  const activeChatId: string | undefined = params.chatId;
 
   useSubscription<MessageAddedData>(MESSAGE_SUBSCRIPTION, {
     variables: { chatId: chatId ?? "" },
     skip: !chatId || !myId,
     onData({ data }): void {
       const newMessage: Message | undefined = data.data?.messageAdded;
-      if (!newMessage || !myId || !chatId) return;
-
-      console.log("--- [SUBSCRIPTION] New Message Received ---");
-      console.log("From Me:", newMessage.sender.id === myId);
-      console.log("Text:", newMessage.text);
-      console.log("Sequence:", newMessage.sequence);
+      if (!newMessage || !myId) return;
 
       const cache: ApolloCache = client.cache;
-      const isFromMe: boolean = newMessage.sender.id === myId;
-      const historyVars: { chatId: string; limit: number; offset: number } = {
-        chatId,
+      const isFromMe: boolean = newMessage.sender?.id === myId;
+      const isCurrentChatActive: boolean =
+        newMessage.chatId === activeChatId &&
+        document.visibilityState === "visible";
+
+      const historyVars = {
+        chatId: newMessage.chatId,
         limit: 50,
         offset: 0,
       };
 
-      const existingHistory = client.readQuery<{
+      const existingHistory = cache.readQuery<{
         messageHistory: { messages: Message[] };
       }>({
         query: GET_MESSAGE_HISTORY,
@@ -103,7 +82,7 @@ export function useGlobalSubscriptions(
       });
 
       if (existingHistory?.messageHistory) {
-        client.writeQuery({
+        cache.writeQuery({
           query: GET_MESSAGE_HISTORY,
           variables: historyVars,
           data: {
@@ -134,34 +113,44 @@ export function useGlobalSubscriptions(
           fields: {
             lastMessage: (
               existing: Reference | Message | undefined,
-              { readField },
+              { readField }: ModifierDetails,
             ): Reference | Message | undefined => {
-              const existingObj: Record<string, unknown> | undefined =
-                existing as unknown as Record<string, unknown>;
+              const objToRead: StoreObject | undefined = existing
+                ? (existing as unknown as StoreObject)
+                : undefined;
 
               const existingSeq: number =
-                (readField(
-                  "sequence",
-                  existingObj as unknown as StoreObject,
-                ) as number) ?? 0;
+                (readField("sequence", objToRead) as number) ?? 0;
               const newSeq: number = newMessage.sequence ?? 0;
 
-              console.log(`[CACHE MODIFY] Chat: ${newMessage.chatId}`);
-              console.log(`Existing Seq: ${existingSeq}, New Seq: ${newSeq}`);
+              return existing && existingSeq > newSeq ? existing : newMessage;
+            },
+            unreadCount: (
+              prev: number | undefined,
+              { readField }: ModifierDetails,
+            ): number => {
+              const currentCount: number = typeof prev === "number" ? prev : 0;
 
-              if (existing && existingSeq > newSeq) {
-                console.warn(
-                  "Rejected: Existing message is newer than subscription message.",
-                );
-                return existing;
+              if (isFromMe || isCurrentChatActive) {
+                return 0;
               }
 
-              console.log("Accepted: Updating lastMessage in cache.");
-              return newMessage;
+              const myReadSeq: number =
+                (readField("myReadSequence") as number) ?? 0;
+              const newMessageSeq: number = newMessage.sequence ?? 0;
+
+              if (newMessageSeq > myReadSeq) {
+                return currentCount + 1;
+              }
+
+              return currentCount;
             },
-            unreadCount: (prev: number): number => {
-              if (newMessage.chatId === chatId) return 0;
-              return isFromMe ? 0 : (prev || 0) + 1;
+            myReadSequence: (prev: number | undefined): number => {
+              const currentPrev: number = typeof prev === "number" ? prev : 0;
+              if (isFromMe || isCurrentChatActive) {
+                return Math.max(currentPrev, newMessage.sequence ?? 0);
+              }
+              return currentPrev;
             },
           },
         });
@@ -169,19 +158,24 @@ export function useGlobalSubscriptions(
         cache.modify({
           fields: {
             myChats(
-              existingData: MyChatsData | Reference,
-            ): MyChatsData | Reference {
+              existingData: MyChatsData | Reference | undefined,
+              { readField }: ModifierDetails,
+            ): MyChatsData | Reference | undefined {
               if (!existingData || !("chats" in existingData))
                 return existingData;
 
               const chatRef: Reference = { __ref: chatCacheId };
-              const filteredChats: Reference[] = existingData.chats.filter(
-                (ref: Reference): boolean => ref.__ref !== chatCacheId,
+              const chats: Reference[] =
+                (existingData as MyChatsData).chats || [];
+
+              const filtered: Reference[] = chats.filter(
+                (ref: Reference): boolean =>
+                  readField("id", ref) !== newMessage.chatId,
               );
 
               return {
                 ...existingData,
-                chats: [chatRef, ...filteredChats],
+                chats: [chatRef, ...filtered],
               };
             },
           },
@@ -207,8 +201,48 @@ export function useGlobalSubscriptions(
         client.cache.modify({
           id: chatRef,
           fields: {
-            unreadCount: (prev: number): number =>
-              myId && payload.userId === myId ? 0 : prev,
+            lastReadSequence: (prev: number | undefined = 0): number => {
+              const currentPrev: number = typeof prev === "number" ? prev : 0;
+              return payload.userId !== myId
+                ? Math.max(currentPrev, payload.lastSequence)
+                : currentPrev;
+            },
+            myReadSequence: (prev: number | undefined = 0): number => {
+              const currentPrev: number = typeof prev === "number" ? prev : 0;
+              return payload.userId === myId
+                ? Math.max(currentPrev, payload.lastSequence)
+                : currentPrev;
+            },
+            unreadCount: (prev: number | undefined = 0): number => {
+              if (payload.userId === myId || payload.chatId === activeChatId) {
+                return 0;
+              }
+              return typeof prev === "number" ? prev : 0;
+            },
+          },
+        });
+      }
+    },
+  });
+
+  useSubscription<TypingData>(USER_TYPING_SUBSCRIPTION, {
+    variables: { chatID: chatId ?? "" },
+    skip: !chatId,
+    onData({ data }): void {
+      const payload: TypingData["userTyping"] | undefined =
+        data.data?.userTyping;
+      if (!payload || payload.userId === myId) return;
+
+      const userRef: string | undefined = client.cache.identify({
+        __typename: "User",
+        id: payload.userId,
+      });
+
+      if (userRef) {
+        client.cache.modify({
+          id: userRef,
+          fields: {
+            isTyping: (): boolean => payload.isTyping,
           },
         });
       }
@@ -257,22 +291,17 @@ export function useGlobalSubscriptions(
         client.cache.modify({
           fields: {
             myChats(
-              existingData: MyChatsData | Reference,
-              options: {
-                readField: (
-                  fieldName: string,
-                  obj?: Reference | StoreObject,
-                ) => unknown;
-              },
-            ): MyChatsData | Reference {
+              existingData: MyChatsData | Reference | undefined,
+              { readField }: ModifierDetails,
+            ): MyChatsData | Reference | undefined {
               if (!existingData || !("chats" in existingData))
                 return existingData;
 
               return {
                 ...existingData,
-                chats: existingData.chats.filter(
+                chats: (existingData as MyChatsData).chats.filter(
                   (ref: Reference): boolean =>
-                    options.readField("id", ref) !== deletedInfo.chatId,
+                    readField("id", ref) !== deletedInfo.chatId,
                 ),
               };
             },

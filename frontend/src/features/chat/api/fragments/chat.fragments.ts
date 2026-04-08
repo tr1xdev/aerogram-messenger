@@ -8,6 +8,7 @@ export const CHAT_BASE_FIELDS = gql`
     photoUrl
     unreadCount
     isPinned
+    myReadSequence
     lastReadSequence
   }
 `;

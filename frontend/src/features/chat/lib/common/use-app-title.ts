@@ -1,11 +1,12 @@
-import { useLayoutEffect, useRef } from "react";
-import { useApolloClient } from "@apollo/client/react";
+import { useLayoutEffect, useRef, useMemo } from "react";
+import { useQuery } from "@apollo/client/react";
 import { useAuthStore } from "@/store/auth-store";
 import { GET_MY_CHATS } from "@/features/chat/api";
 import type { Chat } from "@/entities/chat/model/types";
 
 interface GetChatsData {
   myChats: {
+    __typename?: string;
     chats: Chat[];
   };
 }
@@ -20,7 +21,7 @@ function updateFaviconWithBadge(count: number): void {
   if (!favicon) return;
 
   const img: HTMLImageElement = new Image();
-  img.src = `${FAVICON_SOURCE}?v=${Date.now()}`;
+  img.src = `${FAVICON_SOURCE}?v=1`;
   img.crossOrigin = "anonymous";
 
   img.onload = (): void => {
@@ -33,18 +34,13 @@ function updateFaviconWithBadge(count: number): void {
     ctx.drawImage(img, 0, 0, 32, 32);
 
     if (count > 0) {
-      const radius: number = 4.5;
-      const x: number = 26;
-      const y: number = 26;
-
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.beginPath();
-      ctx.arc(x, y, radius + 2, 0, Math.PI * 2);
-      ctx.fill();
+      const radius: number = 5;
+      const x: number = 25;
+      const y: number = 7;
 
       ctx.globalCompositeOperation = "source-over";
       ctx.beginPath();
-      ctx.arc(x, y, radius + 1, 0, Math.PI * 2);
+      ctx.arc(x, y, radius + 1.5, 0, Math.PI * 2);
       ctx.fillStyle = BORDER_COLOR;
       ctx.fill();
 
@@ -62,10 +58,22 @@ export function useAppTitle(): void {
   const isAuth: boolean = useAuthStore(
     (s: { isAuth: boolean }): boolean => s.isAuth,
   );
-  const client = useApolloClient();
+
+  const { data } = useQuery<GetChatsData>(GET_MY_CHATS, {
+    fetchPolicy: "cache-only",
+    skip: !isAuth,
+  });
+
   const lastCountRef = useRef<number>(0);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const currentTitleRef = useRef<string>("Aerogram");
+
+  const totalUnread: number = useMemo((): number => {
+    if (!data?.myChats?.chats) return 0;
+    return data.myChats.chats.reduce(
+      (acc: number, chat: Chat): number => acc + (chat.unreadCount || 0),
+      0,
+    );
+  }, [data]);
 
   useLayoutEffect((): (() => void) => {
     const baseTitle: string = "Aerogram";
@@ -76,70 +84,39 @@ export function useAppTitle(): void {
       return (): void => {};
     }
 
-    const handleUpdate = (): void => {
-      try {
-        const cacheData = client.readQuery<GetChatsData>({
-          query: GET_MY_CHATS,
-        });
-        const chats: Chat[] = cacheData?.myChats?.chats || [];
-        const totalUnread: number = chats.reduce(
-          (acc: number, chat: Chat): number => acc + (chat.unreadCount || 0),
-          0,
-        );
+    const displayCount: string =
+      totalUnread > 99 ? "99+" : totalUnread.toString();
+    const formattedTitle: string =
+      totalUnread > 0 ? `(${displayCount}) ${baseTitle}` : baseTitle;
 
-        const displayCount: string =
-          totalUnread > 99 ? "99+" : totalUnread.toString();
-        const formattedTitle: string =
-          totalUnread > 0 ? `(${displayCount}) ${baseTitle}` : baseTitle;
-        currentTitleRef.current = formattedTitle;
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
 
-        if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    if (
+      totalUnread > lastCountRef.current &&
+      totalUnread > 0 &&
+      document.hidden
+    ) {
+      document.title = `• ${formattedTitle}`;
+      flashTimerRef.current = setTimeout((): void => {
+        document.title = formattedTitle;
+      }, 3000);
+    } else {
+      document.title = formattedTitle;
+    }
 
-        if (
-          totalUnread > lastCountRef.current &&
-          totalUnread > 0 &&
-          document.hidden
-        ) {
-          document.title = `• ${formattedTitle}`;
-          flashTimerRef.current = setTimeout((): void => {
-            document.title = formattedTitle;
-          }, 3000);
-        } else {
-          document.title = formattedTitle;
-        }
-
-        updateFaviconWithBadge(totalUnread);
-        lastCountRef.current = totalUnread;
-      } catch {
-        document.title = baseTitle;
-      }
-    };
+    updateFaviconWithBadge(totalUnread);
+    lastCountRef.current = totalUnread;
 
     const onFocus = (): void => {
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-      document.title = currentTitleRef.current;
+      document.title = formattedTitle;
     };
 
     window.addEventListener("focus", onFocus);
 
-    const observer = client.watchQuery<GetChatsData>({
-      query: GET_MY_CHATS,
-      fetchPolicy: "cache-only",
-    });
-
-    const sub = observer.subscribe({
-      next: (): void => {
-        requestAnimationFrame(handleUpdate);
-      },
-    });
-
-    handleUpdate();
-
     return (): void => {
-      sub.unsubscribe();
       window.removeEventListener("focus", onFocus);
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-      document.title = baseTitle;
     };
-  }, [isAuth, client]);
+  }, [isAuth, totalUnread]);
 }
