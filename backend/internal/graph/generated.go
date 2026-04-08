@@ -68,6 +68,7 @@ type ComplexityRoot struct {
 		Members          func(childComplexity int) int
 		MembersCount     func(childComplexity int) int
 		Messages         func(childComplexity int, limit *int, offset *int) int
+		MyReadSequence   func(childComplexity int) int
 		PhotoURL         func(childComplexity int) int
 		Slug             func(childComplexity int) int
 		Title            func(childComplexity int) int
@@ -394,6 +395,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Chat.Messages(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
+	case "Chat.myReadSequence":
+		if e.complexity.Chat.MyReadSequence == nil {
+			break
+		}
+
+		return e.complexity.Chat.MyReadSequence(childComplexity), true
 	case "Chat.photoUrl":
 		if e.complexity.Chat.PhotoURL == nil {
 			break
@@ -2161,6 +2168,64 @@ func (ec *executionContext) fieldContext_Chat_unreadCount(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Chat_myReadSequence(ctx context.Context, field graphql.CollectedField, obj *model.Chat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Chat_myReadSequence,
+		func(ctx context.Context) (any, error) {
+			return obj.MyReadSequence, nil
+		},
+		nil,
+		ec.marshalNLong2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Chat_myReadSequence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Chat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Long does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Chat_lastReadSequence(ctx context.Context, field graphql.CollectedField, obj *model.Chat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Chat_lastReadSequence,
+		func(ctx context.Context) (any, error) {
+			return obj.LastReadSequence, nil
+		},
+		nil,
+		ec.marshalNLong2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Chat_lastReadSequence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Chat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Long does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Chat_isPinned(ctx context.Context, field graphql.CollectedField, obj *model.Chat) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2238,35 +2303,6 @@ func (ec *executionContext) fieldContext_Chat_lastMessage(_ context.Context, fie
 				return ec.fieldContext_Message_forwardedFrom(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Message", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Chat_lastReadSequence(ctx context.Context, field graphql.CollectedField, obj *model.Chat) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Chat_lastReadSequence,
-		func(ctx context.Context) (any, error) {
-			return obj.LastReadSequence, nil
-		},
-		nil,
-		ec.marshalNLong2int64,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Chat_lastReadSequence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Chat",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Long does not have child fields")
 		},
 	}
 	return fc, nil
@@ -2438,12 +2474,14 @@ func (ec *executionContext) fieldContext_ChatList_chats(_ context.Context, field
 				return ec.fieldContext_Chat_membersCount(ctx, field)
 			case "unreadCount":
 				return ec.fieldContext_Chat_unreadCount(ctx, field)
+			case "myReadSequence":
+				return ec.fieldContext_Chat_myReadSequence(ctx, field)
+			case "lastReadSequence":
+				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
 			case "isPinned":
 				return ec.fieldContext_Chat_isPinned(ctx, field)
 			case "lastMessage":
 				return ec.fieldContext_Chat_lastMessage(ctx, field)
-			case "lastReadSequence":
-				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
 			case "members":
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
@@ -5181,12 +5219,14 @@ func (ec *executionContext) fieldContext_Subscription_chatCreated(ctx context.Co
 				return ec.fieldContext_Chat_membersCount(ctx, field)
 			case "unreadCount":
 				return ec.fieldContext_Chat_unreadCount(ctx, field)
+			case "myReadSequence":
+				return ec.fieldContext_Chat_myReadSequence(ctx, field)
+			case "lastReadSequence":
+				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
 			case "isPinned":
 				return ec.fieldContext_Chat_isPinned(ctx, field)
 			case "lastMessage":
 				return ec.fieldContext_Chat_lastMessage(ctx, field)
-			case "lastReadSequence":
-				return ec.fieldContext_Chat_lastReadSequence(ctx, field)
 			case "members":
 				return ec.fieldContext_Chat_members(ctx, field)
 			case "messages":
@@ -8059,20 +8099,6 @@ func (ec *executionContext) _MessageHistoryResult(ctx context.Context, sel ast.S
 			return graphql.Null
 		}
 		return ec._NotFoundError(ctx, sel, obj)
-	case model.InternalError:
-		return ec._InternalError(ctx, sel, &obj)
-	case *model.InternalError:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._InternalError(ctx, sel, obj)
-	case model.ForbiddenError:
-		return ec._ForbiddenError(ctx, sel, &obj)
-	case *model.ForbiddenError:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ForbiddenError(ctx, sel, obj)
 	case model.MessageConnection:
 		return ec._MessageConnection(ctx, sel, &obj)
 	case *model.MessageConnection:
@@ -8168,20 +8194,6 @@ func (ec *executionContext) _SendMessageResult(ctx context.Context, sel ast.Sele
 			return graphql.Null
 		}
 		return ec._ValidationError(ctx, sel, obj)
-	case model.InternalError:
-		return ec._InternalError(ctx, sel, &obj)
-	case *model.InternalError:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._InternalError(ctx, sel, obj)
-	case model.ForbiddenError:
-		return ec._ForbiddenError(ctx, sel, &obj)
-	case *model.ForbiddenError:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ForbiddenError(ctx, sel, obj)
 	case model.Message:
 		return ec._Message(ctx, sel, &obj)
 	case *model.Message:
@@ -8290,6 +8302,16 @@ func (ec *executionContext) _Chat(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "myReadSequence":
+			out.Values[i] = ec._Chat_myReadSequence(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastReadSequence":
+			out.Values[i] = ec._Chat_lastReadSequence(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "isPinned":
 			out.Values[i] = ec._Chat_isPinned(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -8297,11 +8319,6 @@ func (ec *executionContext) _Chat(ctx context.Context, sel ast.SelectionSet, obj
 			}
 		case "lastMessage":
 			out.Values[i] = ec._Chat_lastMessage(ctx, field, obj)
-		case "lastReadSequence":
-			out.Values[i] = ec._Chat_lastReadSequence(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "members":
 			out.Values[i] = ec._Chat_members(ctx, field, obj)
 		case "messages":
@@ -8464,7 +8481,7 @@ func (ec *executionContext) _CreateBotPayload(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var forbiddenErrorImplementors = []string{"ForbiddenError", "ChatResult", "MyChatsResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "Error", "SendMessageResult", "MessageHistoryResult", "CreateBotResult"}
+var forbiddenErrorImplementors = []string{"ForbiddenError", "ChatResult", "MyChatsResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "Error", "CreateBotResult"}
 
 func (ec *executionContext) _ForbiddenError(ctx context.Context, sel ast.SelectionSet, obj *model.ForbiddenError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, forbiddenErrorImplementors)
@@ -8503,7 +8520,7 @@ func (ec *executionContext) _ForbiddenError(ctx context.Context, sel ast.Selecti
 	return out
 }
 
-var internalErrorImplementors = []string{"InternalError", "ChatResult", "MyChatsResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "Error", "SendMessageResult", "MessageHistoryResult", "CreateBotResult"}
+var internalErrorImplementors = []string{"InternalError", "ChatResult", "MyChatsResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "Error", "CreateBotResult"}
 
 func (ec *executionContext) _InternalError(ctx context.Context, sel ast.SelectionSet, obj *model.InternalError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, internalErrorImplementors)
