@@ -97,6 +97,12 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.Internal, "failed to save message")
 	}
 
+	_ = qtx.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
+		DialogID:         chatID,
+		UserID:           senderID,
+		LastReadSequence: msg.Sequence,
+	})
+
 	_ = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
 		ID:            chatID,
 		LastMessageID: database.UUIDToNullUUID(msg.ID),
