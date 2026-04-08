@@ -63,9 +63,10 @@ type Chat struct {
 	PhotoURL         *string       `json:"photoUrl,omitempty"`
 	MembersCount     int           `json:"membersCount"`
 	UnreadCount      int           `json:"unreadCount"`
+	MyReadSequence   int64         `json:"myReadSequence"`
+	LastReadSequence int64         `json:"lastReadSequence"`
 	IsPinned         bool          `json:"isPinned"`
 	LastMessage      *Message      `json:"lastMessage,omitempty"`
-	LastReadSequence int64         `json:"lastReadSequence"`
 	Members          []*ChatMember `json:"members,omitempty"`
 	Messages         []*Message    `json:"messages"`
 	CreatedAt        string        `json:"createdAt"`
@@ -110,10 +111,6 @@ func (ForbiddenError) IsDeleteChatResult() {}
 func (ForbiddenError) IsError()                {}
 func (this ForbiddenError) GetMessage() string { return this.Message }
 
-func (ForbiddenError) IsSendMessageResult() {}
-
-func (ForbiddenError) IsMessageHistoryResult() {}
-
 func (ForbiddenError) IsCreateBotResult() {}
 
 type InternalError struct {
@@ -132,10 +129,6 @@ func (InternalError) IsDeleteChatResult() {}
 
 func (InternalError) IsError()                {}
 func (this InternalError) GetMessage() string { return this.Message }
-
-func (InternalError) IsSendMessageResult() {}
-
-func (InternalError) IsMessageHistoryResult() {}
 
 func (InternalError) IsCreateBotResult() {}
 
