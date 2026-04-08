@@ -3,17 +3,12 @@ import {
   type ApolloCache,
   type Reference,
   type StoreObject,
-  gql,
 } from "@apollo/client/index.js";
-import {
-  SEND_MESSAGE,
-  EDIT_MESSAGE,
-  MARK_DIALOG_AS_READ,
-  GET_MY_CHATS,
-} from "../../api";
+import { type ModifierDetails } from "@apollo/client/cache/index.js";
+import { SEND_MESSAGE, EDIT_MESSAGE, MARK_DIALOG_AS_READ } from "../../api";
 import { encryptText, decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import { useMe } from "../common/use-me";
-import { useChatDetails, type MyChatsResponse } from "../chat/use-chats";
+import { useChatDetails } from "../chat/use-chats";
 import type {
   Message,
   User,
@@ -54,7 +49,15 @@ interface SendMessageOptions {
   ) => void;
 }
 
-export function useMessageActions(chatId: string) {
+interface MessageActions {
+  sendMessage: (text: string, options?: SendMessageOptions) => Promise<void>;
+  editMessage: (id: string, text: string) => Promise<void>;
+  decryptMessage: (message: Message) => Promise<string>;
+  markAsRead: () => void;
+  isSending: boolean;
+}
+
+export function useMessageActions(chatId: string): MessageActions {
   const { data: meData } = useMe();
   const { data: chatData } = useChatDetails(chatId);
 
@@ -139,8 +142,26 @@ export function useMessageActions(chatId: string) {
       }
     }
 
+    const patchedOptions = { ...options };
+    if (
+      patchedOptions.optimisticResponse &&
+      "sendMessage" in patchedOptions.optimisticResponse
+    ) {
+      const optMsg = patchedOptions.optimisticResponse.sendMessage;
+      if ("__typename" in optMsg && optMsg.__typename === "Message") {
+        patchedOptions.optimisticResponse = {
+          sendMessage: {
+            ...optMsg,
+            encryptionIv: optMsg.encryptionIv ?? null,
+            replyTo: optMsg.replyTo ?? null,
+            forwardedFrom: optMsg.forwardedFrom ?? null,
+          } as MessageWithTypename,
+        };
+      }
+    }
+
     await send({
-      ...options,
+      ...patchedOptions,
       variables: finalVariables,
       update: (
         cache: ApolloCache,
@@ -153,25 +174,18 @@ export function useMessageActions(chatId: string) {
 
         const newMessage: MessageWithTypename = result as MessageWithTypename;
 
-        const chatRef: string | undefined = cache.identify({
+        const chatCacheId: string | undefined = cache.identify({
           __typename: "Chat",
           id: chatId,
         });
 
-        if (chatRef) {
+        if (chatCacheId) {
           cache.modify({
-            id: chatRef,
+            id: chatCacheId,
             fields: {
               lastMessage: (
                 existing: Reference | Message | undefined,
-                {
-                  readField,
-                }: {
-                  readField: (
-                    fieldName: string,
-                    obj: Reference | StoreObject,
-                  ) => unknown;
-                },
+                { readField }: ModifierDetails,
               ): Reference | Message | undefined => {
                 const existingSeq: number =
                   (readField(
@@ -180,76 +194,41 @@ export function useMessageActions(chatId: string) {
                   ) as number) ?? 0;
                 const newSeq: number = newMessage.sequence ?? 0;
 
-                if (existing && existingSeq > newSeq) {
-                  return existing;
-                }
-                return newMessage as unknown as Reference;
+                return existing && existingSeq > newSeq ? existing : newMessage;
               },
               unreadCount: (): number => 0,
+              myReadSequence: (prev: number | undefined): number => {
+                return Math.max(prev || 0, newMessage.sequence ?? 0);
+              },
             },
           });
-        }
 
-        const queryData: MyChatsResponse | null =
-          cache.readQuery<MyChatsResponse>({
-            query: GET_MY_CHATS,
-          });
+          cache.modify({
+            fields: {
+              myChats(
+                existingData: Reference | StoreObject,
+                { readField }: ModifierDetails,
+              ): StoreObject | Reference {
+                const existingChats: Reference[] | undefined = readField(
+                  "chats",
+                  existingData,
+                ) as Reference[] | undefined;
 
-        if (queryData?.myChats?.chats) {
-          const existingChats: Chat[] = queryData.myChats.chats;
-          const filteredChats: Chat[] = existingChats.filter(
-            (c: Chat): boolean => c.id !== chatId,
-          );
-          const targetChat: Chat | undefined =
-            existingChats.find((c: Chat): boolean => c.id === chatId) ||
-            chatData?.chat;
+                if (!existingChats) return existingData;
 
-          if (targetChat) {
-            const currentLastMessage: Message | Reference | undefined | null =
-              targetChat.lastMessage;
+                const chatRef: Reference = { __ref: chatCacheId };
+                const filtered: Reference[] = existingChats.filter(
+                  (ref: Reference): boolean =>
+                    (readField("id", ref) as string) !== chatId,
+                );
 
-            let finalLastMessage: Message | Reference = newMessage;
-
-            if (currentLastMessage) {
-              const currentId: string | undefined = cache.identify(
-                currentLastMessage as unknown as StoreObject,
-              );
-
-              const existingSeq: number = currentId
-                ? (cache.readFragment<{ sequence: number }>({
-                    id: currentId,
-                    fragment: gql`
-                      fragment MsgSeq on Message {
-                        sequence
-                      }
-                    `,
-                  })?.sequence ?? 0)
-                : 0;
-
-              const newSeq: number = newMessage.sequence ?? 0;
-
-              if (existingSeq > newSeq) {
-                finalLastMessage = currentLastMessage;
-              }
-            }
-
-            cache.writeQuery<MyChatsResponse>({
-              query: GET_MY_CHATS,
-              data: {
-                myChats: {
-                  ...queryData.myChats,
-                  chats: [
-                    {
-                      ...targetChat,
-                      lastMessage: finalLastMessage as Message,
-                      unreadCount: 0,
-                    },
-                    ...filteredChats,
-                  ],
-                },
+                return {
+                  ...(existingData as unknown as StoreObject),
+                  chats: [chatRef, ...filtered],
+                };
               },
-            });
-          }
+            },
+          });
         }
 
         if (options?.update) {
@@ -275,13 +254,20 @@ export function useMessageActions(chatId: string) {
           isRead: false,
           isEdited: true,
           isEncrypted: false,
+          encryptionIv: null,
+          replyTo: null,
+          forwardedFrom: null,
           sender: me,
-        } as MessageWithTypename,
+        } as unknown as MessageWithTypename,
       },
     });
   };
 
   const markAsRead = (): void => {
+    const chat: Chat | undefined = chatData?.chat;
+    const lastSeq: number =
+      chat?.lastMessage?.sequence ?? chat?.lastReadSequence ?? 0;
+
     read({
       variables: { chatId },
       optimisticResponse: { markDialogAsRead: true },
@@ -295,6 +281,8 @@ export function useMessageActions(chatId: string) {
             id: chatRef,
             fields: {
               unreadCount: (): number => 0,
+              myReadSequence: (prev: number | undefined): number =>
+                Math.max(prev || 0, lastSeq),
             },
           });
         }

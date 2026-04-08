@@ -1,8 +1,10 @@
-import { useQuery } from "@apollo/client/react/index.js";
+import { useQuery } from "@apollo/client/react";
+import { CombinedGraphQLErrors, ServerError } from "@apollo/client/errors";
 import { useMemo } from "react";
 import { GET_MESSAGE_HISTORY } from "@/features/chat/api";
 import { useChatDetails } from "@/features/chat/lib";
-import type { Message } from "@/entities/chat/model/types";
+import type { Message, Chat } from "@/entities/chat/model/types";
+import type { GraphQLFormattedError } from "graphql";
 
 export interface ChatHistoryData {
   messageHistory: {
@@ -12,32 +14,61 @@ export interface ChatHistoryData {
   };
 }
 
-export function useChatHistory(chatId: string): {
+export interface ChatHistoryVariables {
+  chatId: string;
+  limit: number;
+  offset: number;
+}
+
+interface ChatHistoryHookResult {
   messages: Message[];
   isLoading: boolean;
   hasMore: boolean;
-  lastReadSequence?: number;
-} {
-  const { data, loading, error } = useQuery<ChatHistoryData>(
-    GET_MESSAGE_HISTORY,
-    {
-      variables: { chatId, limit: 50, offset: 0 },
-      skip: !chatId,
-      fetchPolicy: "cache-and-network",
-    },
-  );
+  lastReadSequence: number | undefined;
+}
 
-  const { data: chatDetails } = useChatDetails(chatId);
+export function useChatHistory(chatId: string): ChatHistoryHookResult {
+  const {
+    data,
+    loading,
+    error,
+  }: {
+    data?: ChatHistoryData;
+    loading: boolean;
+    error?: Error;
+  } = useQuery<ChatHistoryData, ChatHistoryVariables>(GET_MESSAGE_HISTORY, {
+    variables: { chatId, limit: 50, offset: 0 },
+    skip: !chatId,
+    fetchPolicy: "cache-and-network",
+    notifyOnNetworkStatusChange: true,
+  });
+
+  const chatDetails: { data?: { chat?: Chat } } = useChatDetails(chatId);
 
   if (error) {
-    console.error("[Apollo Error] GET_MESSAGE_HISTORY:", error);
+    if (CombinedGraphQLErrors.is(error)) {
+      error.errors.forEach((graphQLError: GraphQLFormattedError): void => {
+        console.error("GraphQL Error:", graphQLError.message);
+      });
+    } else if (ServerError.is(error)) {
+      console.error(
+        "Server Error:",
+        error.message,
+        "Status:",
+        error.statusCode,
+      );
+    } else {
+      console.error("General Error:", error.message);
+    }
   }
 
   const messages: Message[] = useMemo((): Message[] => {
-    const history = data?.messageHistory;
-    if (!history || !("messages" in history)) return [];
+    const history: ChatHistoryData["messageHistory"] | undefined =
+      data?.messageHistory;
+    if (!history?.messages) return [];
+
     return [...history.messages].sort(
-      (a, b) => (a.sequence ?? 0) - (b.sequence ?? 0),
+      (a: Message, b: Message): number => (a.sequence ?? 0) - (b.sequence ?? 0),
     );
   }, [data]);
 
@@ -50,6 +81,6 @@ export function useChatHistory(chatId: string): {
     messages,
     isLoading: loading,
     hasMore,
-    lastReadSequence: chatDetails?.chat?.lastReadSequence,
+    lastReadSequence: chatDetails.data?.chat?.lastReadSequence,
   };
 }

@@ -1,17 +1,16 @@
-import { useApolloClient, useMutation } from "@apollo/client/react";
+import { useApolloClient, useMutation } from "@apollo/client/react/index.js";
 import { useCallback, useRef } from "react";
-import type { Chat, Message } from "@/entities/chat/model/types";
-import { GET_MY_CHATS, MARK_DIALOG_AS_READ } from "@/features/chat/api";
-
-interface MyChatsData {
-  myChats: {
-    __typename: string;
-    chats: Chat[];
-  };
-}
+import { type Reference, type StoreObject, gql } from "@apollo/client/index.js";
+import type { Message } from "@/entities/chat/model/types";
+import { MARK_DIALOG_AS_READ } from "@/features/chat/api";
 
 interface MarkReadResponse {
   markDialogAsRead: boolean;
+}
+
+interface ChatReadFields {
+  unreadCount: number;
+  myReadSequence: number;
 }
 
 export function useMarkDialog(
@@ -23,74 +22,101 @@ export function useMarkDialog(
   const isPendingRef = useRef<boolean>(false);
   const [markDialog] = useMutation<MarkReadResponse>(MARK_DIALOG_AS_READ);
 
-  const checkAndMarkRead = useCallback(async () => {
+  const checkAndMarkRead = useCallback(async (): Promise<void> => {
     if (
       document.visibilityState !== "visible" ||
       !me ||
       !chatId ||
-      isPendingRef.current
+      isPendingRef.current ||
+      messages.length === 0
     ) {
       return;
     }
 
-    const hasUnread = messages.some(
-      (m: Message) => m.sender.id !== me.id && !m.id.startsWith("temp-"),
-    );
+    const cache = client.cache;
+    const chatCacheId: string | undefined = cache.identify({
+      __typename: "Chat",
+      id: chatId,
+    });
 
-    if (!hasUnread && messages.length > 0) return;
+    if (!chatCacheId) return;
+
+    const lastValidMessage: Message | undefined = [...messages]
+      .reverse()
+      .find((m: Message): boolean => typeof m.sequence === "number");
+
+    const lastSeqInChat: number = lastValidMessage?.sequence || 0;
+
+    const cachedData: ChatReadFields | null =
+      cache.readFragment<ChatReadFields>({
+        id: chatCacheId,
+        fragment: gql`
+          fragment ChatReadStatus on Chat {
+            unreadCount
+            myReadSequence
+          }
+        `,
+      });
+
+    const currentReadSeq: number = cachedData?.myReadSequence ?? 0;
+    const currentUnreadCount: number = cachedData?.unreadCount ?? 0;
+
+    if (currentUnreadCount === 0 && currentReadSeq >= lastSeqInChat) {
+      return;
+    }
 
     isPendingRef.current = true;
 
     try {
       await markDialog({
         variables: { chatId },
-        onCompleted: (data: MarkReadResponse) => {
+        optimisticResponse: { markDialogAsRead: true },
+        onCompleted: (data: MarkReadResponse): void => {
           if (!data.markDialogAsRead) return;
 
-          const lastMessage = [...messages]
-            .reverse()
-            .find((m: Message) => typeof m.sequence === "number");
-          const newSeq = lastMessage?.sequence || 0;
-
-          client.cache.modify({
-            id: client.cache.identify({ __typename: "Chat", id: chatId }),
+          cache.modify({
+            id: chatCacheId,
             fields: {
               unreadCount: (): number => 0,
-              lastReadSequence: (prev: number | undefined): number =>
-                Math.max(prev || 0, newSeq),
+              myReadSequence: (prev: number = 0): number =>
+                Math.max(prev, lastSeqInChat),
+              members: (
+                existingMembers: ReadonlyArray<Reference | StoreObject> = [],
+                { readField },
+              ): (Reference | StoreObject)[] => {
+                return existingMembers.map(
+                  (memberRefOrObj): Reference | StoreObject => {
+                    const userRecord: Reference | StoreObject | undefined =
+                      readField<Reference | StoreObject>(
+                        "user",
+                        memberRefOrObj,
+                      );
+                    const userId: string | undefined = userRecord
+                      ? readField<string>("id", userRecord)
+                      : undefined;
+
+                    if (userId === me.id) {
+                      const currentMemberSeq: number =
+                        readField<number>("lastReadSequence", memberRefOrObj) ??
+                        0;
+                      return {
+                        ...memberRefOrObj,
+                        lastReadSequence: Math.max(
+                          currentMemberSeq,
+                          lastSeqInChat,
+                        ),
+                      } as StoreObject;
+                    }
+                    return memberRefOrObj as StoreObject;
+                  },
+                );
+              },
             },
           });
-
-          const sidebar = client.readQuery<MyChatsData>({
-            query: GET_MY_CHATS,
-          });
-
-          if (sidebar?.myChats) {
-            const updated = sidebar.myChats.chats.map(
-              (c: Chat): Chat =>
-                c.id === chatId
-                  ? {
-                      ...c,
-                      unreadCount: 0,
-                      lastReadSequence: Math.max(
-                        c.lastReadSequence || 0,
-                        newSeq,
-                      ),
-                    }
-                  : c,
-            );
-            client.writeQuery<MyChatsData>({
-              query: GET_MY_CHATS,
-              data: {
-                myChats: {
-                  ...sidebar.myChats,
-                  chats: updated,
-                },
-              },
-            });
-          }
         },
       });
+    } catch (error: unknown) {
+      console.error(error);
     } finally {
       isPendingRef.current = false;
     }
