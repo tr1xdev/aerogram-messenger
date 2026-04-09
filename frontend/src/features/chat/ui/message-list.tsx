@@ -34,18 +34,15 @@ export const MessageList = memo(function MessageList({
 }: MessageListProps): ReactNode {
   const groupedMessages = useMemo((): GroupedMessages[] => {
     const groups: GroupedMessages[] = [];
-
     messages.forEach((m: Message) => {
       const dateKey: string = new Date(m.sentAt).toDateString();
       const lastGroup: GroupedMessages | undefined = groups[groups.length - 1];
-
       if (lastGroup && lastGroup.date === dateKey) {
         lastGroup.items.push(m);
       } else {
         groups.push({ date: dateKey, items: [m] });
       }
     });
-
     return groups;
   }, [messages]);
 
@@ -60,26 +57,38 @@ export const MessageList = memo(function MessageList({
             <div key={g.date} className="flex flex-col mb-6">
               <DateDivider date={g.items[0].sentAt} />
               <div className="flex flex-col space-y-1">
-                {g.items.map((m: Message) => (
-                  <motion.div
-                    key={
-                      m.id.startsWith("temp-") ? m.sentAt + m.text.length : m.id
-                    }
-                    initial={m.isSending ? { opacity: 0, y: 10 } : false}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <MessageBubble
-                      message={m}
-                      myId={myId ?? ""}
-                      lastReadSequence={lastReadSequence}
-                      isMe={m.sender.id === myId}
-                      isRead={m.isRead}
-                      onReply={onReply}
-                      onEdit={onEdit}
-                    />
-                  </motion.div>
-                ))}
+                <AnimatePresence initial={false} mode="popLayout">
+                  {g.items.map((m: Message) => {
+                    const isTemp = m.id.startsWith("temp-");
+                    const key = isTemp
+                      ? `temp-${m.sentAt}-${m.text.slice(0, 10)}`
+                      : m.id;
+
+                    return (
+                      <motion.div
+                        key={key}
+                        layout
+                        initial={isTemp ? { opacity: 0, y: 10 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{
+                          opacity: { duration: 0.15 },
+                          layout: { duration: 0.15 },
+                        }}
+                      >
+                        <MessageBubble
+                          message={m}
+                          myId={myId ?? ""}
+                          lastReadSequence={lastReadSequence}
+                          isMe={m.sender.id === myId}
+                          isRead={m.isRead}
+                          onReply={onReply}
+                          onEdit={onEdit}
+                        />
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
               </div>
             </div>
           ))}
@@ -89,9 +98,9 @@ export const MessageList = memo(function MessageList({
       <AnimatePresence>
         {showScrollBtn && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 10 }}
             className="absolute bottom-6 right-6 z-40"
           >
             <Button

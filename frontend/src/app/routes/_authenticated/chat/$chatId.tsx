@@ -177,24 +177,18 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   );
 
   useEffect((): void | (() => void) => {
-    if (isFirstLoad || allMessages.length === 0) return;
-
     const handleVisibilityChange = (): void => {
       if (document.visibilityState === "visible") {
         checkAndMarkRead();
       }
     };
-
-    checkAndMarkRead();
-
     window.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleVisibilityChange);
-
     return (): void => {
       window.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleVisibilityChange);
     };
-  }, [allMessages.length, checkAndMarkRead, isFirstLoad]);
+  }, [checkAndMarkRead]);
 
   const handleSend = useCallback(
     async (overrideText?: string): Promise<void> => {
