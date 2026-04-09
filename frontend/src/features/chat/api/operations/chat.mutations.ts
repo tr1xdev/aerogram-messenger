@@ -18,6 +18,7 @@ export const PIN_CHAT = gql`
         message
       }
       ... on InternalError {
+        a
         message
       }
     }

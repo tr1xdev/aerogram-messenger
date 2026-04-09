@@ -8,7 +8,6 @@ export const USER_FIELDS = gql`
     lastName
     email
     status
-    publicKey
     photoUrl
     isVerified
     isBot
@@ -23,35 +22,26 @@ export const MESSAGE_FIELDS = gql`
     sentAt
     sequence
     isEdited
-    isEncrypted
-    encryptionIv
     sender {
       id
       username
       firstName
       lastName
-      publicKey
     }
     replyTo {
       id
       text
-      isEncrypted
-      encryptionIv
       sender {
         id
         firstName
-        publicKey
       }
     }
     forwardedFrom {
       id
       text
-      isEncrypted
-      encryptionIv
       sender {
         id
         firstName
-        publicKey
       }
     }
   }

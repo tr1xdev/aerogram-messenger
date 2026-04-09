@@ -5,8 +5,6 @@ export const GET_ME = gql`
   query GetMe {
     me {
       ...UserFields
-      encryptedPrivKey
-      encryptionIv
       isVerified
     }
   }
