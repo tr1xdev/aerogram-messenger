@@ -34,6 +34,7 @@ export const MESSAGE_FIELDS = gql`
       sender {
         id
         firstName
+        lastName
       }
     }
     forwardedFrom {

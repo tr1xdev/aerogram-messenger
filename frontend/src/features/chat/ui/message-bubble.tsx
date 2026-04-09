@@ -101,7 +101,9 @@ export const MessageBubble = memo(function MessageBubble({
 
   const replySenderName: string = useMemo((): string => {
     if (!message.replyTo) return "";
-    return message.replyTo.sender?.firstName || "User";
+    const user = message.replyTo.sender;
+    if (!user) return "User";
+    return [user.firstName, user.lastName].filter(Boolean).join(" ");
   }, [message.replyTo]);
 
   const handleCopy = (): void => {
