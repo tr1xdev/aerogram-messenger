@@ -24,28 +24,25 @@ const (
 )
 
 type User struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	FirstName        string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
-	Email            *string                `protobuf:"bytes,3,opt,name=email,proto3,oneof" json:"email,omitempty"`
-	LastName         *string                `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
-	Bio              *string                `protobuf:"bytes,5,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
-	Username         *string                `protobuf:"bytes,6,opt,name=username,proto3,oneof" json:"username,omitempty"`
-	IsPremium        bool                   `protobuf:"varint,7,opt,name=is_premium,json=isPremium,proto3" json:"is_premium,omitempty"`
-	IsVerified       bool                   `protobuf:"varint,8,opt,name=is_verified,json=isVerified,proto3" json:"is_verified,omitempty"`
-	IsEmailVerified  bool                   `protobuf:"varint,9,opt,name=is_email_verified,json=isEmailVerified,proto3" json:"is_email_verified,omitempty"`
-	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3,oneof" json:"created_at,omitempty"`
-	PublicKey        *string                `protobuf:"bytes,11,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
-	EncryptedPrivKey *string                `protobuf:"bytes,12,opt,name=encrypted_priv_key,json=encryptedPrivKey,proto3,oneof" json:"encrypted_priv_key,omitempty"`
-	EncryptionIv     *string                `protobuf:"bytes,13,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
-	PhotoUrl         *string                `protobuf:"bytes,14,opt,name=photo_url,json=photoUrl,proto3,oneof" json:"photo_url,omitempty"`
-	IsBot            bool                   `protobuf:"varint,15,opt,name=is_bot,json=isBot,proto3" json:"is_bot,omitempty"`
-	BotTokenHash     *string                `protobuf:"bytes,16,opt,name=bot_token_hash,json=botTokenHash,proto3,oneof" json:"bot_token_hash,omitempty"`
-	BotOwnerId       *string                `protobuf:"bytes,17,opt,name=bot_owner_id,json=botOwnerId,proto3,oneof" json:"bot_owner_id,omitempty"`
-	BotDescription   *string                `protobuf:"bytes,18,opt,name=bot_description,json=botDescription,proto3,oneof" json:"bot_description,omitempty"`
-	BotCommands      *string                `protobuf:"bytes,19,opt,name=bot_commands,json=botCommands,proto3,oneof" json:"bot_commands,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FirstName       string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	Email           *string                `protobuf:"bytes,3,opt,name=email,proto3,oneof" json:"email,omitempty"`
+	LastName        *string                `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
+	Bio             *string                `protobuf:"bytes,5,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	Username        *string                `protobuf:"bytes,6,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	IsPremium       bool                   `protobuf:"varint,7,opt,name=is_premium,json=isPremium,proto3" json:"is_premium,omitempty"`
+	IsVerified      bool                   `protobuf:"varint,8,opt,name=is_verified,json=isVerified,proto3" json:"is_verified,omitempty"`
+	IsEmailVerified bool                   `protobuf:"varint,9,opt,name=is_email_verified,json=isEmailVerified,proto3" json:"is_email_verified,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3,oneof" json:"created_at,omitempty"`
+	PhotoUrl        *string                `protobuf:"bytes,11,opt,name=photo_url,json=photoUrl,proto3,oneof" json:"photo_url,omitempty"`
+	IsBot           bool                   `protobuf:"varint,12,opt,name=is_bot,json=isBot,proto3" json:"is_bot,omitempty"`
+	BotTokenHash    *string                `protobuf:"bytes,13,opt,name=bot_token_hash,json=botTokenHash,proto3,oneof" json:"bot_token_hash,omitempty"`
+	BotOwnerId      *string                `protobuf:"bytes,14,opt,name=bot_owner_id,json=botOwnerId,proto3,oneof" json:"bot_owner_id,omitempty"`
+	BotDescription  *string                `protobuf:"bytes,15,opt,name=bot_description,json=botDescription,proto3,oneof" json:"bot_description,omitempty"`
+	BotCommands     *string                `protobuf:"bytes,16,opt,name=bot_commands,json=botCommands,proto3,oneof" json:"bot_commands,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -146,27 +143,6 @@ func (x *User) GetCreatedAt() *timestamppb.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
-}
-
-func (x *User) GetPublicKey() string {
-	if x != nil && x.PublicKey != nil {
-		return *x.PublicKey
-	}
-	return ""
-}
-
-func (x *User) GetEncryptedPrivKey() string {
-	if x != nil && x.EncryptedPrivKey != nil {
-		return *x.EncryptedPrivKey
-	}
-	return ""
-}
-
-func (x *User) GetEncryptionIv() string {
-	if x != nil && x.EncryptionIv != nil {
-		return *x.EncryptionIv
-	}
-	return ""
 }
 
 func (x *User) GetPhotoUrl() string {
@@ -576,19 +552,16 @@ func (*UserInfoResponse_Error) isUserInfoResponse_Response() {}
 func (*UserInfoResponse_User) isUserInfoResponse_Response() {}
 
 type UpdateUserRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	FirstName        *string                `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3,oneof" json:"first_name,omitempty"`
-	LastName         *string                `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
-	Username         *string                `protobuf:"bytes,4,opt,name=username,proto3,oneof" json:"username,omitempty"`
-	PublicKey        *string                `protobuf:"bytes,5,opt,name=public_key,json=publicKey,proto3,oneof" json:"public_key,omitempty"`
-	EncryptedPrivKey *string                `protobuf:"bytes,6,opt,name=encrypted_priv_key,json=encryptedPrivKey,proto3,oneof" json:"encrypted_priv_key,omitempty"`
-	EncryptionIv     *string                `protobuf:"bytes,7,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
-	PhotoUrl         *string                `protobuf:"bytes,8,opt,name=photo_url,json=photoUrl,proto3,oneof" json:"photo_url,omitempty"`
-	BotDescription   *string                `protobuf:"bytes,9,opt,name=bot_description,json=botDescription,proto3,oneof" json:"bot_description,omitempty"`
-	BotCommands      *string                `protobuf:"bytes,10,opt,name=bot_commands,json=botCommands,proto3,oneof" json:"bot_commands,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FirstName      *string                `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3,oneof" json:"first_name,omitempty"`
+	LastName       *string                `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3,oneof" json:"last_name,omitempty"`
+	Username       *string                `protobuf:"bytes,4,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	PhotoUrl       *string                `protobuf:"bytes,5,opt,name=photo_url,json=photoUrl,proto3,oneof" json:"photo_url,omitempty"`
+	BotDescription *string                `protobuf:"bytes,6,opt,name=bot_description,json=botDescription,proto3,oneof" json:"bot_description,omitempty"`
+	BotCommands    *string                `protobuf:"bytes,7,opt,name=bot_commands,json=botCommands,proto3,oneof" json:"bot_commands,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateUserRequest) Reset() {
@@ -645,27 +618,6 @@ func (x *UpdateUserRequest) GetLastName() string {
 func (x *UpdateUserRequest) GetUsername() string {
 	if x != nil && x.Username != nil {
 		return *x.Username
-	}
-	return ""
-}
-
-func (x *UpdateUserRequest) GetPublicKey() string {
-	if x != nil && x.PublicKey != nil {
-		return *x.PublicKey
-	}
-	return ""
-}
-
-func (x *UpdateUserRequest) GetEncryptedPrivKey() string {
-	if x != nil && x.EncryptedPrivKey != nil {
-		return *x.EncryptedPrivKey
-	}
-	return ""
-}
-
-func (x *UpdateUserRequest) GetEncryptionIv() string {
-	if x != nil && x.EncryptionIv != nil {
-		return *x.EncryptionIv
 	}
 	return ""
 }
@@ -959,7 +911,7 @@ var File_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_user_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x12user/v1/user.proto\x12\auser.v1\x1a\x16errors/v1/errors.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x83\a\n" +
+	"\x12user/v1/user.proto\x12\auser.v1\x1a\x16errors/v1/errors.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xca\x05\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -975,28 +927,20 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x11is_email_verified\x18\t \x01(\bR\x0fisEmailVerified\x12>\n" +
 	"\n" +
 	"created_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampH\x04R\tcreatedAt\x88\x01\x01\x12\"\n" +
-	"\n" +
-	"public_key\x18\v \x01(\tH\x05R\tpublicKey\x88\x01\x01\x121\n" +
-	"\x12encrypted_priv_key\x18\f \x01(\tH\x06R\x10encryptedPrivKey\x88\x01\x01\x12(\n" +
-	"\rencryption_iv\x18\r \x01(\tH\aR\fencryptionIv\x88\x01\x01\x12 \n" +
-	"\tphoto_url\x18\x0e \x01(\tH\bR\bphotoUrl\x88\x01\x01\x12\x15\n" +
-	"\x06is_bot\x18\x0f \x01(\bR\x05isBot\x12)\n" +
-	"\x0ebot_token_hash\x18\x10 \x01(\tH\tR\fbotTokenHash\x88\x01\x01\x12%\n" +
-	"\fbot_owner_id\x18\x11 \x01(\tH\n" +
-	"R\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampH\x04R\tcreatedAt\x88\x01\x01\x12 \n" +
+	"\tphoto_url\x18\v \x01(\tH\x05R\bphotoUrl\x88\x01\x01\x12\x15\n" +
+	"\x06is_bot\x18\f \x01(\bR\x05isBot\x12)\n" +
+	"\x0ebot_token_hash\x18\r \x01(\tH\x06R\fbotTokenHash\x88\x01\x01\x12%\n" +
+	"\fbot_owner_id\x18\x0e \x01(\tH\aR\n" +
 	"botOwnerId\x88\x01\x01\x12,\n" +
-	"\x0fbot_description\x18\x12 \x01(\tH\vR\x0ebotDescription\x88\x01\x01\x12&\n" +
-	"\fbot_commands\x18\x13 \x01(\tH\fR\vbotCommands\x88\x01\x01B\b\n" +
+	"\x0fbot_description\x18\x0f \x01(\tH\bR\x0ebotDescription\x88\x01\x01\x12&\n" +
+	"\fbot_commands\x18\x10 \x01(\tH\tR\vbotCommands\x88\x01\x01B\b\n" +
 	"\x06_emailB\f\n" +
 	"\n" +
 	"_last_nameB\x06\n" +
 	"\x04_bioB\v\n" +
 	"\t_usernameB\r\n" +
-	"\v_created_atB\r\n" +
-	"\v_public_keyB\x15\n" +
-	"\x13_encrypted_priv_keyB\x10\n" +
-	"\x0e_encryption_ivB\f\n" +
+	"\v_created_atB\f\n" +
 	"\n" +
 	"_photo_urlB\x11\n" +
 	"\x0f_bot_token_hashB\x0f\n" +
@@ -1022,28 +966,20 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x05error\x18\x01 \x01(\v2\x16.errors.v1.CommonErrorH\x00R\x05error\x12#\n" +
 	"\x04user\x18\x02 \x01(\v2\r.user.v1.UserH\x00R\x04userB\n" +
 	"\n" +
-	"\bresponse\"\x98\x04\n" +
+	"\bresponse\"\xdf\x02\n" +
 	"\x11UpdateUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
 	"\n" +
 	"first_name\x18\x02 \x01(\tH\x00R\tfirstName\x88\x01\x01\x12 \n" +
 	"\tlast_name\x18\x03 \x01(\tH\x01R\blastName\x88\x01\x01\x12\x1f\n" +
-	"\busername\x18\x04 \x01(\tH\x02R\busername\x88\x01\x01\x12\"\n" +
-	"\n" +
-	"public_key\x18\x05 \x01(\tH\x03R\tpublicKey\x88\x01\x01\x121\n" +
-	"\x12encrypted_priv_key\x18\x06 \x01(\tH\x04R\x10encryptedPrivKey\x88\x01\x01\x12(\n" +
-	"\rencryption_iv\x18\a \x01(\tH\x05R\fencryptionIv\x88\x01\x01\x12 \n" +
-	"\tphoto_url\x18\b \x01(\tH\x06R\bphotoUrl\x88\x01\x01\x12,\n" +
-	"\x0fbot_description\x18\t \x01(\tH\aR\x0ebotDescription\x88\x01\x01\x12&\n" +
-	"\fbot_commands\x18\n" +
-	" \x01(\tH\bR\vbotCommands\x88\x01\x01B\r\n" +
+	"\busername\x18\x04 \x01(\tH\x02R\busername\x88\x01\x01\x12 \n" +
+	"\tphoto_url\x18\x05 \x01(\tH\x03R\bphotoUrl\x88\x01\x01\x12,\n" +
+	"\x0fbot_description\x18\x06 \x01(\tH\x04R\x0ebotDescription\x88\x01\x01\x12&\n" +
+	"\fbot_commands\x18\a \x01(\tH\x05R\vbotCommands\x88\x01\x01B\r\n" +
 	"\v_first_nameB\f\n" +
 	"\n" +
 	"_last_nameB\v\n" +
-	"\t_usernameB\r\n" +
-	"\v_public_keyB\x15\n" +
-	"\x13_encrypted_priv_keyB\x10\n" +
-	"\x0e_encryption_ivB\f\n" +
+	"\t_usernameB\f\n" +
 	"\n" +
 	"_photo_urlB\x12\n" +
 	"\x10_bot_descriptionB\x0f\n" +

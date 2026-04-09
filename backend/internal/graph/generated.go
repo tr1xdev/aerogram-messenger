@@ -67,7 +67,6 @@ type ComplexityRoot struct {
 		LastReadSequence func(childComplexity int) int
 		Members          func(childComplexity int) int
 		MembersCount     func(childComplexity int) int
-		Messages         func(childComplexity int, limit *int, offset *int) int
 		MyReadSequence   func(childComplexity int) int
 		PhotoURL         func(childComplexity int) int
 		Slug             func(childComplexity int) int
@@ -100,11 +99,9 @@ type ComplexityRoot struct {
 
 	Message struct {
 		ChatID        func(childComplexity int) int
-		EncryptionIv  func(childComplexity int) int
 		ForwardedFrom func(childComplexity int) int
 		ID            func(childComplexity int) int
 		IsEdited      func(childComplexity int) int
-		IsEncrypted   func(childComplexity int) int
 		ReplyTo       func(childComplexity int) int
 		Sender        func(childComplexity int) int
 		SentAt        func(childComplexity int) int
@@ -130,13 +127,13 @@ type ComplexityRoot struct {
 		PinChat                   func(childComplexity int, id string, pinned bool) int
 		RefreshToken              func(childComplexity int, token string) int
 		RotateBotToken            func(childComplexity int, id string) int
-		SendMessage               func(childComplexity int, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) int
+		SendMessage               func(childComplexity int, chatID string, text string, replyToID *string) int
 		SendTypingEvent           func(childComplexity int, chatID string, typing bool) int
 		SignUp                    func(childComplexity int, input model.SignUpInput) int
 		TerminateAllOtherSessions func(childComplexity int) int
 		TerminateSession          func(childComplexity int, id string) int
 		UpdateBot                 func(childComplexity int, id string, input model.UpdateUserInput) int
-		UpdateMessage             func(childComplexity int, id string, text string, encryptionIv *string) int
+		UpdateMessage             func(childComplexity int, id string, text string) int
 		UpdateUser                func(childComplexity int, input model.UpdateUserInput) int
 		VerifyEmail               func(childComplexity int, input model.VerifyEmailInput) int
 	}
@@ -150,11 +147,11 @@ type ComplexityRoot struct {
 		DialogRead     func(childComplexity int, chatID string) int
 		GetUser        func(childComplexity int, id string) int
 		Me             func(childComplexity int) int
-		MessageHistory func(childComplexity int, chatID string, limit int, offset int) int
+		MessageHistory func(childComplexity int, chatID string, limit int, beforeSequence *int64) int
 		MyBots         func(childComplexity int) int
 		MyChats        func(childComplexity int) int
+		MySessions     func(childComplexity int) int
 		SearchUsers    func(childComplexity int, username string) int
-		Sessions       func(childComplexity int, userID string) int
 		User           func(childComplexity int, id string) int
 	}
 
@@ -179,6 +176,8 @@ type ComplexityRoot struct {
 		ChatDeleted       func(childComplexity int, userID string) int
 		DialogRead        func(childComplexity int, chatID string) int
 		MessageAdded      func(childComplexity int, chatID string) int
+		MessageDeleted    func(childComplexity int, chatID string) int
+		MessageUpdated    func(childComplexity int, chatID string) int
 		UserStatusChanged func(childComplexity int, chatID string) int
 		UserTyping        func(childComplexity int, chatID string) int
 	}
@@ -193,23 +192,20 @@ type ComplexityRoot struct {
 	}
 
 	User struct {
-		Bio              func(childComplexity int) int
-		BotCommands      func(childComplexity int) int
-		BotDescription   func(childComplexity int) int
-		DisplayName      func(childComplexity int) int
-		Email            func(childComplexity int) int
-		EncryptedPrivKey func(childComplexity int) int
-		EncryptionIv     func(childComplexity int) int
-		FirstName        func(childComplexity int) int
-		ID               func(childComplexity int) int
-		IsBot            func(childComplexity int) int
-		IsPremium        func(childComplexity int) int
-		IsVerified       func(childComplexity int) int
-		LastName         func(childComplexity int) int
-		PhotoURL         func(childComplexity int) int
-		PublicKey        func(childComplexity int) int
-		Status           func(childComplexity int) int
-		Username         func(childComplexity int) int
+		Bio            func(childComplexity int) int
+		BotCommands    func(childComplexity int) int
+		BotDescription func(childComplexity int) int
+		DisplayName    func(childComplexity int) int
+		Email          func(childComplexity int) int
+		FirstName      func(childComplexity int) int
+		ID             func(childComplexity int) int
+		IsBot          func(childComplexity int) int
+		IsPremium      func(childComplexity int) int
+		IsVerified     func(childComplexity int) int
+		LastName       func(childComplexity int) int
+		PhotoURL       func(childComplexity int) int
+		Status         func(childComplexity int) int
+		Username       func(childComplexity int) int
 	}
 
 	UserStatusPayload struct {
@@ -240,8 +236,8 @@ type MutationResolver interface {
 	PinChat(ctx context.Context, id string, pinned bool) (model.PinChatResult, error)
 	DeleteChat(ctx context.Context, id string, forEveryone *bool) (model.DeleteChatResult, error)
 	SendTypingEvent(ctx context.Context, chatID string, typing bool) (bool, error)
-	SendMessage(ctx context.Context, chatID string, text string, isEncrypted bool, encryptionIv *string, replyToID *string) (model.SendMessageResult, error)
-	UpdateMessage(ctx context.Context, id string, text string, encryptionIv *string) (model.SendMessageResult, error)
+	SendMessage(ctx context.Context, chatID string, text string, replyToID *string) (model.SendMessageResult, error)
+	UpdateMessage(ctx context.Context, id string, text string) (model.SendMessageResult, error)
 	DeleteMessage(ctx context.Context, id string) (bool, error)
 	MarkDialogAsRead(ctx context.Context, chatID string) (bool, error)
 	UpdateUser(ctx context.Context, input model.UpdateUserInput) (*dbgen.User, error)
@@ -251,10 +247,10 @@ type MutationResolver interface {
 	RotateBotToken(ctx context.Context, id string) (string, error)
 }
 type QueryResolver interface {
-	Sessions(ctx context.Context, userID string) ([]*dbgen.Session, error)
+	MySessions(ctx context.Context) ([]*dbgen.Session, error)
 	MyChats(ctx context.Context) (model.MyChatsResult, error)
 	Chat(ctx context.Context, id *string, slug *string) (model.ChatResult, error)
-	MessageHistory(ctx context.Context, chatID string, limit int, offset int) (model.MessageHistoryResult, error)
+	MessageHistory(ctx context.Context, chatID string, limit int, beforeSequence *int64) (model.MessageHistoryResult, error)
 	DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error)
 	Me(ctx context.Context) (*dbgen.User, error)
 	User(ctx context.Context, id string) (*dbgen.User, error)
@@ -276,6 +272,8 @@ type SubscriptionResolver interface {
 	ChatDeleted(ctx context.Context, userID string) (<-chan string, error)
 	UserTyping(ctx context.Context, chatID string) (<-chan *model.TypingPayload, error)
 	MessageAdded(ctx context.Context, chatID string) (<-chan *model.Message, error)
+	MessageUpdated(ctx context.Context, chatID string) (<-chan *model.Message, error)
+	MessageDeleted(ctx context.Context, chatID string) (<-chan string, error)
 	DialogRead(ctx context.Context, chatID string) (<-chan *model.ReadPayload, error)
 	UserStatusChanged(ctx context.Context, chatID string) (<-chan *model.UserStatusPayload, error)
 }
@@ -291,9 +289,6 @@ type UserResolver interface {
 	Status(ctx context.Context, obj *dbgen.User) (string, error)
 	IsVerified(ctx context.Context, obj *dbgen.User) (bool, error)
 
-	PublicKey(ctx context.Context, obj *dbgen.User) (*string, error)
-	EncryptedPrivKey(ctx context.Context, obj *dbgen.User) (*string, error)
-	EncryptionIv(ctx context.Context, obj *dbgen.User) (*string, error)
 	BotDescription(ctx context.Context, obj *dbgen.User) (*string, error)
 	BotCommands(ctx context.Context, obj *dbgen.User) (*string, error)
 }
@@ -384,17 +379,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Chat.MembersCount(childComplexity), true
-	case "Chat.messages":
-		if e.complexity.Chat.Messages == nil {
-			break
-		}
-
-		args, err := ec.field_Chat_messages_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Chat.Messages(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
 	case "Chat.myReadSequence":
 		if e.complexity.Chat.MyReadSequence == nil {
 			break
@@ -485,12 +469,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Message.ChatID(childComplexity), true
-	case "Message.encryptionIv":
-		if e.complexity.Message.EncryptionIv == nil {
-			break
-		}
-
-		return e.complexity.Message.EncryptionIv(childComplexity), true
 	case "Message.forwardedFrom":
 		if e.complexity.Message.ForwardedFrom == nil {
 			break
@@ -509,12 +487,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Message.IsEdited(childComplexity), true
-	case "Message.isEncrypted":
-		if e.complexity.Message.IsEncrypted == nil {
-			break
-		}
-
-		return e.complexity.Message.IsEncrypted(childComplexity), true
 	case "Message.replyTo":
 		if e.complexity.Message.ReplyTo == nil {
 			break
@@ -696,7 +668,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SendMessage(childComplexity, args["chatId"].(string), args["text"].(string), args["isEncrypted"].(bool), args["encryptionIv"].(*string), args["replyToId"].(*string)), true
+		return e.complexity.Mutation.SendMessage(childComplexity, args["chatId"].(string), args["text"].(string), args["replyToId"].(*string)), true
 	case "Mutation.sendTypingEvent":
 		if e.complexity.Mutation.SendTypingEvent == nil {
 			break
@@ -757,7 +729,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateMessage(childComplexity, args["id"].(string), args["text"].(string), args["encryptionIv"].(*string)), true
+		return e.complexity.Mutation.UpdateMessage(childComplexity, args["id"].(string), args["text"].(string)), true
 	case "Mutation.updateUser":
 		if e.complexity.Mutation.UpdateUser == nil {
 			break
@@ -837,7 +809,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.MessageHistory(childComplexity, args["chatId"].(string), args["limit"].(int), args["offset"].(int)), true
+		return e.complexity.Query.MessageHistory(childComplexity, args["chatId"].(string), args["limit"].(int), args["beforeSequence"].(*int64)), true
 	case "Query.myBots":
 		if e.complexity.Query.MyBots == nil {
 			break
@@ -850,6 +822,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MyChats(childComplexity), true
+	case "Query.mySessions":
+		if e.complexity.Query.MySessions == nil {
+			break
+		}
+
+		return e.complexity.Query.MySessions(childComplexity), true
 	case "Query.searchUsers":
 		if e.complexity.Query.SearchUsers == nil {
 			break
@@ -861,17 +839,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.SearchUsers(childComplexity, args["username"].(string)), true
-	case "Query.sessions":
-		if e.complexity.Query.Sessions == nil {
-			break
-		}
-
-		args, err := ec.field_Query_sessions_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.Sessions(childComplexity, args["userId"].(string)), true
 	case "Query.user":
 		if e.complexity.Query.User == nil {
 			break
@@ -990,6 +957,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Subscription.MessageAdded(childComplexity, args["chatId"].(string)), true
+	case "Subscription.messageDeleted":
+		if e.complexity.Subscription.MessageDeleted == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_messageDeleted_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.MessageDeleted(childComplexity, args["chatId"].(string)), true
+	case "Subscription.messageUpdated":
+		if e.complexity.Subscription.MessageUpdated == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_messageUpdated_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.MessageUpdated(childComplexity, args["chatId"].(string)), true
 	case "Subscription.userStatusChanged":
 		if e.complexity.Subscription.UserStatusChanged == nil {
 			break
@@ -1063,18 +1052,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.Email(childComplexity), true
-	case "User.encryptedPrivKey":
-		if e.complexity.User.EncryptedPrivKey == nil {
-			break
-		}
-
-		return e.complexity.User.EncryptedPrivKey(childComplexity), true
-	case "User.encryptionIv":
-		if e.complexity.User.EncryptionIv == nil {
-			break
-		}
-
-		return e.complexity.User.EncryptionIv(childComplexity), true
 	case "User.firstName":
 		if e.complexity.User.FirstName == nil {
 			break
@@ -1117,12 +1094,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.PhotoURL(childComplexity), true
-	case "User.publicKey":
-		if e.complexity.User.PublicKey == nil {
-			break
-		}
-
-		return e.complexity.User.PublicKey(childComplexity), true
 	case "User.status":
 		if e.complexity.User.Status == nil {
 			break
@@ -1318,22 +1289,6 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
 // region    ***************************** args.gotpl *****************************
 
-func (ec *executionContext) field_Chat_messages_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
-	if err != nil {
-		return nil, err
-	}
-	args["limit"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
-	if err != nil {
-		return nil, err
-	}
-	args["offset"] = arg1
-	return args, nil
-}
-
 func (ec *executionContext) field_Mutation_createBot_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1513,21 +1468,11 @@ func (ec *executionContext) field_Mutation_sendMessage_args(ctx context.Context,
 		return nil, err
 	}
 	args["text"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "isEncrypted", ec.unmarshalNBoolean2bool)
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "replyToId", ec.unmarshalOID2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["isEncrypted"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "encryptionIv", ec.unmarshalOString2ᚖstring)
-	if err != nil {
-		return nil, err
-	}
-	args["encryptionIv"] = arg3
-	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "replyToId", ec.unmarshalOID2ᚖstring)
-	if err != nil {
-		return nil, err
-	}
-	args["replyToId"] = arg4
+	args["replyToId"] = arg2
 	return args, nil
 }
 
@@ -1598,11 +1543,6 @@ func (ec *executionContext) field_Mutation_updateMessage_args(ctx context.Contex
 		return nil, err
 	}
 	args["text"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "encryptionIv", ec.unmarshalOString2ᚖstring)
-	if err != nil {
-		return nil, err
-	}
-	args["encryptionIv"] = arg2
 	return args, nil
 }
 
@@ -1690,11 +1630,11 @@ func (ec *executionContext) field_Query_messageHistory_args(ctx context.Context,
 		return nil, err
 	}
 	args["limit"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalNInt2int)
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "beforeSequence", ec.unmarshalOLong2ᚖint64)
 	if err != nil {
 		return nil, err
 	}
-	args["offset"] = arg2
+	args["beforeSequence"] = arg2
 	return args, nil
 }
 
@@ -1706,17 +1646,6 @@ func (ec *executionContext) field_Query_searchUsers_args(ctx context.Context, ra
 		return nil, err
 	}
 	args["username"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_sessions_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userId", ec.unmarshalNID2string)
-	if err != nil {
-		return nil, err
-	}
-	args["userId"] = arg0
 	return args, nil
 }
 
@@ -1765,6 +1694,28 @@ func (ec *executionContext) field_Subscription_dialogRead_args(ctx context.Conte
 }
 
 func (ec *executionContext) field_Subscription_messageAdded_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["chatId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_messageDeleted_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["chatId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_messageUpdated_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatId", ec.unmarshalNID2string)
@@ -2293,10 +2244,6 @@ func (ec *executionContext) fieldContext_Chat_lastMessage(_ context.Context, fie
 				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
-			case "isEncrypted":
-				return ec.fieldContext_Message_isEncrypted(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_Message_encryptionIv(ctx, field)
 			case "replyTo":
 				return ec.fieldContext_Message_replyTo(ctx, field)
 			case "forwardedFrom":
@@ -2339,70 +2286,6 @@ func (ec *executionContext) fieldContext_Chat_members(_ context.Context, field g
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ChatMember", field.Name)
 		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Chat_messages(ctx context.Context, field graphql.CollectedField, obj *model.Chat) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Chat_messages,
-		func(ctx context.Context) (any, error) {
-			return obj.Messages, nil
-		},
-		nil,
-		ec.marshalNMessage2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐMessageᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Chat_messages(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Chat",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Message_id(ctx, field)
-			case "chatId":
-				return ec.fieldContext_Message_chatId(ctx, field)
-			case "sender":
-				return ec.fieldContext_Message_sender(ctx, field)
-			case "text":
-				return ec.fieldContext_Message_text(ctx, field)
-			case "sentAt":
-				return ec.fieldContext_Message_sentAt(ctx, field)
-			case "sequence":
-				return ec.fieldContext_Message_sequence(ctx, field)
-			case "isEdited":
-				return ec.fieldContext_Message_isEdited(ctx, field)
-			case "isEncrypted":
-				return ec.fieldContext_Message_isEncrypted(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_Message_encryptionIv(ctx, field)
-			case "replyTo":
-				return ec.fieldContext_Message_replyTo(ctx, field)
-			case "forwardedFrom":
-				return ec.fieldContext_Message_forwardedFrom(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Message", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Chat_messages_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -2484,8 +2367,6 @@ func (ec *executionContext) fieldContext_ChatList_chats(_ context.Context, field
 				return ec.fieldContext_Chat_lastMessage(ctx, field)
 			case "members":
 				return ec.fieldContext_Chat_members(ctx, field)
-			case "messages":
-				return ec.fieldContext_Chat_messages(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Chat_createdAt(ctx, field)
 			}
@@ -2543,12 +2424,6 @@ func (ec *executionContext) fieldContext_ChatMember_user(_ context.Context, fiel
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -2666,12 +2541,6 @@ func (ec *executionContext) fieldContext_CreateBotPayload_user(_ context.Context
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -2847,12 +2716,6 @@ func (ec *executionContext) fieldContext_Message_sender(_ context.Context, field
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -2980,64 +2843,6 @@ func (ec *executionContext) fieldContext_Message_isEdited(_ context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _Message_isEncrypted(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Message_isEncrypted,
-		func(ctx context.Context) (any, error) {
-			return obj.IsEncrypted, nil
-		},
-		nil,
-		ec.marshalNBoolean2bool,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Message_isEncrypted(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Message",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Message_encryptionIv(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Message_encryptionIv,
-		func(ctx context.Context) (any, error) {
-			return obj.EncryptionIv, nil
-		},
-		nil,
-		ec.marshalOString2ᚖstring,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_Message_encryptionIv(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Message",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Message_replyTo(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3076,10 +2881,6 @@ func (ec *executionContext) fieldContext_Message_replyTo(_ context.Context, fiel
 				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
-			case "isEncrypted":
-				return ec.fieldContext_Message_isEncrypted(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_Message_encryptionIv(ctx, field)
 			case "replyTo":
 				return ec.fieldContext_Message_replyTo(ctx, field)
 			case "forwardedFrom":
@@ -3129,10 +2930,6 @@ func (ec *executionContext) fieldContext_Message_forwardedFrom(_ context.Context
 				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
-			case "isEncrypted":
-				return ec.fieldContext_Message_isEncrypted(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_Message_encryptionIv(ctx, field)
 			case "replyTo":
 				return ec.fieldContext_Message_replyTo(ctx, field)
 			case "forwardedFrom":
@@ -3182,10 +2979,6 @@ func (ec *executionContext) fieldContext_MessageConnection_messages(_ context.Co
 				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
-			case "isEncrypted":
-				return ec.fieldContext_Message_isEncrypted(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_Message_encryptionIv(ctx, field)
 			case "replyTo":
 				return ec.fieldContext_Message_replyTo(ctx, field)
 			case "forwardedFrom":
@@ -3742,7 +3535,7 @@ func (ec *executionContext) _Mutation_sendMessage(ctx context.Context, field gra
 		ec.fieldContext_Mutation_sendMessage,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().SendMessage(ctx, fc.Args["chatId"].(string), fc.Args["text"].(string), fc.Args["isEncrypted"].(bool), fc.Args["encryptionIv"].(*string), fc.Args["replyToId"].(*string))
+			return ec.resolvers.Mutation().SendMessage(ctx, fc.Args["chatId"].(string), fc.Args["text"].(string), fc.Args["replyToId"].(*string))
 		},
 		nil,
 		ec.marshalNSendMessageResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐSendMessageResult,
@@ -3783,7 +3576,7 @@ func (ec *executionContext) _Mutation_updateMessage(ctx context.Context, field g
 		ec.fieldContext_Mutation_updateMessage,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdateMessage(ctx, fc.Args["id"].(string), fc.Args["text"].(string), fc.Args["encryptionIv"].(*string))
+			return ec.resolvers.Mutation().UpdateMessage(ctx, fc.Args["id"].(string), fc.Args["text"].(string))
 		},
 		nil,
 		ec.marshalNSendMessageResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐSendMessageResult,
@@ -3947,12 +3740,6 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4065,12 +3852,6 @@ func (ec *executionContext) fieldContext_Mutation_updateBot(ctx context.Context,
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4204,15 +3985,14 @@ func (ec *executionContext) fieldContext_NotFoundError_message(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_sessions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_mySessions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Query_sessions,
+		ec.fieldContext_Query_mySessions,
 		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Sessions(ctx, fc.Args["userId"].(string))
+			return ec.resolvers.Query().MySessions(ctx)
 		},
 		nil,
 		ec.marshalNSession2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐSessionᚄ,
@@ -4221,7 +4001,7 @@ func (ec *executionContext) _Query_sessions(ctx context.Context, field graphql.C
 	)
 }
 
-func (ec *executionContext) fieldContext_Query_sessions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_mySessions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -4246,17 +4026,6 @@ func (ec *executionContext) fieldContext_Query_sessions(ctx context.Context, fie
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Session", field.Name)
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_sessions_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -4339,7 +4108,7 @@ func (ec *executionContext) _Query_messageHistory(ctx context.Context, field gra
 		ec.fieldContext_Query_messageHistory,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().MessageHistory(ctx, fc.Args["chatId"].(string), fc.Args["limit"].(int), fc.Args["offset"].(int))
+			return ec.resolvers.Query().MessageHistory(ctx, fc.Args["chatId"].(string), fc.Args["limit"].(int), fc.Args["beforeSequence"].(*int64))
 		},
 		nil,
 		ec.marshalNMessageHistoryResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐMessageHistoryResult,
@@ -4469,12 +4238,6 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4535,12 +4298,6 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4612,12 +4369,6 @@ func (ec *executionContext) fieldContext_Query_getUser(ctx context.Context, fiel
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4689,12 +4440,6 @@ func (ec *executionContext) fieldContext_Query_searchUsers(ctx context.Context, 
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4765,12 +4510,6 @@ func (ec *executionContext) fieldContext_Query_myBots(_ context.Context, field g
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
-			case "publicKey":
-				return ec.fieldContext_User_publicKey(ctx, field)
-			case "encryptedPrivKey":
-				return ec.fieldContext_User_encryptedPrivKey(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_User_encryptionIv(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -5229,8 +4968,6 @@ func (ec *executionContext) fieldContext_Subscription_chatCreated(ctx context.Co
 				return ec.fieldContext_Chat_lastMessage(ctx, field)
 			case "members":
 				return ec.fieldContext_Chat_members(ctx, field)
-			case "messages":
-				return ec.fieldContext_Chat_messages(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Chat_createdAt(ctx, field)
 			}
@@ -5378,10 +5115,6 @@ func (ec *executionContext) fieldContext_Subscription_messageAdded(ctx context.C
 				return ec.fieldContext_Message_sequence(ctx, field)
 			case "isEdited":
 				return ec.fieldContext_Message_isEdited(ctx, field)
-			case "isEncrypted":
-				return ec.fieldContext_Message_isEncrypted(ctx, field)
-			case "encryptionIv":
-				return ec.fieldContext_Message_encryptionIv(ctx, field)
 			case "replyTo":
 				return ec.fieldContext_Message_replyTo(ctx, field)
 			case "forwardedFrom":
@@ -5398,6 +5131,108 @@ func (ec *executionContext) fieldContext_Subscription_messageAdded(ctx context.C
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Subscription_messageAdded_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_messageUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_messageUpdated,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().MessageUpdated(ctx, fc.Args["chatId"].(string))
+		},
+		nil,
+		ec.marshalNMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐMessage,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_messageUpdated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Message_id(ctx, field)
+			case "chatId":
+				return ec.fieldContext_Message_chatId(ctx, field)
+			case "sender":
+				return ec.fieldContext_Message_sender(ctx, field)
+			case "text":
+				return ec.fieldContext_Message_text(ctx, field)
+			case "sentAt":
+				return ec.fieldContext_Message_sentAt(ctx, field)
+			case "sequence":
+				return ec.fieldContext_Message_sequence(ctx, field)
+			case "isEdited":
+				return ec.fieldContext_Message_isEdited(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Message_replyTo(ctx, field)
+			case "forwardedFrom":
+				return ec.fieldContext_Message_forwardedFrom(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Message", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_messageUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_messageDeleted(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_messageDeleted,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().MessageDeleted(ctx, fc.Args["chatId"].(string))
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_messageDeleted(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_messageDeleted_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -5932,93 +5767,6 @@ func (ec *executionContext) fieldContext_User_isBot(_ context.Context, field gra
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _User_publicKey(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_User_publicKey,
-		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().PublicKey(ctx, obj)
-		},
-		nil,
-		ec.marshalOString2ᚖstring,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_User_publicKey(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "User",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _User_encryptedPrivKey(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_User_encryptedPrivKey,
-		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().EncryptedPrivKey(ctx, obj)
-		},
-		nil,
-		ec.marshalOString2ᚖstring,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_User_encryptedPrivKey(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "User",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _User_encryptionIv(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_User_encryptionIv,
-		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().EncryptionIv(ctx, obj)
-		},
-		nil,
-		ec.marshalOString2ᚖstring,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_User_encryptionIv(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "User",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7769,7 +7517,7 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"firstName", "lastName", "username", "bio", "publicKey", "encryptedPrivKey", "encryptionIv", "photoUrl", "botDescription", "botCommands"}
+	fieldsInOrder := [...]string{"firstName", "lastName", "username", "bio", "photoUrl", "botDescription", "botCommands"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -7804,27 +7552,6 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.Bio = data
-		case "publicKey":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("publicKey"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.PublicKey = data
-		case "encryptedPrivKey":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("encryptedPrivKey"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.EncryptedPrivKey = data
-		case "encryptionIv":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("encryptionIv"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.EncryptionIv = data
 		case "photoUrl":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photoUrl"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -8321,11 +8048,6 @@ func (ec *executionContext) _Chat(ctx context.Context, sel ast.SelectionSet, obj
 			out.Values[i] = ec._Chat_lastMessage(ctx, field, obj)
 		case "members":
 			out.Values[i] = ec._Chat_members(ctx, field, obj)
-		case "messages":
-			out.Values[i] = ec._Chat_messages(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "createdAt":
 			out.Values[i] = ec._Chat_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -8633,13 +8355,6 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "isEncrypted":
-			out.Values[i] = ec._Message_isEncrypted(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "encryptionIv":
-			out.Values[i] = ec._Message_encryptionIv(ctx, field, obj)
 		case "replyTo":
 			out.Values[i] = ec._Message_replyTo(ctx, field, obj)
 		case "forwardedFrom":
@@ -8958,7 +8673,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
-		case "sessions":
+		case "mySessions":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -8967,7 +8682,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_sessions(ctx, field)
+				res = ec._Query_mySessions(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -9491,6 +9206,10 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_userTyping(ctx, fields[0])
 	case "messageAdded":
 		return ec._Subscription_messageAdded(ctx, fields[0])
+	case "messageUpdated":
+		return ec._Subscription_messageUpdated(ctx, fields[0])
+	case "messageDeleted":
+		return ec._Subscription_messageDeleted(ctx, fields[0])
 	case "dialogRead":
 		return ec._Subscription_dialogRead(ctx, fields[0])
 	case "userStatusChanged":
@@ -9946,105 +9665,6 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "publicKey":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._User_publicKey(ctx, field, obj)
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "encryptedPrivKey":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._User_encryptedPrivKey(ctx, field, obj)
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "encryptionIv":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._User_encryptionIv(ctx, field, obj)
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "botDescription":
 			field := field
 
@@ -11424,21 +11044,21 @@ func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
+func (ec *executionContext) unmarshalOLong2ᚖint64(ctx context.Context, v any) (*int64, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := graphql.UnmarshalInt(v)
+	res, err := graphql.UnmarshalInt64(v)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+func (ec *executionContext) marshalOLong2ᚖint64(ctx context.Context, sel ast.SelectionSet, v *int64) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	_ = sel
 	_ = ctx
-	res := graphql.MarshalInt(*v)
+	res := graphql.MarshalInt64(*v)
 	return res
 }
 

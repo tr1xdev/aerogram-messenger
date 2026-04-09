@@ -22,7 +22,6 @@ type Chat {
     isPinned: Boolean!
     lastMessage: Message
     members: [ChatMember!]
-    messages(limit: Int = 50, offset: Int = 0): [Message!]!
     createdAt: String!
 }
 

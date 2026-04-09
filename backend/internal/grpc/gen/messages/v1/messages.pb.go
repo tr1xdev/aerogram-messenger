@@ -114,14 +114,12 @@ type Message struct {
 	SentAt          string                 `protobuf:"bytes,5,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
 	Sequence        int64                  `protobuf:"varint,6,opt,name=sequence,proto3" json:"sequence,omitempty"`
 	IsEdited        bool                   `protobuf:"varint,7,opt,name=is_edited,json=isEdited,proto3" json:"is_edited,omitempty"`
-	IsEncrypted     bool                   `protobuf:"varint,8,opt,name=is_encrypted,json=isEncrypted,proto3" json:"is_encrypted,omitempty"`
-	EncryptionIv    *string                `protobuf:"bytes,9,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
-	ReplyToId       *string                `protobuf:"bytes,10,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
-	ForwardedFromId *string                `protobuf:"bytes,11,opt,name=forwarded_from_id,json=forwardedFromId,proto3,oneof" json:"forwarded_from_id,omitempty"`
-	MediaUrl        *string                `protobuf:"bytes,12,opt,name=media_url,json=mediaUrl,proto3,oneof" json:"media_url,omitempty"`
-	MediaType       *string                `protobuf:"bytes,13,opt,name=media_type,json=mediaType,proto3,oneof" json:"media_type,omitempty"`
-	IsSystem        bool                   `protobuf:"varint,14,opt,name=is_system,json=isSystem,proto3" json:"is_system,omitempty"`
-	Sender          *User                  `protobuf:"bytes,15,opt,name=sender,proto3" json:"sender,omitempty"`
+	ReplyToId       *string                `protobuf:"bytes,8,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
+	ForwardedFromId *string                `protobuf:"bytes,9,opt,name=forwarded_from_id,json=forwardedFromId,proto3,oneof" json:"forwarded_from_id,omitempty"`
+	MediaUrl        *string                `protobuf:"bytes,10,opt,name=media_url,json=mediaUrl,proto3,oneof" json:"media_url,omitempty"`
+	MediaType       *string                `protobuf:"bytes,11,opt,name=media_type,json=mediaType,proto3,oneof" json:"media_type,omitempty"`
+	IsSystem        bool                   `protobuf:"varint,12,opt,name=is_system,json=isSystem,proto3" json:"is_system,omitempty"`
+	Sender          *User                  `protobuf:"bytes,13,opt,name=sender,proto3" json:"sender,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -205,20 +203,6 @@ func (x *Message) GetIsEdited() bool {
 	return false
 }
 
-func (x *Message) GetIsEncrypted() bool {
-	if x != nil {
-		return x.IsEncrypted
-	}
-	return false
-}
-
-func (x *Message) GetEncryptionIv() string {
-	if x != nil && x.EncryptionIv != nil {
-		return *x.EncryptionIv
-	}
-	return ""
-}
-
 func (x *Message) GetReplyToId() string {
 	if x != nil && x.ReplyToId != nil {
 		return *x.ReplyToId
@@ -266,11 +250,9 @@ type SendMessageRequest struct {
 	ChatId        string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
 	SenderId      string                 `protobuf:"bytes,2,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
 	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-	IsEncrypted   bool                   `protobuf:"varint,4,opt,name=is_encrypted,json=isEncrypted,proto3" json:"is_encrypted,omitempty"`
-	EncryptionIv  *string                `protobuf:"bytes,5,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
-	ReplyToId     *string                `protobuf:"bytes,6,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
-	MediaUrl      *string                `protobuf:"bytes,7,opt,name=media_url,json=mediaUrl,proto3,oneof" json:"media_url,omitempty"`
-	MediaType     *string                `protobuf:"bytes,8,opt,name=media_type,json=mediaType,proto3,oneof" json:"media_type,omitempty"`
+	ReplyToId     *string                `protobuf:"bytes,4,opt,name=reply_to_id,json=replyToId,proto3,oneof" json:"reply_to_id,omitempty"`
+	MediaUrl      *string                `protobuf:"bytes,5,opt,name=media_url,json=mediaUrl,proto3,oneof" json:"media_url,omitempty"`
+	MediaType     *string                `protobuf:"bytes,6,opt,name=media_type,json=mediaType,proto3,oneof" json:"media_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -322,20 +304,6 @@ func (x *SendMessageRequest) GetSenderId() string {
 func (x *SendMessageRequest) GetText() string {
 	if x != nil {
 		return x.Text
-	}
-	return ""
-}
-
-func (x *SendMessageRequest) GetIsEncrypted() bool {
-	if x != nil {
-		return x.IsEncrypted
-	}
-	return false
-}
-
-func (x *SendMessageRequest) GetEncryptionIv() string {
-	if x != nil && x.EncryptionIv != nil {
-		return *x.EncryptionIv
 	}
 	return ""
 }
@@ -410,7 +378,6 @@ type UpdateMessageRequest struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	SenderId      string                 `protobuf:"bytes,2,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
 	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-	EncryptionIv  *string                `protobuf:"bytes,4,opt,name=encryption_iv,json=encryptionIv,proto3,oneof" json:"encryption_iv,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -462,13 +429,6 @@ func (x *UpdateMessageRequest) GetSenderId() string {
 func (x *UpdateMessageRequest) GetText() string {
 	if x != nil {
 		return x.Text
-	}
-	return ""
-}
-
-func (x *UpdateMessageRequest) GetEncryptionIv() string {
-	if x != nil && x.EncryptionIv != nil {
-		return *x.EncryptionIv
 	}
 	return ""
 }
@@ -614,12 +574,12 @@ func (x *DeleteMessageResponse) GetSuccess() bool {
 }
 
 type GetHistoryRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChatId        string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
-	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	Offset        int32                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ChatId         string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	Limit          int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	BeforeSequence *int64                 `protobuf:"varint,3,opt,name=before_sequence,json=beforeSequence,proto3,oneof" json:"before_sequence,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetHistoryRequest) Reset() {
@@ -666,9 +626,9 @@ func (x *GetHistoryRequest) GetLimit() int32 {
 	return 0
 }
 
-func (x *GetHistoryRequest) GetOffset() int32 {
-	if x != nil {
-		return x.Offset
+func (x *GetHistoryRequest) GetBeforeSequence() int64 {
+	if x != nil && x.BeforeSequence != nil {
+		return *x.BeforeSequence
 	}
 	return 0
 }
@@ -834,7 +794,7 @@ const file_messages_v1_messages_proto_rawDesc = "" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\x05 \x01(\tR\tpublicKey\x12\x1b\n" +
-	"\tphoto_url\x18\x06 \x01(\tR\bphotoUrl\"\xbb\x04\n" +
+	"\tphoto_url\x18\x06 \x01(\tR\bphotoUrl\"\xdc\x03\n" +
 	"\aMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\achat_id\x18\x02 \x01(\tR\x06chatId\x12\x1b\n" +
@@ -842,57 +802,50 @@ const file_messages_v1_messages_proto_rawDesc = "" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x12\x17\n" +
 	"\asent_at\x18\x05 \x01(\tR\x06sentAt\x12\x1a\n" +
 	"\bsequence\x18\x06 \x01(\x03R\bsequence\x12\x1b\n" +
-	"\tis_edited\x18\a \x01(\bR\bisEdited\x12!\n" +
-	"\fis_encrypted\x18\b \x01(\bR\visEncrypted\x12(\n" +
-	"\rencryption_iv\x18\t \x01(\tH\x00R\fencryptionIv\x88\x01\x01\x12#\n" +
-	"\vreply_to_id\x18\n" +
-	" \x01(\tH\x01R\treplyToId\x88\x01\x01\x12/\n" +
-	"\x11forwarded_from_id\x18\v \x01(\tH\x02R\x0fforwardedFromId\x88\x01\x01\x12 \n" +
-	"\tmedia_url\x18\f \x01(\tH\x03R\bmediaUrl\x88\x01\x01\x12\"\n" +
+	"\tis_edited\x18\a \x01(\bR\bisEdited\x12#\n" +
+	"\vreply_to_id\x18\b \x01(\tH\x00R\treplyToId\x88\x01\x01\x12/\n" +
+	"\x11forwarded_from_id\x18\t \x01(\tH\x01R\x0fforwardedFromId\x88\x01\x01\x12 \n" +
+	"\tmedia_url\x18\n" +
+	" \x01(\tH\x02R\bmediaUrl\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"media_type\x18\r \x01(\tH\x04R\tmediaType\x88\x01\x01\x12\x1b\n" +
-	"\tis_system\x18\x0e \x01(\bR\bisSystem\x12)\n" +
-	"\x06sender\x18\x0f \x01(\v2\x11.messages.v1.UserR\x06senderB\x10\n" +
-	"\x0e_encryption_ivB\x0e\n" +
+	"media_type\x18\v \x01(\tH\x03R\tmediaType\x88\x01\x01\x12\x1b\n" +
+	"\tis_system\x18\f \x01(\bR\bisSystem\x12)\n" +
+	"\x06sender\x18\r \x01(\v2\x11.messages.v1.UserR\x06senderB\x0e\n" +
 	"\f_reply_to_idB\x14\n" +
 	"\x12_forwarded_from_idB\f\n" +
 	"\n" +
 	"_media_urlB\r\n" +
-	"\v_media_type\"\xd5\x02\n" +
+	"\v_media_type\"\xf6\x01\n" +
 	"\x12SendMessageRequest\x12\x17\n" +
 	"\achat_id\x18\x01 \x01(\tR\x06chatId\x12\x1b\n" +
 	"\tsender_id\x18\x02 \x01(\tR\bsenderId\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\x12!\n" +
-	"\fis_encrypted\x18\x04 \x01(\bR\visEncrypted\x12(\n" +
-	"\rencryption_iv\x18\x05 \x01(\tH\x00R\fencryptionIv\x88\x01\x01\x12#\n" +
-	"\vreply_to_id\x18\x06 \x01(\tH\x01R\treplyToId\x88\x01\x01\x12 \n" +
-	"\tmedia_url\x18\a \x01(\tH\x02R\bmediaUrl\x88\x01\x01\x12\"\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\x12#\n" +
+	"\vreply_to_id\x18\x04 \x01(\tH\x00R\treplyToId\x88\x01\x01\x12 \n" +
+	"\tmedia_url\x18\x05 \x01(\tH\x01R\bmediaUrl\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"media_type\x18\b \x01(\tH\x03R\tmediaType\x88\x01\x01B\x10\n" +
-	"\x0e_encryption_ivB\x0e\n" +
+	"media_type\x18\x06 \x01(\tH\x02R\tmediaType\x88\x01\x01B\x0e\n" +
 	"\f_reply_to_idB\f\n" +
 	"\n" +
 	"_media_urlB\r\n" +
 	"\v_media_type\"E\n" +
 	"\x13SendMessageResponse\x12.\n" +
-	"\amessage\x18\x01 \x01(\v2\x14.messages.v1.MessageR\amessage\"\x93\x01\n" +
+	"\amessage\x18\x01 \x01(\v2\x14.messages.v1.MessageR\amessage\"W\n" +
 	"\x14UpdateMessageRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tsender_id\x18\x02 \x01(\tR\bsenderId\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\x12(\n" +
-	"\rencryption_iv\x18\x04 \x01(\tH\x00R\fencryptionIv\x88\x01\x01B\x10\n" +
-	"\x0e_encryption_iv\"G\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\"G\n" +
 	"\x15UpdateMessageResponse\x12.\n" +
 	"\amessage\x18\x01 \x01(\v2\x14.messages.v1.MessageR\amessage\"C\n" +
 	"\x14DeleteMessageRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tsender_id\x18\x02 \x01(\tR\bsenderId\"1\n" +
 	"\x15DeleteMessageResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"Z\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x84\x01\n" +
 	"\x11GetHistoryRequest\x12\x17\n" +
 	"\achat_id\x18\x01 \x01(\tR\x06chatId\x12\x14\n" +
-	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x03 \x01(\x05R\x06offset\"F\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12,\n" +
+	"\x0fbefore_sequence\x18\x03 \x01(\x03H\x00R\x0ebeforeSequence\x88\x01\x01B\x12\n" +
+	"\x10_before_sequence\"F\n" +
 	"\x12GetHistoryResponse\x120\n" +
 	"\bmessages\x18\x01 \x03(\v2\x14.messages.v1.MessageR\bmessages\"m\n" +
 	"\x11MarkAsReadRequest\x12\x17\n" +
@@ -966,7 +919,7 @@ func file_messages_v1_messages_proto_init() {
 	}
 	file_messages_v1_messages_proto_msgTypes[1].OneofWrappers = []any{}
 	file_messages_v1_messages_proto_msgTypes[2].OneofWrappers = []any{}
-	file_messages_v1_messages_proto_msgTypes[4].OneofWrappers = []any{}
+	file_messages_v1_messages_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

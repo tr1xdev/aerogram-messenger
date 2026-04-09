@@ -68,7 +68,6 @@ type Chat struct {
 	IsPinned         bool          `json:"isPinned"`
 	LastMessage      *Message      `json:"lastMessage,omitempty"`
 	Members          []*ChatMember `json:"members,omitempty"`
-	Messages         []*Message    `json:"messages"`
 	CreatedAt        string        `json:"createdAt"`
 }
 
@@ -145,8 +144,6 @@ type Message struct {
 	SentAt        string      `json:"sentAt"`
 	Sequence      int64       `json:"sequence"`
 	IsEdited      bool        `json:"isEdited"`
-	IsEncrypted   bool        `json:"isEncrypted"`
-	EncryptionIv  *string     `json:"encryptionIv,omitempty"`
 	ReplyTo       *Message    `json:"replyTo,omitempty"`
 	ForwardedFrom *Message    `json:"forwardedFrom,omitempty"`
 }
@@ -208,16 +205,13 @@ type TypingPayload struct {
 }
 
 type UpdateUserInput struct {
-	FirstName        *string `json:"firstName,omitempty"`
-	LastName         *string `json:"lastName,omitempty"`
-	Username         *string `json:"username,omitempty"`
-	Bio              *string `json:"bio,omitempty"`
-	PublicKey        *string `json:"publicKey,omitempty"`
-	EncryptedPrivKey *string `json:"encryptedPrivKey,omitempty"`
-	EncryptionIv     *string `json:"encryptionIv,omitempty"`
-	PhotoURL         *string `json:"photoUrl,omitempty"`
-	BotDescription   *string `json:"botDescription,omitempty"`
-	BotCommands      *string `json:"botCommands,omitempty"`
+	FirstName      *string `json:"firstName,omitempty"`
+	LastName       *string `json:"lastName,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	Bio            *string `json:"bio,omitempty"`
+	PhotoURL       *string `json:"photoUrl,omitempty"`
+	BotDescription *string `json:"botDescription,omitempty"`
+	BotCommands    *string `json:"botCommands,omitempty"`
 }
 
 type UserStatusPayload struct {
