@@ -151,15 +151,12 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) 
 	}
 
 	params := dbgen.UpdateUserParams{
-		ID:               uid,
-		FirstName:        database.ToNullString(req.FirstName),
-		LastName:         database.ToNullString(req.LastName),
-		Username:         database.ToNullString(req.Username),
-		PublicKey:        database.ToNullString(req.PublicKey),
-		EncryptedPrivKey: database.ToNullString(req.EncryptedPrivKey),
-		EncryptionIv:     database.ToNullString(req.EncryptionIv),
-		PhotoUrl:         database.ToNullString(req.PhotoUrl),
-		BotDescription:   database.ToNullString(req.BotDescription),
+		ID:             uid,
+		FirstName:      database.ToNullString(req.FirstName),
+		LastName:       database.ToNullString(req.LastName),
+		Username:       database.ToNullString(req.Username),
+		PhotoUrl:       database.ToNullString(req.PhotoUrl),
+		BotDescription: database.ToNullString(req.BotDescription),
 	}
 
 	if req.BotCommands != nil {
@@ -247,15 +244,6 @@ func (s *Server) mapDBToProto(u dbgen.User) *userpb.User {
 	}
 	if u.LastName.Valid {
 		res.LastName = &u.LastName.String
-	}
-	if u.PublicKey.Valid {
-		res.PublicKey = &u.PublicKey.String
-	}
-	if u.EncryptedPrivKey.Valid {
-		res.EncryptedPrivKey = &u.EncryptedPrivKey.String
-	}
-	if u.EncryptionIv.Valid {
-		res.EncryptionIv = &u.EncryptionIv.String
 	}
 	if u.PhotoUrl.Valid {
 		res.PhotoUrl = &u.PhotoUrl.String

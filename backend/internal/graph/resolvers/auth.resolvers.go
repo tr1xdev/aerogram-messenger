@@ -159,28 +159,9 @@ func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// Sessions is the resolver for the sessions field.
-func (r *queryResolver) Sessions(ctx context.Context, userID string) ([]*dbgen.Session, error) {
-	authID := middleware.GetUserID(ctx)
-	if authID != userID {
-		return nil, fmt.Errorf("permission denied")
-	}
-
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user id")
-	}
-
-	dbSessions, err := r.Store.GetSessionsByUserID(ctx, uid)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]*dbgen.Session, len(dbSessions))
-	for i := range dbSessions {
-		res[i] = &dbSessions[i]
-	}
-	return res, nil
+// MySessions is the resolver for the mySessions field.
+func (r *queryResolver) MySessions(ctx context.Context) ([]*dbgen.Session, error) {
+	panic(fmt.Errorf("not implemented: MySessions - mySessions"))
 }
 
 // ID is the resolver for the id field.
@@ -222,3 +203,34 @@ func (r *sessionResolver) CreatedAt(ctx context.Context, obj *dbgen.Session) (st
 func (r *Resolver) Session() graph.SessionResolver { return &sessionResolver{r} }
 
 type sessionResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *queryResolver) Sessions(ctx context.Context, userID string) ([]*dbgen.Session, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID != userID {
+		return nil, fmt.Errorf("permission denied")
+	}
+
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id")
+	}
+
+	dbSessions, err := r.Store.GetSessionsByUserID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*dbgen.Session, len(dbSessions))
+	for i := range dbSessions {
+		res[i] = &dbSessions[i]
+	}
+	return res, nil
+}
+*/

@@ -2,6 +2,7 @@ package messages_svc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -88,8 +89,8 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		DialogID:     chatID,
 		AuthorID:     senderID,
 		Content:      req.Text,
-		IsEncrypted:  req.IsEncrypted,
-		EncryptionIv: database.ToNullString(req.EncryptionIv),
+		IsEncrypted:  false,
+		EncryptionIv: sql.NullString{Valid: false},
 		ReplyToID:    database.ToNullUUIDPtr(req.ReplyToId),
 		IsSystem:     false,
 	})
@@ -160,7 +161,12 @@ func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryReque
 		limit = 50
 	}
 
-	msgs, err := s.messageRepo.GetHistory(ctx, cid, limit, req.Offset)
+	var beforeSeq int64
+	if req.BeforeSequence != nil {
+		beforeSeq = *req.BeforeSequence
+	}
+
+	msgs, err := s.messageRepo.GetHistory(ctx, cid, limit, int32(beforeSeq))
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to fetch history")
 	}
@@ -232,13 +238,17 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 		ID:           id,
 		AuthorID:     sid,
 		Content:      req.Text,
-		EncryptionIv: database.ToNullString(req.EncryptionIv),
+		EncryptionIv: sql.NullString{Valid: false},
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update message")
 	}
 
-	return &messagespb.UpdateMessageResponse{Message: s.mapDBToProto(msg)}, nil
+	protoMsg := s.mapDBToProto(msg)
+	msgPayload, _ := json.Marshal(protoMsg)
+	_ = s.rdb.Publish(ctx, "chat:"+msg.DialogID.String()+":updated", msgPayload)
+
+	return &messagespb.UpdateMessageResponse{Message: protoMsg}, nil
 }
 
 func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessageRequest) (*messagespb.DeleteMessageResponse, error) {
@@ -260,8 +270,12 @@ func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessag
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
 
-	if err := s.messageRepo.Delete(ctx, id, sid); err != nil {
-		return nil, status.Error(codes.Internal, "failed to delete message")
+	msg, err := s.messageRepo.GetByID(ctx, id)
+	if err == nil {
+		if err := s.messageRepo.Delete(ctx, id, sid); err != nil {
+			return nil, status.Error(codes.Internal, "failed to delete message")
+		}
+		_ = s.rdb.Publish(ctx, "chat:"+msg.DialogID.String()+":deleted", id.String())
 	}
 
 	return &messagespb.DeleteMessageResponse{Success: true}, nil
@@ -269,19 +283,14 @@ func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessag
 
 func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 	pb := &messagespb.Message{
-		Id:          m.ID.String(),
-		ChatId:      m.DialogID.String(),
-		SenderId:    m.AuthorID.String(),
-		Text:        m.Content,
-		SentAt:      m.CreatedAt.Format(time.RFC3339),
-		Sequence:    m.Sequence,
-		IsEdited:    m.IsEdited,
-		IsEncrypted: m.IsEncrypted,
-		IsSystem:    m.IsSystem,
-	}
-	if m.EncryptionIv.Valid {
-		iv := m.EncryptionIv.String
-		pb.EncryptionIv = &iv
+		Id:       m.ID.String(),
+		ChatId:   m.DialogID.String(),
+		SenderId: m.AuthorID.String(),
+		Text:     m.Content,
+		SentAt:   m.CreatedAt.Format(time.RFC3339),
+		Sequence: m.Sequence,
+		IsEdited: m.IsEdited,
+		IsSystem: m.IsSystem,
 	}
 	if m.ReplyToID.Valid {
 		rid := m.ReplyToID.UUID.String()
@@ -292,27 +301,21 @@ func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 
 func (s *Server) mapHistoryRowToProto(m dbgen.GetChatHistoryRow) *messagespb.Message {
 	pb := &messagespb.Message{
-		Id:          m.ID.String(),
-		ChatId:      m.DialogID.String(),
-		SenderId:    m.AuthorID.String(),
-		Text:        m.Content,
-		SentAt:      m.CreatedAt.Format(time.RFC3339),
-		Sequence:    m.Sequence,
-		IsEdited:    m.IsEdited,
-		IsEncrypted: m.IsEncrypted,
-		IsSystem:    m.IsSystem,
+		Id:       m.ID.String(),
+		ChatId:   m.DialogID.String(),
+		SenderId: m.AuthorID.String(),
+		Text:     m.Content,
+		SentAt:   m.CreatedAt.Format(time.RFC3339),
+		Sequence: m.Sequence,
+		IsEdited: m.IsEdited,
+		IsSystem: m.IsSystem,
 		Sender: &messagespb.User{
 			Id:        m.AuthorID.String(),
 			Username:  m.AuthorUsername.String,
 			FirstName: m.AuthorFirstName,
 			LastName:  m.AuthorLastName.String,
-			PublicKey: m.AuthorPublicKey.String,
 			PhotoUrl:  m.AuthorPhotoUrl.String,
 		},
-	}
-	if m.EncryptionIv.Valid {
-		iv := m.EncryptionIv.String
-		pb.EncryptionIv = &iv
 	}
 	if m.ReplyToID.Valid {
 		rid := m.ReplyToID.UUID.String()
