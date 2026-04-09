@@ -120,6 +120,14 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	msgPayload, _ := json.Marshal(protoMsg)
 	_ = s.rdb.Publish(ctx, "chat:"+req.ChatId, msgPayload)
 
+	readPayload := map[string]interface{}{
+		"chatId":       req.ChatId,
+		"userId":       senderIDStr,
+		"lastSequence": msg.Sequence,
+	}
+	readData, _ := json.Marshal(readPayload)
+	_ = s.rdb.Publish(ctx, "chat:"+req.ChatId+":read", readData)
+
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
 	if err == nil {
 		protoChat := s.mapDBDialogToProto(dialog)
@@ -291,6 +299,9 @@ func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 		Sequence: m.Sequence,
 		IsEdited: m.IsEdited,
 		IsSystem: m.IsSystem,
+		Sender: &messagespb.User{
+			Id: m.AuthorID.String(),
+		},
 	}
 	if m.ReplyToID.Valid {
 		rid := m.ReplyToID.UUID.String()

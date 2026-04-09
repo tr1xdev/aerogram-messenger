@@ -15,9 +15,14 @@ import {
   CHAT_DELETED_SUBSCRIPTION,
   USER_PRESENCE_SUBSCRIPTION,
   USER_TYPING_SUBSCRIPTION,
-  GET_MESSAGE_HISTORY,
 } from "@/features/chat/api";
 import type { Message } from "@/entities/chat/model/types";
+
+interface MyChatsData {
+  chats: Reference[];
+  __typename?: string;
+  [key: string]: unknown;
+}
 
 interface MessageAddedData {
   messageAdded: Message;
@@ -42,11 +47,6 @@ interface TypingData {
   };
 }
 
-interface MyChatsData {
-  chats: Reference[];
-  __typename?: string;
-}
-
 export function useGlobalSubscriptions(
   chatId: string | undefined,
   myId: string | undefined,
@@ -68,89 +68,83 @@ export function useGlobalSubscriptions(
         newMessage.chatId === activeChatId &&
         document.visibilityState === "visible";
 
-      console.log(`[SUBSCRIPTION:MESSAGE] New message ${newMessage.id}`, {
-        chatId: newMessage.chatId,
-        isFromMe,
-        isCurrentChatActive,
-        seq: newMessage.sequence,
-      });
+      cache.modify({
+        id: "ROOT_QUERY",
+        fields: {
+          messageHistory(
+            existing: StoreObject | Reference | undefined,
+            { storeFieldName, toReference, readField }: ModifierDetails,
+          ): StoreObject | Reference | undefined {
+            if (!existing || !storeFieldName.includes(newMessage.chatId)) {
+              return existing;
+            }
 
-      const historyVars = {
-        chatId: newMessage.chatId,
-        limit: 50,
-      };
+            const messageRef: Reference | null =
+              toReference(newMessage as unknown as StoreObject) ?? null;
 
-      const existingHistory = cache.readQuery<{
-        messageHistory: { messages: Message[] };
-      }>({
-        query: GET_MESSAGE_HISTORY,
-        variables: historyVars,
-      });
+            if (!messageRef) return existing;
 
-      if (existingHistory?.messageHistory) {
-        cache.writeQuery({
-          query: GET_MESSAGE_HISTORY,
-          variables: historyVars,
-          data: {
-            messageHistory: {
-              ...existingHistory.messageHistory,
-              messages: [
-                ...existingHistory.messageHistory.messages.filter(
-                  (m: Message): boolean => m.id !== newMessage.id,
-                ),
-                newMessage,
-              ].sort(
-                (a: Message, b: Message): number =>
-                  (a.sequence ?? 0) - (b.sequence ?? 0),
-              ),
-            },
+            const existingMessages: Reference[] =
+              (readField("messages", existing as StoreObject) as Reference[]) ||
+              [];
+
+            const newMessageId: string | undefined = cache.identify(
+              newMessage as unknown as StoreObject,
+            );
+
+            const exists: boolean = existingMessages.some(
+              (ref: Reference): boolean => cache.identify(ref) === newMessageId,
+            );
+
+            if (exists) return existing;
+
+            const newMessages: Reference[] = [
+              ...existingMessages,
+              messageRef,
+            ].sort((a: Reference, b: Reference): number => {
+              const seqA: number = (readField("sequence", a) as number) ?? 0;
+              const seqB: number = (readField("sequence", b) as number) ?? 0;
+              return seqA - seqB;
+            });
+
+            return {
+              ...(existing as StoreObject),
+              messages: newMessages,
+            };
           },
-        });
-      }
+        },
+      });
 
       const chatCacheId: string | undefined = cache.identify({
         __typename: "Chat",
         id: newMessage.chatId,
-      });
+      } as StoreObject);
 
       if (chatCacheId) {
         cache.modify({
           id: chatCacheId,
           fields: {
-            lastMessage: (
-              existing: Reference | Message | undefined,
+            lastMessage(
+              existing: Reference | StoreObject | undefined,
               { readField }: ModifierDetails,
-            ): Reference | Message | undefined => {
-              const objToRead: StoreObject | undefined = existing
-                ? (existing as unknown as StoreObject)
-                : undefined;
-
+            ): Reference | Message {
               const existingSeq: number =
-                (readField("sequence", objToRead) as number) ?? 0;
+                (readField("sequence", existing as StoreObject) as number) ?? 0;
               const newSeq: number = newMessage.sequence ?? 0;
-
-              return existing && existingSeq > newSeq ? existing : newMessage;
+              return existing && existingSeq > newSeq
+                ? (existing as Reference)
+                : newMessage;
             },
-            unreadCount: (prev: number | undefined): number => {
-              const currentCount: number = typeof prev === "number" ? prev : 0;
-
-              if (isFromMe) return 0;
-
-              if (isCurrentChatActive) {
-                console.log(
-                  `[CACHE:MODIFY] Unread incremented (active chat). useMarkDialog will handle reset.`,
-                );
-                return currentCount + 1;
-              }
-
+            unreadCount(prev: number | undefined): number {
+              const currentCount: number = prev ?? 0;
+              if (isFromMe || isCurrentChatActive) return currentCount;
               return currentCount + 1;
             },
-            myReadSequence: (prev: number | undefined): number => {
-              const currentPrev: number = typeof prev === "number" ? prev : 0;
-              if (isFromMe) {
-                return Math.max(currentPrev, newMessage.sequence ?? 0);
-              }
-              return currentPrev;
+            myReadSequence(prev: number | undefined): number {
+              const currentPrev: number = prev ?? 0;
+              return isFromMe
+                ? Math.max(currentPrev, newMessage.sequence ?? 0)
+                : currentPrev;
             },
           },
         });
@@ -161,22 +155,31 @@ export function useGlobalSubscriptions(
               existingData: MyChatsData | Reference | undefined,
               { readField }: ModifierDetails,
             ): MyChatsData | Reference | undefined {
-              if (!existingData || !("chats" in existingData))
-                return existingData;
+              if (!existingData) return existingData;
+
+              const chats: Reference[] =
+                "chats" in (existingData as object)
+                  ? (existingData as MyChatsData).chats
+                  : (readField(
+                      "chats",
+                      existingData as StoreObject,
+                    ) as Reference[]) || [];
 
               const chatRef: Reference = { __ref: chatCacheId };
-              const chats: Reference[] =
-                (existingData as MyChatsData).chats || [];
-
               const filtered: Reference[] = chats.filter(
                 (ref: Reference): boolean =>
-                  readField("id", ref) !== newMessage.chatId,
+                  readField("id", ref as unknown as StoreObject) !==
+                  newMessage.chatId,
               );
 
-              return {
-                ...existingData,
-                chats: [chatRef, ...filtered],
-              };
+              if ("chats" in (existingData as object)) {
+                return {
+                  ...(existingData as MyChatsData),
+                  chats: [chatRef, ...filtered],
+                };
+              }
+
+              return existingData;
             },
           },
         });
@@ -192,44 +195,26 @@ export function useGlobalSubscriptions(
         data.data?.dialogRead;
       if (!payload) return;
 
-      console.log(
-        `[SUBSCRIPTION:READ] Event: User ${payload.userId} read seq ${payload.lastSequence}`,
-      );
-
       const chatRef: string | undefined = client.cache.identify({
         __typename: "Chat",
         id: payload.chatId,
-      });
-
+      } as StoreObject);
       if (chatRef) {
         client.cache.modify({
           id: chatRef,
           fields: {
-            lastReadSequence: (prev: number | undefined = 0): number => {
-              const currentPrev: number = typeof prev === "number" ? prev : 0;
-              if (payload.userId !== myId) {
-                console.log(
-                  `[CACHE:MODIFY] Peer read: ${currentPrev} -> ${payload.lastSequence}`,
-                );
-                return Math.max(currentPrev, payload.lastSequence);
-              }
-              return currentPrev;
+            lastReadSequence(prev: number = 0): number {
+              return payload.userId !== myId
+                ? Math.max(prev, payload.lastSequence)
+                : prev;
             },
-            myReadSequence: (prev: number | undefined = 0): number => {
-              const currentPrev: number = typeof prev === "number" ? prev : 0;
-              if (payload.userId === myId) {
-                console.log(
-                  `[CACHE:MODIFY] I read: ${currentPrev} -> ${payload.lastSequence}`,
-                );
-                return Math.max(currentPrev, payload.lastSequence);
-              }
-              return currentPrev;
+            myReadSequence(prev: number = 0): number {
+              return payload.userId === myId
+                ? Math.max(prev, payload.lastSequence)
+                : prev;
             },
-            unreadCount: (prev: number | undefined = 0): number => {
-              if (payload.userId === myId) {
-                return 0;
-              }
-              return typeof prev === "number" ? prev : 0;
+            unreadCount(prev: number = 0): number {
+              return payload.userId === myId ? 0 : prev;
             },
           },
         });
@@ -244,17 +229,17 @@ export function useGlobalSubscriptions(
       const payload: TypingData["userTyping"] | undefined =
         data.data?.userTyping;
       if (!payload || payload.userId === myId) return;
-
       const userRef: string | undefined = client.cache.identify({
         __typename: "User",
         id: payload.userId,
-      });
-
+      } as StoreObject);
       if (userRef) {
         client.cache.modify({
           id: userRef,
           fields: {
-            isTyping: (): boolean => payload.isTyping,
+            isTyping(): boolean {
+              return payload.isTyping;
+            },
           },
         });
       }
@@ -268,18 +253,20 @@ export function useGlobalSubscriptions(
       const payload: StatusChanged["userStatusChanged"] | undefined =
         data.data?.userStatusChanged;
       if (!payload) return;
-
       const userRef: string | undefined = client.cache.identify({
         __typename: "User",
         id: payload.userId,
-      });
-
+      } as StoreObject);
       if (userRef) {
         client.cache.modify({
           id: userRef,
           fields: {
-            status: (): string => payload.status,
-            lastSeen: (): string | undefined => payload.lastSeen,
+            status(): string {
+              return payload.status;
+            },
+            lastSeen(): string | undefined {
+              return payload.lastSeen;
+            },
           },
         });
       }
@@ -293,12 +280,10 @@ export function useGlobalSubscriptions(
       const deletedInfo: ChatDeletedData["chatDeleted"] | undefined =
         data.data?.chatDeleted;
       if (!deletedInfo) return;
-
       const chatCacheId: string | undefined = client.cache.identify({
         __typename: "Chat",
         id: deletedInfo.chatId,
-      });
-
+      } as StoreObject);
       if (chatCacheId) {
         client.cache.modify({
           fields: {
@@ -306,16 +291,24 @@ export function useGlobalSubscriptions(
               existingData: MyChatsData | Reference | undefined,
               { readField }: ModifierDetails,
             ): MyChatsData | Reference | undefined {
-              if (!existingData || !("chats" in existingData))
-                return existingData;
+              if (!existingData) return existingData;
+
+              const chats: Reference[] =
+                "chats" in (existingData as object)
+                  ? (existingData as MyChatsData).chats
+                  : (readField(
+                      "chats",
+                      existingData as StoreObject,
+                    ) as Reference[]) || [];
 
               return {
-                ...existingData,
-                chats: (existingData as MyChatsData).chats.filter(
+                ...(existingData as object),
+                chats: chats.filter(
                   (ref: Reference): boolean =>
-                    readField("id", ref) !== deletedInfo.chatId,
+                    readField("id", ref as unknown as StoreObject) !==
+                    deletedInfo.chatId,
                 ),
-              };
+              } as MyChatsData;
             },
           },
         });
