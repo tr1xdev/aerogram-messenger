@@ -88,7 +88,7 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 				defer ticker.Stop()
 
 				initialCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				res.PresenceClient.SetOnline(initialCtx, &presencepb.SetOnlineRequest{UserId: userID})
+				_, _ = res.PresenceClient.SetOnline(initialCtx, &presencepb.SetOnlineRequest{UserId: userID})
 				cancel()
 
 				for {
