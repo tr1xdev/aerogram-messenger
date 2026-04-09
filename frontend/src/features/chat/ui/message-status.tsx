@@ -2,6 +2,7 @@ import { Check, CheckCheck, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MessageStatusProps {
+  messageId?: string;
   isSending?: boolean;
   isMe: boolean;
   sequence: number;
@@ -10,6 +11,7 @@ interface MessageStatusProps {
 }
 
 export function MessageStatus({
+  messageId,
   isSending,
   isMe,
   sequence,
@@ -18,7 +20,10 @@ export function MessageStatus({
 }: MessageStatusProps) {
   if (!isMe) return null;
 
-  const isActuallyRead: boolean = sequence <= lastReadSequence;
+  const isTemp: boolean = messageId?.startsWith("temp-") ?? false;
+  const isPending: boolean = isSending || isTemp || sequence === 0;
+  const isActuallyRead: boolean =
+    !isPending && sequence > 0 && sequence <= lastReadSequence;
 
   return (
     <div
@@ -27,7 +32,7 @@ export function MessageStatus({
         className,
       )}
     >
-      {isSending ? (
+      {isPending ? (
         <Clock className="h-3 w-3 animate-pulse opacity-70" strokeWidth={2.5} />
       ) : isActuallyRead ? (
         <CheckCheck className="h-3.5 w-3.5 text-inherit" strokeWidth={2.5} />

@@ -1,12 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
-import { useApolloClient } from "@apollo/client/react";
-import { gql } from "@apollo/client/index.js";
+import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import { Skeleton } from "@/components/ui/skeleton";
-import { decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type { Chat, Message } from "@/entities/chat/model/types";
 import {
   LuTerminal,
@@ -74,117 +70,18 @@ const previewComponents: Components = {
 
 export function LastMessageContent({
   message,
-  myId,
-  chat,
 }: LastMessageContentProps): React.ReactNode {
-  const client = useApolloClient();
-  const [decryptedText, setDecryptedText] = useState<string | null>(null);
-  const [isDecrypting, setIsDecrypting] = useState<boolean>(
-    message.isEncrypted,
-  );
-  const [lastProcessedId, setLastProcessedId] = useState<string | null>(null);
-
-  if (lastProcessedId !== message.id) {
-    setLastProcessedId(message.id);
-    setIsDecrypting(message.isEncrypted);
-    setDecryptedText(null);
-  }
-
-  const senderId: string = message.sender.id;
-  const senderPublicKey: string | undefined = message.sender.publicKey;
-  const encryptionIv: string | undefined = message.encryptionIv;
-  const isEncrypted: boolean = message.isEncrypted;
-  const messageText: string = message.text;
-
-  useEffect((): (() => void) => {
-    let isMounted: boolean = true;
-    if (!isEncrypted) return (): void => {};
-
-    const performDecryption = async (): Promise<void> => {
-      try {
-        const myPrivKeyObj = await getPrivateKey(myId);
-        const isMe: boolean = senderId === myId;
-        let targetPublicKey: string | null | undefined = isMe
-          ? null
-          : senderPublicKey;
-
-        if (isMe) {
-          const otherMember = chat.members?.find((m) => m.user.id !== myId);
-          targetPublicKey = otherMember?.user.publicKey;
-        }
-
-        if (!targetPublicKey && !isMe) {
-          const userInCache = client.cache.readFragment<{ publicKey: string }>({
-            id: client.cache.identify({ __typename: "User", id: senderId }),
-            fragment: gql`
-              fragment UserKey on User {
-                publicKey
-              }
-            `,
-          });
-          targetPublicKey = userInCache?.publicKey;
-        }
-
-        if (!targetPublicKey || !myPrivKeyObj || !encryptionIv) {
-          if (isMounted) {
-            setDecryptedText("Encrypted");
-            setIsDecrypting(false);
-          }
-          return;
-        }
-
-        const clearText: string = await decryptText(
-          messageText,
-          encryptionIv,
-          targetPublicKey,
-          myPrivKeyObj,
-        );
-
-        if (isMounted) {
-          setDecryptedText(clearText);
-          setIsDecrypting(false);
-        }
-      } catch {
-        if (isMounted) {
-          setDecryptedText("Decryption error");
-          setIsDecrypting(false);
-        }
-      }
-    };
-
-    performDecryption();
-    return (): void => {
-      isMounted = false;
-    };
-  }, [
-    message.id,
-    messageText,
-    encryptionIv,
-    isEncrypted,
-    senderId,
-    senderPublicKey,
-    myId,
-    chat.members,
-    client.cache,
-  ]);
-
-  const rawContent: string | null = isEncrypted ? decryptedText : messageText;
-
   const content = useMemo((): React.ReactNode => {
-    if (!rawContent) return null;
+    if (!message.text) return null;
     return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={previewComponents}
       >
-        {rawContent}
+        {message.text}
       </ReactMarkdown>
     );
-  }, [rawContent]);
-
-  if (isDecrypting && !decryptedText) {
-    return <Skeleton className="h-3 w-24 mt-1" />;
-  }
+  }, [message.text]);
 
   return (
     <div
@@ -195,9 +92,7 @@ export function LastMessageContent({
         WebkitLineClamp: 2,
       }}
     >
-      <span className="inline">
-        {content || (isEncrypted ? "Encrypted" : "")}
-      </span>
+      <span className="inline">{content}</span>
     </div>
   );
 }

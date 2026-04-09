@@ -21,21 +21,15 @@ interface DebugData {
   id: string;
   seq: number | undefined;
   type: "reply" | "forward" | "message";
-  encryption: {
-    enabled: boolean;
-    iv: string | undefined;
-  };
   meta: {
     sentAt: string | Date;
     isEdited: boolean | undefined;
   };
   sender: {
     id: string;
-    key: string | undefined;
   };
   replyTo: {
     id: string;
-    isEncrypted: boolean;
     senderId: string;
   } | null;
 }
@@ -57,24 +51,16 @@ export const MessageInfoDialog = memo(function MessageInfoDialog({
         : message.forwardedFrom
           ? "forward"
           : "message",
-      encryption: {
-        enabled: message.isEncrypted,
-        iv: message.encryptionIv,
-      },
       meta: {
         sentAt: message.sentAt,
         isEdited: message.isEdited,
       },
       sender: {
         id: message.sender.id,
-        key: message.sender.publicKey
-          ? message.sender.publicKey.slice(0, 16) + "..."
-          : undefined,
       },
       replyTo: message.replyTo
         ? {
             id: message.replyTo.id,
-            isEncrypted: message.replyTo.isEncrypted,
             senderId: message.replyTo.sender.id,
           }
         : null,
