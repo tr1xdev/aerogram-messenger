@@ -57,38 +57,30 @@ export const MessageList = memo(function MessageList({
             <div key={g.date} className="flex flex-col mb-6">
               <DateDivider date={g.items[0].sentAt} />
               <div className="flex flex-col space-y-1">
-                <AnimatePresence initial={false} mode="popLayout">
-                  {g.items.map((m: Message) => {
-                    const isTemp = m.id.startsWith("temp-");
-                    const key = isTemp
-                      ? `temp-${m.sentAt}-${m.text.slice(0, 10)}`
-                      : m.id;
+                {/* Убрали AnimatePresence и motion.div с анимацией появления/layout.
+                  Теперь список ведет себя как стандартный HTML-список,
+                  а плавность обеспечивает useChatScroll.
+                */}
+                {g.items.map((m: Message) => {
+                  const isTemp = m.id.startsWith("temp-");
+                  const key = isTemp
+                    ? `temp-${m.sentAt}-${m.text.slice(0, 10)}`
+                    : m.id;
 
-                    return (
-                      <motion.div
-                        key={key}
-                        layout
-                        initial={isTemp ? { opacity: 0, y: 10 } : false}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{
-                          opacity: { duration: 0.15 },
-                          layout: { duration: 0.15 },
-                        }}
-                      >
-                        <MessageBubble
-                          message={m}
-                          myId={myId ?? ""}
-                          lastReadSequence={lastReadSequence}
-                          isMe={m.sender.id === myId}
-                          isRead={m.isRead}
-                          onReply={onReply}
-                          onEdit={onEdit}
-                        />
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
+                  return (
+                    <div key={key}>
+                      <MessageBubble
+                        message={m}
+                        myId={myId ?? ""}
+                        lastReadSequence={lastReadSequence}
+                        isMe={m.sender.id === myId}
+                        isRead={m.isRead}
+                        onReply={onReply}
+                        onEdit={onEdit}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
