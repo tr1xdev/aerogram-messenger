@@ -22,11 +22,22 @@ export function useChatScroll({
   const [showScrollBtn, setShowScrollBtn] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  const isInitialLoad = useRef<boolean>(true);
-  const prevChatId = useRef<string | null>(null);
+  const [prevChatId, setPrevChatId] = useState<string | null>(null);
+
+  const isInitialLoadRef = useRef<boolean>(true);
+  const prevMessagesLengthRef = useRef<number>(0);
+  const lastProcessedChatIdRef = useRef<string | null>(null);
   const isNearBottomRef = useRef<boolean>(true);
-  const prevMessagesLength = useRef<number>(0);
   const isScrollingToBottom = useRef<boolean>(false);
+
+  const currentChatId: string | null =
+    messages.length > 0 ? messages[0].chatId : null;
+
+  if (currentChatId !== prevChatId) {
+    setPrevChatId(currentChatId);
+    setShowScrollBtn(false);
+    setUnreadCount(0);
+  }
 
   const getViewport = useCallback((): HTMLElement | null => {
     return scrollRef.current?.querySelector(
@@ -41,7 +52,7 @@ export function useChatScroll({
     const { scrollTop, scrollHeight, clientHeight } = viewport;
     const distanceToBottom: number = scrollHeight - scrollTop - clientHeight;
 
-    const isAtBottom: boolean = distanceToBottom < 30;
+    const isAtBottom: boolean = distanceToBottom < 35;
     isNearBottomRef.current = distanceToBottom < 150;
 
     if (isScrollingToBottom.current && isAtBottom) {
@@ -49,16 +60,18 @@ export function useChatScroll({
     }
 
     if (!isScrollingToBottom.current) {
-      setShowScrollBtn(!isAtBottom);
+      const shouldShow: boolean = distanceToBottom > 250 || unreadCount > 0;
+      setShowScrollBtn((prev: boolean): boolean => {
+        if (prev !== shouldShow) return shouldShow;
+        return prev;
+      });
     }
 
     if (isAtBottom) {
-      if (unreadCount > 0) {
-        requestAnimationFrame((): void => setUnreadCount(0));
-      }
+      setUnreadCount(0);
       onMarkRead();
     }
-  }, [getViewport, unreadCount, onMarkRead]);
+  }, [getViewport, onMarkRead, unreadCount]);
 
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = "smooth"): void => {
@@ -67,37 +80,46 @@ export function useChatScroll({
 
       if (behavior === "smooth") {
         isScrollingToBottom.current = true;
+        setShowScrollBtn(false);
       }
 
-      requestAnimationFrame((): void => {
+      const performScroll = (): void => {
+        if (!viewport) return;
         viewport.scrollTo({
           top: viewport.scrollHeight,
           behavior,
         });
+      };
+
+      requestAnimationFrame((): void => {
+        performScroll();
+        if (behavior === "smooth") {
+          setTimeout(performScroll, 50);
+          setTimeout(performScroll, 150);
+        }
       });
     },
     [getViewport],
   );
 
   useLayoutEffect((): void => {
-    const currentChatId: string | null =
-      messages.length > 0 ? messages[0].chatId : null;
-    if (!currentChatId) return;
-
-    if (prevChatId.current !== currentChatId) {
-      prevChatId.current = currentChatId;
-      isInitialLoad.current = true;
-      prevMessagesLength.current = 0;
+    if (lastProcessedChatIdRef.current !== currentChatId) {
+      lastProcessedChatIdRef.current = currentChatId;
+      isInitialLoadRef.current = true;
+      prevMessagesLengthRef.current = 0;
     }
 
-    if (isInitialLoad.current && messages.length > 0) {
-      scrollToBottom("instant");
-      isInitialLoad.current = false;
+    if (isInitialLoadRef.current && messages.length > 0) {
+      isInitialLoadRef.current = false;
       isNearBottomRef.current = true;
-      prevMessagesLength.current = messages.length;
-      requestAnimationFrame((): void => setUnreadCount(0));
+      prevMessagesLengthRef.current = messages.length;
+
+      const viewport: HTMLElement | null = getViewport();
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, currentChatId, getViewport]);
 
   useEffect((): (() => void) | void => {
     const viewport: HTMLElement | null = getViewport();
@@ -108,29 +130,48 @@ export function useChatScroll({
     if (!content) return;
 
     const resizeObserver: ResizeObserver = new ResizeObserver((): void => {
-      if (isInitialLoad.current) return;
-
-      const lastMsg: Message | undefined = messages[messages.length - 1];
-      if (!lastMsg) return;
+      if (
+        isInitialLoadRef.current ||
+        lastProcessedChatIdRef.current !== currentChatId
+      ) {
+        return;
+      }
 
       const isNewMessage: boolean =
-        messages.length > prevMessagesLength.current;
-      const isMe: boolean = lastMsg.sender.id === myId;
+        messages.length > prevMessagesLengthRef.current;
 
       if (isNewMessage) {
+        const lastMsg: Message | undefined = messages[messages.length - 1];
+        if (!lastMsg) return;
+
+        const isMe: boolean = lastMsg.sender.id === myId;
+
         if (isMe || isNearBottomRef.current) {
+          setShowScrollBtn(false);
           scrollToBottom("smooth");
+          if (isNearBottomRef.current) {
+            onMarkRead();
+          }
         } else {
           setUnreadCount((prev: number): number => prev + 1);
+          setShowScrollBtn(true);
+        }
+      } else if (isNearBottomRef.current && !isScrollingToBottom.current) {
+        const viewportNow: HTMLElement | null = getViewport();
+        if (viewportNow) {
+          viewportNow.scrollTo({
+            top: viewportNow.scrollHeight,
+            behavior: "auto",
+          });
         }
       }
 
-      prevMessagesLength.current = messages.length;
+      prevMessagesLengthRef.current = messages.length;
     });
 
     resizeObserver.observe(content);
     return (): void => resizeObserver.disconnect();
-  }, [messages, myId, scrollToBottom, getViewport]);
+  }, [messages, currentChatId, myId, scrollToBottom, getViewport, onMarkRead]);
 
   useEffect((): (() => void) => {
     const viewport: HTMLElement | null = getViewport();

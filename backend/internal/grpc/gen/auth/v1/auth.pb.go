@@ -412,8 +412,8 @@ func (x *SignUpRequest) GetUsername() string {
 type SignUpResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	AccessToken   *string                `protobuf:"bytes,2,opt,name=access_token,json=accessToken,proto3,oneof" json:"access_token,omitempty"`    // returned only if 2fa is bypassed
-	RefreshToken  *string                `protobuf:"bytes,3,opt,name=refresh_token,json=refreshToken,proto3,oneof" json:"refresh_token,omitempty"` // returned only if 2fa is bypassed
+	AccessToken   *string                `protobuf:"bytes,2,opt,name=access_token,json=accessToken,proto3,oneof" json:"access_token,omitempty"`
+	RefreshToken  *string                `protobuf:"bytes,3,opt,name=refresh_token,json=refreshToken,proto3,oneof" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -524,8 +524,8 @@ func (x *LoginRequest) GetPassword() string {
 type LoginResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	AccessToken   *string                `protobuf:"bytes,2,opt,name=access_token,json=accessToken,proto3,oneof" json:"access_token,omitempty"`    // returned only if 2fa is bypassed
-	RefreshToken  *string                `protobuf:"bytes,3,opt,name=refresh_token,json=refreshToken,proto3,oneof" json:"refresh_token,omitempty"` // returned only if 2fa is bypassed
+	AccessToken   *string                `protobuf:"bytes,2,opt,name=access_token,json=accessToken,proto3,oneof" json:"access_token,omitempty"`
+	RefreshToken  *string                `protobuf:"bytes,3,opt,name=refresh_token,json=refreshToken,proto3,oneof" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

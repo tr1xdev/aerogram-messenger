@@ -17,14 +17,12 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 	senderID, _ := uuid.Parse(m.SenderId)
 
 	msg := &model.Message{
-		ID:           m.Id,
-		ChatID:       m.ChatId,
-		Text:         m.Text,
-		SentAt:       m.SentAt,
-		Sequence:     m.Sequence,
-		IsEdited:     m.IsEdited,
-		IsEncrypted:  m.IsEncrypted,
-		EncryptionIv: m.EncryptionIv,
+		ID:       m.Id,
+		ChatID:   m.ChatId,
+		Text:     m.Text,
+		SentAt:   m.SentAt,
+		Sequence: m.Sequence,
+		IsEdited: m.IsEdited,
 		Sender: &dbgen.User{
 			ID: senderID,
 		},
@@ -52,15 +50,13 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 	}
 
 	msg := &model.Message{
-		ID:           m.ID.String(),
-		ChatID:       m.DialogID.String(),
-		Text:         m.Content,
-		SentAt:       m.CreatedAt.Format(time.RFC3339),
-		Sequence:     m.Sequence,
-		IsEdited:     m.IsEdited,
-		IsEncrypted:  m.IsEncrypted,
-		EncryptionIv: NullStringToStringPtr(m.EncryptionIv),
-		Sender:       sender,
+		ID:       m.ID.String(),
+		ChatID:   m.DialogID.String(),
+		Text:     m.Content,
+		SentAt:   m.CreatedAt.Format(time.RFC3339),
+		Sequence: m.Sequence,
+		IsEdited: m.IsEdited,
+		Sender:   sender,
 	}
 
 	if m.ReplyToID.Valid {

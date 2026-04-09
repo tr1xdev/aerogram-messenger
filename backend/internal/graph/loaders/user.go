@@ -39,23 +39,20 @@ func newUserBatchFn(client userpb.UserServiceClient) dataloader.BatchFunc[string
 			if uid, err := uuid.Parse(u.Id); err == nil {
 				normalizedID := strings.ToLower(uid.String())
 				userMap[normalizedID] = &dbgen.User{
-					ID:               uid,
-					FirstName:        u.FirstName,
-					Email:            toNullString(u.Email),
-					LastName:         toNullString(u.LastName),
-					Username:         toNullString(u.Username),
-					PublicKey:        toNullString(u.PublicKey),
-					PhotoUrl:         toNullString(u.PhotoUrl),
-					EncryptedPrivKey: toNullString(u.EncryptedPrivKey),
-					EncryptionIv:     toNullString(u.EncryptionIv),
-					IsVerified:       u.IsVerified,
-					IsPremium:        u.IsPremium,
-					IsEmailVerified:  u.IsEmailVerified,
-					IsBot:            u.IsBot,
-					BotTokenHash:     toNullString(u.BotTokenHash),
-					BotOwnerID:       toNullUUID(u.BotOwnerId),
-					BotDescription:   toNullString(u.BotDescription),
-					BotCommands:      toNullRawMessage(u.BotCommands),
+					ID:              uid,
+					FirstName:       u.FirstName,
+					Email:           toNullString(u.Email),
+					LastName:        toNullString(u.LastName),
+					Username:        toNullString(u.Username),
+					PhotoUrl:        toNullString(u.PhotoUrl),
+					IsVerified:      u.IsVerified,
+					IsPremium:       u.IsPremium,
+					IsEmailVerified: u.IsEmailVerified,
+					IsBot:           u.IsBot,
+					BotTokenHash:    toNullString(u.BotTokenHash),
+					BotOwnerID:      toNullUUID(u.BotOwnerId),
+					BotDescription:  toNullString(u.BotDescription),
+					BotCommands:     toNullRawMessage(u.BotCommands),
 				}
 			}
 		}

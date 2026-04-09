@@ -6,8 +6,6 @@ type Message {
     sentAt: String!
     sequence: Long!
     isEdited: Boolean!
-    isEncrypted: Boolean!
-    encryptionIv: String
     replyTo: Message
     forwardedFrom: Message
 }
@@ -31,25 +29,15 @@ extend type Query {
     messageHistory(
         chatId: ID!
         limit: Int!
-        offset: Int!
+        beforeSequence: Long
     ): MessageHistoryResult!
     dialogRead(chatId: ID!): ReadPayload!
 }
 
 extend type Mutation {
-    sendMessage(
-        chatId: ID!
-        text: String!
-        isEncrypted: Boolean!
-        encryptionIv: String
-        replyToId: ID
-    ): SendMessageResult!
+    sendMessage(chatId: ID!, text: String!, replyToId: ID): SendMessageResult!
 
-    updateMessage(
-        id: ID!
-        text: String!
-        encryptionIv: String
-    ): SendMessageResult!
+    updateMessage(id: ID!, text: String!): SendMessageResult!
 
     deleteMessage(id: ID!): Boolean!
     markDialogAsRead(chatId: ID!): Boolean!
@@ -57,5 +45,7 @@ extend type Mutation {
 
 extend type Subscription {
     messageAdded(chatId: ID!): Message!
+    messageUpdated(chatId: ID!): Message!
+    messageDeleted(chatId: ID!): ID!
     dialogRead(chatId: ID!): ReadPayload!
 }

@@ -20,7 +20,6 @@ export interface ChatHistoryData {
 export interface ChatHistoryVariables {
   chatId: string;
   limit: number;
-  offset: number;
 }
 
 interface ChatHistoryHookResult {
@@ -40,7 +39,7 @@ export function useChatHistory(chatId: string): ChatHistoryHookResult {
     loading: boolean;
     error?: Error;
   } = useQuery<ChatHistoryData, ChatHistoryVariables>(GET_MESSAGE_HISTORY, {
-    variables: { chatId, limit: 50, offset: 0 },
+    variables: { chatId, limit: 50 },
     skip: !chatId,
     fetchPolicy: "cache-and-network",
     notifyOnNetworkStatusChange: true,

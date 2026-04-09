@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@apollo/client/react/index.js";
-import { type ApolloCache } from "@apollo/client";
+import { type ApolloCache } from "@apollo/client/index.js";
 import { toast } from "sonner";
 import {
   CREATE_DIRECT_CHAT,
@@ -11,6 +11,15 @@ import {
 import { useMyChats, type MyChatsResponse } from "./use-chats";
 import type { Chat, User } from "@/entities/chat/model/types";
 
+interface ChatError {
+  __typename: "ForbiddenError" | "ValidationError" | "InternalError";
+  message: string;
+}
+
+type CreateChatResponse = {
+  createDirectChat: (Chat & { __typename: "Chat" }) | ChatError;
+};
+
 export function useSearchUsers(username: string) {
   return useQuery<{ searchUsers: User[] }, { username: string }>(SEARCH_USERS, {
     variables: { username },
@@ -21,14 +30,15 @@ export function useSearchUsers(username: string) {
 export function useChatActions(chatId?: string) {
   const { data: myChatsData } = useMyChats();
 
-  const [createDirect] = useMutation<
-    { createDirectChat: Chat },
-    { userID: string }
-  >(CREATE_DIRECT_CHAT);
+  const [createDirect] = useMutation<CreateChatResponse, { userID: string }>(
+    CREATE_DIRECT_CHAT,
+  );
+
   const [pin] = useMutation<
     { pinChat: { success?: boolean } },
     { id: string; pinned: boolean }
   >(PIN_CHAT);
+
   const [remove] = useMutation<
     { deleteChat: { success?: boolean } },
     { id: string; forEveryone: boolean }
@@ -36,22 +46,31 @@ export function useChatActions(chatId?: string) {
 
   const createChat = async (userID: string): Promise<Chat | undefined> => {
     try {
-      const result = await createDirect({
+      const { data: mutationData } = await createDirect({
         variables: { userID },
-        update: (cache: ApolloCache, { data: mutationData }): void => {
-          const newChat = mutationData?.createDirectChat;
-          if (!newChat) return;
+        update: (cache: ApolloCache, { data: result }): void => {
+          const response = result?.createDirectChat;
+
+          if (!response || response.__typename !== "Chat") {
+            return;
+          }
+
+          const newChat: Chat = response;
+
           const queryData = cache.readQuery<MyChatsResponse>({
             query: GET_MY_CHATS,
           });
-          if (queryData?.myChats?.chats) {
-            const existingChats = queryData.myChats.chats;
+
+          if (queryData?.myChats && "chats" in queryData.myChats) {
+            const existingChats: Chat[] = queryData.myChats.chats;
+
             if (!existingChats.some((c) => c.id === newChat.id)) {
               cache.writeQuery<MyChatsResponse>({
                 query: GET_MY_CHATS,
                 data: {
                   myChats: {
                     ...queryData.myChats,
+                    __typename: "ChatList",
                     chats: [newChat, ...existingChats],
                   },
                 },
@@ -60,7 +79,18 @@ export function useChatActions(chatId?: string) {
           }
         },
       });
-      return result.data?.createDirectChat;
+
+      const finalResponse = mutationData?.createDirectChat;
+
+      if (finalResponse?.__typename === "Chat") {
+        return finalResponse;
+      }
+
+      if (finalResponse) {
+        toast.error(finalResponse.message);
+      }
+
+      return undefined;
     } catch {
       toast.error("Failed to create chat");
       return undefined;
@@ -70,8 +100,13 @@ export function useChatActions(chatId?: string) {
   const togglePin = async (pinned: boolean): Promise<void> => {
     if (!chatId) return;
     if (pinned) {
-      const pinnedCount =
-        myChatsData?.myChats.chats.filter((c: Chat) => c.isPinned).length ?? 0;
+      const chats =
+        myChatsData?.myChats && "chats" in myChatsData.myChats
+          ? myChatsData.myChats.chats
+          : [];
+
+      const pinnedCount = chats.filter((c: Chat) => c.isPinned).length;
+
       if (pinnedCount >= 5) {
         toast.error("Limit reached", {
           description: "You can pin up to 5 chats maximum.",
@@ -84,8 +119,14 @@ export function useChatActions(chatId?: string) {
         variables: { id: chatId, pinned },
         update: (cache: ApolloCache): void => {
           const chatRef = cache.identify({ __typename: "Chat", id: chatId });
-          if (chatRef)
-            cache.modify({ id: chatRef, fields: { isPinned: () => pinned } });
+          if (chatRef) {
+            cache.modify({
+              id: chatRef,
+              fields: {
+                isPinned: () => pinned,
+              },
+            });
+          }
         },
       });
     } catch {
@@ -102,17 +143,21 @@ export function useChatActions(chatId?: string) {
           const queryData = cache.readQuery<MyChatsResponse>({
             query: GET_MY_CHATS,
           });
-          if (queryData?.myChats?.chats) {
+
+          if (queryData?.myChats && "chats" in queryData.myChats) {
             cache.writeQuery<MyChatsResponse>({
               query: GET_MY_CHATS,
               data: {
                 myChats: {
                   ...queryData.myChats,
-                  chats: queryData.myChats.chats.filter((c) => c.id !== chatId),
+                  chats: queryData.myChats.chats.filter(
+                    (c: Chat) => c.id !== chatId,
+                  ),
                 },
               },
             });
           }
+
           const chatRef = cache.identify({ __typename: "Chat", id: chatId });
           if (chatRef) {
             cache.evict({ id: chatRef });

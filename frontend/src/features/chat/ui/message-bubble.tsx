@@ -7,7 +7,6 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Forward, Reply, Pencil, Trash2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { decryptText, getPrivateKey } from "@/shared/lib/crypto";
 import type { Message } from "@/entities/chat/model/types";
 import {
   ContextMenu,
@@ -25,7 +24,6 @@ interface MessageBubbleProps {
   myId: string;
   isRead?: boolean;
   lastReadSequence?: number;
-  peerPublicKey?: string;
   onDelete?: (id: string) => void;
   onEdit?: (message: Message) => void;
   onReply?: (message: Message) => void;
@@ -36,88 +34,17 @@ interface HighlightEvent extends Event {
   detail?: { id: string };
 }
 
-const isLikelyEncrypted = (str: string): boolean => {
-  if (!str || str.includes(" ") || str.length < 12) return false;
-  const base64Regex: RegExp = /^[A-Za-z0-9+/]*={0,2}$/;
-  if (!base64Regex.test(str)) return false;
-  try {
-    const decoded: string = atob(str);
-    return decoded.length >= 8;
-  } catch {
-    return false;
-  }
-};
-
 export const MessageBubble = memo(function MessageBubble({
   message,
   isMe,
-  myId,
   lastReadSequence,
-  peerPublicKey,
   onDelete,
   onEdit,
   onReply,
   onForward,
 }: MessageBubbleProps) {
-  const [decryptedText, setDecryptedText] = useState<string | null>(null);
-  const [decryptedReplyText, setDecryptedReplyText] = useState<string | null>(
-    null,
-  );
   const [isHighlighted, setIsHighlighted] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
-
-  useEffect((): (() => void) => {
-    let isMounted: boolean = true;
-
-    const decrypt = async (
-      text: string,
-      iv: string,
-      isMsgMe: boolean,
-      senderPub?: string,
-    ): Promise<string | null> => {
-      try {
-        if (!isLikelyEncrypted(text)) return text;
-        const privKeyObj = await getPrivateKey(myId);
-        const pubKey: string | undefined = isMsgMe ? peerPublicKey : senderPub;
-        if (!privKeyObj || !pubKey || !iv) return null;
-        return await decryptText(text, iv, pubKey, privKeyObj);
-      } catch {
-        return null;
-      }
-    };
-
-    const processAll = async (): Promise<void> => {
-      if (message.isEncrypted && message.encryptionIv) {
-        const res: string | null = await decrypt(
-          message.text,
-          message.encryptionIv,
-          isMe,
-          message.sender?.publicKey,
-        );
-        if (isMounted) {
-          setDecryptedText(res);
-          if (!res) setError("Decryption error");
-        }
-      }
-
-      if (message.replyTo?.isEncrypted && message.replyTo.encryptionIv) {
-        const isReplyMe: boolean = message.replyTo.sender?.id === myId;
-        const res: string | null = await decrypt(
-          message.replyTo.text,
-          message.replyTo.encryptionIv,
-          isReplyMe,
-          message.replyTo.sender?.publicKey,
-        );
-        if (isMounted) setDecryptedReplyText(res);
-      }
-    };
-
-    processAll();
-    return (): void => {
-      isMounted = false;
-    };
-  }, [message, myId, isMe, peerPublicKey]);
 
   const handleScrollToReply = (): void => {
     if (!message.replyTo) return;
@@ -172,24 +99,15 @@ export const MessageBubble = memo(function MessageBubble({
     };
   }, [message.id]);
 
-  const displayText: string = useMemo((): string => {
-    if (!message.isEncrypted) return message.text;
-    if (decryptedText) return decryptedText;
-    if (error) return error;
-    return "...";
-  }, [message.isEncrypted, message.text, decryptedText, error]);
-
-  const displayReplyText: string | undefined = message.replyTo?.isEncrypted
-    ? (decryptedReplyText ?? "...")
-    : message.replyTo?.text;
-
   const replySenderName: string = useMemo((): string => {
     if (!message.replyTo) return "";
-    return message.replyTo.sender?.firstName || "User";
+    const user = message.replyTo.sender;
+    if (!user) return "User";
+    return [user.firstName, user.lastName].filter(Boolean).join(" ");
   }, [message.replyTo]);
 
   const handleCopy = (): void => {
-    if (displayText) navigator.clipboard.writeText(displayText);
+    if (message.text) navigator.clipboard.writeText(message.text);
   };
 
   const markdownComponents: Components = useMemo(
@@ -331,7 +249,7 @@ export const MessageBubble = memo(function MessageBubble({
                     {replySenderName}
                   </span>
                   <span className="text-[12px] truncate opacity-80 leading-tight">
-                    {displayReplyText}
+                    {message.replyTo.text}
                   </span>
                 </div>
               )}
@@ -342,7 +260,7 @@ export const MessageBubble = memo(function MessageBubble({
                     remarkPlugins={[remarkGfm, remarkBreaks]}
                     components={markdownComponents}
                   >
-                    {displayText}
+                    {message.text}
                   </ReactMarkdown>
                 </div>
 
@@ -364,6 +282,7 @@ export const MessageBubble = memo(function MessageBubble({
                   </span>
                   {isMe && (
                     <MessageStatus
+                      messageId={message.id}
                       isMe={isMe}
                       isSending={message.isSending}
                       sequence={message.sequence ?? 0}

@@ -8,9 +8,6 @@ export interface User {
   photoUrl?: string | null;
   status: string;
   bio?: string | null;
-  publicKey?: string;
-  encryptedPrivKey?: string;
-  encryptionIv?: string;
   lastSeen?: string | null;
   isVerified?: boolean;
   isBot: boolean;
@@ -26,12 +23,10 @@ export interface Message {
   sequence?: number;
   isRead: boolean;
   isEdited: boolean;
-  isEncrypted: boolean;
   isSending?: boolean;
-  encryptionIv?: string;
   sender: User;
-  replyTo?: Message;
-  forwardedFrom?: Message;
+  replyTo?: Message | null;
+  forwardedFrom?: Message | null;
 }
 
 export type ChatType = "PRIVATE" | "GROUP" | "CHANNEL" | "DIRECT";
@@ -50,6 +45,7 @@ export interface Chat {
   lastMessage?: Message | null;
   unreadCount: number;
   lastReadSequence: number;
+  myReadSequence: number;
   isPinned: boolean;
   messages?: Message[];
   createdAt: string;

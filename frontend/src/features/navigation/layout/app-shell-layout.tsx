@@ -14,8 +14,6 @@ import { AppSidebar } from "@/app/layout/app-sidebar";
 import { MobileNav } from "@/features/navigation/ui/mobile-nav";
 import { UserProfileOverlay } from "@/features/user/ui/user-profile-overlay";
 import { Toaster } from "@/components/ui/sonner";
-import { useMe } from "@/features/chat/lib/common/use-me";
-import { useE2EEInit } from "@/features/auth/lib/use-e2ee-init";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -32,9 +30,9 @@ export function AuthenticatedLayout() {
     from: "/_authenticated/users/$userId",
     shouldThrow: false,
   });
-
-  const { data: meData } = useMe();
-  useE2EEInit(meData?.me);
+  // NOTE: Now for secret chats only
+  // const { data: meData } = useMe();
+  // useE2EEInit(meData?.me);
 
   React.useEffect((): void => {
     if (pathname.includes("/chat/")) {

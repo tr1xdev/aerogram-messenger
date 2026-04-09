@@ -2,20 +2,8 @@ import { gql } from "@apollo/client";
 import { MESSAGE_FIELDS } from "../fragments/message.fragments";
 
 export const SEND_MESSAGE = gql`
-  mutation SendMessage(
-    $chatId: ID!
-    $text: String!
-    $isEncrypted: Boolean!
-    $encryptionIv: String
-    $replyToId: ID
-  ) {
-    sendMessage(
-      chatId: $chatId
-      text: $text
-      isEncrypted: $isEncrypted
-      encryptionIv: $encryptionIv
-      replyToId: $replyToId
-    ) {
+  mutation SendMessage($chatId: ID!, $text: String!, $replyToId: ID) {
+    sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {
       __typename
       ... on Message {
         ...MessageFields

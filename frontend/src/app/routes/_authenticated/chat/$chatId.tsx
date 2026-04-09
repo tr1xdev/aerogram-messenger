@@ -45,7 +45,6 @@ function ChatRoute(): ReactNode {
 export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const navigate = useNavigate();
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [decryptedReplyText, setDecryptedReplyText] = useState<string>("");
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
 
@@ -74,8 +73,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     lastReadSequence,
   } = useChatHistory(chatId);
 
-  const { sendMessage, editMessage, decryptMessage } =
-    useMessageActions(chatId);
+  const { sendMessage, editMessage } = useMessageActions(chatId);
   const { sendTyping } = useSendTyping(chatId);
 
   const { data: chatsData } = useMyChats() as {
@@ -104,18 +102,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     };
   }, [chatId, setActiveChatId]);
 
-  useEffect((): void => {
-    if (replyingTo) {
-      decryptMessage(replyingTo).then((text: string): void =>
-        setDecryptedReplyText(text),
-      );
-    }
-  }, [replyingTo, decryptMessage]);
-
   const cancelAction = useCallback((): void => {
     setReplyingTo(null);
     setEditingMessage(null);
-    setDecryptedReplyText("");
     resetInput();
   }, [resetInput]);
 
@@ -123,7 +112,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     (msg: Message): void => {
       setReplyingTo(null);
       setEditingMessage(msg);
-      setDecryptedReplyText("");
       setInput(msg.text);
     },
     [setInput],
@@ -189,24 +177,18 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   );
 
   useEffect((): void | (() => void) => {
-    if (isFirstLoad || allMessages.length === 0) return;
-
     const handleVisibilityChange = (): void => {
       if (document.visibilityState === "visible") {
         checkAndMarkRead();
       }
     };
-
-    checkAndMarkRead();
-
     window.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleVisibilityChange);
-
     return (): void => {
       window.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleVisibilityChange);
     };
-  }, [allMessages.length, checkAndMarkRead, isFirstLoad]);
+  }, [checkAndMarkRead]);
 
   const handleSend = useCallback(
     async (overrideText?: string): Promise<void> => {
@@ -242,6 +224,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
               isEdited: false,
               isEncrypted: false,
               isSending: true,
+              forwardedFrom: null,
               sequence:
                 allMessages.length > 0
                   ? (allMessages[allMessages.length - 1].sequence ?? 0) + 1
@@ -252,8 +235,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
               replyTo: originalReply
                 ? {
                     ...originalReply,
+                    __typename: "Message",
                   }
-                : undefined,
+                : null,
             } as Message & { __typename: "Message" },
           },
         });
@@ -275,11 +259,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       setInput,
     ],
   );
-
-  const replyPreview = useMemo((): (Message & { text: string }) | null => {
-    if (!replyingTo) return null;
-    return { ...replyingTo, text: decryptedReplyText };
-  }, [replyingTo, decryptedReplyText]);
 
   if (isNotFound) {
     return (
@@ -360,7 +339,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           onSend={handleSend}
           onTyping={handleTyping}
           disabled={false}
-          replyingTo={replyPreview}
+          replyingTo={replyingTo}
           editingMessage={editingMessage}
           onCancelAction={cancelAction}
         />

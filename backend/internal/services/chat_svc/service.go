@@ -335,18 +335,12 @@ func (s *Server) mapGetUserDialogsRowToProto(row dbgen.GetUserDialogsRow) *chatp
 
 	if row.LastMessageID.Valid {
 		msgPb := &messagespb.Message{
-			Id:          row.LastMessageID.UUID.String(),
-			ChatId:      row.ID.String(),
-			Text:        row.MsgContent.String,
-			IsEncrypted: row.MsgIsEncrypted.Bool,
-			Sequence:    row.MsgSequence.Int64,
-			SenderId:    row.MsgAuthorID.UUID.String(),
-			SentAt:      row.MsgCreatedAt.Time.Format(time.RFC3339),
-		}
-
-		if row.MsgEncryptionIv.Valid {
-			iv := row.MsgEncryptionIv.String
-			msgPb.EncryptionIv = &iv
+			Id:       row.LastMessageID.UUID.String(),
+			ChatId:   row.ID.String(),
+			Text:     row.MsgContent.String,
+			Sequence: row.MsgSequence.Int64,
+			SenderId: row.MsgAuthorID.UUID.String(),
+			SentAt:   row.MsgCreatedAt.Time.Format(time.RFC3339),
 		}
 
 		if row.MsgReplyToID.Valid {

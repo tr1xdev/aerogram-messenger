@@ -13,7 +13,6 @@ import {
   Bell,
   Database,
   HelpCircle,
-  ShieldCheck,
   Gift,
   Pencil,
 } from "lucide-react";
@@ -27,22 +26,21 @@ interface MobileSettingsViewProps {
 }
 
 export function MobileSettingsView({ user }: MobileSettingsViewProps) {
-  const [showHeader, setShowHeader] = useState(false);
+  const [showHeader, setShowHeader] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const displayName =
+  const displayName: string =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
     user?.username ||
     "User";
 
-  useEffect(() => {
-    const viewport = scrollRef.current?.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    );
+  useEffect((): (() => void) | void => {
+    const viewport: HTMLElement | null | undefined =
+      scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]");
     if (!viewport) return;
-    const handleScroll = () => setShowHeader(viewport.scrollTop > 80);
+    const handleScroll = (): void => setShowHeader(viewport.scrollTop > 80);
     viewport.addEventListener("scroll", handleScroll);
-    return () => viewport.removeEventListener("scroll", handleScroll);
+    return (): void => viewport.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
@@ -134,12 +132,6 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
                 type="copy"
                 value={user?.id}
               />
-              <SettingsButton
-                icon={ShieldCheck}
-                label="Public Key"
-                type="copy"
-                value={user?.publicKey ?? undefined}
-              />
               <SettingsButton icon={Plus} label="Add Account" type="action" />
             </div>
           </section>
@@ -170,7 +162,6 @@ export function MobileSettingsView({ user }: MobileSettingsViewProps) {
             </h3>
             <div className="overflow-hidden rounded-2xl bg-card/50 border border-border/50 shadow-sm">
               <SettingsButton icon={Lock} label="Privacy Policy" />
-              <SettingsButton icon={ShieldCheck} label="Security Checkup" />
               <SettingsButton icon={Laptop} label="Devices" value="3 active" />
             </div>
           </section>

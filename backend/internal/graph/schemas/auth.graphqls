@@ -34,7 +34,7 @@ input VerifyEmailInput {
 }
 
 extend type Query {
-    sessions(userId: ID!): [Session!]!
+    mySessions: [Session!]!
 }
 
 extend type Mutation {
