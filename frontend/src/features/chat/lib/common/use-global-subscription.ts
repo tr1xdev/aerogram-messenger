@@ -78,7 +78,6 @@ export function useGlobalSubscriptions(
       const historyVars = {
         chatId: newMessage.chatId,
         limit: 50,
-        offset: 0,
       };
 
       const existingHistory = cache.readQuery<{

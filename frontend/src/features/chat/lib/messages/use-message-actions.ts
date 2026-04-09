@@ -1,20 +1,17 @@
 import { useMutation } from "@apollo/client/react/index.js";
-import {
-  type ApolloCache,
-  type Reference,
-  type StoreObject,
-} from "@apollo/client/index.js";
+import { type ApolloCache, type Reference } from "@apollo/client/index.js";
 import { type ModifierDetails } from "@apollo/client/cache/index.js";
-import { SEND_MESSAGE, EDIT_MESSAGE, MARK_DIALOG_AS_READ } from "../../api";
-import { encryptText, decryptText, getPrivateKey } from "@/shared/lib/crypto";
+
+import {
+  SEND_MESSAGE,
+  EDIT_MESSAGE,
+  MARK_DIALOG_AS_READ,
+  MESSAGE_FIELDS,
+} from "@/features/chat/api";
+
 import { useMe } from "../common/use-me";
 import { useChatDetails } from "../chat/use-chats";
-import type {
-  Message,
-  User,
-  Chat,
-  ChatMember,
-} from "@/entities/chat/model/types";
+import type { Message, User, Chat } from "@/entities/chat/model/types";
 
 interface ValidationError {
   __typename: "ValidationError";
@@ -35,9 +32,7 @@ interface UpdateMutationResult {
 interface SendMessageVariables {
   chatId: string;
   text: string;
-  isEncrypted: boolean;
-  encryptionIv?: string;
-  replyToId?: string;
+  replyToId: string | null;
 }
 
 interface SendMessageOptions {
@@ -52,9 +47,17 @@ interface SendMessageOptions {
 interface MessageActions {
   sendMessage: (text: string, options?: SendMessageOptions) => Promise<void>;
   editMessage: (id: string, text: string) => Promise<void>;
-  decryptMessage: (message: Message) => Promise<string>;
   markAsRead: () => void;
   isSending: boolean;
+}
+
+interface MessageConnection {
+  messages: Reference[];
+  hasMore: boolean;
+}
+
+interface PaginatedChats {
+  chats: Reference[];
 }
 
 export function useMessageActions(chatId: string): MessageActions {
@@ -75,35 +78,6 @@ export function useMessageActions(chatId: string): MessageActions {
     MARK_DIALOG_AS_READ,
   );
 
-  const decryptMessage = async (message: Message): Promise<string> => {
-    if (!message.isEncrypted || !message.encryptionIv || !meData?.me) {
-      return message.text;
-    }
-
-    const me: User = meData.me;
-    const chat: Chat | undefined = chatData?.chat;
-    const peer: User | undefined = chat?.members?.find(
-      (m: ChatMember): boolean => m.user.id !== me.id,
-    )?.user;
-
-    if (!peer?.publicKey) return message.text;
-
-    try {
-      const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
-      if (!myPrivKeyObj) return message.text;
-
-      return await decryptText(
-        message.text,
-        message.encryptionIv,
-        peer.publicKey,
-        myPrivKeyObj,
-      );
-    } catch (error: unknown) {
-      console.error(error);
-      return "[Decryption Error]";
-    }
-  };
-
   const sendMessage = async (
     text: string,
     options?: SendMessageOptions,
@@ -113,127 +87,126 @@ export function useMessageActions(chatId: string): MessageActions {
 
     if (!me || !chat) return;
 
-    const peer: User | undefined = chat.members?.find(
-      (m: ChatMember): boolean => m.user.id !== me.id,
-    )?.user;
-
-    let finalVariables: SendMessageVariables = {
+    const finalVariables: SendMessageVariables = {
       chatId,
       text,
-      isEncrypted: false,
-      ...options?.variables,
+      replyToId: options?.variables?.replyToId ?? null,
     };
 
-    if (chat.type === "PRIVATE" && peer?.publicKey) {
-      try {
-        const myPrivKeyObj: CryptoKey | null = await getPrivateKey(me.id);
-        if (myPrivKeyObj) {
-          const encrypted: { ciphertext: string; iv: string } =
-            await encryptText(text, peer.publicKey, myPrivKeyObj);
-          finalVariables = {
-            ...finalVariables,
-            text: encrypted.ciphertext,
-            isEncrypted: true,
-            encryptionIv: encrypted.iv,
-          };
-        }
-      } catch (err: unknown) {
-        console.error(err);
-      }
-    }
-
     const patchedOptions = { ...options };
+
     if (
-      patchedOptions.optimisticResponse &&
-      "sendMessage" in patchedOptions.optimisticResponse
+      patchedOptions.optimisticResponse?.sendMessage?.__typename === "Message"
     ) {
       const optMsg = patchedOptions.optimisticResponse.sendMessage;
-      if ("__typename" in optMsg && optMsg.__typename === "Message") {
-        patchedOptions.optimisticResponse = {
-          sendMessage: {
-            ...optMsg,
-            encryptionIv: optMsg.encryptionIv ?? null,
-            replyTo: optMsg.replyTo ?? null,
-            forwardedFrom: optMsg.forwardedFrom ?? null,
-          } as MessageWithTypename,
-        };
-      }
+      patchedOptions.optimisticResponse = {
+        sendMessage: {
+          ...optMsg,
+          sequence: optMsg.sequence ?? 0,
+          forwardedFrom: optMsg.forwardedFrom ?? null,
+          replyTo: optMsg.replyTo
+            ? {
+                ...optMsg.replyTo,
+                __typename: "Message",
+              }
+            : null,
+        } as unknown as MessageWithTypename,
+      };
     }
 
     await send({
       ...patchedOptions,
       variables: finalVariables,
-      update: (
-        cache: ApolloCache,
-        { data: mutationData }: { data?: SendMutationResult | null },
-      ): void => {
-        const result: MessageWithTypename | ValidationError | undefined =
-          mutationData?.sendMessage;
-
+      update: (cache: ApolloCache, { data: mutationData }) => {
+        const result = mutationData?.sendMessage;
         if (!result || result.__typename !== "Message") return;
 
-        const newMessage: MessageWithTypename = result as MessageWithTypename;
+        const newMessage: MessageWithTypename = {
+          ...result,
+          replyTo: result.replyTo ?? null,
+          forwardedFrom: result.forwardedFrom ?? null,
+        };
 
-        const chatCacheId: string | undefined = cache.identify({
+        const msgId: string | undefined = cache.identify({
+          __typename: "Message",
+          id: newMessage.id,
+        });
+
+        if (!msgId) return;
+
+        cache.writeFragment({
+          data: newMessage,
+          fragment: MESSAGE_FIELDS,
+        });
+
+        const chatRef: string | undefined = cache.identify({
           __typename: "Chat",
           id: chatId,
         });
 
-        if (chatCacheId) {
+        if (chatRef) {
           cache.modify({
-            id: chatCacheId,
+            id: chatRef,
             fields: {
-              lastMessage: (
-                existing: Reference | Message | undefined,
-                { readField }: ModifierDetails,
-              ): Reference | Message | undefined => {
-                const existingSeq: number =
-                  (readField(
-                    "sequence",
-                    existing as unknown as StoreObject,
-                  ) as number) ?? 0;
-                const newSeq: number = newMessage.sequence ?? 0;
-
-                return existing && existingSeq > newSeq ? existing : newMessage;
-              },
+              lastMessage: (): Reference => ({ __ref: msgId }),
               unreadCount: (): number => 0,
-              myReadSequence: (prev: number | undefined): number => {
-                return Math.max(prev || 0, newMessage.sequence ?? 0);
-              },
-            },
-          });
-
-          cache.modify({
-            fields: {
-              myChats(
-                existingData: Reference | StoreObject,
-                { readField }: ModifierDetails,
-              ): StoreObject | Reference {
-                const existingChats: Reference[] | undefined = readField(
-                  "chats",
-                  existingData,
-                ) as Reference[] | undefined;
-
-                if (!existingChats) return existingData;
-
-                const chatRef: Reference = { __ref: chatCacheId };
-                const filtered: Reference[] = existingChats.filter(
-                  (ref: Reference): boolean =>
-                    (readField("id", ref) as string) !== chatId,
-                );
-
-                return {
-                  ...(existingData as unknown as StoreObject),
-                  chats: [chatRef, ...filtered],
-                };
+              myReadSequence: (prev: unknown): number => {
+                const currentSeq: number = typeof prev === "number" ? prev : 0;
+                return Math.max(currentSeq, Number(newMessage.sequence) || 0);
               },
             },
           });
         }
 
-        if (options?.update) {
-          options.update(cache, { data: mutationData });
-        }
+        cache.modify({
+          fields: {
+            messageHistory(
+              existing: MessageConnection | Reference | undefined,
+              { storeFieldName, readField }: ModifierDetails,
+            ): MessageConnection | Reference | undefined {
+              if (!storeFieldName.includes(chatId) || !existing)
+                return existing;
+              if ("__ref" in existing) return existing;
+
+              const messages: Reference[] =
+                (existing as MessageConnection).messages ?? [];
+              if (
+                messages.some(
+                  (ref: Reference) => readField("id", ref) === newMessage.id,
+                )
+              ) {
+                return existing;
+              }
+
+              return {
+                ...existing,
+                messages: [...messages, { __ref: msgId }],
+              };
+            },
+          },
+        });
+
+        cache.modify({
+          fields: {
+            myChats(
+              existing: PaginatedChats | Reference | undefined,
+              { readField }: ModifierDetails,
+            ): PaginatedChats | Reference | undefined {
+              if (!existing || !chatRef) return existing;
+              if ("__ref" in existing) return existing;
+
+              const chats: Reference[] =
+                (existing as PaginatedChats).chats ?? [];
+              const chatRefObj: Reference = { __ref: chatRef };
+              const filtered: Reference[] = chats.filter(
+                (ref: Reference) => readField("id", ref) !== chatId,
+              );
+              return { ...existing, chats: [chatRefObj, ...filtered] };
+            },
+          },
+        });
+
+        if (options?.update) options.update(cache, { data: mutationData });
       },
     });
   };
@@ -251,12 +224,10 @@ export function useMessageActions(chatId: string): MessageActions {
           chatId,
           text,
           sentAt: new Date().toISOString(),
-          isRead: false,
           isEdited: true,
-          isEncrypted: false,
-          encryptionIv: null,
           replyTo: null,
           forwardedFrom: null,
+          sequence: 0,
           sender: me,
         } as unknown as MessageWithTypename,
       },
@@ -265,24 +236,28 @@ export function useMessageActions(chatId: string): MessageActions {
 
   const markAsRead = (): void => {
     const chat: Chat | undefined = chatData?.chat;
-    const lastSeq: number =
-      chat?.lastMessage?.sequence ?? chat?.lastReadSequence ?? 0;
+    const lastSeq: number = Number(
+      chat?.lastMessage?.sequence ?? chat?.lastReadSequence ?? 0,
+    );
 
     read({
       variables: { chatId },
       optimisticResponse: { markDialogAsRead: true },
-      update: (cache: ApolloCache): void => {
+      update: (cache: ApolloCache) => {
         const chatRef: string | undefined = cache.identify({
           __typename: "Chat",
           id: chatId,
         });
+
         if (chatRef) {
           cache.modify({
             id: chatRef,
             fields: {
               unreadCount: (): number => 0,
-              myReadSequence: (prev: number | undefined): number =>
-                Math.max(prev || 0, lastSeq),
+              myReadSequence: (prev: unknown): number => {
+                const currentSeq: number = typeof prev === "number" ? prev : 0;
+                return Math.max(currentSeq, lastSeq);
+              },
             },
           });
         }
@@ -290,11 +265,5 @@ export function useMessageActions(chatId: string): MessageActions {
     });
   };
 
-  return {
-    sendMessage,
-    editMessage,
-    decryptMessage,
-    markAsRead,
-    isSending,
-  };
+  return { sendMessage, editMessage, markAsRead, isSending };
 }
