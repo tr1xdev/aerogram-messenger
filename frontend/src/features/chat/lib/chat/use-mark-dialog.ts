@@ -34,12 +34,14 @@ export function useMarkDialog(
   const isPendingRef = useRef<boolean>(false);
 
   const checkAndMarkRead = useCallback((): void => {
+    const currentMyReadSequence: number = chat.myReadSequence ?? 0;
+
     if (
       document.visibilityState !== "visible" ||
       !meId ||
       !chat.id ||
       isPendingRef.current ||
-      lastSequence <= chat.myReadSequence ||
+      lastSequence <= currentMyReadSequence ||
       chat.unreadCount === 0
     ) {
       return;
@@ -48,28 +50,32 @@ export function useMarkDialog(
     isPendingRef.current = true;
 
     const updateStore = (store: RecordSourceSelectorProxy): void => {
-      const chatRecord = store.get(chat.id);
+      const chatRecord: RecordProxy | null | undefined = store.get(chat.id);
       if (!chatRecord) return;
 
       chatRecord.setValue(0, "unreadCount");
+
+      const prevSequence: number = Number(
+        chatRecord.getValue("myReadSequence") ?? 0,
+      );
       chatRecord.setValue(
-        Math.max(
-          Number(chatRecord.getValue("myReadSequence") ?? 0),
-          lastSequence,
-        ),
+        Math.max(prevSequence, lastSequence),
         "myReadSequence",
       );
 
-      const members = chatRecord.getLinkedRecords("members");
+      const members: RecordProxy[] | null | undefined =
+        chatRecord.getLinkedRecords("members");
+
       if (members) {
         members.forEach((member: RecordProxy): void => {
-          const user = member.getLinkedRecord("user");
+          const user: RecordProxy | null | undefined =
+            member.getLinkedRecord("user");
           if (user?.getValue("id") === meId) {
+            const prevMemberSeq: number = Number(
+              member.getValue("lastReadSequence") ?? 0,
+            );
             member.setValue(
-              Math.max(
-                Number(member.getValue("lastReadSequence") ?? 0),
-                lastSequence,
-              ),
+              Math.max(prevMemberSeq, lastSequence),
               "lastReadSequence",
             );
           }

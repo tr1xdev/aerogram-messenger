@@ -79,14 +79,19 @@ const deleteChatMutation = graphql`
 
 export function useSearchUsers(
   username: string,
-): useChatManagementSearchQuery["response"] {
-  return useLazyLoadQuery<useChatManagementSearchQuery>(
+): useChatManagementSearchQuery["response"] | null {
+  const isEnabled: boolean = username.trim().length > 0;
+
+  const data = useLazyLoadQuery<useChatManagementSearchQuery>(
     searchUsersQuery,
-    { username },
+    { username: isEnabled ? username : "" },
     {
       fetchPolicy: "store-or-network",
-    } as { fetchPolicy: "store-or-network" },
+      fetchKey: isEnabled ? username : "disabled",
+    },
   );
+
+  return isEnabled ? data : null;
 }
 
 export function useChatActions(chatId?: string): {
@@ -160,14 +165,11 @@ export function useChatActions(chatId?: string): {
 
   const togglePin = (pinned: boolean): void => {
     if (!chatId) return;
-
     pin({
       variables: { id: chatId, pinned },
       optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
         const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
-        if (chatRecord) {
-          chatRecord.setValue(pinned, "isPinned");
-        }
+        if (chatRecord) chatRecord.setValue(pinned, "isPinned");
       },
       onCompleted: (
         response: useChatManagementPinMutation["response"],
@@ -185,14 +187,12 @@ export function useChatActions(chatId?: string): {
 
   const deleteChat = (forEveryone: boolean = false): void => {
     if (!chatId) return;
-
     remove({
       variables: { id: chatId, forEveryone },
       updater: (store: RecordSourceSelectorProxy): void => {
         const root: RecordProxy = store.getRoot();
         const myChats: RecordProxy | null =
           root.getLinkedRecord("myChats") ?? null;
-
         if (myChats && myChats.getType() === "ChatList") {
           const chats: ReadonlyArray<RecordProxy> =
             myChats.getLinkedRecords("chats") ?? [];
@@ -201,7 +201,6 @@ export function useChatActions(chatId?: string): {
           );
           myChats.setLinkedRecords(nextChats, "chats");
         }
-
         store.delete(chatId);
       },
       onCompleted: (

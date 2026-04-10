@@ -1,12 +1,22 @@
-import { useLazyLoadQuery } from "react-relay";
+import { useLazyLoadQuery, graphql } from "react-relay";
 import type { useMeQuery } from "./__generated__/useMeQuery.graphql";
-import meQueryNode from "./__generated__/useMeQuery.graphql";
+
+const meQuery = graphql`
+  query useMeQuery {
+    me {
+      id
+      username
+      photoUrl
+    }
+  }
+`;
 
 export function useMe(): useMeQuery["response"] {
-  console.log("useMe called");
-  return useLazyLoadQuery<useMeQuery>(
-    meQueryNode,
+  const response: useMeQuery["response"] = useLazyLoadQuery<useMeQuery>(
+    meQuery,
     {},
     { fetchPolicy: "store-and-network" },
   );
+
+  return response;
 }

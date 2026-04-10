@@ -1,4 +1,4 @@
-import { graphql, useLazyLoadQuery } from "react-relay";
+import { useLazyLoadQuery, graphql } from "react-relay";
 import type { useChatsMyChatsQuery } from "./__generated__/useChatsMyChatsQuery.graphql";
 import type { useChatsDetailsQuery } from "./__generated__/useChatsDetailsQuery.graphql";
 
@@ -10,28 +10,14 @@ const myChatsQuery = graphql`
     myChats {
       __typename
       ... on ChatList {
-        ...useAppTitle_chats
         chats {
           id
-          type
           title
           photoUrl
           unreadCount
-          isPinned
-          createdAt
-          lastReadSequence
-          myReadSequence
           lastMessage {
-            id
             text
             sentAt
-          }
-          members {
-            user {
-              id
-              displayName
-              photoUrl
-            }
           }
         }
       }
@@ -50,24 +36,17 @@ const chatDetailsQuery = graphql`
     chat(id: $id) {
       __typename
       ... on Chat {
+        ...useMarkDialog_chat
         id
-        type
         title
+        type
         photoUrl
         membersCount
-        unreadCount
-        myReadSequence
         lastReadSequence
-        isPinned
-        createdAt
-        ...useMarkDialog_chat
         members {
           user {
             id
             firstName
-            lastName
-            displayName
-            username
             photoUrl
             isBot
           }

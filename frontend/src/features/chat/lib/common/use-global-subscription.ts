@@ -106,6 +106,17 @@ export function useGlobalSubscriptions(
       () => ({
         subscription: presenceSubscription,
         variables: { chatId: chatId ?? "" },
+        updater: (store) => {
+          const payload = store.getRootField("userStatusChanged");
+          if (!payload) return;
+
+          const uId = payload.getValue("userId");
+          const userRecord = store.get(String(uId));
+          if (userRecord) {
+            userRecord.setValue(payload.getValue("status"), "status");
+            userRecord.setValue(payload.getValue("lastSeen"), "lastSeen");
+          }
+        },
       }),
       [chatId],
     ),
