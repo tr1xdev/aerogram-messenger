@@ -1,4 +1,4 @@
-type Message {
+type Message implements Node {
     id: ID!
     chatId: ID!
     sender: User
@@ -36,9 +36,7 @@ extend type Query {
 
 extend type Mutation {
     sendMessage(chatId: ID!, text: String!, replyToId: ID): SendMessageResult!
-
     updateMessage(id: ID!, text: String!): SendMessageResult!
-
     deleteMessage(id: ID!): Boolean!
     markDialogAsRead(chatId: ID!): Boolean!
 }

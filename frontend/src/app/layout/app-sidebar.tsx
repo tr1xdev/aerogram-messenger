@@ -1,6 +1,13 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  useTransition,
+} from "react";
 import { useRouterState, useNavigate } from "@tanstack/react-router";
-import { useApolloClient } from "@apollo/client/react";
+import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import {
   Loader2,
   Search,
@@ -12,6 +19,9 @@ import {
 import { MdVerified } from "react-icons/md";
 import { HiDownload } from "react-icons/hi";
 import { BsFillPinFill } from "react-icons/bs";
+import { toast } from "sonner";
+import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
+
 import {
   Sidebar,
   SidebarContent,
@@ -32,76 +42,144 @@ import { NewChatDialog } from "@/features/chat/ui/new-chat-dialog";
 import { ChatMenuItem } from "@/features/chat/ui/chat-menu-item";
 import { SettingsDialog } from "@/features/settings/ui/settings-dialog";
 import { SearchResults } from "@/features/chat/ui/search-results";
-import {
-  useMyChats,
-  useMe,
-  useSearchUsers,
-  useChatActions,
-} from "@/features/chat/lib";
-import { GET_MY_CHATS } from "@/features/chat/api";
+import { useSearchUsers } from "@/features/chat/lib";
 import { useConnectionStore } from "@/store/connection";
 import { cn } from "@/lib/utils";
-import type { Chat, User } from "@/entities/chat/model/types";
 import { Button } from "@/components/ui/button";
 
-interface ApolloChat extends Chat {
-  __typename: "Chat";
-}
+import type { Chat, User } from "@/entities/chat/model/types";
+import type {
+  appSidebarQuery as AppSidebarQueryType,
+  appSidebarQuery$data,
+  ChatType,
+} from "./__generated__/appSidebarQuery.graphql";
+import type { appSidebarCreateMutation as AppSidebarCreateMutationType } from "./__generated__/appSidebarCreateMutation.graphql";
 
-interface ApolloChatList {
-  __typename: "ChatList";
-  chats: ApolloChat[];
-}
+const appSidebarQuery = graphql`
+  query appSidebarQuery {
+    me {
+      id
+      username
+      firstName
+      lastName
+      photoUrl
+      isVerified
+    }
+    myChats {
+      __typename
+      ... on ChatList {
+        chats {
+          id
+          title
+          photoUrl
+          unreadCount
+          isPinned
+          type
+        }
+      }
+      ... on Error {
+        message
+      }
+    }
+  }
+`;
 
-interface MyChatsData {
-  myChats: ApolloChatList;
-}
+const createChatMutation = graphql`
+  mutation appSidebarCreateMutation($userID: ID!) {
+    createDirectChat(userID: $userID) {
+      __typename
+      ... on Chat {
+        id
+        type
+        title
+        photoUrl
+        unreadCount
+        isPinned
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on ValidationError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
 
-interface ChatFolder {
-  id: string;
-  label: string;
-  unread: number;
-}
+type MyChatsUnion = AppSidebarQueryType["response"]["myChats"];
+
+export type SidebarChat = {
+  readonly id: string;
+  readonly isPinned: boolean;
+  readonly photoUrl: string | null | undefined;
+  readonly title: string;
+  readonly type: ChatType;
+  readonly unreadCount: number;
+};
+
+type SidebarMe = NonNullable<AppSidebarQueryType["response"]["me"]>;
+
+const SEARCH_DEBOUNCE_MS: number = 250;
 
 export function AppSidebar(): React.ReactNode {
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [activeFolder, setActiveFolder] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedQuery, setDebouncedQuery] = useState<string>("");
+  const [isPending, startTransition] = useTransition();
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [indicatorStyle, setIndicatorStyle] = useState<{
     left: number;
     width: number;
   }>({ left: 0, width: 0 });
   const [isFocused, setIsFocused] = useState<boolean>(false);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  const [recentSearches, setRecentSearches] = useState<readonly string[]>(
+    (): readonly string[] => {
+      if (typeof window === "undefined") return [];
+      const saved: string | null = localStorage.getItem("recent_searches");
+      return saved ? (JSON.parse(saved) as string[]) : [];
+    },
+  );
 
   const foldersRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const client = useApolloClient();
   const navigate = useNavigate();
   const pathname: string = useRouterState().location.pathname;
   const isWsConnected: boolean = useConnectionStore((s) => s.isWsConnected);
 
-  const { data: userData, loading: isLoadingMe } = useMe();
-  const { data: chatsData, loading: isLoadingChats } = useMyChats();
-  const { data: globalSearchData, loading: isSearchingGlobal } =
-    useSearchUsers(debouncedQuery);
-  const { createChat } = useChatActions("");
-
-  const user = useMemo(
-    (): User | undefined => userData?.me as User | undefined,
-    [userData],
+  const data: appSidebarQuery$data = useLazyLoadQuery<AppSidebarQueryType>(
+    appSidebarQuery,
+    {},
+    { fetchPolicy: "store-or-network" },
   );
 
-  const chats = useMemo((): ApolloChat[] => {
-    const rawChats = chatsData?.myChats?.chats;
-    if (Array.isArray(rawChats)) {
-      return rawChats as ApolloChat[];
+  const globalSearchData = useSearchUsers(debouncedQuery);
+
+  const [commitCreate] =
+    useMutation<AppSidebarCreateMutationType>(createChatMutation);
+
+  const user: SidebarMe | null = data.me;
+
+  const chats: readonly SidebarChat[] = useMemo((): readonly SidebarChat[] => {
+    const myChats: MyChatsUnion = data.myChats;
+    if (myChats?.__typename === "ChatList" && myChats.chats) {
+      return myChats.chats as readonly SidebarChat[];
     }
-    return [];
-  }, [chatsData]);
+    return [] as readonly SidebarChat[];
+  }, [data.myChats]);
+
+  const pinnedChats = useMemo((): readonly SidebarChat[] => {
+    return chats.filter((c: SidebarChat): boolean => c.isPinned === true);
+  }, [chats]);
+
+  const otherChats = useMemo((): readonly SidebarChat[] => {
+    return chats.filter((c: SidebarChat): boolean => c.isPinned === false);
+  }, [chats]);
 
   const fullName = useMemo((): string => {
     if (!user) return "";
@@ -116,37 +194,33 @@ export function AppSidebar(): React.ReactNode {
     return (user.firstName?.[0] || user.username?.[0] || "?").toUpperCase();
   }, [user]);
 
-  const pinnedChats = useMemo(
-    (): ApolloChat[] => chats.filter((c: ApolloChat) => c.isPinned),
-    [chats],
-  );
-  const otherChats = useMemo(
-    (): ApolloChat[] => chats.filter((c: ApolloChat) => !c.isPinned),
-    [chats],
-  );
-
-  const folders: ChatFolder[] = useMemo((): ChatFolder[] => {
+  const folders: { id: string; label: string; unread: number }[] = useMemo((): {
+    id: string;
+    label: string;
+    unread: number;
+  }[] => {
     const totalUnread: number = chats.reduce(
-      (acc: number, chat: ApolloChat) => acc + (chat.unreadCount || 0),
+      (acc: number, chat: SidebarChat): number => acc + (chat.unreadCount || 0),
       0,
     );
     return [{ id: "all", label: "All chats", unread: totalUnread }];
   }, [chats]);
 
-  const filteredLocalChats = useMemo((): ApolloChat[] => {
-    if (!debouncedQuery) return [];
+  const filteredLocalChats = useMemo((): readonly SidebarChat[] => {
+    if (!debouncedQuery) return [] as readonly SidebarChat[];
     const q: string = debouncedQuery.toLowerCase();
-    return chats.filter((c: ApolloChat) => c.title.toLowerCase().includes(q));
+    return chats.filter((c: SidebarChat): boolean =>
+      c.title.toLowerCase().includes(q),
+    );
   }, [debouncedQuery, chats]);
 
-  useEffect((): void => {
-    const saved: string | null = localStorage.getItem("recent_searches");
-    if (saved) setRecentSearches(JSON.parse(saved) as string[]);
-  }, []);
-
   useEffect((): (() => void) => {
-    const handler = setTimeout((): void => setDebouncedQuery(searchQuery), 250);
-    return (): void => clearTimeout(handler);
+    const handler: number = window.setTimeout((): void => {
+      startTransition((): void => {
+        setDebouncedQuery(searchQuery);
+      });
+    }, SEARCH_DEBOUNCE_MS);
+    return (): void => window.clearTimeout(handler);
   }, [searchQuery]);
 
   const updateIndicator = useCallback((): void => {
@@ -167,10 +241,10 @@ export function AppSidebar(): React.ReactNode {
   }, [activeFolder]);
 
   useEffect((): (() => void) => {
-    const timeoutId = setTimeout(updateIndicator, 0);
+    const timeoutId: number = window.setTimeout(updateIndicator, 0);
     window.addEventListener("resize", updateIndicator);
     return (): void => {
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       window.removeEventListener("resize", updateIndicator);
     };
   }, [updateIndicator, chats, pathname]);
@@ -178,10 +252,10 @@ export function AppSidebar(): React.ReactNode {
   const addToRecent = useCallback((query: string): void => {
     const trimmed: string = query.trim();
     if (!trimmed) return;
-    setRecentSearches((prev: string[]) => {
+    setRecentSearches((prev: readonly string[]): readonly string[] => {
       const updated: string[] = [
         trimmed,
-        ...prev.filter((s: string) => s !== trimmed),
+        ...prev.filter((s: string): boolean => s !== trimmed),
       ].slice(0, 10);
       localStorage.setItem("recent_searches", JSON.stringify(updated));
       return updated;
@@ -190,7 +264,9 @@ export function AppSidebar(): React.ReactNode {
 
   const removeFromRecent = (e: React.MouseEvent, query: string): void => {
     e.stopPropagation();
-    const updated: string[] = recentSearches.filter((s: string) => s !== query);
+    const updated: string[] = recentSearches.filter(
+      (s: string): boolean => s !== query,
+    );
     setRecentSearches(updated);
     localStorage.setItem("recent_searches", JSON.stringify(updated));
   };
@@ -202,46 +278,53 @@ export function AppSidebar(): React.ReactNode {
     localStorage.removeItem("recent_searches");
   };
 
-  const handleSelectUser = async (userId: string): Promise<void> => {
+  const handleSelectUser = (userId: string): void => {
     if (isCreating) return;
     setIsCreating(true);
-    try {
-      const newChat: Chat | undefined = await createChat(userId);
-      if (newChat) {
-        const existing = client.readQuery<MyChatsData>({
-          query: GET_MY_CHATS,
-        });
 
-        if (existing?.myChats) {
-          const apolloNewChat: ApolloChat = {
-            ...newChat,
-            __typename: "Chat",
-          };
+    commitCreate({
+      variables: { userID: userId },
+      updater: (store: RecordSourceSelectorProxy): void => {
+        const payload: RecordProxy | null =
+          store.getRootField("createDirectChat") ?? null;
+        if (!payload || payload.getType() !== "Chat") return;
 
-          client.writeQuery<MyChatsData>({
-            query: GET_MY_CHATS,
-            data: {
-              myChats: {
-                __typename: "ChatList",
-                chats: [
-                  apolloNewChat,
-                  ...existing.myChats.chats.filter(
-                    (c: ApolloChat) => c.id !== newChat.id,
-                  ),
-                ],
-              },
-            },
-          });
+        const root: RecordProxy = store.getRoot();
+        const myChatsRec: RecordProxy | null =
+          root.getLinkedRecord("myChats") ?? null;
+
+        if (myChatsRec && myChatsRec.getType() === "ChatList") {
+          const chatList: ReadonlyArray<RecordProxy> =
+            myChatsRec.getLinkedRecords("chats") ?? [];
+          const alreadyExists: boolean = chatList.some(
+            (c: RecordProxy): boolean =>
+              c.getValue("id") === payload.getValue("id"),
+          );
+
+          if (!alreadyExists) {
+            myChatsRec.setLinkedRecords([payload, ...chatList], "chats");
+          }
         }
-
-        if (searchQuery) addToRecent(searchQuery);
-        setSearchQuery("");
-        setIsFocused(false);
-        navigate({ to: "/chat/$chatId", params: { chatId: newChat.id } });
-      }
-    } finally {
-      setIsCreating(false);
-    }
+      },
+      onCompleted: (
+        response: AppSidebarCreateMutationType["response"],
+      ): void => {
+        setIsCreating(false);
+        const res = response.createDirectChat;
+        if (res?.__typename === "Chat") {
+          if (searchQuery) addToRecent(searchQuery);
+          setSearchQuery("");
+          setIsFocused(false);
+          navigate({ to: "/chat/$chatId", params: { chatId: res.id } });
+        } else if (res?.__typename !== "%other" && res && "message" in res) {
+          toast.error(res.message as string);
+        }
+      },
+      onError: (): void => {
+        setIsCreating(false);
+        toast.error("Failed to create chat");
+      },
+    });
   };
 
   return (
@@ -370,21 +453,23 @@ export function AppSidebar(): React.ReactNode {
                   <button className="shrink-0 pr-3 py-2 text-muted-foreground/30 hover:text-foreground">
                     <HiDownload className="h-5 w-5" />
                   </button>
-                  {folders.map((f: ChatFolder) => (
-                    <button
-                      key={f.id}
-                      data-folder-id={f.id}
-                      onClick={(): void => setActiveFolder(f.id)}
-                      className={cn(
-                        "px-4 h-9 flex items-center text-[13.5px] font-semibold transition-all relative",
-                        f.id === activeFolder
-                          ? "text-sky-500"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      <span className="folder-label">{f.label}</span>
-                    </button>
-                  ))}
+                  {folders.map(
+                    (f: { id: string; label: string; unread: number }) => (
+                      <button
+                        key={f.id}
+                        data-folder-id={f.id}
+                        onClick={(): void => setActiveFolder(f.id)}
+                        className={cn(
+                          "px-4 h-9 flex items-center text-[13.5px] font-semibold transition-all relative",
+                          f.id === activeFolder
+                            ? "text-sky-500"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        <span className="folder-label">{f.label}</span>
+                      </button>
+                    ),
+                  )}
                   <div
                     className="absolute bottom-0 h-[2.5px] bg-sky-500 transition-all duration-300 rounded-t-full"
                     style={{
@@ -402,11 +487,15 @@ export function AppSidebar(): React.ReactNode {
                   {searchQuery ? (
                     <SearchResults
                       query={debouncedQuery}
-                      localChats={filteredLocalChats}
-                      globalUsers={globalSearchData?.searchUsers || []}
+                      localChats={
+                        filteredLocalChats as unknown as readonly Chat[]
+                      }
+                      globalUsers={
+                        (globalSearchData?.searchUsers as User[]) ?? []
+                      }
                       isLoading={
                         searchQuery !== debouncedQuery ||
-                        isSearchingGlobal ||
+                        isPending ||
                         isCreating
                       }
                       onSelectChat={(id: string): void => {
@@ -439,31 +528,33 @@ export function AppSidebar(): React.ReactNode {
                             </button>
                           </div>
                           <div className="flex flex-col gap-0.5">
-                            {recentSearches.map((s: string, i: number) => (
-                              <div
-                                key={i}
-                                onClick={(): void => setSearchQuery(s)}
-                                className="group flex items-center justify-between px-3 py-2 rounded-xl hover:bg-muted/60 transition-all cursor-pointer"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <History className="h-4 w-4 text-muted-foreground/60" />
-                                  <span className="text-[14px] text-foreground/90 font-medium">
-                                    {s}
-                                  </span>
-                                </div>
-                                <button
-                                  onMouseDown={(e: React.MouseEvent): void =>
-                                    e.preventDefault()
-                                  }
-                                  onClick={(e: React.MouseEvent): void =>
-                                    removeFromRecent(e, s)
-                                  }
-                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded-full transition-all"
+                            {recentSearches.map(
+                              (s: string, i: number): React.ReactNode => (
+                                <div
+                                  key={i}
+                                  onClick={(): void => setSearchQuery(s)}
+                                  className="group flex items-center justify-between px-3 py-2 rounded-xl hover:bg-muted/60 transition-all cursor-pointer"
                                 >
-                                  <X className="h-3.5 w-3.5 text-muted-foreground" />
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-3">
+                                    <History className="h-4 w-4 text-muted-foreground/60" />
+                                    <span className="text-[14px] text-foreground/90 font-medium">
+                                      {s}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onMouseDown={(e: React.MouseEvent): void =>
+                                      e.preventDefault()
+                                    }
+                                    onClick={(e: React.MouseEvent): void =>
+                                      removeFromRecent(e, s)
+                                    }
+                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded-full transition-all"
+                                  >
+                                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </button>
+                                </div>
+                              ),
+                            )}
                           </div>
                         </div>
                       )}
@@ -482,11 +573,13 @@ export function AppSidebar(): React.ReactNode {
                     </div>
                   )}
                 </div>
-              ) : isLoadingChats && chats.length === 0 ? (
+              ) : !data ? (
                 <div className="p-4 space-y-4">
-                  {[...Array(6)].map((_: unknown, i: number) => (
-                    <Skeleton key={i} className="h-16 w-full rounded-xl" />
-                  ))}
+                  {[...Array(6)].map(
+                    (_: unknown, i: number): React.ReactNode => (
+                      <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                    ),
+                  )}
                 </div>
               ) : chats.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-700">
@@ -525,14 +618,16 @@ export function AppSidebar(): React.ReactNode {
                         <BsFillPinFill className="h-3 w-3" /> PINNED CHATS
                       </div>
                       <SidebarMenu>
-                        {pinnedChats.map((chat: ApolloChat) => (
-                          <ChatMenuItem
-                            key={chat.id}
-                            chat={chat}
-                            isActive={pathname.includes(chat.id)}
-                            myId={user?.id}
-                          />
-                        ))}
+                        {pinnedChats.map(
+                          (chat: SidebarChat): React.ReactNode => (
+                            <ChatMenuItem
+                              key={chat.id}
+                              chat={chat as unknown as Chat}
+                              isActive={pathname.includes(chat.id)}
+                              myId={user?.id}
+                            />
+                          ),
+                        )}
                       </SidebarMenu>
                     </div>
                   )}
@@ -542,14 +637,16 @@ export function AppSidebar(): React.ReactNode {
                         ALL CHATS
                       </div>
                       <SidebarMenu>
-                        {otherChats.map((chat: ApolloChat) => (
-                          <ChatMenuItem
-                            key={chat.id}
-                            chat={chat}
-                            isActive={pathname.includes(chat.id)}
-                            myId={user?.id}
-                          />
-                        ))}
+                        {otherChats.map(
+                          (chat: SidebarChat): React.ReactNode => (
+                            <ChatMenuItem
+                              key={chat.id}
+                              chat={chat as unknown as Chat}
+                              isActive={pathname.includes(chat.id)}
+                              myId={user?.id}
+                            />
+                          ),
+                        )}
                       </SidebarMenu>
                     </div>
                   )}
@@ -563,7 +660,7 @@ export function AppSidebar(): React.ReactNode {
           className="hidden md:flex p-4 border-t border-border/5 bg-muted/2 hover:bg-muted/10 transition-colors cursor-pointer group"
           onClick={(): void => setSettingsOpen(true)}
         >
-          {isLoadingMe || !user ? (
+          {!user ? (
             <div className="flex items-center gap-3">
               <Skeleton className="h-9 w-9 rounded-full" />
               <div className="space-y-1.5">
@@ -576,7 +673,7 @@ export function AppSidebar(): React.ReactNode {
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar className="h-9 w-9 border border-border/10 rounded-full shrink-0">
                   <AvatarImage
-                    src={user.photoUrl || undefined}
+                    src={user.photoUrl ?? undefined}
                     alt={fullName}
                     className="aspect-square object-cover"
                   />
@@ -612,7 +709,7 @@ export function AppSidebar(): React.ReactNode {
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        user={user}
+        user={user as unknown as User}
       />
     </>
   );

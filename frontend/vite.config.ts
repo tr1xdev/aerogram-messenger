@@ -1,17 +1,21 @@
 import path from "path";
-import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { defineConfig, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 
-export default defineConfig({
+const config: UserConfig = {
   plugins: [
     TanStackRouterVite({
       routesDirectory: "./src/app/routes",
       generatedRouteTree: "./src/routeTree.gen.ts",
       quoteStyle: "single",
     }),
-    react(),
+    react({
+      babel: {
+        plugins: ["relay"],
+      },
+    }),
     tailwindcss(),
   ],
   resolve: {
@@ -19,7 +23,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  optimizeDeps: {
-    include: ["framer-motion", "lucide-react", "clsx", "tailwind-merge"],
-  },
-});
+};
+
+export default defineConfig(config);

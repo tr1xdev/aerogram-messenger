@@ -87,6 +87,12 @@ SET
 WHERE id = sqlc.arg('id')
 RETURNING *;
 
+-- name: UpdateUserPhoto :one
+UPDATE users
+SET photo_url = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
 -- name: GetUserByUsername :one
 SELECT * FROM users
 WHERE username = $1 AND deleted_at IS NULL LIMIT 1;

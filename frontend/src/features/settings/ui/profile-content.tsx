@@ -7,13 +7,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useMutation } from "@apollo/client/react";
-import { gql } from "@apollo/client";
-import { logoutAll } from "@/app/api/apollo-client";
+import { graphql, useMutation } from "react-relay";
+import { useAuthStore } from "@/store/auth-store";
 import type { User } from "@/entities/chat/model/types";
+import { type ReactNode, useCallback } from "react";
+import type { profileContentLogoutMutation } from "./__generated__/profileContentLogoutMutation.graphql";
 
-const LOGOUT = gql`
-  mutation Logout {
+const logoutMutation = graphql`
+  mutation profileContentLogoutMutation {
     logout
   }
 `;
@@ -26,17 +27,24 @@ interface ProfileContentProps {
 export function ProfileContent({
   user,
   onActionComplete,
-}: ProfileContentProps) {
-  const [logoutMutation] = useMutation(LOGOUT);
+}: ProfileContentProps): ReactNode {
+  const logout = useAuthStore((state) => state.logout);
+  const [commit] = useMutation<profileContentLogoutMutation>(logoutMutation);
 
-  const handleLogout = async (): Promise<void> => {
+  const handleLogout = useCallback((): void => {
     onActionComplete?.();
-    try {
-      await logoutMutation().catch((): void => {});
-    } finally {
-      logoutAll();
-    }
-  };
+    commit({
+      variables: {},
+      onCompleted: (): void => {
+        logout();
+        window.location.href = "/login";
+      },
+      onError: (): void => {
+        logout();
+        window.location.href = "/login";
+      },
+    });
+  }, [commit, logout, onActionComplete]);
 
   const initial: string = (user?.firstName ||
     user?.username ||

@@ -9,7 +9,7 @@ type ChatMember {
     lastReadSequence: Long!
 }
 
-type Chat {
+type Chat implements Node {
     id: ID!
     type: ChatType!
     slug: String

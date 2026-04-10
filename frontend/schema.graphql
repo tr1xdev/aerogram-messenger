@@ -1,0 +1,267 @@
+type Query
+type Mutation
+type Subscription
+scalar Long
+scalar Upload
+
+interface Node {
+    id: ID!
+}
+
+interface Error {
+    message: String!
+}
+
+type InternalError implements Error {
+    message: String!
+}
+
+type ForbiddenError implements Error {
+    message: String!
+}
+
+type NotFoundError implements Error {
+    message: String!
+}
+
+type ValidationError implements Error {
+    message: String!
+    field: String
+}
+
+type SuccessResult {
+    success: Boolean!
+}
+type AuthPayload {
+    userId: ID!
+    accessToken: String
+    refreshToken: String
+    requiresVerification: Boolean!
+}
+
+type Session implements Node {
+    id: ID!
+    device: String
+    ipAddress: String
+    location: String
+    isActive: Boolean
+    isCurrent: Boolean!
+    createdAt: String!
+}
+
+input SignUpInput {
+    username: String
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String
+}
+
+input LoginInput {
+    email: String!
+    password: String!
+}
+
+input VerifyEmailInput {
+    userID: ID!
+    code: String!
+}
+
+extend type Query {
+    mySessions: [Session!]!
+}
+
+extend type Mutation {
+    signUp(input: SignUpInput!): AuthPayload!
+    login(input: LoginInput!): AuthPayload!
+    verifyEmail(input: VerifyEmailInput!): AuthPayload!
+    refreshToken(token: String!): AuthPayload!
+    terminateAllOtherSessions: Boolean!
+    terminateSession(id: ID!): Boolean!
+    logout: Boolean!
+}
+type User implements Node {
+    id: ID!
+    email: String
+    firstName: String!
+    lastName: String
+    displayName: String
+    username: String
+    photoUrl: String
+    bio: String
+    status: String!
+    isVerified: Boolean!
+    isPremium: Boolean!
+    isBot: Boolean!
+    botDescription: String
+    botCommands: String
+}
+
+input UpdateUserInput {
+    firstName: String
+    lastName: String
+    username: String
+    bio: String
+    photoUrl: String
+    botDescription: String
+    botCommands: String
+}
+
+type UserStatusPayload {
+    userId: ID!
+    status: String!
+    lastSeen: String
+}
+
+type CreateBotPayload {
+    botToken: String!
+    user: User!
+}
+
+union CreateBotResult =
+    | CreateBotPayload
+    | ValidationError
+    | ForbiddenError
+    | InternalError
+
+extend type Query {
+    node(id: ID!): Node
+    me: User!
+    user(id: ID!): User!
+    getUser(id: ID!): User!
+    searchUsers(username: String!): [User!]!
+    myBots: [User!]!
+}
+
+extend type Mutation {
+    uploadAvatar(file: Upload!): User!
+    updateUser(input: UpdateUserInput!): User!
+    createBot(
+        username: String!
+        firstName: String!
+        lastName: String
+        description: String
+        commands: String
+    ): CreateBotResult!
+    updateBot(id: ID!, input: UpdateUserInput!): User!
+    deleteBot(id: ID!): Boolean!
+    rotateBotToken(id: ID!): String!
+}
+
+extend type Subscription {
+    userStatusChanged(chatId: ID!): UserStatusPayload!
+}
+enum ChatType {
+    PRIVATE
+    GROUP
+    CHANNEL
+}
+
+type ChatMember {
+    user: User!
+    lastReadSequence: Long!
+}
+
+type Chat implements Node {
+    id: ID!
+    type: ChatType!
+    slug: String
+    title: String!
+    photoUrl: String
+    membersCount: Int!
+    unreadCount: Int!
+    myReadSequence: Long!
+    lastReadSequence: Long!
+    isPinned: Boolean!
+    lastMessage: Message
+    members: [ChatMember!]
+    createdAt: String!
+}
+
+type ChatList {
+    chats: [Chat!]!
+}
+
+union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
+union MyChatsResult = ChatList | ForbiddenError | InternalError
+union CreateChatResult = Chat | ValidationError | ForbiddenError | InternalError
+union PinChatResult = SuccessResult | ForbiddenError | InternalError
+union DeleteChatResult = SuccessResult | ForbiddenError | InternalError
+
+extend type Query {
+    myChats: MyChatsResult!
+    chat(id: ID, slug: String): ChatResult!
+}
+
+type TypingPayload {
+    userId: ID!
+    isTyping: Boolean!
+}
+
+extend type Mutation {
+    createChat(
+        type: ChatType!
+        participantIds: [ID!]
+        slug: String
+        title: String
+    ): CreateChatResult!
+    createDirectChat(userID: ID!): CreateChatResult!
+    pinChat(id: ID!, pinned: Boolean!): PinChatResult!
+    deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
+    sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
+}
+
+extend type Subscription {
+    chatCreated(userId: ID!): Chat!
+    chatDeleted(userId: ID!): ID!
+    userTyping(chatID: ID!): TypingPayload!
+}
+type Message implements Node {
+    id: ID!
+    chatId: ID!
+    sender: User
+    text: String!
+    sentAt: String!
+    sequence: Long!
+    isEdited: Boolean!
+    replyTo: Message
+    forwardedFrom: Message
+}
+
+type ReadPayload {
+    chatId: ID!
+    userId: ID!
+    lastSequence: Long!
+}
+
+type MessageConnection {
+    messages: [Message!]!
+    hasMore: Boolean!
+}
+
+union SendMessageResult = Message | ValidationError
+
+union MessageHistoryResult = MessageConnection | NotFoundError
+
+extend type Query {
+    messageHistory(
+        chatId: ID!
+        limit: Int!
+        beforeSequence: Long
+    ): MessageHistoryResult!
+    dialogRead(chatId: ID!): ReadPayload!
+}
+
+extend type Mutation {
+    sendMessage(chatId: ID!, text: String!, replyToId: ID): SendMessageResult!
+    updateMessage(id: ID!, text: String!): SendMessageResult!
+    deleteMessage(id: ID!): Boolean!
+    markDialogAsRead(chatId: ID!): Boolean!
+}
+
+extend type Subscription {
+    messageAdded(chatId: ID!): Message!
+    messageUpdated(chatId: ID!): Message!
+    messageDeleted(chatId: ID!): ID!
+    dialogRead(chatId: ID!): ReadPayload!
+}

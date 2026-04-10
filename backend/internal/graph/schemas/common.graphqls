@@ -1,4 +1,9 @@
 scalar Long
+scalar Upload
+
+interface Node {
+    id: ID!
+}
 
 interface Error {
     message: String!

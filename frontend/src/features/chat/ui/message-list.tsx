@@ -10,8 +10,8 @@ import { useChatScroll } from "../lib/chat/use-chat-scroll";
 
 interface MessageListProps {
   chatId: string;
-  messages: Message[];
-  members?: ChatMember[];
+  messages: readonly Message[];
+  members?: readonly ChatMember[];
   myId?: string;
   lastReadSequence?: number;
   onMarkRead: () => void;
@@ -29,22 +29,25 @@ export const MessageList = memo(function MessageList({
 }: MessageListProps): ReactNode {
   const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
     useChatScroll({
-      messages,
+      messages: messages as Message[],
       myId,
       onMarkRead,
     });
 
   const groupedMessages = useMemo(() => {
     const groups: { date: string; items: Message[] }[] = [];
-    messages.forEach((m) => {
-      const dateKey = new Date(m.sentAt).toDateString();
+
+    messages.forEach((m: Message): void => {
+      const dateKey: string = new Date(m.sentAt).toDateString();
       const lastGroup = groups[groups.length - 1];
+
       if (lastGroup?.date === dateKey) {
         lastGroup.items.push(m);
       } else {
         groups.push({ date: dateKey, items: [m] });
       }
     });
+
     return groups;
   }, [messages]);
 
@@ -58,7 +61,7 @@ export const MessageList = memo(function MessageList({
               <div className="flex flex-col">
                 {g.items.map((m, index) => {
                   const prevMessage = g.items[index - 1];
-                  const isFirstInGroup =
+                  const isFirstInGroup: boolean =
                     !prevMessage || prevMessage.sender.id !== m.sender.id;
 
                   return (

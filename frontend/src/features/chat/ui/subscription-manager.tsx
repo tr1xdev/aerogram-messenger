@@ -1,33 +1,37 @@
-import { useMyChats, useMe } from "@/features/chat/lib";
-import { useGlobalSubscriptions } from "@/features/chat/lib";
-import { useEffect } from "react";
+import {
+  useMyChats,
+  useMe,
+  useAppTitle,
+  useGlobalSubscriptions,
+} from "@/features/chat/lib";
+import { useEffect, type ReactNode } from "react";
 import type { Chat } from "@/entities/chat/model/types";
+import type { useAppTitle_chats$key } from "@/features/chat/lib/common/__generated__/useAppTitle_chats.graphql";
+import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 
 const logStyle = (color: string): string =>
   `color: ${color}; font-weight: bold; font-family: "JetBrains Mono", monospace;`;
-const dimStyle = `color: #888; font-family: "JetBrains Mono", monospace;`;
+const dimStyle: string = `color: #888; font-family: "JetBrains Mono", monospace;`;
 
-export function SubscriptionManager() {
-  const { data: meData } = useMe();
-  const { data: chatsData, loading, error } = useMyChats();
+export function SubscriptionManager(): ReactNode {
+  const meData: useMeQuery$data = useMe();
+  const chatsData = useMyChats();
 
-  const myId: string | undefined = meData?.me.id;
-  const chats: Chat[] = chatsData?.myChats?.chats || [];
+  const myId: string | undefined = meData?.me?.id;
 
-  useEffect(() => {
-    if (loading) return;
+  const chatsKey: useAppTitle_chats$key | null =
+    chatsData?.myChats?.__typename === "ChatList"
+      ? (chatsData.myChats as useAppTitle_chats$key)
+      : null;
 
-    if (error) {
-      console.log(
-        "%c[WS]%c subscription error:%c %s",
-        logStyle("#ff4d4d"),
-        dimStyle,
-        "color: #fca5a5;",
-        error.message,
-      );
-      return;
-    }
+  useAppTitle(chatsKey);
 
+  const chats: readonly Chat[] =
+    chatsData?.myChats?.__typename === "ChatList"
+      ? (chatsData.myChats.chats as unknown as readonly Chat[])
+      : [];
+
+  useEffect((): void => {
     if (chats.length > 0) {
       console.log(
         "%c[WS]%c initializing subscriptions for %c%d%c chats",
@@ -38,13 +42,15 @@ export function SubscriptionManager() {
         dimStyle,
       );
     }
-  }, [chats.length, loading, error]);
+  }, [chats.length]);
 
   return (
     <>
-      {chats.map((chat: Chat) => (
-        <ActiveSubscription key={chat.id} chatId={chat.id} myId={myId} />
-      ))}
+      {chats.map(
+        (chat: Chat): ReactNode => (
+          <ActiveSubscription key={chat.id} chatId={chat.id} myId={myId} />
+        ),
+      )}
     </>
   );
 }
@@ -54,9 +60,9 @@ function ActiveSubscription({
   myId,
 }: {
   chatId: string;
-  myId?: string;
-}) {
-  useEffect(() => {
+  myId: string | undefined;
+}): null {
+  useEffect((): void => {
     console.log(
       "%c[SUB]%c active for chat:%c %s",
       logStyle("#a855f7"),

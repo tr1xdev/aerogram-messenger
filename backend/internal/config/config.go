@@ -18,6 +18,7 @@ type Config struct {
 	Auth        AuthConfig        `mapstructure:"auth"`
 	RateLimit   RateLimitConfig   `mapstructure:"ratelimit"`
 	UserService UserServiceConfig `mapstructure:"user_service"`
+	S3          S3Config          `mapstructure:"s3"`
 }
 
 type AppConfig struct {
@@ -137,6 +138,15 @@ type LimitEntry struct {
 
 type UserServiceConfig struct {
 	MaxBotsPerUser int `mapstructure:"max_bots_per_user"`
+}
+
+type S3Config struct {
+	Endpoint  string `mapstructure:"endpoint"`
+	AccessKey string `mapstructure:"access_key"`
+	SecretKey string `mapstructure:"secret_key"`
+	Bucket    string `mapstructure:"bucket"`
+	UseSSL    bool   `mapstructure:"use_ssl"`
+	Region    string `mapstructure:"region"`
 }
 
 func Load() (*Config, error) {

@@ -69,6 +69,7 @@ type Querier interface {
 	UpdateMessageExtended(ctx context.Context, arg UpdateMessageExtendedParams) (Message, error)
 	UpdateSessionActivity(ctx context.Context, id uuid.UUID) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpdateUserPhoto(ctx context.Context, arg UpdateUserPhotoParams) (User, error)
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error
 }
 

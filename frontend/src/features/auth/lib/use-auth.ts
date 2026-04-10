@@ -1,120 +1,187 @@
-import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { graphql, useMutation } from "react-relay";
 import { useNavigate } from "@tanstack/react-router";
-import { gqlClient } from "@/shared/api/client";
 import { useAuthStore } from "@/store/auth-store";
-import {
-  LOGIN_MUTATION,
-  SIGNUP_MUTATION,
-  VERIFY_EMAIL_MUTATION,
-} from "../api/auth.gql";
+import type { useAuthLoginMutation } from "./__generated__/useAuthLoginMutation.graphql";
+import type { useAuthSignUpMutation } from "./__generated__/useAuthSignUpMutation.graphql";
+import type { useAuthVerifyEmailMutation } from "./__generated__/useAuthVerifyEmailMutation.graphql";
 
-export const parseApiError = (error: unknown): string => {
-  if (typeof error === "object" && error !== null && "response" in error) {
-    const e = error as { response?: { errors?: { message: string }[] } };
-    if (e.response?.errors && e.response.errors.length > 0) {
-      return e.response.errors[0].message;
+const loginMutation = graphql`
+  mutation useAuthLoginMutation($input: LoginInput!) {
+    login(input: $input) {
+      userId
+      accessToken
+      refreshToken
+      requiresVerification
     }
   }
-  if (error instanceof Error) {
-    return error.message;
+`;
+
+const signUpMutation = graphql`
+  mutation useAuthSignUpMutation($input: SignUpInput!) {
+    signUp(input: $input) {
+      userId
+      accessToken
+      refreshToken
+      requiresVerification
+    }
   }
-  return "An unexpected error occurred. Please try again.";
-};
+`;
 
-interface AuthPayload {
-  userId: string;
-  accessToken?: string;
-  refreshToken?: string;
-  requiresVerification: boolean;
+const verifyEmailMutation = graphql`
+  mutation useAuthVerifyEmailMutation($input: VerifyEmailInput!) {
+    verifyEmail(input: $input) {
+      userId
+      accessToken
+      refreshToken
+      requiresVerification
+    }
+  }
+`;
+
+export function parseApiError(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  if (Array.isArray(error) && error.length > 0) {
+    return error[0]?.message || "An unknown error occurred";
+  }
+  return "An unknown error occurred";
 }
 
-interface LoginInput {
-  email: string;
-  password: string;
-}
-
-interface SignUpInput {
-  username?: string;
-  email: string;
-  password: string;
-  firstName: string;
-  lastName?: string;
-}
-
-interface VerifyEmailInput {
-  userID: string;
-  code: string;
-}
-
-export const useLogin = () => {
+export const useLogin = (): {
+  mutate: (params: {
+    input: useAuthLoginMutation["variables"]["input"];
+  }) => void;
+  isPending: boolean;
+  error: Error | null;
+} => {
   const navigate = useNavigate();
   const setTokens = useAuthStore((state) => state.setTokens);
+  const [error, setError] = useState<Error | null>(null);
+  const [commit, isInFlight] = useMutation<useAuthLoginMutation>(loginMutation);
 
-  return useMutation({
-    mutationFn: async (variables: { input: LoginInput }) => {
-      const response = await gqlClient.request<{ login: AuthPayload }>(
-        LOGIN_MUTATION,
-        variables,
-      );
-      return response.login;
-    },
-    onSuccess: (data) => {
-      if (data.requiresVerification) {
-        navigate({
-          to: "/otp",
-          search: { userId: data.userId },
-        });
-      } else if (data.accessToken && data.refreshToken) {
-        setTokens(data.accessToken, data.refreshToken);
-        navigate({ to: "/" });
-      }
-    },
-  });
+  const mutate = (params: {
+    input: useAuthLoginMutation["variables"]["input"];
+  }): void => {
+    setError(null);
+    commit({
+      variables: { input: params.input },
+      onCompleted: (
+        response: useAuthLoginMutation["response"],
+        errors,
+      ): void => {
+        if (errors && errors.length > 0) {
+          setError(new Error(errors[0].message));
+          return;
+        }
+
+        const data = response.login;
+        if (data.requiresVerification) {
+          navigate({
+            to: "/otp",
+            search: { userId: data.userId },
+          });
+        } else if (data.accessToken && data.refreshToken) {
+          setTokens(data.accessToken, data.refreshToken);
+          navigate({ to: "/" });
+        }
+      },
+      onError: (err: Error): void => {
+        setError(err);
+      },
+    });
+  };
+
+  return { mutate, isPending: isInFlight, error };
 };
 
-export const useSignUp = () => {
+export const useSignUp = (): {
+  mutate: (params: {
+    input: useAuthSignUpMutation["variables"]["input"];
+  }) => void;
+  isPending: boolean;
+  error: Error | null;
+} => {
   const navigate = useNavigate();
   const setTokens = useAuthStore((state) => state.setTokens);
+  const [error, setError] = useState<Error | null>(null);
+  const [commit, isInFlight] =
+    useMutation<useAuthSignUpMutation>(signUpMutation);
 
-  return useMutation({
-    mutationFn: async (variables: { input: SignUpInput }) => {
-      const response = await gqlClient.request<{ signUp: AuthPayload }>(
-        SIGNUP_MUTATION,
-        variables,
-      );
-      return response.signUp;
-    },
-    onSuccess: (data) => {
-      if (data.requiresVerification) {
-        navigate({
-          to: "/otp",
-          search: { userId: data.userId },
-        });
-      } else if (data.accessToken && data.refreshToken) {
-        setTokens(data.accessToken, data.refreshToken);
-        navigate({ to: "/" });
-      }
-    },
-  });
+  const mutate = (params: {
+    input: useAuthSignUpMutation["variables"]["input"];
+  }): void => {
+    setError(null);
+    commit({
+      variables: { input: params.input },
+      onCompleted: (
+        response: useAuthSignUpMutation["response"],
+        errors,
+      ): void => {
+        if (errors && errors.length > 0) {
+          setError(new Error(errors[0].message));
+          return;
+        }
+
+        const data = response.signUp;
+        if (data.requiresVerification) {
+          navigate({
+            to: "/otp",
+            search: { userId: data.userId },
+          });
+        } else if (data.accessToken && data.refreshToken) {
+          setTokens(data.accessToken, data.refreshToken);
+          navigate({ to: "/" });
+        }
+      },
+      onError: (err: Error): void => {
+        setError(err);
+      },
+    });
+  };
+
+  return { mutate, isPending: isInFlight, error };
 };
 
-export const useVerifyEmail = () => {
+export const useVerifyEmail = (): {
+  mutate: (params: {
+    input: useAuthVerifyEmailMutation["variables"]["input"];
+  }) => void;
+  isPending: boolean;
+  error: Error | null;
+} => {
   const navigate = useNavigate();
   const setTokens = useAuthStore((state) => state.setTokens);
+  const [error, setError] = useState<Error | null>(null);
+  const [commit, isInFlight] =
+    useMutation<useAuthVerifyEmailMutation>(verifyEmailMutation);
 
-  return useMutation({
-    mutationFn: async (variables: { input: VerifyEmailInput }) => {
-      const response = await gqlClient.request<{ verifyEmail: AuthPayload }>(
-        VERIFY_EMAIL_MUTATION,
-        variables,
-      );
-      return response.verifyEmail;
-    },
-    onSuccess: (data) => {
-      if (data.accessToken && data.refreshToken) {
-        setTokens(data.accessToken, data.refreshToken);
-        navigate({ to: "/" });
-      }
-    },
-  });
+  const mutate = (params: {
+    input: useAuthVerifyEmailMutation["variables"]["input"];
+  }): void => {
+    setError(null);
+    commit({
+      variables: { input: params.input },
+      onCompleted: (
+        response: useAuthVerifyEmailMutation["response"],
+        errors,
+      ): void => {
+        if (errors && errors.length > 0) {
+          setError(new Error(errors[0].message));
+          return;
+        }
+
+        const data = response.verifyEmail;
+        if (data.accessToken && data.refreshToken) {
+          setTokens(data.accessToken, data.refreshToken);
+          navigate({ to: "/" });
+        }
+      },
+      onError: (err: Error): void => {
+        setError(err);
+      },
+    });
+  };
+
+  return { mutate, isPending: isInFlight, error };
 };

@@ -32,7 +32,9 @@ import type {
   User,
   ChatMember,
 } from "@/entities/chat/model/types";
-
+import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generated__/useMarkDialog_chat.graphql";
+import type { useMessageActionsSendMutation$data } from "@/features/chat/lib/messages/__generated__/useMessageActionsSendMutation.graphql";
+import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 export const Route = createFileRoute("/_authenticated/chat/$chatId")({
   component: ChatRoute,
 });
@@ -55,45 +57,56 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     inputRef.current = input;
   }, [input]);
 
-  const { data: meData } = useMe();
-  const {
-    data: chatData,
-    loading: chatLoading,
-    error: chatError,
-  } = useChatDetails(chatId);
+  const meData: useMeQuery$data = useMe();
+  const chatData: {
+    readonly chat?: { readonly __typename: string } | null;
+  } | null = useChatDetails(chatId);
+  const chatsData: MyChatsResponse = useMyChats();
 
-  const me: User | undefined = meData?.me;
-  const chat: Chat | undefined = chatData?.chat;
+  const me: User | undefined = meData?.me as unknown as User | undefined;
 
-  const typingFromSub = useTypingSubscription(chatId);
+  const chatRaw: { readonly __typename: string } | undefined | null =
+    chatData?.chat;
+  const isChatType: boolean = chatRaw?.__typename === "Chat";
+  const chat: Chat | undefined = isChatType
+    ? (chatRaw as unknown as Chat)
+    : undefined;
 
-  const {
-    messages: messagesFromHistory,
-    isLoading: historyLoading,
-    lastReadSequence,
-  } = useChatHistory(chatId);
+  const chatError: unknown = !isChatType ? chatRaw : null;
+  const typingFromSub: { isTyping: boolean; userId: string } | null =
+    useTypingSubscription(chatId);
+
+  const { messages: messagesFromHistory, isLoading: historyLoading } =
+    useChatHistory(chatId);
 
   const { sendMessage, editMessage } = useMessageActions(chatId);
   const { sendTyping } = useSendTyping(chatId);
 
-  const { data: chatsData } = useMyChats() as {
-    data: MyChatsResponse | undefined;
-  };
+  const isInitialLoading: boolean = isFirstLoad && historyLoading;
+  const isNotFound: boolean = !chat && !isInitialLoading && !!chatError;
 
-  const isInitialLoading: boolean =
-    (!chat && chatLoading) || (historyLoading && isFirstLoad);
-  const isNotFound: boolean =
-    (!chat && !chatLoading && !!chatError) ||
-    (!chat && !chatLoading && !!chatData && !chatData.chat);
+  const lastSequence = useMemo((): number => {
+    if (!messagesFromHistory || messagesFromHistory.length === 0) return 0;
+    const lastMsg: Message = messagesFromHistory[
+      messagesFromHistory.length - 1
+    ] as unknown as Message;
+    return (lastMsg.sequence as number) ?? 0;
+  }, [messagesFromHistory]);
+
+  const { checkAndMarkRead } = useMarkDialog(
+    chatRaw as unknown as useMarkDialog_chat$key,
+    lastSequence,
+    me?.id,
+  );
 
   useEffect((): void | (() => void) => {
-    if (!historyLoading && !chatLoading && chat) {
-      const timer = setTimeout((): void => {
+    if (!historyLoading && chat) {
+      const timer: ReturnType<typeof setTimeout> = setTimeout((): void => {
         setIsFirstLoad(false);
       }, 100);
       return (): void => clearTimeout(timer);
     }
-  }, [historyLoading, chatLoading, chat]);
+  }, [historyLoading, chat]);
 
   useEffect((): (() => void) => {
     setActiveChatId(chatId);
@@ -130,51 +143,50 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   );
 
   const totalUnread = useMemo((): number => {
-    const chats: Chat[] = chatsData?.myChats?.chats || [];
+    const chatList:
+      | { readonly __typename: string; readonly chats?: readonly unknown[] }
+      | null
+      | undefined = chatsData?.myChats;
+    const chats: readonly Chat[] =
+      chatList?.__typename === "ChatList"
+        ? (chatList.chats as readonly Chat[])
+        : [];
     return chats.reduce((acc: number, c: Chat): number => {
       return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
     }, 0);
   }, [chatsData, chatId]);
 
   const typingUser = useMemo((): User | undefined => {
-    if (!chat?.members || !me) return undefined;
-    if (typingFromSub?.isTyping && typingFromSub.id !== me.id) {
-      const subUser: User | undefined = chat.members.find(
-        (m: ChatMember): boolean => m.user.id === typingFromSub.id,
+    if (!chat?.members || !me || !typingFromSub) return undefined;
+    if (typingFromSub.isTyping && typingFromSub.userId !== me.id) {
+      const members: ChatMember[] = chat.members as ChatMember[];
+      const subUser: User | undefined = members.find(
+        (m: ChatMember): boolean => m.user.id === typingFromSub.userId,
       )?.user;
       if (subUser) return subUser;
     }
-    const typingMember: ChatMember | undefined = chat.members.find(
-      (m: ChatMember): boolean =>
-        m.user.id !== me.id && m.user.isTyping === true,
-    );
-    return typingMember?.user;
+    return undefined;
   }, [chat, me, typingFromSub]);
 
   const isBotChat = useMemo((): boolean => {
     if (!chat?.members || !me) return false;
-    const otherMember: ChatMember | undefined = chat.members.find(
+    const members: ChatMember[] = chat.members as ChatMember[];
+    const otherMember: ChatMember | undefined = members.find(
       (m: ChatMember): boolean => m.user.id !== me.id,
     );
     return otherMember?.user.isBot ?? false;
   }, [chat, me]);
 
-  const allMessages = useMemo((): Message[] => {
-    return [...messagesFromHistory].sort((a: Message, b: Message): number => {
+  const allMessages = useMemo((): readonly Message[] => {
+    const rawMessages: Message[] = (messagesFromHistory ??
+      []) as unknown as Message[];
+    return [...rawMessages].sort((a: Message, b: Message): number => {
       const timeA: number = new Date(a.sentAt).getTime();
       const timeB: number = new Date(b.sentAt).getTime();
       if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
-      if (a.sequence !== undefined && b.sequence !== undefined)
-        return a.sequence - b.sequence;
-      return timeA - timeB;
+      return (a.sequence ?? 0) - (b.sequence ?? 0);
     });
   }, [messagesFromHistory]);
-
-  const { checkAndMarkRead } = useMarkDialog(
-    chatId,
-    allMessages,
-    me ?? undefined,
-  );
 
   useEffect((): void | (() => void) => {
     const handleVisibilityChange = (): void => {
@@ -212,7 +224,11 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
       try {
         await sendMessage(val, {
-          variables: { replyToId: originalReply?.id },
+          variables: {
+            chatId,
+            text: val,
+            replyToId: originalReply?.id ?? null,
+          },
           optimisticResponse: {
             sendMessage: {
               __typename: "Message",
@@ -220,26 +236,17 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
               chatId,
               text: val,
               sentAt: new Date().toISOString(),
-              isRead: false,
-              isEdited: false,
-              isEncrypted: false,
-              isSending: true,
-              forwardedFrom: null,
               sequence:
                 allMessages.length > 0
                   ? (allMessages[allMessages.length - 1].sequence ?? 0) + 1
                   : 1,
               sender: {
-                ...me,
+                id: me.id,
+                firstName: me.firstName,
+                photoUrl: me.photoUrl,
               },
-              replyTo: originalReply
-                ? {
-                    ...originalReply,
-                    __typename: "Message",
-                  }
-                : null,
-            } as Message & { __typename: "Message" },
-          },
+            },
+          } as useMessageActionsSendMutation$data,
         });
       } catch (err: unknown) {
         console.error(err);
@@ -288,7 +295,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         title={chat?.title ?? undefined}
         photoUrl={chat?.photoUrl ?? undefined}
         totalUnread={totalUnread}
-        members={chat?.members}
+        members={chat?.members as ChatMember[]}
         meId={me?.id}
         isLoading={isInitialLoading}
         typingUser={typingUser}
@@ -320,9 +327,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           <MessageList
             chatId={chatId}
             messages={allMessages}
-            members={chat?.members}
+            members={chat?.members as ChatMember[]}
             myId={me?.id}
-            lastReadSequence={lastReadSequence ?? 0}
+            lastReadSequence={chat?.lastReadSequence ?? 0}
             onMarkRead={checkAndMarkRead}
             onReply={handleReplyInitiate}
             onEdit={handleEditInitiate}

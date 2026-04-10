@@ -722,6 +722,50 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 	return i, err
 }
 
+const updateUserPhoto = `-- name: UpdateUserPhoto :one
+UPDATE users
+SET photo_url = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, username, first_name, last_name, email, password, status, photo_url, is_premium, is_email_verified, is_verified, verification_token, verification_expiry, public_key, encrypted_priv_key, encryption_iv, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands, created_at, updated_at, deleted_at
+`
+
+type UpdateUserPhotoParams struct {
+	ID       uuid.UUID      `json:"id"`
+	PhotoUrl sql.NullString `json:"photo_url"`
+}
+
+func (q *Queries) UpdateUserPhoto(ctx context.Context, arg UpdateUserPhotoParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUserPhoto, arg.ID, arg.PhotoUrl)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.Password,
+		&i.Status,
+		&i.PhotoUrl,
+		&i.IsPremium,
+		&i.IsEmailVerified,
+		&i.IsVerified,
+		&i.VerificationToken,
+		&i.VerificationExpiry,
+		&i.PublicKey,
+		&i.EncryptedPrivKey,
+		&i.EncryptionIv,
+		&i.IsBot,
+		&i.BotTokenHash,
+		&i.BotOwnerID,
+		&i.BotDescription,
+		&i.BotCommands,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const updateUserStatus = `-- name: UpdateUserStatus :exec
 UPDATE users
 SET status = $2, updated_at = NOW()
