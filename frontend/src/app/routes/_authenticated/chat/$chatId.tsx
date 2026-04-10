@@ -20,6 +20,7 @@ import {
   useMessageActions,
   useSendTyping,
   type MyChatsResponse,
+  type ChatDetailsResponse,
 } from "@/features/chat/lib";
 import { useMarkDialog } from "@/features/chat/lib";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
@@ -35,12 +36,13 @@ import type {
 import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generated__/useMarkDialog_chat.graphql";
 import type { useMessageActionsSendMutation$data } from "@/features/chat/lib/messages/__generated__/useMessageActionsSendMutation.graphql";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
+
 export const Route = createFileRoute("/_authenticated/chat/$chatId")({
   component: ChatRoute,
 });
 
 function ChatRoute(): ReactNode {
-  const { chatId } = Route.useParams();
+  const { chatId }: { chatId: string } = Route.useParams();
   return <ChatPage key={chatId} chatId={chatId} />;
 }
 
@@ -58,15 +60,12 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }, [input]);
 
   const meData: useMeQuery$data = useMe();
-  const chatData: {
-    readonly chat?: { readonly __typename: string } | null;
-  } | null = useChatDetails(chatId);
+  const chatData: ChatDetailsResponse = useChatDetails(chatId);
   const chatsData: MyChatsResponse = useMyChats();
 
   const me: User | undefined = meData?.me as unknown as User | undefined;
 
-  const chatRaw: { readonly __typename: string } | undefined | null =
-    chatData?.chat;
+  const chatRaw: ChatDetailsResponse["chat"] = chatData.chat;
   const isChatType: boolean = chatRaw?.__typename === "Chat";
   const chat: Chat | undefined = isChatType
     ? (chatRaw as unknown as Chat)
@@ -85,7 +84,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const isInitialLoading: boolean = isFirstLoad && historyLoading;
   const isNotFound: boolean = !chat && !isInitialLoading && !!chatError;
 
-  const lastSequence = useMemo((): number => {
+  const lastSequence: number = useMemo((): number => {
     if (!messagesFromHistory || messagesFromHistory.length === 0) return 0;
     const lastMsg: Message = messagesFromHistory[
       messagesFromHistory.length - 1
@@ -142,21 +141,24 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     [sendTyping],
   );
 
-  const totalUnread = useMemo((): number => {
-    const chatList:
-      | { readonly __typename: string; readonly chats?: readonly unknown[] }
-      | null
-      | undefined = chatsData?.myChats;
-    const chats: readonly Chat[] =
-      chatList?.__typename === "ChatList"
-        ? (chatList.chats as readonly Chat[])
-        : [];
-    return chats.reduce((acc: number, c: Chat): number => {
-      return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
-    }, 0);
+  const totalUnread: number = useMemo((): number => {
+    const myChats: MyChatsResponse["myChats"] = chatsData.myChats;
+    if (myChats?.__typename === "ChatList") {
+      return (myChats.chats ?? []).reduce(
+        (
+          acc: number,
+          c: { readonly id: string; readonly unreadCount?: number | null },
+        ): number => {
+          const unread: number = c.unreadCount ?? 0;
+          return c.id === chatId ? acc : acc + unread;
+        },
+        0,
+      );
+    }
+    return 0;
   }, [chatsData, chatId]);
 
-  const typingUser = useMemo((): User | undefined => {
+  const typingUser: User | undefined = useMemo((): User | undefined => {
     if (!chat?.members || !me || !typingFromSub) return undefined;
     if (typingFromSub.isTyping && typingFromSub.userId !== me.id) {
       const members: ChatMember[] = chat.members as ChatMember[];
@@ -168,7 +170,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     return undefined;
   }, [chat, me, typingFromSub]);
 
-  const isBotChat = useMemo((): boolean => {
+  const isBotChat: boolean = useMemo((): boolean => {
     if (!chat?.members || !me) return false;
     const members: ChatMember[] = chat.members as ChatMember[];
     const otherMember: ChatMember | undefined = members.find(
@@ -177,7 +179,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     return otherMember?.user.isBot ?? false;
   }, [chat, me]);
 
-  const allMessages = useMemo((): readonly Message[] => {
+  const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
     const rawMessages: Message[] = (messagesFromHistory ??
       []) as unknown as Message[];
     return [...rawMessages].sort((a: Message, b: Message): number => {

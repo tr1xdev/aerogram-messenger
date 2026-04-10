@@ -45,7 +45,7 @@ import { SearchResults } from "@/features/chat/ui/search-results";
 import { useSearchUsers } from "@/features/chat/lib";
 import { useConnectionStore } from "@/store/connection";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import type { Chat, User } from "@/entities/chat/model/types";
 import type {
@@ -151,6 +151,7 @@ export function AppSidebar(): React.ReactNode {
   const navigate = useNavigate();
   const pathname: string = useRouterState().location.pathname;
   const isWsConnected: boolean = useConnectionStore((s) => s.isWsConnected);
+  const isMobile: boolean = useIsMobile();
 
   const data: appSidebarQuery$data = useLazyLoadQuery<AppSidebarQueryType>(
     appSidebarQuery,
@@ -207,12 +208,12 @@ export function AppSidebar(): React.ReactNode {
   }, [chats]);
 
   const filteredLocalChats = useMemo((): readonly SidebarChat[] => {
-    if (!debouncedQuery) return [] as readonly SidebarChat[];
-    const q: string = debouncedQuery.toLowerCase();
+    const q: string = searchQuery.trim().toLowerCase();
+    if (!q) return [] as readonly SidebarChat[];
     return chats.filter((c: SidebarChat): boolean =>
       c.title.toLowerCase().includes(q),
     );
-  }, [debouncedQuery, chats]);
+  }, [searchQuery, chats]);
 
   useEffect((): (() => void) => {
     const handler: number = window.setTimeout((): void => {
@@ -286,19 +287,22 @@ export function AppSidebar(): React.ReactNode {
       variables: { userID: userId },
       updater: (store: RecordSourceSelectorProxy): void => {
         const payload: RecordProxy | null =
-          store.getRootField("createDirectChat") ?? null;
+          store.getRootField("createDirectChat");
         if (!payload || payload.getType() !== "Chat") return;
 
         const root: RecordProxy = store.getRoot();
-        const myChatsRec: RecordProxy | null =
-          root.getLinkedRecord("myChats") ?? null;
+        const myChatsRec: RecordProxy | null = root.getLinkedRecord("myChats");
 
-        if (myChatsRec && myChatsRec.getType() === "ChatList") {
-          const chatList: ReadonlyArray<RecordProxy> =
+        if (myChatsRec?.getType() === "ChatList") {
+          const chatList: readonly RecordProxy[] =
             myChatsRec.getLinkedRecords("chats") ?? [];
+          const payloadId = payload.getValue("id") as
+            | string
+            | number
+            | boolean
+            | null;
           const alreadyExists: boolean = chatList.some(
-            (c: RecordProxy): boolean =>
-              c.getValue("id") === payload.getValue("id"),
+            (c: RecordProxy): boolean => c.getValue("id") === payloadId,
           );
 
           if (!alreadyExists) {
@@ -316,7 +320,7 @@ export function AppSidebar(): React.ReactNode {
           setSearchQuery("");
           setIsFocused(false);
           navigate({ to: "/chat/$chatId", params: { chatId: res.id } });
-        } else if (res?.__typename !== "%other" && res && "message" in res) {
+        } else if (res && "message" in res) {
           toast.error(res.message as string);
         }
       },
@@ -326,6 +330,10 @@ export function AppSidebar(): React.ReactNode {
       },
     });
   };
+
+  if (isMobile && pathname.startsWith("/chat/")) {
+    return null;
+  }
 
   return (
     <>
@@ -582,7 +590,7 @@ export function AppSidebar(): React.ReactNode {
                   )}
                 </div>
               ) : chats.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-700">
+                <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300">
                   <div className="relative mb-6 select-none pointer-events-none">
                     <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full" />
                     <div className="relative w-20 h-20 bg-muted/30 rounded-[2rem] flex items-center justify-center rotate-3 border border-border/50 shadow-inner">
@@ -598,8 +606,7 @@ export function AppSidebar(): React.ReactNode {
                     </p>
                   </div>
                   <div className="mt-8">
-                    <Button
-                      variant="secondary"
+                    <button
                       onClick={(): void => {
                         inputRef.current?.focus();
                         setIsFocused(true);
@@ -607,7 +614,7 @@ export function AppSidebar(): React.ReactNode {
                       className="rounded-full px-6 h-10 font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-none transition-all"
                     >
                       Start searching
-                    </Button>
+                    </button>
                   </div>
                 </div>
               ) : (

@@ -41,31 +41,25 @@ export function ChatMenuItem({
 
   const otherMember: ChatMember | undefined = useMemo(
     (): ChatMember | undefined =>
-      chat.members?.find((m: ChatMember): boolean => m.user.id !== myId),
+      chat.members?.find(
+        (m: ChatMember): boolean =>
+          m.user?.id !== undefined && m.user.id !== myId,
+      ),
     [chat.members, myId],
   );
 
   const otherUser: User | undefined = otherMember?.user;
-  const otherUserFirstName: string | undefined = otherUser?.firstName;
-  const otherUserLastName: string | undefined = otherUser?.lastName;
-  const otherUserUsername: string | undefined = otherUser?.username;
   const chatTitle: string | undefined = chat.title;
 
   const displayName: string = useMemo((): string => {
     if (otherUser) {
-      const first: string = otherUserFirstName?.trim() || "";
-      const last: string = otherUserLastName?.trim() || "";
+      const first: string = otherUser.firstName?.trim() || "";
+      const last: string = otherUser.lastName?.trim() || "";
       const full: string = `${first} ${last}`.trim();
-      return full || otherUserUsername || "Chat";
+      return full || otherUser.username || "Chat";
     }
     return chatTitle || "Chat";
-  }, [
-    otherUser,
-    otherUserFirstName,
-    otherUserLastName,
-    otherUserUsername,
-    chatTitle,
-  ]);
+  }, [otherUser, chatTitle]);
 
   const avatarUrl: string | undefined = useMemo((): string | undefined => {
     if (chat.type === "PRIVATE") {
@@ -80,32 +74,21 @@ export function ChatMenuItem({
   );
 
   const lastMessage: Message | undefined = chat.lastMessage ?? undefined;
-  const isMe: boolean = lastMessage?.sender.id === myId;
+  const isMe: boolean = lastMessage?.sender?.id === myId;
   const sender: User | undefined = lastMessage?.sender;
   const isOnline: boolean = otherUser?.status === "online";
 
   const showSenderName: boolean =
     chat.type === "GROUP" || chat.type === "CHANNEL" || isMe;
 
-  const senderFirstName: string | undefined = sender?.firstName;
-  const senderLastName: string | undefined = sender?.lastName;
-  const senderUsername: string | undefined = sender?.username;
-
   const senderName: string | null = useMemo((): string | null => {
     if (!showSenderName || !sender) return null;
     if (isMe) return "You";
-    const first: string = senderFirstName?.trim() || "";
-    const last: string = senderLastName?.trim() || "";
+    const first: string = sender.firstName?.trim() || "";
+    const last: string = sender.lastName?.trim() || "";
     const full: string = `${first} ${last}`.trim();
-    return full || senderUsername || null;
-  }, [
-    showSenderName,
-    sender,
-    isMe,
-    senderFirstName,
-    senderLastName,
-    senderUsername,
-  ]);
+    return full || sender.username || null;
+  }, [showSenderName, sender, isMe]);
 
   return (
     <>

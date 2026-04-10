@@ -19,9 +19,9 @@ export function SubscriptionManager(): ReactNode {
 
   const myId: string | undefined = meData?.me?.id;
 
-  const chatsKey: useAppTitle_chats$key | null =
+  const chatsKey =
     chatsData?.myChats?.__typename === "ChatList"
-      ? (chatsData.myChats as useAppTitle_chats$key)
+      ? (chatsData.myChats as unknown as useAppTitle_chats$key)
       : null;
 
   useAppTitle(chatsKey);

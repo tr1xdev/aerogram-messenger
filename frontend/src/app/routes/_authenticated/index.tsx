@@ -2,32 +2,20 @@ import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMyChats, useMe } from "@/features/chat/lib";
 import { ChatMenuItem } from "@/features/chat/ui/chat-menu-item";
-import { Skeleton } from "@/components/ui/skeleton";
 import type { Chat } from "@/entities/chat/model/types";
-
-interface MyChatsResponse {
-  chats: Chat[];
-}
 
 export const Route = createFileRoute("/_authenticated/")({
   component: IndexComponent,
 });
 
-function IndexComponent() {
-  const { data: chatsData, loading } = useMyChats();
-  const { data: userData } = useMe();
+function IndexComponent(): React.ReactNode {
+  const chatsData = useMyChats();
+  const userData = useMe();
 
-  const chats: Chat[] = useMemo((): Chat[] => {
-    const rawData: MyChatsResponse | Chat[] | undefined = chatsData?.myChats as
-      | MyChatsResponse
-      | Chat[]
-      | undefined;
-
-    if (!rawData) return [];
-    if (Array.isArray(rawData)) return rawData;
-    if ("chats" in rawData && Array.isArray(rawData.chats))
-      return rawData.chats;
-
+  const chats: readonly Chat[] = useMemo((): readonly Chat[] => {
+    if (chatsData?.myChats?.__typename === "ChatList") {
+      return chatsData.myChats.chats as unknown as readonly Chat[];
+    }
     return [];
   }, [chatsData]);
 
@@ -38,26 +26,14 @@ function IndexComponent() {
           <h1 className="text-2xl font-bold tracking-tight">Chats</h1>
         </header>
         <div className="flex-1 overflow-y-auto px-2 pb-20">
-          {loading
-            ? Array(6)
-                .fill(0)
-                .map((_, i: number) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-4">
-                    <Skeleton className="h-12 w-12 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-3 w-full opacity-50" />
-                    </div>
-                  </div>
-                ))
-            : chats.map((chat: Chat) => (
-                <ChatMenuItem
-                  key={chat.id}
-                  chat={chat}
-                  isActive={false}
-                  myId={userData?.me?.id}
-                />
-              ))}
+          {chats.map((chat: Chat) => (
+            <ChatMenuItem
+              key={chat.id}
+              chat={chat}
+              isActive={false}
+              myId={userData?.me?.id}
+            />
+          ))}
         </div>
       </div>
 
