@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d855976bb830be6be7666c153940d35c>>
+ * @generated SignedSource<<ead302b5976fa8f7c6a0e117abb3cff7>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -33,40 +33,35 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "chatID",
+        "variableName": "chatID"
+      }
+    ],
+    "concreteType": "TypingPayload",
+    "kind": "LinkedField",
+    "name": "userTyping",
+    "plural": false,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "chatID",
-            "variableName": "chatID"
-          }
-        ],
-        "concreteType": "TypingPayload",
-        "kind": "LinkedField",
-        "name": "userTyping",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "userId",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "isTyping",
-            "storageKey": null
-          }
-        ],
+        "args": null,
+        "kind": "ScalarField",
+        "name": "userId",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "isTyping",
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -87,12 +82,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "14aa27ce511bb249cf14efd7967649cf",
+    "cacheID": "ed57047f13c97f2fde5c3cdbb8c17eae",
     "id": null,
     "metadata": {},
     "name": "useTypingSubscription",
     "operationKind": "subscription",
-    "text": null
+    "text": "subscription useTypingSubscription(\n  $chatID: ID!\n) {\n  userTyping(chatID: $chatID) {\n    userId\n    isTyping\n  }\n}\n"
   }
 };
 })();

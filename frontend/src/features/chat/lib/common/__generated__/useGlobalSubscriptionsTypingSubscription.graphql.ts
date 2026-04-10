@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<313ae3460fc28a86c8f73eb62142857d>>
+ * @generated SignedSource<<8a52bb39d10bebbc155d547d6f91b888>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -33,40 +33,35 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "chatID",
+        "variableName": "chatID"
+      }
+    ],
+    "concreteType": "TypingPayload",
+    "kind": "LinkedField",
+    "name": "userTyping",
+    "plural": false,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "chatID",
-            "variableName": "chatID"
-          }
-        ],
-        "concreteType": "TypingPayload",
-        "kind": "LinkedField",
-        "name": "userTyping",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "userId",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "isTyping",
-            "storageKey": null
-          }
-        ],
+        "args": null,
+        "kind": "ScalarField",
+        "name": "userId",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "isTyping",
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -87,12 +82,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "53bbd476afe32fcab02527116b81d775",
+    "cacheID": "9ea67a06c9d57b16471296a1379ac10a",
     "id": null,
     "metadata": {},
     "name": "useGlobalSubscriptionsTypingSubscription",
     "operationKind": "subscription",
-    "text": null
+    "text": "subscription useGlobalSubscriptionsTypingSubscription(\n  $chatID: ID!\n) {\n  userTyping(chatID: $chatID) {\n    userId\n    isTyping\n  }\n}\n"
   }
 };
 })();

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<b4547818d690d16be72323ca49ac430c>>
+ * @generated SignedSource<<ce44069cfd7ff7b7f496649332f6e94c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -46,67 +46,62 @@ v1 = {
 },
 v2 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "chatId",
+        "variableName": "chatId"
+      }
+    ],
+    "concreteType": "Message",
+    "kind": "LinkedField",
+    "name": "messageAdded",
+    "plural": false,
     "selections": [
+      (v1/*: any*/),
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "chatId",
-            "variableName": "chatId"
-          }
-        ],
-        "concreteType": "Message",
+        "args": null,
+        "kind": "ScalarField",
+        "name": "chatId",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "text",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "sentAt",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "sequence",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "User",
         "kind": "LinkedField",
-        "name": "messageAdded",
+        "name": "sender",
         "plural": false,
         "selections": [
-          (v1/*: any*/),
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "chatId",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "text",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "sentAt",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "sequence",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "concreteType": "User",
-            "kind": "LinkedField",
-            "name": "sender",
-            "plural": false,
-            "selections": [
-              (v1/*: any*/)
-            ],
-            "storageKey": null
-          }
+          (v1/*: any*/)
         ],
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -127,12 +122,12 @@ return {
     "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "6a688392d2f5f4db5524d90283520da2",
+    "cacheID": "bf1ff96500fd0739bd4f5bf465752134",
     "id": null,
     "metadata": {},
     "name": "useGlobalSubscriptionsMessageAddedSubscription",
     "operationKind": "subscription",
-    "text": null
+    "text": "subscription useGlobalSubscriptionsMessageAddedSubscription(\n  $chatId: ID!\n) {\n  messageAdded(chatId: $chatId) {\n    id\n    chatId\n    text\n    sentAt\n    sequence\n    sender {\n      id\n    }\n  }\n}\n"
   }
 };
 })();

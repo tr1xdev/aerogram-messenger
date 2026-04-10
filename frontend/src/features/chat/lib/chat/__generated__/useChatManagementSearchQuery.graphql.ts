@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f77ac73221b0b183a1f359c6970fd150>>
+ * @generated SignedSource<<64a3d1f69f4488452d1be42d7d5285a3>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -36,61 +36,56 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "username",
+        "variableName": "username"
+      }
+    ],
+    "concreteType": "User",
+    "kind": "LinkedField",
+    "name": "searchUsers",
+    "plural": true,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "username",
-            "variableName": "username"
-          }
-        ],
-        "concreteType": "User",
-        "kind": "LinkedField",
-        "name": "searchUsers",
-        "plural": true,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "id",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "username",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "firstName",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "lastName",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "photoUrl",
-            "storageKey": null
-          }
-        ],
+        "args": null,
+        "kind": "ScalarField",
+        "name": "id",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "username",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "firstName",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "lastName",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "photoUrl",
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -111,12 +106,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "62ffa7b13612a82d0f2b7cbfa9cef4c3",
+    "cacheID": "713ca9e5ea1a1099f9bf0cb40ab87dc9",
     "id": null,
     "metadata": {},
     "name": "useChatManagementSearchQuery",
     "operationKind": "query",
-    "text": null
+    "text": "query useChatManagementSearchQuery(\n  $username: String!\n) {\n  searchUsers(username: $username) {\n    id\n    username\n    firstName\n    lastName\n    photoUrl\n  }\n}\n"
   }
 };
 })();

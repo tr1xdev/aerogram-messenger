@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<120558bd9a2145b106e9ec44d8045856>>
+ * @generated SignedSource<<1e9d5c95579286b47b1d530dafe85c49>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -30,22 +30,17 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
-    "selections": [
+    "alias": null,
+    "args": [
       {
-        "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "chatId",
-            "variableName": "chatId"
-          }
-        ],
-        "kind": "ScalarField",
-        "name": "markDialogAsRead",
-        "storageKey": null
+        "kind": "Variable",
+        "name": "chatId",
+        "variableName": "chatId"
       }
-    ]
+    ],
+    "kind": "ScalarField",
+    "name": "markDialogAsRead",
+    "storageKey": null
   }
 ];
 return {
@@ -66,12 +61,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "f217856681b8ff3103b638cc89418628",
+    "cacheID": "f648f5018940715eca0a521fb07dd7eb",
     "id": null,
     "metadata": {},
     "name": "useMessageActionsReadMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation useMessageActionsReadMutation(\n  $chatId: ID!\n) {\n  markDialogAsRead(chatId: $chatId)\n}\n"
   }
 };
 })();

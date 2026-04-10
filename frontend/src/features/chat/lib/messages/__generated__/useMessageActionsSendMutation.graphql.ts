@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d006ba5848e3ad64f06a3e2920ff8e3b>>
+ * @generated SignedSource<<5f58458255002090ae6d81d9180cb853>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -147,21 +147,16 @@ return {
     "name": "useMessageActionsSendMutation",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": (v3/*: any*/),
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "sendMessage",
+        "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": (v3/*: any*/),
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "sendMessage",
-            "plural": false,
-            "selections": [
-              (v5/*: any*/)
-            ],
-            "storageKey": null
-          }
-        ]
+          (v5/*: any*/)
+        ],
+        "storageKey": null
       }
     ],
     "type": "Mutation",
@@ -178,46 +173,41 @@ return {
     "name": "useMessageActionsSendMutation",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": (v3/*: any*/),
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "sendMessage",
+        "plural": false,
         "selections": [
           {
             "alias": null,
-            "args": (v3/*: any*/),
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "sendMessage",
-            "plural": false,
-            "selections": [
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "__typename",
-                "storageKey": null
-              },
-              (v5/*: any*/),
-              {
-                "kind": "InlineFragment",
-                "selections": [
-                  (v4/*: any*/)
-                ],
-                "type": "Node",
-                "abstractKey": "__isNode"
-              }
-            ],
+            "args": null,
+            "kind": "ScalarField",
+            "name": "__typename",
             "storageKey": null
+          },
+          (v5/*: any*/),
+          {
+            "kind": "InlineFragment",
+            "selections": [
+              (v4/*: any*/)
+            ],
+            "type": "Node",
+            "abstractKey": "__isNode"
           }
-        ]
+        ],
+        "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "27864b7a48c50ae9878b6d734d1b3ccc",
+    "cacheID": "5119df7e56821305b986c2b36db79dc7",
     "id": null,
     "metadata": {},
     "name": "useMessageActionsSendMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation useMessageActionsSendMutation(\n  $chatId: ID!\n  $text: String!\n  $replyToId: ID\n) {\n  sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {\n    __typename\n    ... on Message {\n      id\n      chatId\n      text\n      sentAt\n      sequence\n      sender {\n        id\n        firstName\n        photoUrl\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();

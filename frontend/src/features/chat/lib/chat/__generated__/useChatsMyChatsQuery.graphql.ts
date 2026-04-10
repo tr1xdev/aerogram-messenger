@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7eeb45ac9e6028f83e9356c1ccd8043f>>
+ * @generated SignedSource<<3384e54ba041af9af1a9002133684076>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,7 +12,8 @@ import { ConcreteRequest } from 'relay-runtime';
 export type useChatsMyChatsQuery$variables = Record<PropertyKey, never>;
 export type useChatsMyChatsQuery$data = {
   readonly myChats: {
-    readonly chats?: ReadonlyArray<{
+    readonly __typename: "ChatList";
+    readonly chats: ReadonlyArray<{
       readonly id: string;
       readonly lastMessage: {
         readonly sentAt: string;
@@ -20,8 +21,18 @@ export type useChatsMyChatsQuery$data = {
       } | null | undefined;
       readonly photoUrl: string | null | undefined;
       readonly title: string;
+      readonly unreadCount: number;
     }>;
-    readonly message?: string;
+  } | {
+    readonly __typename: "ForbiddenError";
+    readonly message: string;
+  } | {
+    readonly __typename: "InternalError";
+    readonly message: string;
+  } | {
+    // This will never be '%other', but we need some
+    // value in case none of the concrete values match.
+    readonly __typename: "%other";
   };
 };
 export type useChatsMyChatsQuery = {
@@ -34,49 +45,70 @@ var v0 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "id",
+  "name": "__typename",
   "storageKey": null
 },
 v1 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "title",
+  "name": "id",
   "storageKey": null
 },
 v2 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "photoUrl",
+  "name": "title",
   "storageKey": null
 },
 v3 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "text",
+  "name": "photoUrl",
   "storageKey": null
 },
 v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "sentAt",
+  "name": "unreadCount",
   "storageKey": null
 },
 v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "text",
+  "storageKey": null
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "sentAt",
+  "storageKey": null
+},
+v7 = [
+  {
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "message",
+    "storageKey": null
+  }
+],
+v8 = {
   "kind": "InlineFragment",
-  "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "message",
-      "storageKey": null
-    }
-  ],
+  "selections": (v7/*: any*/),
   "type": "ForbiddenError",
+  "abstractKey": null
+},
+v9 = {
+  "kind": "InlineFragment",
+  "selections": (v7/*: any*/),
+  "type": "InternalError",
   "abstractKey": null
 };
 return {
@@ -87,55 +119,53 @@ return {
     "name": "useChatsMyChatsQuery",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": null,
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "myChats",
+        "plural": false,
         "selections": [
+          (v0/*: any*/),
           {
-            "alias": null,
-            "args": null,
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "myChats",
-            "plural": false,
+            "kind": "InlineFragment",
             "selections": [
               {
-                "kind": "InlineFragment",
+                "alias": null,
+                "args": null,
+                "concreteType": "Chat",
+                "kind": "LinkedField",
+                "name": "chats",
+                "plural": true,
                 "selections": [
+                  (v1/*: any*/),
+                  (v2/*: any*/),
+                  (v3/*: any*/),
+                  (v4/*: any*/),
                   {
                     "alias": null,
                     "args": null,
-                    "concreteType": "Chat",
+                    "concreteType": "Message",
                     "kind": "LinkedField",
-                    "name": "chats",
-                    "plural": true,
+                    "name": "lastMessage",
+                    "plural": false,
                     "selections": [
-                      (v0/*: any*/),
-                      (v1/*: any*/),
-                      (v2/*: any*/),
-                      {
-                        "alias": null,
-                        "args": null,
-                        "concreteType": "Message",
-                        "kind": "LinkedField",
-                        "name": "lastMessage",
-                        "plural": false,
-                        "selections": [
-                          (v3/*: any*/),
-                          (v4/*: any*/)
-                        ],
-                        "storageKey": null
-                      }
+                      (v5/*: any*/),
+                      (v6/*: any*/)
                     ],
                     "storageKey": null
                   }
                 ],
-                "type": "ChatList",
-                "abstractKey": null
-              },
-              (v5/*: any*/)
+                "storageKey": null
+              }
             ],
-            "storageKey": null
-          }
-        ]
+            "type": "ChatList",
+            "abstractKey": null
+          },
+          (v8/*: any*/),
+          (v9/*: any*/)
+        ],
+        "storageKey": null
       }
     ],
     "type": "Query",
@@ -148,77 +178,68 @@ return {
     "name": "useChatsMyChatsQuery",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": null,
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "myChats",
+        "plural": false,
         "selections": [
+          (v0/*: any*/),
           {
-            "alias": null,
-            "args": null,
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "myChats",
-            "plural": false,
+            "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "__typename",
-                "storageKey": null
-              },
-              {
-                "kind": "InlineFragment",
+                "concreteType": "Chat",
+                "kind": "LinkedField",
+                "name": "chats",
+                "plural": true,
                 "selections": [
+                  (v1/*: any*/),
+                  (v2/*: any*/),
+                  (v3/*: any*/),
+                  (v4/*: any*/),
                   {
                     "alias": null,
                     "args": null,
-                    "concreteType": "Chat",
+                    "concreteType": "Message",
                     "kind": "LinkedField",
-                    "name": "chats",
-                    "plural": true,
+                    "name": "lastMessage",
+                    "plural": false,
                     "selections": [
-                      (v0/*: any*/),
-                      (v1/*: any*/),
-                      (v2/*: any*/),
-                      {
-                        "alias": null,
-                        "args": null,
-                        "concreteType": "Message",
-                        "kind": "LinkedField",
-                        "name": "lastMessage",
-                        "plural": false,
-                        "selections": [
-                          (v3/*: any*/),
-                          (v4/*: any*/),
-                          (v0/*: any*/)
-                        ],
-                        "storageKey": null
-                      }
+                      (v5/*: any*/),
+                      (v6/*: any*/),
+                      (v1/*: any*/)
                     ],
                     "storageKey": null
                   }
                 ],
-                "type": "ChatList",
-                "abstractKey": null
-              },
-              (v5/*: any*/)
+                "storageKey": null
+              }
             ],
-            "storageKey": null
-          }
-        ]
+            "type": "ChatList",
+            "abstractKey": null
+          },
+          (v8/*: any*/),
+          (v9/*: any*/)
+        ],
+        "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "d5b10fd64e0770a60b87c33ac92e2788",
+    "cacheID": "f7188e9e35c1636ad44e527763cdc724",
     "id": null,
     "metadata": {},
     "name": "useChatsMyChatsQuery",
     "operationKind": "query",
-    "text": null
+    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      chats {\n        id\n        title\n        photoUrl\n        unreadCount\n        lastMessage {\n          text\n          sentAt\n          id\n        }\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "fd8d40386e9674bd5f24938c6873f3a2";
+(node as any).hash = "3ac2b3497c249359cd094a0918442b4f";
 
 export default node;

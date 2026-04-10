@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9e149e480cc140c28ee09d82d494a62b>>
+ * @generated SignedSource<<db32c94ac8ee94de8e02901f13e745bd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -102,69 +102,103 @@ return {
     "name": "useMessagesQuery",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": [
+          {
+            "kind": "Variable",
+            "name": "beforeSequence",
+            "variableName": "cursor"
+          },
+          (v1/*: any*/),
+          {
+            "kind": "Variable",
+            "name": "limit",
+            "variableName": "count"
+          }
+        ],
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "messageHistory",
+        "plural": false,
         "selections": [
           {
             "alias": null,
-            "args": [
-              {
-                "kind": "Variable",
-                "name": "beforeSequence",
-                "variableName": "cursor"
-              },
-              (v1/*: any*/),
-              {
-                "kind": "Variable",
-                "name": "limit",
-                "variableName": "count"
-              }
-            ],
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "messageHistory",
-            "plural": false,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "__typename",
+            "storageKey": null
+          },
+          {
+            "kind": "InlineFragment",
             "selections": [
               {
                 "alias": null,
                 "args": null,
-                "kind": "ScalarField",
-                "name": "__typename",
-                "storageKey": null
-              },
-              {
-                "kind": "InlineFragment",
+                "concreteType": "Message",
+                "kind": "LinkedField",
+                "name": "messages",
+                "plural": true,
                 "selections": [
+                  (v2/*: any*/),
+                  (v3/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "sentAt",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "sequence",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "isEdited",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "User",
+                    "kind": "LinkedField",
+                    "name": "sender",
+                    "plural": false,
+                    "selections": [
+                      (v2/*: any*/),
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "firstName",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "photoUrl",
+                        "storageKey": null
+                      },
+                      (v4/*: any*/)
+                    ],
+                    "storageKey": null
+                  },
                   {
                     "alias": null,
                     "args": null,
                     "concreteType": "Message",
                     "kind": "LinkedField",
-                    "name": "messages",
-                    "plural": true,
+                    "name": "replyTo",
+                    "plural": false,
                     "selections": [
                       (v2/*: any*/),
                       (v3/*: any*/),
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "sentAt",
-                        "storageKey": null
-                      },
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "sequence",
-                        "storageKey": null
-                      },
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "isEdited",
-                        "storageKey": null
-                      },
                       {
                         "alias": null,
                         "args": null,
@@ -173,93 +207,54 @@ return {
                         "name": "sender",
                         "plural": false,
                         "selections": [
-                          (v2/*: any*/),
-                          {
-                            "alias": null,
-                            "args": null,
-                            "kind": "ScalarField",
-                            "name": "firstName",
-                            "storageKey": null
-                          },
-                          {
-                            "alias": null,
-                            "args": null,
-                            "kind": "ScalarField",
-                            "name": "photoUrl",
-                            "storageKey": null
-                          },
-                          (v4/*: any*/)
-                        ],
-                        "storageKey": null
-                      },
-                      {
-                        "alias": null,
-                        "args": null,
-                        "concreteType": "Message",
-                        "kind": "LinkedField",
-                        "name": "replyTo",
-                        "plural": false,
-                        "selections": [
-                          (v2/*: any*/),
-                          (v3/*: any*/),
-                          {
-                            "alias": null,
-                            "args": null,
-                            "concreteType": "User",
-                            "kind": "LinkedField",
-                            "name": "sender",
-                            "plural": false,
-                            "selections": [
-                              (v4/*: any*/),
-                              (v2/*: any*/)
-                            ],
-                            "storageKey": null
-                          }
+                          (v4/*: any*/),
+                          (v2/*: any*/)
                         ],
                         "storageKey": null
                       }
                     ],
                     "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "hasMore",
-                    "storageKey": null
                   }
                 ],
-                "type": "MessageConnection",
-                "abstractKey": null
+                "storageKey": null
               },
               {
-                "kind": "InlineFragment",
-                "selections": [
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "message",
-                    "storageKey": null
-                  }
-                ],
-                "type": "NotFoundError",
-                "abstractKey": null
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "hasMore",
+                "storageKey": null
               }
             ],
-            "storageKey": null
+            "type": "MessageConnection",
+            "abstractKey": null
+          },
+          {
+            "kind": "InlineFragment",
+            "selections": [
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "message",
+                "storageKey": null
+              }
+            ],
+            "type": "NotFoundError",
+            "abstractKey": null
           }
-        ]
+        ],
+        "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "2a87a9555e1cd5d6ded6ad47e00189ea",
+    "cacheID": "5a4037fac74f53370f1a62dd523fab7a",
     "id": null,
     "metadata": {},
     "name": "useMessagesQuery",
     "operationKind": "query",
-    "text": null
+    "text": "query useMessagesQuery(\n  $chatId: ID!\n  $count: Int!\n  $cursor: Long\n) {\n  ...useMessages_history_2v0QF4\n}\n\nfragment useMessages_history_2v0QF4 on Query {\n  messageHistory(chatId: $chatId, limit: $count, beforeSequence: $cursor) {\n    __typename\n    ... on MessageConnection {\n      messages {\n        id\n        text\n        sentAt\n        sequence\n        isEdited\n        sender {\n          id\n          firstName\n          photoUrl\n          displayName\n        }\n        replyTo {\n          id\n          text\n          sender {\n            displayName\n            id\n          }\n        }\n      }\n      hasMore\n    }\n    ... on NotFoundError {\n      message\n    }\n  }\n}\n"
   }
 };
 })();

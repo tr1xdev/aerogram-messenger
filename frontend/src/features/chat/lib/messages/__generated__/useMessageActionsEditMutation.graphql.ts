@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<59eca559b677c97b2ceda0f80c5c537d>>
+ * @generated SignedSource<<5171a2e9fce6fe315a08f1ef0d2f8ec3>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -87,21 +87,16 @@ return {
     "name": "useMessageActionsEditMutation",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": (v1/*: any*/),
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "updateMessage",
+        "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": (v1/*: any*/),
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "updateMessage",
-            "plural": false,
-            "selections": [
-              (v3/*: any*/)
-            ],
-            "storageKey": null
-          }
-        ]
+          (v3/*: any*/)
+        ],
+        "storageKey": null
       }
     ],
     "type": "Mutation",
@@ -114,46 +109,41 @@ return {
     "name": "useMessageActionsEditMutation",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": (v1/*: any*/),
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "updateMessage",
+        "plural": false,
         "selections": [
           {
             "alias": null,
-            "args": (v1/*: any*/),
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "updateMessage",
-            "plural": false,
-            "selections": [
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "__typename",
-                "storageKey": null
-              },
-              (v3/*: any*/),
-              {
-                "kind": "InlineFragment",
-                "selections": [
-                  (v2/*: any*/)
-                ],
-                "type": "Node",
-                "abstractKey": "__isNode"
-              }
-            ],
+            "args": null,
+            "kind": "ScalarField",
+            "name": "__typename",
             "storageKey": null
+          },
+          (v3/*: any*/),
+          {
+            "kind": "InlineFragment",
+            "selections": [
+              (v2/*: any*/)
+            ],
+            "type": "Node",
+            "abstractKey": "__isNode"
           }
-        ]
+        ],
+        "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "069d70f240a8ea22fba20fad47f0215b",
+    "cacheID": "7f71fd1f79b7b58600050502af38b273",
     "id": null,
     "metadata": {},
     "name": "useMessageActionsEditMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation useMessageActionsEditMutation(\n  $id: ID!\n  $text: String!\n) {\n  updateMessage(id: $id, text: $text) {\n    __typename\n    ... on Message {\n      id\n      text\n      isEdited\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();

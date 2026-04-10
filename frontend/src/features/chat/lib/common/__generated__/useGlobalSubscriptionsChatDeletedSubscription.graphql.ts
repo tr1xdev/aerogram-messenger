@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5ec0ace70295e7588539da76b2178009>>
+ * @generated SignedSource<<dba93ca8031ee7ff3790d2651cc3d676>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -30,22 +30,17 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
-    "selections": [
+    "alias": null,
+    "args": [
       {
-        "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "userId",
-            "variableName": "userId"
-          }
-        ],
-        "kind": "ScalarField",
-        "name": "chatDeleted",
-        "storageKey": null
+        "kind": "Variable",
+        "name": "userId",
+        "variableName": "userId"
       }
-    ]
+    ],
+    "kind": "ScalarField",
+    "name": "chatDeleted",
+    "storageKey": null
   }
 ];
 return {
@@ -66,12 +61,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "1f58a731aca1def430798c8af9b08b55",
+    "cacheID": "51164235811c019a2c3e8fb9cd5a39ff",
     "id": null,
     "metadata": {},
     "name": "useGlobalSubscriptionsChatDeletedSubscription",
     "operationKind": "subscription",
-    "text": null
+    "text": "subscription useGlobalSubscriptionsChatDeletedSubscription(\n  $userId: ID!\n) {\n  chatDeleted(userId: $userId)\n}\n"
   }
 };
 })();

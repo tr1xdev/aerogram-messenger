@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<88568dc63f95f57b1de5dc04e589e4a0>>
+ * @generated SignedSource<<d2239aa0b9076b25b84fcb04e2759049>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -39,54 +39,49 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "input",
+        "variableName": "input"
+      }
+    ],
+    "concreteType": "AuthPayload",
+    "kind": "LinkedField",
+    "name": "verifyEmail",
+    "plural": false,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "input",
-            "variableName": "input"
-          }
-        ],
-        "concreteType": "AuthPayload",
-        "kind": "LinkedField",
-        "name": "verifyEmail",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "userId",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "accessToken",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "refreshToken",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "requiresVerification",
-            "storageKey": null
-          }
-        ],
+        "args": null,
+        "kind": "ScalarField",
+        "name": "userId",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "accessToken",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "refreshToken",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "requiresVerification",
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -107,12 +102,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "31ee0aa0047e0c22a1268c709ea87d2f",
+    "cacheID": "b5843c623f352242b1c486e9631f355f",
     "id": null,
     "metadata": {},
     "name": "useAuthVerifyEmailMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation useAuthVerifyEmailMutation(\n  $input: VerifyEmailInput!\n) {\n  verifyEmail(input: $input) {\n    userId\n    accessToken\n    refreshToken\n    requiresVerification\n  }\n}\n"
   }
 };
 })();

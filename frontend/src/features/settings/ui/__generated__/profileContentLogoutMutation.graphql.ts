@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d845e602b55d59d2744cc878bd9b4c29>>
+ * @generated SignedSource<<46a235723d1fba2e9c6bb0a62c825e6c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -21,16 +21,11 @@ export type profileContentLogoutMutation = {
 const node: ConcreteRequest = (function(){
 var v0 = [
   {
-    "kind": "ClientExtension",
-    "selections": [
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "logout",
-        "storageKey": null
-      }
-    ]
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "logout",
+    "storageKey": null
   }
 ];
 return {
@@ -51,12 +46,12 @@ return {
     "selections": (v0/*: any*/)
   },
   "params": {
-    "cacheID": "0ef6b1ca8d02e1c22ca496e2056b533c",
+    "cacheID": "96629239a177264ae8bea8905eb4015f",
     "id": null,
     "metadata": {},
     "name": "profileContentLogoutMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation profileContentLogoutMutation {\n  logout\n}\n"
   }
 };
 })();

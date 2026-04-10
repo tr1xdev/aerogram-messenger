@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<06fb96c868e78fcf4c1abd9d34a74a3f>>
+ * @generated SignedSource<<2a3a175c53e56f201288cde2fa8ea43b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -42,54 +42,49 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "input",
+        "variableName": "input"
+      }
+    ],
+    "concreteType": "AuthPayload",
+    "kind": "LinkedField",
+    "name": "signUp",
+    "plural": false,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "input",
-            "variableName": "input"
-          }
-        ],
-        "concreteType": "AuthPayload",
-        "kind": "LinkedField",
-        "name": "signUp",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "userId",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "accessToken",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "refreshToken",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "requiresVerification",
-            "storageKey": null
-          }
-        ],
+        "args": null,
+        "kind": "ScalarField",
+        "name": "userId",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "accessToken",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "refreshToken",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "requiresVerification",
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -110,12 +105,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "dca64c6ee900fc1ed5d9e63616c7d651",
+    "cacheID": "75538a7dd69b71c8f187bc068107a05a",
     "id": null,
     "metadata": {},
     "name": "useAuthSignUpMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation useAuthSignUpMutation(\n  $input: SignUpInput!\n) {\n  signUp(input: $input) {\n    userId\n    accessToken\n    refreshToken\n    requiresVerification\n  }\n}\n"
   }
 };
 })();

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a03944a023fe1d33433c2c7a40b88723>>
+ * @generated SignedSource<<3e34f48739564bb24ae20fcb8f81cafd>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -58,64 +58,59 @@ v1 = [
 ],
 v2 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "id",
+        "variableName": "id"
+      },
+      {
+        "kind": "Variable",
+        "name": "pinned",
+        "variableName": "pinned"
+      }
+    ],
+    "concreteType": null,
+    "kind": "LinkedField",
+    "name": "pinChat",
+    "plural": false,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "id",
-            "variableName": "id"
-          },
-          {
-            "kind": "Variable",
-            "name": "pinned",
-            "variableName": "pinned"
-          }
-        ],
-        "concreteType": null,
-        "kind": "LinkedField",
-        "name": "pinChat",
-        "plural": false,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "__typename",
+        "storageKey": null
+      },
+      {
+        "kind": "InlineFragment",
         "selections": [
           {
             "alias": null,
             "args": null,
             "kind": "ScalarField",
-            "name": "__typename",
+            "name": "success",
             "storageKey": null
-          },
-          {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "success",
-                "storageKey": null
-              }
-            ],
-            "type": "SuccessResult",
-            "abstractKey": null
-          },
-          {
-            "kind": "InlineFragment",
-            "selections": (v1/*: any*/),
-            "type": "ForbiddenError",
-            "abstractKey": null
-          },
-          {
-            "kind": "InlineFragment",
-            "selections": (v1/*: any*/),
-            "type": "InternalError",
-            "abstractKey": null
           }
         ],
-        "storageKey": null
+        "type": "SuccessResult",
+        "abstractKey": null
+      },
+      {
+        "kind": "InlineFragment",
+        "selections": (v1/*: any*/),
+        "type": "ForbiddenError",
+        "abstractKey": null
+      },
+      {
+        "kind": "InlineFragment",
+        "selections": (v1/*: any*/),
+        "type": "InternalError",
+        "abstractKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -136,12 +131,12 @@ return {
     "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "6b8e8fc9814e5baec72f779865a02db8",
+    "cacheID": "57fac8acc6c9cae846128aaded6dbf26",
     "id": null,
     "metadata": {},
     "name": "useChatManagementPinMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation useChatManagementPinMutation(\n  $id: ID!\n  $pinned: Boolean!\n) {\n  pinChat(id: $id, pinned: $pinned) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n"
   }
 };
 })();

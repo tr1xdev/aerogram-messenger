@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c1b00cbfadec405e6912abbbf2378b88>>
+ * @generated SignedSource<<974c20279ed637ad6b542d115fa10fd9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -34,47 +34,42 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "chatId",
+        "variableName": "chatId"
+      }
+    ],
+    "concreteType": "ReadPayload",
+    "kind": "LinkedField",
+    "name": "dialogRead",
+    "plural": false,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "chatId",
-            "variableName": "chatId"
-          }
-        ],
-        "concreteType": "ReadPayload",
-        "kind": "LinkedField",
-        "name": "dialogRead",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "chatId",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "userId",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "lastSequence",
-            "storageKey": null
-          }
-        ],
+        "args": null,
+        "kind": "ScalarField",
+        "name": "chatId",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "userId",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "lastSequence",
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -95,12 +90,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "20a0ccf1e6637459eb068a3eed8e9cda",
+    "cacheID": "8a26374e83d10cb5ac26679d6d400a8f",
     "id": null,
     "metadata": {},
     "name": "useGlobalSubscriptionsDialogReadSubscription",
     "operationKind": "subscription",
-    "text": null
+    "text": "subscription useGlobalSubscriptionsDialogReadSubscription(\n  $chatId: ID!\n) {\n  dialogRead(chatId: $chatId) {\n    chatId\n    userId\n    lastSequence\n  }\n}\n"
   }
 };
 })();

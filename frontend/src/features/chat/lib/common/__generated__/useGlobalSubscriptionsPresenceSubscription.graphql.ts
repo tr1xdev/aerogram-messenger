@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<97ff5c869a36bfa69a9762d5194962e5>>
+ * @generated SignedSource<<a8a5ce323efae8ad34cdcc20d769b7e0>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -34,47 +34,42 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "chatId",
+        "variableName": "chatId"
+      }
+    ],
+    "concreteType": "UserStatusPayload",
+    "kind": "LinkedField",
+    "name": "userStatusChanged",
+    "plural": false,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "chatId",
-            "variableName": "chatId"
-          }
-        ],
-        "concreteType": "UserStatusPayload",
-        "kind": "LinkedField",
-        "name": "userStatusChanged",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "userId",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "status",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "lastSeen",
-            "storageKey": null
-          }
-        ],
+        "args": null,
+        "kind": "ScalarField",
+        "name": "userId",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "status",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "lastSeen",
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -95,12 +90,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "9305f452706127e735884fd902644a15",
+    "cacheID": "d84517268a4aa05a22a1de36c927c48f",
     "id": null,
     "metadata": {},
     "name": "useGlobalSubscriptionsPresenceSubscription",
     "operationKind": "subscription",
-    "text": null
+    "text": "subscription useGlobalSubscriptionsPresenceSubscription(\n  $chatId: ID!\n) {\n  userStatusChanged(chatId: $chatId) {\n    userId\n    status\n    lastSeen\n  }\n}\n"
   }
 };
 })();

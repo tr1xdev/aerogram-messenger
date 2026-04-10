@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<cd37acfe81137b560f965784ae5cc354>>
+ * @generated SignedSource<<ce11e125c1d8eaf38972e9e6e7d9690e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -149,25 +149,20 @@ return {
     "name": "appSidebarCreateMutation",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": (v1/*: any*/),
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "createDirectChat",
+        "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": (v1/*: any*/),
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "createDirectChat",
-            "plural": false,
-            "selections": [
-              (v2/*: any*/),
-              (v4/*: any*/),
-              (v6/*: any*/),
-              (v7/*: any*/),
-              (v8/*: any*/)
-            ],
-            "storageKey": null
-          }
-        ]
+          (v2/*: any*/),
+          (v4/*: any*/),
+          (v6/*: any*/),
+          (v7/*: any*/),
+          (v8/*: any*/)
+        ],
+        "storageKey": null
       }
     ],
     "type": "Mutation",
@@ -180,43 +175,38 @@ return {
     "name": "appSidebarCreateMutation",
     "selections": [
       {
-        "kind": "ClientExtension",
+        "alias": null,
+        "args": (v1/*: any*/),
+        "concreteType": null,
+        "kind": "LinkedField",
+        "name": "createDirectChat",
+        "plural": false,
         "selections": [
+          (v2/*: any*/),
+          (v4/*: any*/),
+          (v6/*: any*/),
+          (v7/*: any*/),
+          (v8/*: any*/),
           {
-            "alias": null,
-            "args": (v1/*: any*/),
-            "concreteType": null,
-            "kind": "LinkedField",
-            "name": "createDirectChat",
-            "plural": false,
+            "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/),
-              (v4/*: any*/),
-              (v6/*: any*/),
-              (v7/*: any*/),
-              (v8/*: any*/),
-              {
-                "kind": "InlineFragment",
-                "selections": [
-                  (v3/*: any*/)
-                ],
-                "type": "Node",
-                "abstractKey": "__isNode"
-              }
+              (v3/*: any*/)
             ],
-            "storageKey": null
+            "type": "Node",
+            "abstractKey": "__isNode"
           }
-        ]
+        ],
+        "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "484ae9dee6f31f0a656fc10b321e41d2",
+    "cacheID": "0954d6a4f6b710750886a4f405a02629",
     "id": null,
     "metadata": {},
     "name": "appSidebarCreateMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation appSidebarCreateMutation(\n  $userID: ID!\n) {\n  createDirectChat(userID: $userID) {\n    __typename\n    ... on Chat {\n      id\n      type\n      title\n      photoUrl\n      unreadCount\n      isPinned\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on ValidationError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();

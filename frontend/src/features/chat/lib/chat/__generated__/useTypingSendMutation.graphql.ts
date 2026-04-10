@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<4e3cb646cbc6fa90b1269e3a99ea33ff>>
+ * @generated SignedSource<<bb80ef429dd21cc65dd2da5f3c670896>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -36,27 +36,22 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "ClientExtension",
-    "selections": [
+    "alias": null,
+    "args": [
       {
-        "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "chatID",
-            "variableName": "chatID"
-          },
-          {
-            "kind": "Variable",
-            "name": "typing",
-            "variableName": "typing"
-          }
-        ],
-        "kind": "ScalarField",
-        "name": "sendTypingEvent",
-        "storageKey": null
+        "kind": "Variable",
+        "name": "chatID",
+        "variableName": "chatID"
+      },
+      {
+        "kind": "Variable",
+        "name": "typing",
+        "variableName": "typing"
       }
-    ]
+    ],
+    "kind": "ScalarField",
+    "name": "sendTypingEvent",
+    "storageKey": null
   }
 ];
 return {
@@ -77,12 +72,12 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "912b0cf1d82b542e7123546d5e4afcaf",
+    "cacheID": "af547fcbdf90036ff3a2586add748cd1",
     "id": null,
     "metadata": {},
     "name": "useTypingSendMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation useTypingSendMutation(\n  $chatID: ID!\n  $typing: Boolean!\n) {\n  sendTypingEvent(chatID: $chatID, typing: $typing)\n}\n"
   }
 };
 })();

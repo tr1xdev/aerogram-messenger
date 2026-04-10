@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<06b2924cad68391710ec33e63e3cfdcb>>
+ * @generated SignedSource<<692cf623fb50da40b958e7aec59b4f9d>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -56,64 +56,59 @@ v2 = [
 ],
 v3 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "forEveryone",
+        "variableName": "forEveryone"
+      },
+      {
+        "kind": "Variable",
+        "name": "id",
+        "variableName": "id"
+      }
+    ],
+    "concreteType": null,
+    "kind": "LinkedField",
+    "name": "deleteChat",
+    "plural": false,
     "selections": [
       {
         "alias": null,
-        "args": [
-          {
-            "kind": "Variable",
-            "name": "forEveryone",
-            "variableName": "forEveryone"
-          },
-          {
-            "kind": "Variable",
-            "name": "id",
-            "variableName": "id"
-          }
-        ],
-        "concreteType": null,
-        "kind": "LinkedField",
-        "name": "deleteChat",
-        "plural": false,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "__typename",
+        "storageKey": null
+      },
+      {
+        "kind": "InlineFragment",
         "selections": [
           {
             "alias": null,
             "args": null,
             "kind": "ScalarField",
-            "name": "__typename",
+            "name": "success",
             "storageKey": null
-          },
-          {
-            "kind": "InlineFragment",
-            "selections": [
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "success",
-                "storageKey": null
-              }
-            ],
-            "type": "SuccessResult",
-            "abstractKey": null
-          },
-          {
-            "kind": "InlineFragment",
-            "selections": (v2/*: any*/),
-            "type": "ForbiddenError",
-            "abstractKey": null
-          },
-          {
-            "kind": "InlineFragment",
-            "selections": (v2/*: any*/),
-            "type": "InternalError",
-            "abstractKey": null
           }
         ],
-        "storageKey": null
+        "type": "SuccessResult",
+        "abstractKey": null
+      },
+      {
+        "kind": "InlineFragment",
+        "selections": (v2/*: any*/),
+        "type": "ForbiddenError",
+        "abstractKey": null
+      },
+      {
+        "kind": "InlineFragment",
+        "selections": (v2/*: any*/),
+        "type": "InternalError",
+        "abstractKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -140,12 +135,12 @@ return {
     "selections": (v3/*: any*/)
   },
   "params": {
-    "cacheID": "da04dd585cfba5d5b59aa261bab27e04",
+    "cacheID": "dd62b0321260f600ebf823e35f3b7b70",
     "id": null,
     "metadata": {},
     "name": "useChatManagementDeleteMutation",
     "operationKind": "mutation",
-    "text": null
+    "text": "mutation useChatManagementDeleteMutation(\n  $id: ID!\n  $forEveryone: Boolean!\n) {\n  deleteChat(id: $id, forEveryone: $forEveryone) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n"
   }
 };
 })();

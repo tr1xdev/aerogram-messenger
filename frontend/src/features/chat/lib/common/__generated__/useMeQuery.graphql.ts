@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e8032a5ce4977bf8385251cbf376dd62>>
+ * @generated SignedSource<<54a15e00d048016c6d7d9b96e686e929>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -25,41 +25,36 @@ export type useMeQuery = {
 const node: ConcreteRequest = (function(){
 var v0 = [
   {
-    "kind": "ClientExtension",
+    "alias": null,
+    "args": null,
+    "concreteType": "User",
+    "kind": "LinkedField",
+    "name": "me",
+    "plural": false,
     "selections": [
       {
         "alias": null,
         "args": null,
-        "concreteType": "User",
-        "kind": "LinkedField",
-        "name": "me",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "id",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "username",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "photoUrl",
-            "storageKey": null
-          }
-        ],
+        "kind": "ScalarField",
+        "name": "id",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "username",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "photoUrl",
         "storageKey": null
       }
-    ]
+    ],
+    "storageKey": null
   }
 ];
 return {
@@ -80,12 +75,12 @@ return {
     "selections": (v0/*: any*/)
   },
   "params": {
-    "cacheID": "315bb7f8a91c853f5f56d63d0d96053e",
+    "cacheID": "28f3f63ada633e996f822aa091d0ebc0",
     "id": null,
     "metadata": {},
     "name": "useMeQuery",
     "operationKind": "query",
-    "text": null
+    "text": "query useMeQuery {\n  me {\n    id\n    username\n    photoUrl\n  }\n}\n"
   }
 };
 })();
