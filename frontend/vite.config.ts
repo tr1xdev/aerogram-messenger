@@ -13,7 +13,7 @@ const config: UserConfig = {
     }),
     react({
       babel: {
-        plugins: ["relay"],
+        plugins: [["babel-plugin-relay", { eagerESM: true }]],
       },
     }),
     tailwindcss(),

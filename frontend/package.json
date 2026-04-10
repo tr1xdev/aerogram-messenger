@@ -7,7 +7,7 @@
     "routes": "tsr generate",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build-schema": "cat ../backend/internal/graph/schemas/schema.graphqls ../backend/internal/graph/schemas/common.graphqls ../backend/internal/graph/schemas/auth.graphqls ../backend/internal/graph/schemas/user.graphqls ../backend/internal/graph/schemas/chat.graphqls ../backend/internal/graph/schemas/message.graphqls > schema.graphql",
+    "build-schema": "node scripts/merge-schema.cjs",
     "relay": "npm run build-schema && relay-compiler",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -50,6 +50,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@graphql-tools/load-files": "^7.0.1",
+    "@graphql-tools/merge": "^9.1.8",
     "@tanstack/router-cli": "^1.166.7",
     "@tanstack/router-devtools": "^1.161.1",
     "@tanstack/router-vite-plugin": "^1.166.7",

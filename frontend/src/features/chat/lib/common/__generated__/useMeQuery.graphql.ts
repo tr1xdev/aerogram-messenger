@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e8696005bf0bf0999a7ed3d0981da6a3>>
+ * @generated SignedSource<<e8032a5ce4977bf8385251cbf376dd62>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,15 +12,8 @@ import { ConcreteRequest } from 'relay-runtime';
 export type useMeQuery$variables = Record<PropertyKey, never>;
 export type useMeQuery$data = {
   readonly me: {
-    readonly displayName: string | null | undefined;
-    readonly email: string | null | undefined;
-    readonly firstName: string;
     readonly id: string;
-    readonly isPremium: boolean;
-    readonly isVerified: boolean;
-    readonly lastName: string | null | undefined;
     readonly photoUrl: string | null | undefined;
-    readonly status: string;
     readonly username: string | null | undefined;
   };
 };
@@ -53,34 +46,6 @@ var v0 = [
             "alias": null,
             "args": null,
             "kind": "ScalarField",
-            "name": "email",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "firstName",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "lastName",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "displayName",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
             "name": "username",
             "storageKey": null
           },
@@ -89,27 +54,6 @@ var v0 = [
             "args": null,
             "kind": "ScalarField",
             "name": "photoUrl",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "status",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "isVerified",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "isPremium",
             "storageKey": null
           }
         ],
@@ -146,6 +90,6 @@ return {
 };
 })();
 
-(node as any).hash = "7ef85fedff52a723560f5b9650cfa4b9";
+(node as any).hash = "d5e29972ea225a13d499e8a504a504b6";
 
 export default node;

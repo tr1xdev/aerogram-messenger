@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React from "react";
 import ReactDOM from "react-dom/client";
 import { RelayEnvironmentProvider } from "react-relay";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -15,9 +15,7 @@ if (rootElement) {
     <React.StrictMode>
       <RelayEnvironmentProvider environment={RelayEnvironment}>
         <QueryClientProvider client={queryClient}>
-          <Suspense fallback={<div>Loading app...</div>}>
-            <App />
-          </Suspense>
+          <App />
         </QueryClientProvider>
       </RelayEnvironmentProvider>
     </React.StrictMode>,
