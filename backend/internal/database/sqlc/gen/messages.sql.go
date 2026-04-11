@@ -93,7 +93,6 @@ SELECT
     u.username as author_username,
     u.first_name as author_first_name,
     u.last_name as author_last_name,
-    u.public_key as author_public_key,
     u.photo_url as author_photo_url,
     u.is_bot as author_is_bot
 FROM messages m
@@ -131,7 +130,6 @@ type GetChatHistoryRow struct {
 	AuthorUsername  sql.NullString `json:"author_username"`
 	AuthorFirstName string         `json:"author_first_name"`
 	AuthorLastName  sql.NullString `json:"author_last_name"`
-	AuthorPublicKey sql.NullString `json:"author_public_key"`
 	AuthorPhotoUrl  sql.NullString `json:"author_photo_url"`
 	AuthorIsBot     bool           `json:"author_is_bot"`
 }
@@ -167,7 +165,6 @@ func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) 
 			&i.AuthorUsername,
 			&i.AuthorFirstName,
 			&i.AuthorLastName,
-			&i.AuthorPublicKey,
 			&i.AuthorPhotoUrl,
 			&i.AuthorIsBot,
 		); err != nil {

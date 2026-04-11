@@ -16,7 +16,6 @@ SELECT
     u.username as author_username,
     u.first_name as author_first_name,
     u.last_name as author_last_name,
-    u.public_key as author_public_key,
     u.photo_url as author_photo_url,
     u.is_bot as author_is_bot
 FROM messages m

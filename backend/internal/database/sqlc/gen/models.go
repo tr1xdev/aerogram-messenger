@@ -122,14 +122,12 @@ type User struct {
 	Password           sql.NullString        `json:"password"`
 	Status             string                `json:"status"`
 	PhotoUrl           sql.NullString        `json:"photo_url"`
+	Bio                sql.NullString        `json:"bio"`
 	IsPremium          bool                  `json:"is_premium"`
 	IsEmailVerified    bool                  `json:"is_email_verified"`
 	IsVerified         bool                  `json:"is_verified"`
 	VerificationToken  sql.NullString        `json:"verification_token"`
 	VerificationExpiry sql.NullTime          `json:"verification_expiry"`
-	PublicKey          sql.NullString        `json:"public_key"`
-	EncryptedPrivKey   sql.NullString        `json:"encrypted_priv_key"`
-	EncryptionIv       sql.NullString        `json:"encryption_iv"`
 	IsBot              bool                  `json:"is_bot"`
 	BotTokenHash       sql.NullString        `json:"bot_token_hash"`
 	BotOwnerID         uuid.NullUUID         `json:"bot_owner_id"`

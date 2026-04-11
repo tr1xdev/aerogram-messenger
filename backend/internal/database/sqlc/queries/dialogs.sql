@@ -13,7 +13,9 @@ INSERT INTO dialog_members (
     is_pinned, last_read_sequence, is_hidden, created_at, updated_at
 ) VALUES (
     $1, $2, $3, NOW(), $4, $5, $6, FALSE, NOW(), NOW()
-);
+) ON CONFLICT (dialog_id, user_id) DO UPDATE SET
+    is_hidden = FALSE,
+    updated_at = NOW();
 
 -- name: PinDialog :exec
 UPDATE dialog_members
@@ -26,7 +28,8 @@ INSERT INTO dialog_settings (
     is_signatures_enabled, created_at, updated_at
 ) VALUES (
     $1, $2, $3, $4, $5, NOW(), NOW()
-);
+) ON CONFLICT (dialog_id) DO UPDATE SET
+    updated_at = NOW();
 
 -- name: GetDialogByID :one
 SELECT * FROM dialogs WHERE id = $1 LIMIT 1;
@@ -45,13 +48,10 @@ SELECT
     dm.is_pinned,
     dm.last_read_sequence,
     m.content AS msg_content,
-    m.is_encrypted AS msg_is_encrypted,
-    m.encryption_iv AS msg_encryption_iv,
     m.sequence AS msg_sequence,
     m.author_id AS msg_author_id,
     u.username AS msg_author_username,
     u.first_name AS msg_author_first_name,
-    u.public_key AS msg_author_public_key,
     u.is_bot AS msg_author_is_bot,
     m.created_at AS msg_created_at,
     m.reply_to_id AS msg_reply_to_id,
