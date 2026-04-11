@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { graphql, useLazyLoadQuery } from "react-relay";
 import { useNavigate } from "@tanstack/react-router";
 import { MdVerified } from "react-icons/md";
@@ -9,11 +9,12 @@ import {
 } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatLastSeen } from "@/shared/lib/date";
+import { cn } from "@/lib/utils";
 import type { chatUserPopoverQuery } from "./__generated__/chatUserPopoverQuery.graphql";
 
 interface ChatUserPopoverProps {
   userId: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 const UserQuery = graphql`
@@ -33,7 +34,7 @@ const UserQuery = graphql`
   }
 `;
 
-function PopoverContentInner({ userId }: { userId: string }): React.ReactNode {
+function PopoverContentInner({ userId }: { userId: string }): ReactNode {
   const data = useLazyLoadQuery<chatUserPopoverQuery>(
     UserQuery,
     { id: userId },
@@ -49,6 +50,8 @@ function PopoverContentInner({ userId }: { userId: string }): React.ReactNode {
       </div>
     );
   }
+
+  const isOnline: boolean = user.status?.toLowerCase() === "online";
 
   return (
     <div className="flex flex-col">
@@ -72,10 +75,7 @@ function PopoverContentInner({ userId }: { userId: string }): React.ReactNode {
               {user.displayName || `${user.firstName} ${user.lastName}`}
             </h3>
             {user.isVerified && (
-              <MdVerified
-                className="text-[#2196f3] shrink-0 text-[18px]"
-                title="Verified User"
-              />
+              <MdVerified className="text-[#2196f3] shrink-0 text-[18px]" />
             )}
           </div>
           <p className="text-sm text-muted-foreground">@{user.username}</p>
@@ -95,11 +95,9 @@ function PopoverContentInner({ userId }: { userId: string }): React.ReactNode {
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Status</span>
               <span
-                className={
-                  user.status === "online"
-                    ? "text-primary font-medium"
-                    : "text-foreground"
-                }
+                className={cn(
+                  isOnline ? "text-primary font-medium" : "text-foreground",
+                )}
               >
                 {formatLastSeen(user.status)}
               </span>
@@ -119,25 +117,26 @@ function PopoverContentInner({ userId }: { userId: string }): React.ReactNode {
   );
 }
 
-export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
+export function ChatUserPopover({
+  userId,
+  children,
+}: ChatUserPopoverProps): ReactNode {
   const navigate = useNavigate();
   const [open, setOpen] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
-  useEffect((): (() => void) => {
-    const checkMobile = (): void => setIsMobile(window.innerWidth < 768);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
-    return (): void => window.removeEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const handleTriggerClick = (e: React.MouseEvent): void => {
+  const handleTriggerClick = (e: React.MouseEvent) => {
     if (isMobile) {
       e.preventDefault();
       e.stopPropagation();
-      navigate({ to: "/users/$userId", params: { userId } }).catch(
-        (): void => {},
-      );
+      navigate({ to: "/users/$userId", params: { userId } }).catch(() => {});
     }
   };
 
@@ -146,7 +145,6 @@ export function ChatUserPopover({ userId, children }: ChatUserPopoverProps) {
       <PopoverTrigger asChild onClick={handleTriggerClick}>
         {children}
       </PopoverTrigger>
-
       <PopoverContent
         className="w-72 p-0 overflow-hidden border-border/50 shadow-xl"
         align="start"

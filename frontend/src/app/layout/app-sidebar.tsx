@@ -315,13 +315,19 @@ export function AppSidebar(): React.ReactNode {
       ): void => {
         setIsCreating(false);
         const res = response.createDirectChat;
+
         if (res?.__typename === "Chat") {
-          if (searchQuery) addToRecent(searchQuery);
-          setSearchQuery("");
-          setIsFocused(false);
-          navigate({ to: "/chat/$chatId", params: { chatId: res.id } });
-        } else if (res && "message" in res) {
-          toast.error(res.message as string);
+          if (res.id) {
+            if (searchQuery) addToRecent(searchQuery);
+            setSearchQuery("");
+            setIsFocused(false);
+            navigate({
+              to: "/chat/$chatId",
+              params: { chatId: res.id },
+            });
+          }
+        } else if (res && "message" in res && typeof res.message === "string") {
+          toast.error(res.message);
         }
       },
       onError: (): void => {

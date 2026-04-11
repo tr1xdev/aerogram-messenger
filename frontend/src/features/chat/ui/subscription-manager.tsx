@@ -72,6 +72,7 @@ function ActiveSubscription({
     );
   }, [chatId]);
 
+  console.log("sub called!!");
   useGlobalSubscriptions(chatId, myId);
   return null;
 }

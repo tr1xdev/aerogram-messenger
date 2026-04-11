@@ -1,13 +1,19 @@
 import { useCallback } from "react";
 import { graphql, useMutation } from "react-relay";
 import type { UseMutationConfig } from "react-relay";
-import type { RecordSourceSelectorProxy } from "relay-runtime";
+import type {
+  RecordSourceSelectorProxy,
+  RecordProxy,
+  PayloadError,
+} from "relay-runtime";
 import type {
   useMessageActionsSendMutation,
-  useMessageActionsSendMutation$variables,
   useMessageActionsSendMutation$data,
 } from "./__generated__/useMessageActionsSendMutation.graphql";
-import type { useMessageActionsEditMutation } from "./__generated__/useMessageActionsEditMutation.graphql";
+import type {
+  useMessageActionsEditMutation,
+  useMessageActionsEditMutation$data,
+} from "./__generated__/useMessageActionsEditMutation.graphql";
 import type { useMessageActionsReadMutation } from "./__generated__/useMessageActionsReadMutation.graphql";
 
 const sendMessageMutation = graphql`
@@ -26,7 +32,9 @@ const sendMessageMutation = graphql`
         sender {
           id
           firstName
+          lastName
           photoUrl
+          displayName
         }
       }
     }
@@ -51,15 +59,7 @@ const markAsReadMutation = graphql`
   }
 `;
 
-export function useMessageActions(chatId: string): {
-  sendMessage: (
-    text: string,
-    config?: Partial<UseMutationConfig<useMessageActionsSendMutation>>,
-  ) => Promise<void>;
-  editMessage: (id: string, text: string) => Promise<void>;
-  markAsRead: () => void;
-  isSending: boolean;
-} {
+export function useMessageActions(chatId: string) {
   const [send, isSending] =
     useMutation<useMessageActionsSendMutation>(sendMessageMutation);
   const [edit] =
@@ -72,45 +72,64 @@ export function useMessageActions(chatId: string): {
       config?: Partial<UseMutationConfig<useMessageActionsSendMutation>>,
     ): Promise<void> => {
       return new Promise((resolve, reject): void => {
-        const variables: useMessageActionsSendMutation$variables = {
-          chatId,
-          text,
-          replyToId: config?.variables?.replyToId ?? null,
-        };
-
         send({
           ...config,
-          variables,
-          updater: (
-            store: RecordSourceSelectorProxy<useMessageActionsSendMutation$data>,
-            data: useMessageActionsSendMutation$data | null | undefined,
-          ): void => {
-            const payload = store.getRootField("sendMessage");
-            if (!payload || payload.getType() !== "Message") return;
+          variables: {
+            chatId,
+            text,
+            replyToId: config?.variables?.replyToId ?? null,
+          },
+          updater: (store: RecordSourceSelectorProxy): void => {
+            const payload: RecordProxy | null = store.getRootField(
+              "sendMessage",
+            ) as RecordProxy | null;
+            const chatRecord: RecordProxy | null = store.get(
+              chatId,
+            ) as RecordProxy | null;
+            const root: RecordProxy = store.getRoot();
 
-            const chatRecord = store.get(chatId);
-            if (chatRecord) {
+            if (payload && chatRecord) {
               chatRecord.setLinkedRecord(payload, "lastMessage");
               chatRecord.setValue(0, "unreadCount");
-              chatRecord.setValue(
-                payload.getValue("sequence"),
-                "myReadSequence",
-              );
-            }
 
-            if (config?.updater) {
-              config.updater(store, data);
+              const seq: number = Number(payload.getValue("sequence")) || 0;
+              chatRecord.setValue(seq, "myReadSequence");
+
+              // ВНИМАНИЕ: Аргументы должны быть 1-в-1 как в useChatHistory
+              const history: RecordProxy | null = root.getLinkedRecord(
+                "messageHistory",
+                {
+                  chatId,
+                  limit: 50, // Было count
+                  beforeSequence: null, // Было cursor
+                },
+              ) as RecordProxy | null;
+
+              if (history) {
+                const messages: readonly RecordProxy[] =
+                  (history.getLinkedRecords("messages") as
+                    | readonly RecordProxy[]
+                    | null) ?? [];
+
+                const payloadId: string = payload.getDataID();
+                const alreadyExists: boolean = messages.some(
+                  (m: RecordProxy): boolean => m.getDataID() === payloadId,
+                );
+
+                if (!alreadyExists) {
+                  history.setLinkedRecords([...messages, payload], "messages");
+                }
+              }
             }
           },
-          onCompleted: (response, errors): void => {
-            if (errors) reject(errors);
+          onCompleted: (
+            _response: useMessageActionsSendMutation$data,
+            err: ReadonlyArray<PayloadError> | null,
+          ): void => {
+            if (err) reject(err);
             else resolve();
-            if (config?.onCompleted) config.onCompleted(response, errors);
           },
-          onError: (error): void => {
-            reject(error);
-            if (config?.onError) config.onError(error);
-          },
+          onError: (err: Error): void => reject(err),
         });
       });
     },
@@ -122,18 +141,14 @@ export function useMessageActions(chatId: string): {
       return new Promise((resolve, reject): void => {
         edit({
           variables: { id, text },
-          optimisticResponse: {
-            updateMessage: {
-              id,
-              text,
-              isEdited: true,
-            },
-          },
-          onCompleted: (_, errors): void => {
-            if (errors) reject(errors);
+          onCompleted: (
+            _response: useMessageActionsEditMutation$data,
+            err: ReadonlyArray<PayloadError> | null,
+          ): void => {
+            if (err) reject(err);
             else resolve();
           },
-          onError: (err): void => reject(err),
+          onError: (err: Error): void => reject(err),
         });
       });
     },
@@ -141,22 +156,7 @@ export function useMessageActions(chatId: string): {
   );
 
   const markAsRead = useCallback((): void => {
-    read({
-      variables: { chatId },
-      optimisticResponse: {
-        markDialogAsRead: true,
-      },
-      updater: (store: RecordSourceSelectorProxy): void => {
-        const chatRecord = store.get(chatId);
-        if (chatRecord) {
-          chatRecord.setValue(0, "unreadCount");
-          const lastMsg = chatRecord.getLinkedRecord("lastMessage");
-          if (lastMsg) {
-            chatRecord.setValue(lastMsg.getValue("sequence"), "myReadSequence");
-          }
-        }
-      },
-    });
+    read({ variables: { chatId } });
   }, [chatId, read]);
 
   return { sendMessage, editMessage, markAsRead, isSending };

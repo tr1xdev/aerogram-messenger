@@ -33,16 +33,18 @@ export function useMarkDialog(
   const [commit] = useMutation<useMarkDialogMutation>(markDialogMutation);
   const isPendingRef = useRef<boolean>(false);
 
-  const checkAndMarkRead = useCallback((): void => {
-    const currentMyReadSequence: number = chat.myReadSequence ?? 0;
+  const chatId: string = chat.id;
+  const myReadSequence: number = chat.myReadSequence ?? 0;
+  const unreadCount: number = chat.unreadCount ?? 0;
 
+  const checkAndMarkRead = useCallback((): void => {
     if (
       document.visibilityState !== "visible" ||
       !meId ||
-      !chat.id ||
+      !chatId ||
       isPendingRef.current ||
-      lastSequence <= currentMyReadSequence ||
-      chat.unreadCount === 0
+      lastSequence <= myReadSequence ||
+      unreadCount === 0
     ) {
       return;
     }
@@ -50,7 +52,7 @@ export function useMarkDialog(
     isPendingRef.current = true;
 
     const updateStore = (store: RecordSourceSelectorProxy): void => {
-      const chatRecord: RecordProxy | null | undefined = store.get(chat.id);
+      const chatRecord: RecordProxy | null | undefined = store.get(chatId);
       if (!chatRecord) return;
 
       chatRecord.setValue(0, "unreadCount");
@@ -84,7 +86,7 @@ export function useMarkDialog(
     };
 
     commit({
-      variables: { chatId: chat.id },
+      variables: { chatId },
       optimisticUpdater: updateStore,
       updater: updateStore,
       onCompleted: (): void => {
@@ -94,7 +96,7 @@ export function useMarkDialog(
         isPendingRef.current = false;
       },
     });
-  }, [chat, lastSequence, meId, commit]);
+  }, [chatId, myReadSequence, unreadCount, lastSequence, meId, commit]);
 
   return { checkAndMarkRead };
 }

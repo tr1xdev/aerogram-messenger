@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5f58458255002090ae6d81d9180cb853>>
+ * @generated SignedSource<<c8fc50d22fecdcd13e86192ff7e8219d>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -19,8 +19,10 @@ export type useMessageActionsSendMutation$data = {
     readonly chatId?: string;
     readonly id?: string;
     readonly sender?: {
+      readonly displayName: string | null | undefined;
       readonly firstName: string;
       readonly id: string;
+      readonly lastName: string | null | undefined;
       readonly photoUrl: string | null | undefined;
     } | null | undefined;
     readonly sentAt?: string;
@@ -125,7 +127,21 @@ v5 = {
           "alias": null,
           "args": null,
           "kind": "ScalarField",
+          "name": "lastName",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
           "name": "photoUrl",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "displayName",
           "storageKey": null
         }
       ],
@@ -202,16 +218,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5119df7e56821305b986c2b36db79dc7",
+    "cacheID": "58e02133c4e64bda3a67fa5831a2fad8",
     "id": null,
     "metadata": {},
     "name": "useMessageActionsSendMutation",
     "operationKind": "mutation",
-    "text": "mutation useMessageActionsSendMutation(\n  $chatId: ID!\n  $text: String!\n  $replyToId: ID\n) {\n  sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {\n    __typename\n    ... on Message {\n      id\n      chatId\n      text\n      sentAt\n      sequence\n      sender {\n        id\n        firstName\n        photoUrl\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "mutation useMessageActionsSendMutation(\n  $chatId: ID!\n  $text: String!\n  $replyToId: ID\n) {\n  sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {\n    __typename\n    ... on Message {\n      id\n      chatId\n      text\n      sentAt\n      sequence\n      sender {\n        id\n        firstName\n        lastName\n        photoUrl\n        displayName\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "f8cac73cd19d05444c29583aa5c91576";
+(node as any).hash = "27c3d32c70ba439fef43ca56da65cfdf";
 
 export default node;

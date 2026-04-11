@@ -16,8 +16,9 @@ import { UserProfileOverlay } from "@/features/user/ui/user-profile-overlay";
 import { Toaster } from "@/components/ui/sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { SubscriptionManager } from "@/features/chat/ui/subscription-manager";
 
-export function AuthenticatedLayout() {
+export function AuthenticatedLayout(): React.ReactNode {
   const matches = useMatches();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -30,9 +31,6 @@ export function AuthenticatedLayout() {
     from: "/_authenticated/users/$userId",
     shouldThrow: false,
   });
-  // NOTE: Now for secret chats only
-  // const { data: meData } = useMe();
-  // useE2EEInit(meData?.me);
 
   React.useEffect((): void => {
     if (pathname.includes("/chat/")) {
@@ -68,17 +66,19 @@ export function AuthenticatedLayout() {
 
   return (
     <SidebarProvider defaultOpen={true}>
+      <SubscriptionManager />
       <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
         <div className="flex flex-1 overflow-hidden relative">
-          <aside
-            className={cn(
-              "flex-shrink-0 border-r bg-background z-20 transition-[width] duration-200 ease-in-out w-full md:w-80 lg:w-96",
-              isDetailView ? "hidden md:flex" : "flex",
-              hideSidebarRequested && "md:hidden",
-            )}
-          >
-            <AppSidebar />
-          </aside>
+          {!hideSidebarRequested && (
+            <div
+              className={cn(
+                "flex-shrink-0 transition-all duration-200",
+                isDetailView ? "hidden md:block" : "block",
+              )}
+            >
+              <AppSidebar />
+            </div>
+          )}
 
           <main className="flex-1 min-w-0 h-full bg-background relative z-10">
             <div

@@ -17,6 +17,7 @@ interface UseChatScrollProps {
   messages: ReadonlyArray<ScrollMessage>;
   myId: string | undefined;
   onMarkRead: () => void;
+  hasUnread: boolean;
 }
 
 interface ChatScrollResult {
@@ -30,18 +31,25 @@ export function useChatScroll({
   messages,
   myId,
   onMarkRead,
+  hasUnread,
 }: UseChatScrollProps): ChatScrollResult {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const isReadPending = useRef<boolean>(false);
 
   const isNearBottomRef = useRef<boolean>(true);
   const prevMessagesLengthRef = useRef<number>(messages.length);
   const onMarkReadRef = useRef<() => void>(onMarkRead);
+  const hasUnreadRef = useRef<boolean>(hasUnread);
 
   useLayoutEffect((): void => {
     onMarkReadRef.current = onMarkRead;
-  }, [onMarkRead]);
+    hasUnreadRef.current = hasUnread;
+    if (!hasUnread) {
+      isReadPending.current = false;
+    }
+  }, [onMarkRead, hasUnread]);
 
   const getViewport = useCallback((): HTMLElement | null => {
     const el: HTMLDivElement | null = scrollRef.current;
@@ -74,10 +82,13 @@ export function useChatScroll({
     isNearBottomRef.current = distanceToBottom < 150;
 
     if (atBottom) {
-      requestAnimationFrame((): void => {
-        setUnreadCount(0);
+      if (unreadCount > 0) {
+        requestAnimationFrame((): void => setUnreadCount(0));
+      }
+      if (hasUnreadRef.current && !isReadPending.current) {
+        isReadPending.current = true;
         onMarkReadRef.current();
-      });
+      }
     }
 
     setShowScrollBtn(distanceToBottom > 350 || unreadCount > 0);

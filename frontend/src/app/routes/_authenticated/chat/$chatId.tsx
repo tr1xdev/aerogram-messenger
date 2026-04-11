@@ -37,6 +37,11 @@ import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generate
 import type { useMessageActionsSendMutation$data } from "@/features/chat/lib/messages/__generated__/useMessageActionsSendMutation.graphql";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 
+interface ExtendedUser extends Omit<User, "lastName"> {
+  lastName?: string | null;
+  displayName?: string | null;
+}
+
 export const Route = createFileRoute("/_authenticated/chat/$chatId")({
   component: ChatRoute,
 });
@@ -78,7 +83,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const { messages: messagesFromHistory, isLoading: historyLoading } =
     useChatHistory(chatId);
 
-  const { sendMessage, editMessage } = useMessageActions(chatId);
+  const { sendMessage, editMessage, markAsRead } = useMessageActions(chatId);
   const { sendTyping } = useSendTyping(chatId);
 
   const isInitialLoading: boolean = isFirstLoad && historyLoading;
@@ -89,7 +94,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     const lastMsg: Message = messagesFromHistory[
       messagesFromHistory.length - 1
     ] as unknown as Message;
-    return (lastMsg.sequence as number) ?? 0;
+    return Number(lastMsg.sequence) || 0;
   }, [messagesFromHistory]);
 
   const { checkAndMarkRead } = useMarkDialog(
@@ -186,7 +191,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       const timeA: number = new Date(a.sentAt).getTime();
       const timeB: number = new Date(b.sentAt).getTime();
       if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
-      return (a.sequence ?? 0) - (b.sequence ?? 0);
+      return (Number(a.sequence) || 0) - (Number(b.sequence) || 0);
     });
   }, [messagesFromHistory]);
 
@@ -194,6 +199,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     const handleVisibilityChange = (): void => {
       if (document.visibilityState === "visible") {
         checkAndMarkRead();
+        markAsRead();
       }
     };
     window.addEventListener("visibilitychange", handleVisibilityChange);
@@ -202,59 +208,57 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       window.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleVisibilityChange);
     };
-  }, [checkAndMarkRead]);
+  }, [checkAndMarkRead, markAsRead]);
 
   const handleSend = useCallback(
-    async (overrideText?: string): Promise<void> => {
-      const val: string = (overrideText ?? inputRef.current).trim();
+    (text?: string): void => {
+      const val: string = (text ?? inputRef.current).trim();
       if (!val || !me) return;
 
       if (editingMessage) {
-        try {
-          await editMessage(editingMessage.id, val);
-          cancelAction();
-        } catch (err: unknown) {
-          console.error(err);
-        }
+        editMessage(editingMessage.id, val)
+          .then((): void => cancelAction())
+          .catch((err: Error): void => console.error(err));
         return;
       }
 
       const originalReply: Message | null = replyingTo;
       const tempId: string = `temp-${Date.now()}`;
+      const extendedMe: ExtendedUser = me as unknown as ExtendedUser;
 
       cancelAction();
 
-      try {
-        await sendMessage(val, {
-          variables: {
+      sendMessage(val, {
+        variables: {
+          chatId,
+          text: val,
+          replyToId: originalReply?.id ?? null,
+        },
+        optimisticResponse: {
+          sendMessage: {
+            __typename: "Message",
+            id: tempId,
             chatId,
             text: val,
-            replyToId: originalReply?.id ?? null,
-          },
-          optimisticResponse: {
-            sendMessage: {
-              __typename: "Message",
-              id: tempId,
-              chatId,
-              text: val,
-              sentAt: new Date().toISOString(),
-              sequence:
-                allMessages.length > 0
-                  ? (allMessages[allMessages.length - 1].sequence ?? 0) + 1
-                  : 1,
-              sender: {
-                id: me.id,
-                firstName: me.firstName,
-                photoUrl: me.photoUrl,
-              },
+            sentAt: new Date().toISOString(),
+            sequence:
+              allMessages.length > 0
+                ? (Number(allMessages[allMessages.length - 1].sequence) || 0) +
+                  1
+                : 1,
+            sender: {
+              id: extendedMe.id,
+              firstName: extendedMe.firstName,
+              lastName: extendedMe.lastName ?? null,
+              photoUrl: extendedMe.photoUrl ?? null,
+              displayName: extendedMe.displayName ?? extendedMe.firstName,
             },
-          } as useMessageActionsSendMutation$data,
-        });
-      } catch (err: unknown) {
-        console.error(err);
+          },
+        } as useMessageActionsSendMutation$data,
+      }).catch((): void => {
         setInput(val);
         if (originalReply) setReplyingTo(originalReply);
-      }
+      });
     },
     [
       me,
@@ -297,13 +301,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         title={chat?.title ?? undefined}
         photoUrl={chat?.photoUrl ?? undefined}
         totalUnread={totalUnread}
-        members={chat?.members as ChatMember[]}
+        members={(chat?.members as ChatMember[]) ?? []}
         meId={me?.id}
         isLoading={isInitialLoading}
         typingUser={typingUser}
       />
 
-      <main className="flex-1 relative min-h-0 bg-background">
+      <main className="flex-1 relative min-h-0 bg-background overflow-y-auto">
         {isInitialLoading ? (
           <div className="absolute inset-0 p-6 flex flex-col gap-6">
             <Skeleton className="h-10 w-[60%] self-end rounded-2xl rounded-tr-none" />
@@ -329,10 +333,10 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           <MessageList
             chatId={chatId}
             messages={allMessages}
-            members={chat?.members as ChatMember[]}
+            members={(chat?.members as ChatMember[]) ?? []}
             myId={me?.id}
             lastReadSequence={chat?.lastReadSequence ?? 0}
-            onMarkRead={checkAndMarkRead}
+            onMarkRead={markAsRead}
             onReply={handleReplyInitiate}
             onEdit={handleEditInitiate}
           />

@@ -1,7 +1,10 @@
 import { useMemo, useCallback } from "react";
 import { graphql, useLazyLoadQuery, useRefetchableFragment } from "react-relay";
 import type { useMessagesQuery } from "./__generated__/useMessagesQuery.graphql";
-import type { useMessages_history$key } from "./__generated__/useMessages_history.graphql";
+import type {
+  useMessages_history$key,
+  useMessages_history$data,
+} from "./__generated__/useMessages_history.graphql";
 
 const messagesQuery = graphql`
   query useMessagesQuery($chatId: ID!, $count: Int!, $cursor: Long) {
@@ -50,10 +53,15 @@ const messagesFragment = graphql`
   }
 `;
 
+type MessageType = Extract<
+  NonNullable<useMessages_history$data["messageHistory"]>,
+  { __typename: "MessageConnection" }
+>["messages"][number];
+
 export function useChatHistory(chatId: string) {
   const queryData = useLazyLoadQuery<useMessagesQuery>(
     messagesQuery,
-    { chatId, count: 50 },
+    { chatId, count: 50, cursor: null },
     { fetchPolicy: "store-and-network" },
   );
 
@@ -64,25 +72,26 @@ export function useChatHistory(chatId: string) {
 
   const history = data?.messageHistory;
 
-  const messages = useMemo(() => {
+  const messages = useMemo((): readonly MessageType[] => {
     if (history?.__typename === "MessageConnection") {
       return [...(history.messages ?? [])].sort(
-        (a, b) => Number(a.sequence) - Number(b.sequence),
+        (a: MessageType, b: MessageType): number =>
+          Number(a.sequence) - Number(b.sequence),
       );
     }
     return [];
   }, [history]);
 
-  const hasMore =
+  const hasMore: boolean =
     history?.__typename === "MessageConnection" ? history.hasMore : false;
 
-  const loadMore = useCallback(() => {
+  const loadMore = useCallback((): void => {
     if (!hasMore || !messages.length) return;
 
-    const oldestSequence = messages[0].sequence;
+    const oldestSequence: string | number = messages[0].sequence;
 
     refetch(
-      { chatId, count: 50, cursor: oldestSequence },
+      { chatId, count: 50, cursor: Number(oldestSequence) },
       { fetchPolicy: "network-only" },
     );
   }, [hasMore, messages, chatId, refetch]);

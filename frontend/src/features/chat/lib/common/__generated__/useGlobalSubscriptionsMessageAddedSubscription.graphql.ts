@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ce44069cfd7ff7b7f496649332f6e94c>>
+ * @generated SignedSource<<d2d8e1219f574ae7bb5be4b2743ff106>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,7 +17,11 @@ export type useGlobalSubscriptionsMessageAddedSubscription$data = {
     readonly chatId: string;
     readonly id: string;
     readonly sender: {
+      readonly displayName: string | null | undefined;
+      readonly firstName: string;
       readonly id: string;
+      readonly lastName: string | null | undefined;
+      readonly photoUrl: string | null | undefined;
     } | null | undefined;
     readonly sentAt: string;
     readonly sequence: any;
@@ -96,7 +100,35 @@ v2 = [
         "name": "sender",
         "plural": false,
         "selections": [
-          (v1/*: any*/)
+          (v1/*: any*/),
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "firstName",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "lastName",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "photoUrl",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "displayName",
+            "storageKey": null
+          }
         ],
         "storageKey": null
       }
@@ -122,16 +154,16 @@ return {
     "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "bf1ff96500fd0739bd4f5bf465752134",
+    "cacheID": "5dc6fa8b873a98a71f4f8e331d4acee6",
     "id": null,
     "metadata": {},
     "name": "useGlobalSubscriptionsMessageAddedSubscription",
     "operationKind": "subscription",
-    "text": "subscription useGlobalSubscriptionsMessageAddedSubscription(\n  $chatId: ID!\n) {\n  messageAdded(chatId: $chatId) {\n    id\n    chatId\n    text\n    sentAt\n    sequence\n    sender {\n      id\n    }\n  }\n}\n"
+    "text": "subscription useGlobalSubscriptionsMessageAddedSubscription(\n  $chatId: ID!\n) {\n  messageAdded(chatId: $chatId) {\n    id\n    chatId\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      photoUrl\n      displayName\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "5e2c8e9fd15bfbcb9fd3dbd2375068ec";
+(node as any).hash = "f9c1857ad7bc576a6fa2046a2520b1dd";
 
 export default node;

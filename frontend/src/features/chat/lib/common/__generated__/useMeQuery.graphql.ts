@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<54a15e00d048016c6d7d9b96e686e929>>
+ * @generated SignedSource<<05c1b3cd0219c4680824904bdea47108>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -12,7 +12,9 @@ import { ConcreteRequest } from 'relay-runtime';
 export type useMeQuery$variables = Record<PropertyKey, never>;
 export type useMeQuery$data = {
   readonly me: {
+    readonly firstName: string;
     readonly id: string;
+    readonly lastName: string | null | undefined;
     readonly photoUrl: string | null | undefined;
     readonly username: string | null | undefined;
   };
@@ -50,6 +52,20 @@ var v0 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
+        "name": "firstName",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "lastName",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
         "name": "photoUrl",
         "storageKey": null
       }
@@ -75,16 +91,16 @@ return {
     "selections": (v0/*: any*/)
   },
   "params": {
-    "cacheID": "28f3f63ada633e996f822aa091d0ebc0",
+    "cacheID": "c58ab513565cd1b1fff6b920543ada97",
     "id": null,
     "metadata": {},
     "name": "useMeQuery",
     "operationKind": "query",
-    "text": "query useMeQuery {\n  me {\n    id\n    username\n    photoUrl\n  }\n}\n"
+    "text": "query useMeQuery {\n  me {\n    id\n    username\n    firstName\n    lastName\n    photoUrl\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "d5e29972ea225a13d499e8a504a504b6";
+(node as any).hash = "58a18ba31eebdc1007ff45f763a6bbe7";
 
 export default node;

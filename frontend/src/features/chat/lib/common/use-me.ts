@@ -6,6 +6,8 @@ const meQuery = graphql`
     me {
       id
       username
+      firstName
+      lastName
       photoUrl
     }
   }
