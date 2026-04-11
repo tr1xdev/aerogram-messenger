@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type Server struct {
@@ -61,6 +63,8 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
+	log.Printf("[MSG_SVC] Processing SendMessage from %s to chat %s", senderIDStr, req.ChatId)
+
 	if err := s.limiter.Check(ctx, "msg:send:"+senderIDStr, s.cfg.Send.Limit, s.cfg.Send.Window); err != nil {
 		return nil, status.Error(codes.ResourceExhausted, "too many messages")
 	}
@@ -95,6 +99,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		IsSystem:     false,
 	})
 	if err != nil {
+		log.Printf("[MSG_SVC] Error saving to DB: %v", err)
 		return nil, status.Error(codes.Internal, "failed to save message")
 	}
 
@@ -116,9 +121,24 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
+	log.Printf("[MSG_SVC] Message saved to DB with ID: %s", msg.ID)
+
 	protoMsg := s.mapDBToProto(msg)
-	msgPayload, _ := json.Marshal(protoMsg)
-	_ = s.rdb.Publish(ctx, "chat:"+req.ChatId, msgPayload)
+
+	marshaller := protojson.MarshalOptions{
+		UseProtoNames:   true,
+		EmitUnpopulated: true,
+	}
+	msgPayload, err := marshaller.Marshal(protoMsg)
+	if err == nil {
+		channel := "chat:" + req.ChatId
+		errPub := s.rdb.Publish(context.Background(), channel, msgPayload).Err()
+		if errPub != nil {
+			log.Printf("[MSG_SVC] Redis Publish Error (chat): %v", errPub)
+		} else {
+			log.Printf("[MSG_SVC] Successfully published to Redis channel: %s", channel)
+		}
+	}
 
 	readPayload := map[string]interface{}{
 		"chatId":       req.ChatId,
@@ -126,7 +146,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		"lastSequence": msg.Sequence,
 	}
 	readData, _ := json.Marshal(readPayload)
-	_ = s.rdb.Publish(ctx, "chat:"+req.ChatId+":read", readData)
+	_ = s.rdb.Publish(context.Background(), "chat:"+req.ChatId+":read", readData)
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
 	if err == nil {
@@ -146,7 +166,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		members, err := s.db.Queries.GetDialogMembers(ctx, chatID)
 		if err == nil {
 			for _, m := range members {
-				_ = s.rdb.Publish(ctx, "user_chats:"+m.UserID.String(), chatJson)
+				_ = s.rdb.Publish(context.Background(), "user_chats:"+m.UserID.String(), chatJson)
 			}
 		}
 	}
@@ -155,10 +175,6 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 }
 
 func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryRequest) (*messagespb.GetHistoryResponse, error) {
-	if err := s.limiter.Check(ctx, "msg:history:"+req.ChatId, s.cfg.History.Limit, s.cfg.History.Window); err != nil {
-		return nil, status.Error(codes.ResourceExhausted, "too many history requests")
-	}
-
 	cid, err := uuid.Parse(req.ChatId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
@@ -229,10 +245,6 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
-	if err := s.limiter.Check(ctx, "msg:update:"+senderIDStr, s.cfg.Update.Limit, s.cfg.Update.Window); err != nil {
-		return nil, status.Error(codes.ResourceExhausted, "too many update requests")
-	}
-
 	id, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid message id")
@@ -253,8 +265,8 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 	}
 
 	protoMsg := s.mapDBToProto(msg)
-	msgPayload, _ := json.Marshal(protoMsg)
-	_ = s.rdb.Publish(ctx, "chat:"+msg.DialogID.String()+":updated", msgPayload)
+	msgPayload, _ := protojson.Marshal(protoMsg)
+	_ = s.rdb.Publish(context.Background(), "chat:"+msg.DialogID.String()+":updated", msgPayload)
 
 	return &messagespb.UpdateMessageResponse{Message: protoMsg}, nil
 }
@@ -263,10 +275,6 @@ func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessag
 	senderIDStr := s.getUserID(ctx, req.SenderId)
 	if senderIDStr == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
-	}
-
-	if err := s.limiter.Check(ctx, "msg:delete:"+senderIDStr, s.cfg.Delete.Limit, s.cfg.Delete.Window); err != nil {
-		return nil, status.Error(codes.ResourceExhausted, "too many delete requests")
 	}
 
 	id, err := uuid.Parse(req.Id)
@@ -283,7 +291,7 @@ func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessag
 		if err := s.messageRepo.Delete(ctx, id, sid); err != nil {
 			return nil, status.Error(codes.Internal, "failed to delete message")
 		}
-		_ = s.rdb.Publish(ctx, "chat:"+msg.DialogID.String()+":deleted", id.String())
+		_ = s.rdb.Publish(context.Background(), "chat:"+msg.DialogID.String()+":deleted", id.String())
 	}
 
 	return &messagespb.DeleteMessageResponse{Success: true}, nil

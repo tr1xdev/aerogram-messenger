@@ -2,6 +2,7 @@ package chat_svc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -50,6 +51,109 @@ func (s *Server) getUserID(ctx context.Context, reqID string) string {
 		}
 	}
 	return ""
+}
+
+func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) (*chatpb.CreateChatResponse, error) {
+	creatorIDStr := s.getUserID(ctx, req.CreatorId)
+	if creatorIDStr == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
+
+	if err := s.limiter.Check(ctx, "chat:create:"+creatorIDStr, s.cfg.Create.Limit, s.cfg.Create.Window); err != nil {
+		return nil, status.Error(codes.ResourceExhausted, "too many chat creation requests")
+	}
+
+	if req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
+		if len(req.ParticipantIds) != 2 {
+			return nil, status.Error(codes.InvalidArgument, "private chat must have exactly 2 participants")
+		}
+		if req.ParticipantIds[0] == req.ParticipantIds[1] {
+			return nil, status.Error(codes.InvalidArgument, "cannot create a private chat with yourself")
+		}
+
+		existingDialog, err := s.dialogRepo.GetPrivateDialogByMembers(ctx, req.ParticipantIds[0], req.ParticipantIds[1])
+		if err == nil {
+			return &chatpb.CreateChatResponse{Chat: s.mapDBDialogToProto(existingDialog)}, nil
+		}
+	}
+
+	newID := uuid.New()
+	creatorUUID, _ := uuid.Parse(creatorIDStr)
+
+	dParams := dbgen.CreateDialogParams{
+		ID:           newID,
+		Type:         s.mapProtoTypeToDB(req.Type),
+		Name:         database.ToNullString(req.Title),
+		Username:     database.ToNullString(req.Slug),
+		PhotoUrl:     sql.NullString{Valid: false},
+		Bio:          sql.NullString{Valid: false},
+		Description:  sql.NullString{Valid: false},
+		InviteLink:   sql.NullString{Valid: false},
+		CreatorID:    uuid.NullUUID{UUID: creatorUUID, Valid: true},
+		MembersCount: int32(len(req.ParticipantIds)),
+		IsActive:     true,
+		IsVerified:   false,
+	}
+
+	mParams := make([]dbgen.AddDialogMemberParams, len(req.ParticipantIds))
+	for i, pID := range req.ParticipantIds {
+		pUUID, err := uuid.Parse(pID)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "invalid participant id")
+		}
+
+		role := "member"
+		if pID == creatorIDStr {
+			role = "owner"
+		}
+		mParams[i] = dbgen.AddDialogMemberParams{
+			DialogID:         newID,
+			UserID:           pUUID,
+			Role:             role,
+			NotificationsOn:  true,
+			IsPinned:         false,
+			LastReadSequence: 0,
+		}
+	}
+
+	sParams := dbgen.CreateDialogSettingsParams{
+		DialogID:            newID,
+		Permissions:         0,
+		SlowModeDelay:       0,
+		IsHistoryHidden:     false,
+		IsSignaturesEnabled: false,
+	}
+
+	if err := s.dialogRepo.CreateDialog(ctx, dParams, mParams, sParams); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	dialog, _ := s.dialogRepo.GetDialogByID(ctx, newID.String())
+	protoChat := s.mapDBDialogToProto(dialog)
+
+	chatType := strings.ToUpper(strings.TrimPrefix(req.Type.String(), "CHAT_TYPE_"))
+	displayTitle := protoChat.Title
+	if displayTitle == "" && req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
+		displayTitle = "New Chat"
+	}
+
+	notification := map[string]interface{}{
+		"id":           protoChat.Id,
+		"title":        displayTitle,
+		"type":         chatType,
+		"slug":         protoChat.Slug,
+		"membersCount": protoChat.MembersCount,
+		"isVerified":   protoChat.IsVerified,
+		"createdAt":    time.Now().Format(time.RFC3339),
+		"unreadCount":  0,
+	}
+
+	payload, _ := json.Marshal(notification)
+	for _, pID := range req.ParticipantIds {
+		s.rdb.Publish(ctx, "user_chats:"+pID, payload)
+	}
+
+	return &chatpb.CreateChatResponse{Chat: protoChat}, nil
 }
 
 func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chatpb.PinChatResponse, error) {
@@ -118,84 +222,6 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 	}
 
 	return &chatpb.DeleteChatResponse{Success: true}, nil
-}
-
-func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) (*chatpb.CreateChatResponse, error) {
-	creatorIDStr := s.getUserID(ctx, req.CreatorId)
-	if creatorIDStr == "" {
-		return nil, status.Error(codes.Unauthenticated, "unauthorized")
-	}
-
-	if err := s.limiter.Check(ctx, "chat:create:"+creatorIDStr, s.cfg.Create.Limit, s.cfg.Create.Window); err != nil {
-		return nil, status.Error(codes.ResourceExhausted, "too many chat creation requests")
-	}
-
-	if req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
-		existingDialog, err := s.dialogRepo.GetPrivateDialogByMembers(ctx, req.ParticipantIds[0], req.ParticipantIds[1])
-		if err == nil {
-			return &chatpb.CreateChatResponse{Chat: s.mapDBDialogToProto(existingDialog)}, nil
-		}
-	}
-
-	newID := uuid.New()
-	creatorUUID, _ := uuid.Parse(creatorIDStr)
-
-	dParams := dbgen.CreateDialogParams{
-		ID:           newID,
-		Type:         s.mapProtoTypeToDB(req.Type),
-		Name:         database.ToNullString(req.Title),
-		Username:     database.ToNullString(req.Slug),
-		CreatorID:    uuid.NullUUID{UUID: creatorUUID, Valid: true},
-		MembersCount: int32(len(req.ParticipantIds)),
-		IsActive:     true,
-	}
-
-	mParams := make([]dbgen.AddDialogMemberParams, len(req.ParticipantIds))
-	for i, pID := range req.ParticipantIds {
-		pUUID, _ := uuid.Parse(pID)
-		role := "member"
-		if pID == creatorIDStr {
-			role = "owner"
-		}
-		mParams[i] = dbgen.AddDialogMemberParams{
-			DialogID: newID,
-			UserID:   pUUID,
-			Role:     role,
-		}
-	}
-
-	sParams := dbgen.CreateDialogSettingsParams{DialogID: newID}
-
-	if err := s.dialogRepo.CreateDialog(ctx, dParams, mParams, sParams); err != nil {
-		return nil, status.Error(codes.Internal, "database error")
-	}
-
-	dialog, _ := s.dialogRepo.GetDialogByID(ctx, newID.String())
-	protoChat := s.mapDBDialogToProto(dialog)
-
-	chatType := strings.ToUpper(strings.TrimPrefix(req.Type.String(), "CHAT_TYPE_"))
-	displayTitle := protoChat.Title
-	if displayTitle == "" && req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
-		displayTitle = "New Chat"
-	}
-
-	notification := map[string]interface{}{
-		"id":           protoChat.Id,
-		"title":        displayTitle,
-		"type":         chatType,
-		"slug":         protoChat.Slug,
-		"membersCount": protoChat.MembersCount,
-		"isVerified":   protoChat.IsVerified,
-		"createdAt":    time.Now().Format(time.RFC3339),
-		"unreadCount":  0,
-	}
-
-	payload, _ := json.Marshal(notification)
-	for _, pID := range req.ParticipantIds {
-		s.rdb.Publish(ctx, "user_chats:"+pID, payload)
-	}
-
-	return &chatpb.CreateChatResponse{Chat: protoChat}, nil
 }
 
 func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) (*chatpb.GetMyChatsResponse, error) {
