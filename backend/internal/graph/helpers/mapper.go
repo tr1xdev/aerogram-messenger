@@ -16,7 +16,7 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 
 	senderID, _ := uuid.Parse(m.SenderId)
 
-	msg := &model.Message{
+	return &model.Message{
 		ID:       m.Id,
 		ChatID:   m.ChatId,
 		Text:     m.Text,
@@ -27,26 +27,11 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 			ID: senderID,
 		},
 	}
-
-	if m.ReplyToId != nil && *m.ReplyToId != "" {
-		msg.ReplyTo = &model.Message{
-			ID: *m.ReplyToId,
-		}
-	}
-
-	return msg
 }
 
 func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 	if m == nil {
 		return nil
-	}
-
-	var sender *dbgen.User
-	if m.AuthorID != uuid.Nil {
-		sender = &dbgen.User{
-			ID: m.AuthorID,
-		}
 	}
 
 	msg := &model.Message{
@@ -56,7 +41,12 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 		SentAt:   m.CreatedAt.Format(time.RFC3339),
 		Sequence: m.Sequence,
 		IsEdited: m.IsEdited,
-		Sender:   sender,
+	}
+
+	if m.AuthorID != uuid.Nil {
+		msg.Sender = &dbgen.User{
+			ID: m.AuthorID,
+		}
 	}
 
 	if m.ReplyToID.Valid {
