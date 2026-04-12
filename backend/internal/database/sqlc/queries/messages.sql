@@ -17,9 +17,16 @@ SELECT
     u.first_name as author_first_name,
     u.last_name as author_last_name,
     u.photo_url as author_photo_url,
-    u.is_bot as author_is_bot
+    u.is_bot as author_is_bot,
+    rm.content as reply_content,
+    rm.author_id as reply_author_id,
+    ru.username as reply_author_username,
+    ru.first_name as reply_author_first_name,
+    ru.last_name as reply_author_last_name
 FROM messages m
 JOIN users u ON m.author_id = u.id
+LEFT JOIN messages rm ON m.reply_to_id = rm.id
+LEFT JOIN users ru ON rm.author_id = ru.id
 WHERE m.dialog_id = $1 AND m.is_deleted = false
 ORDER BY m.sequence DESC
 LIMIT $2 OFFSET $3;

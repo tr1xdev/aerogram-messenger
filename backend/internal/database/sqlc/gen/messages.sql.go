@@ -94,9 +94,16 @@ SELECT
     u.first_name as author_first_name,
     u.last_name as author_last_name,
     u.photo_url as author_photo_url,
-    u.is_bot as author_is_bot
+    u.is_bot as author_is_bot,
+    rm.content as reply_content,
+    rm.author_id as reply_author_id,
+    ru.username as reply_author_username,
+    ru.first_name as reply_author_first_name,
+    ru.last_name as reply_author_last_name
 FROM messages m
 JOIN users u ON m.author_id = u.id
+LEFT JOIN messages rm ON m.reply_to_id = rm.id
+LEFT JOIN users ru ON rm.author_id = ru.id
 WHERE m.dialog_id = $1 AND m.is_deleted = false
 ORDER BY m.sequence DESC
 LIMIT $2 OFFSET $3
@@ -109,29 +116,34 @@ type GetChatHistoryParams struct {
 }
 
 type GetChatHistoryRow struct {
-	ID              uuid.UUID      `json:"id"`
-	DialogID        uuid.UUID      `json:"dialog_id"`
-	AuthorID        uuid.UUID      `json:"author_id"`
-	Content         string         `json:"content"`
-	IsEncrypted     bool           `json:"is_encrypted"`
-	EncryptionIv    sql.NullString `json:"encryption_iv"`
-	Sequence        int64          `json:"sequence"`
-	ReplyToID       uuid.NullUUID  `json:"reply_to_id"`
-	ForwardFromID   uuid.NullUUID  `json:"forward_from_id"`
-	MediaUrl        sql.NullString `json:"media_url"`
-	MediaType       sql.NullString `json:"media_type"`
-	IsEdited        bool           `json:"is_edited"`
-	IsDeleted       bool           `json:"is_deleted"`
-	IsSystem        bool           `json:"is_system"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
-	DeletedAt       sql.NullTime   `json:"deleted_at"`
-	AuthorID_2      uuid.UUID      `json:"author_id_2"`
-	AuthorUsername  sql.NullString `json:"author_username"`
-	AuthorFirstName string         `json:"author_first_name"`
-	AuthorLastName  sql.NullString `json:"author_last_name"`
-	AuthorPhotoUrl  sql.NullString `json:"author_photo_url"`
-	AuthorIsBot     bool           `json:"author_is_bot"`
+	ID                   uuid.UUID      `json:"id"`
+	DialogID             uuid.UUID      `json:"dialog_id"`
+	AuthorID             uuid.UUID      `json:"author_id"`
+	Content              string         `json:"content"`
+	IsEncrypted          bool           `json:"is_encrypted"`
+	EncryptionIv         sql.NullString `json:"encryption_iv"`
+	Sequence             int64          `json:"sequence"`
+	ReplyToID            uuid.NullUUID  `json:"reply_to_id"`
+	ForwardFromID        uuid.NullUUID  `json:"forward_from_id"`
+	MediaUrl             sql.NullString `json:"media_url"`
+	MediaType            sql.NullString `json:"media_type"`
+	IsEdited             bool           `json:"is_edited"`
+	IsDeleted            bool           `json:"is_deleted"`
+	IsSystem             bool           `json:"is_system"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            sql.NullTime   `json:"deleted_at"`
+	AuthorID_2           uuid.UUID      `json:"author_id_2"`
+	AuthorUsername       sql.NullString `json:"author_username"`
+	AuthorFirstName      string         `json:"author_first_name"`
+	AuthorLastName       sql.NullString `json:"author_last_name"`
+	AuthorPhotoUrl       sql.NullString `json:"author_photo_url"`
+	AuthorIsBot          bool           `json:"author_is_bot"`
+	ReplyContent         sql.NullString `json:"reply_content"`
+	ReplyAuthorID        uuid.NullUUID  `json:"reply_author_id"`
+	ReplyAuthorUsername  sql.NullString `json:"reply_author_username"`
+	ReplyAuthorFirstName sql.NullString `json:"reply_author_first_name"`
+	ReplyAuthorLastName  sql.NullString `json:"reply_author_last_name"`
 }
 
 func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error) {
@@ -167,6 +179,11 @@ func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) 
 			&i.AuthorLastName,
 			&i.AuthorPhotoUrl,
 			&i.AuthorIsBot,
+			&i.ReplyContent,
+			&i.ReplyAuthorID,
+			&i.ReplyAuthorUsername,
+			&i.ReplyAuthorFirstName,
+			&i.ReplyAuthorLastName,
 		); err != nil {
 			return nil, err
 		}
