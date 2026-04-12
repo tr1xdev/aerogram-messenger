@@ -40,6 +40,7 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Chat() ChatResolver
 	Message() MessageResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
@@ -152,6 +153,7 @@ type ComplexityRoot struct {
 		MyBots         func(childComplexity int) int
 		MyChats        func(childComplexity int) int
 		MySessions     func(childComplexity int) int
+		Node           func(childComplexity int, id string) int
 		SearchUsers    func(childComplexity int, username string) int
 		User           func(childComplexity int, id string) int
 	}
@@ -202,6 +204,7 @@ type ComplexityRoot struct {
 		ID             func(childComplexity int) int
 		IsBot          func(childComplexity int) int
 		IsPremium      func(childComplexity int) int
+		IsTyping       func(childComplexity int) int
 		IsVerified     func(childComplexity int) int
 		LastName       func(childComplexity int) int
 		PhotoURL       func(childComplexity int) int
@@ -221,8 +224,16 @@ type ComplexityRoot struct {
 	}
 }
 
+type ChatResolver interface {
+	ID(ctx context.Context, obj *model.Chat) (string, error)
+}
 type MessageResolver interface {
+	ID(ctx context.Context, obj *model.Message) (string, error)
+
 	Sender(ctx context.Context, obj *model.Message) (*dbgen.User, error)
+
+	ReplyTo(ctx context.Context, obj *model.Message) (*model.Message, error)
+	ForwardedFrom(ctx context.Context, obj *model.Message) (*model.Message, error)
 }
 type MutationResolver interface {
 	SignUp(ctx context.Context, input model.SignUpInput) (*model.AuthPayload, error)
@@ -254,6 +265,7 @@ type QueryResolver interface {
 	Chat(ctx context.Context, id *string, slug *string) (model.ChatResult, error)
 	MessageHistory(ctx context.Context, chatID string, limit int, beforeSequence *int64) (model.MessageHistoryResult, error)
 	DialogRead(ctx context.Context, chatID string) (*model.ReadPayload, error)
+	Node(ctx context.Context, id string) (model.Node, error)
 	Me(ctx context.Context) (*dbgen.User, error)
 	User(ctx context.Context, id string) (*dbgen.User, error)
 	GetUser(ctx context.Context, id string) (*dbgen.User, error)
@@ -262,7 +274,6 @@ type QueryResolver interface {
 }
 type SessionResolver interface {
 	ID(ctx context.Context, obj *dbgen.Session) (string, error)
-	Device(ctx context.Context, obj *dbgen.Session) (*string, error)
 
 	Location(ctx context.Context, obj *dbgen.Session) (*string, error)
 
@@ -289,8 +300,8 @@ type UserResolver interface {
 	PhotoURL(ctx context.Context, obj *dbgen.User) (*string, error)
 	Bio(ctx context.Context, obj *dbgen.User) (*string, error)
 	Status(ctx context.Context, obj *dbgen.User) (string, error)
-	IsVerified(ctx context.Context, obj *dbgen.User) (bool, error)
 
+	IsTyping(ctx context.Context, obj *dbgen.User) (bool, error)
 	BotDescription(ctx context.Context, obj *dbgen.User) (*string, error)
 	BotCommands(ctx context.Context, obj *dbgen.User) (*string, error)
 }
@@ -841,6 +852,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MySessions(childComplexity), true
+	case "Query.node":
+		if e.complexity.Query.Node == nil {
+			break
+		}
+
+		args, err := ec.field_Query_node_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Node(childComplexity, args["id"].(string)), true
 	case "Query.searchUsers":
 		if e.complexity.Query.SearchUsers == nil {
 			break
@@ -1089,6 +1111,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.IsPremium(childComplexity), true
+	case "User.isTyping":
+		if e.complexity.User.IsTyping == nil {
+			break
+		}
+
+		return e.complexity.User.IsTyping(childComplexity), true
 	case "User.isVerified":
 		if e.complexity.User.IsVerified == nil {
 			break
@@ -1662,6 +1690,17 @@ func (ec *executionContext) field_Query_messageHistory_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_node_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_searchUsers_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1947,7 +1986,7 @@ func (ec *executionContext) _Chat_id(ctx context.Context, field graphql.Collecte
 		field,
 		ec.fieldContext_Chat_id,
 		func(ctx context.Context) (any, error) {
-			return obj.ID, nil
+			return ec.resolvers.Chat().ID(ctx, obj)
 		},
 		nil,
 		ec.marshalNID2string,
@@ -1960,8 +1999,8 @@ func (ec *executionContext) fieldContext_Chat_id(_ context.Context, field graphq
 	fc = &graphql.FieldContext{
 		Object:     "Chat",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ID does not have child fields")
 		},
@@ -2448,6 +2487,8 @@ func (ec *executionContext) fieldContext_ChatMember_user(_ context.Context, fiel
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -2565,6 +2606,8 @@ func (ec *executionContext) fieldContext_CreateBotPayload_user(_ context.Context
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -2641,7 +2684,7 @@ func (ec *executionContext) _Message_id(ctx context.Context, field graphql.Colle
 		field,
 		ec.fieldContext_Message_id,
 		func(ctx context.Context) (any, error) {
-			return obj.ID, nil
+			return ec.resolvers.Message().ID(ctx, obj)
 		},
 		nil,
 		ec.marshalNID2string,
@@ -2654,8 +2697,8 @@ func (ec *executionContext) fieldContext_Message_id(_ context.Context, field gra
 	fc = &graphql.FieldContext{
 		Object:     "Message",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ID does not have child fields")
 		},
@@ -2740,6 +2783,8 @@ func (ec *executionContext) fieldContext_Message_sender(_ context.Context, field
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -2874,7 +2919,7 @@ func (ec *executionContext) _Message_replyTo(ctx context.Context, field graphql.
 		field,
 		ec.fieldContext_Message_replyTo,
 		func(ctx context.Context) (any, error) {
-			return obj.ReplyTo, nil
+			return ec.resolvers.Message().ReplyTo(ctx, obj)
 		},
 		nil,
 		ec.marshalOMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐMessage,
@@ -2887,8 +2932,8 @@ func (ec *executionContext) fieldContext_Message_replyTo(_ context.Context, fiel
 	fc = &graphql.FieldContext{
 		Object:     "Message",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -2923,7 +2968,7 @@ func (ec *executionContext) _Message_forwardedFrom(ctx context.Context, field gr
 		field,
 		ec.fieldContext_Message_forwardedFrom,
 		func(ctx context.Context) (any, error) {
-			return obj.ForwardedFrom, nil
+			return ec.resolvers.Message().ForwardedFrom(ctx, obj)
 		},
 		nil,
 		ec.marshalOMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐMessage,
@@ -2936,8 +2981,8 @@ func (ec *executionContext) fieldContext_Message_forwardedFrom(_ context.Context
 	fc = &graphql.FieldContext{
 		Object:     "Message",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -3764,6 +3809,8 @@ func (ec *executionContext) fieldContext_Mutation_uploadAvatar(ctx context.Conte
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -3835,6 +3882,8 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -3947,6 +3996,8 @@ func (ec *executionContext) fieldContext_Mutation_updateBot(ctx context.Context,
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4285,6 +4336,47 @@ func (ec *executionContext) fieldContext_Query_dialogRead(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_node(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_node,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().Node(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalONode2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐNode,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("FieldContext.Child cannot be called on type INTERFACE")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_node_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4333,6 +4425,8 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4393,6 +4487,8 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4464,6 +4560,8 @@ func (ec *executionContext) fieldContext_Query_getUser(ctx context.Context, fiel
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4535,6 +4633,8 @@ func (ec *executionContext) fieldContext_Query_searchUsers(ctx context.Context, 
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4605,6 +4705,8 @@ func (ec *executionContext) fieldContext_Query_myBots(_ context.Context, field g
 				return ec.fieldContext_User_isPremium(ctx, field)
 			case "isBot":
 				return ec.fieldContext_User_isBot(ctx, field)
+			case "isTyping":
+				return ec.fieldContext_User_isTyping(ctx, field)
 			case "botDescription":
 				return ec.fieldContext_User_botDescription(ctx, field)
 			case "botCommands":
@@ -4847,10 +4949,10 @@ func (ec *executionContext) _Session_device(ctx context.Context, field graphql.C
 		field,
 		ec.fieldContext_Session_device,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Session().Device(ctx, obj)
+			return obj.Device, nil
 		},
 		nil,
-		ec.marshalOString2ᚖstring,
+		ec.marshalOString2string,
 		true,
 		false,
 	)
@@ -4860,8 +4962,8 @@ func (ec *executionContext) fieldContext_Session_device(_ context.Context, field
 	fc = &graphql.FieldContext{
 		Object:     "Session",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -5787,7 +5889,7 @@ func (ec *executionContext) _User_isVerified(ctx context.Context, field graphql.
 		field,
 		ec.fieldContext_User_isVerified,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().IsVerified(ctx, obj)
+			return obj.IsVerified, nil
 		},
 		nil,
 		ec.marshalNBoolean2bool,
@@ -5800,8 +5902,8 @@ func (ec *executionContext) fieldContext_User_isVerified(_ context.Context, fiel
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -5860,6 +5962,35 @@ func (ec *executionContext) fieldContext_User_isBot(_ context.Context, field gra
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_isTyping(ctx context.Context, field graphql.CollectedField, obj *dbgen.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_isTyping,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.User().IsTyping(ctx, obj)
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_isTyping(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -7971,6 +8102,47 @@ func (ec *executionContext) _MyChatsResult(ctx context.Context, sel ast.Selectio
 	}
 }
 
+func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj model.Node) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case dbgen.User:
+		return ec._User(ctx, sel, &obj)
+	case *dbgen.User:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._User(ctx, sel, obj)
+	case dbgen.Session:
+		return ec._Session(ctx, sel, &obj)
+	case *dbgen.Session:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Session(ctx, sel, obj)
+	case model.Message:
+		return ec._Message(ctx, sel, &obj)
+	case *model.Message:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Message(ctx, sel, obj)
+	case model.Chat:
+		return ec._Chat(ctx, sel, &obj)
+	case *model.Chat:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Chat(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of Node must implement graphql.Marshaler", obj))
+		}
+	}
+}
+
 func (ec *executionContext) _PinChatResult(ctx context.Context, sel ast.SelectionSet, obj model.PinChatResult) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -8084,7 +8256,7 @@ func (ec *executionContext) _AuthPayload(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var chatImplementors = []string{"Chat", "ChatResult", "CreateChatResult"}
+var chatImplementors = []string{"Chat", "Node", "ChatResult", "CreateChatResult"}
 
 func (ec *executionContext) _Chat(ctx context.Context, sel ast.SelectionSet, obj *model.Chat) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, chatImplementors)
@@ -8096,48 +8268,79 @@ func (ec *executionContext) _Chat(ctx context.Context, sel ast.SelectionSet, obj
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Chat")
 		case "id":
-			out.Values[i] = ec._Chat_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Chat_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "type":
 			out.Values[i] = ec._Chat_type(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "slug":
 			out.Values[i] = ec._Chat_slug(ctx, field, obj)
 		case "title":
 			out.Values[i] = ec._Chat_title(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "photoUrl":
 			out.Values[i] = ec._Chat_photoUrl(ctx, field, obj)
 		case "membersCount":
 			out.Values[i] = ec._Chat_membersCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "unreadCount":
 			out.Values[i] = ec._Chat_unreadCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "myReadSequence":
 			out.Values[i] = ec._Chat_myReadSequence(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "lastReadSequence":
 			out.Values[i] = ec._Chat_lastReadSequence(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "isPinned":
 			out.Values[i] = ec._Chat_isPinned(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "lastMessage":
 			out.Values[i] = ec._Chat_lastMessage(ctx, field, obj)
@@ -8146,7 +8349,7 @@ func (ec *executionContext) _Chat(ctx context.Context, sel ast.SelectionSet, obj
 		case "createdAt":
 			out.Values[i] = ec._Chat_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -8376,7 +8579,7 @@ func (ec *executionContext) _InternalError(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var messageImplementors = []string{"Message", "SendMessageResult"}
+var messageImplementors = []string{"Message", "Node", "SendMessageResult"}
 
 func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, obj *model.Message) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, messageImplementors)
@@ -8388,10 +8591,41 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Message")
 		case "id":
-			out.Values[i] = ec._Message_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "chatId":
 			out.Values[i] = ec._Message_chatId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -8451,9 +8685,71 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "replyTo":
-			out.Values[i] = ec._Message_replyTo(ctx, field, obj)
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_replyTo(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "forwardedFrom":
-			out.Values[i] = ec._Message_forwardedFrom(ctx, field, obj)
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_forwardedFrom(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8885,6 +9181,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "node":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_node(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "me":
 			field := field
 
@@ -9075,7 +9390,7 @@ func (ec *executionContext) _ReadPayload(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var sessionImplementors = []string{"Session"}
+var sessionImplementors = []string{"Session", "Node"}
 
 func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, obj *dbgen.Session) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, sessionImplementors)
@@ -9123,38 +9438,7 @@ func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, 
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "device":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Session_device(ctx, field, obj)
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			out.Values[i] = ec._Session_device(ctx, field, obj)
 		case "ipAddress":
 			out.Values[i] = ec._Session_ipAddress(ctx, field, obj)
 		case "location":
@@ -9404,7 +9688,7 @@ func (ec *executionContext) _TypingPayload(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var userImplementors = []string{"User"}
+var userImplementors = []string{"User", "Node"}
 
 func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj *dbgen.User) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, userImplementors)
@@ -9722,6 +10006,21 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "isVerified":
+			out.Values[i] = ec._User_isVerified(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "isPremium":
+			out.Values[i] = ec._User_isPremium(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "isBot":
+			out.Values[i] = ec._User_isBot(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "isTyping":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -9730,7 +10029,7 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._User_isVerified(ctx, field, obj)
+				res = ec._User_isTyping(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -9757,16 +10056,6 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "isPremium":
-			out.Values[i] = ec._User_isPremium(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "isBot":
-			out.Values[i] = ec._User_isBot(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "botDescription":
 			field := field
 
@@ -11185,6 +11474,13 @@ func (ec *executionContext) marshalOMessage2ᚖgithubᚗcomᚋtr1xdevᚋaerogram
 		return graphql.Null
 	}
 	return ec._Message(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalONode2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐNode(ctx context.Context, sel ast.SelectionSet, v model.Node) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Node(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v any) (string, error) {

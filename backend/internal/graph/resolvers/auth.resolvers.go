@@ -161,22 +161,32 @@ func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
 
 // MySessions is the resolver for the mySessions field.
 func (r *queryResolver) MySessions(ctx context.Context) ([]*dbgen.Session, error) {
-	panic(fmt.Errorf("not implemented: MySessions - mySessions"))
+	userIDStr := middleware.GetUserID(ctx)
+	if userIDStr == "" {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	uid, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id")
+	}
+
+	sessions, err := r.Store.GetSessionsByUserID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]*dbgen.Session, len(sessions))
+	for i := range sessions {
+		results[i] = &sessions[i]
+	}
+
+	return results, nil
 }
 
 // ID is the resolver for the id field.
 func (r *sessionResolver) ID(ctx context.Context, obj *dbgen.Session) (string, error) {
 	return obj.ID.String(), nil
-}
-
-// Device is the resolver for the device field.
-func (r *sessionResolver) Device(ctx context.Context, obj *dbgen.Session) (*string, error) {
-	if obj.Device == "" {
-		res := "Unknown Device"
-		return &res, nil
-	}
-	name := r.UaService.Parse(obj.Device)
-	return &name, nil
 }
 
 // Location is the resolver for the location field.
