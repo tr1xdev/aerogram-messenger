@@ -1,7 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
-import { useQuery } from "@apollo/client/react";
+import { graphql, useFragment, useLazyLoadQuery } from "react-relay";
 import { motion } from "framer-motion";
-import { GET_USER_BY_ID } from "@/features/chat/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,27 +13,66 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { User } from "@/entities/chat/model/types";
 import { MdVerified } from "react-icons/md";
+import type { userProfileOverlay_user$key } from "./__generated__/userProfileOverlay_user.graphql";
+import type { userProfileOverlayQuery } from "./__generated__/userProfileOverlayQuery.graphql";
+
+const UserProfileFragment = graphql`
+  fragment userProfileOverlay_user on User {
+    id
+    email
+    firstName
+    lastName
+    displayName
+    username
+    photoUrl
+    bio
+    status
+    isVerified
+  }
+`;
+
+const UserProfileQuery = graphql`
+  query userProfileOverlayQuery($id: ID!) {
+    user(id: $id) {
+      ...userProfileOverlay_user
+    }
+  }
+`;
 
 export function UserProfileOverlay({ userId }: { userId: string }) {
   const router = useRouter();
-  const { data, loading } = useQuery<{ user: User }>(GET_USER_BY_ID, {
-    variables: { id: userId },
-    fetchPolicy: "cache-and-network",
-  });
 
-  const user = data?.user;
+  const data = useLazyLoadQuery<userProfileOverlayQuery>(
+    UserProfileQuery,
+    { id: userId },
+    { fetchPolicy: "store-or-network" },
+  );
+
+  const user = useFragment<userProfileOverlay_user$key>(
+    UserProfileFragment,
+    data.user,
+  );
 
   const handleBack = (): void => {
     router.history.back();
   };
 
-  const handleCopy = (text: string | undefined, label: string): void => {
+  const handleCopy = (text: string | null | undefined, label: string): void => {
     if (!text) return;
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied`);
   };
+
+  const overlayTransition = {
+    type: "tween",
+    ease: [0.33, 1, 0.68, 1],
+    duration: 0.22,
+  } as const;
+
+  if (!user) {
+    return <ProfileSkeleton />;
+  }
 
   return (
     <>
@@ -43,23 +81,23 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={handleBack}
-        className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-90 md:hidden"
+        className="fixed inset-0 bg-black/40 z-90 md:hidden"
       />
 
       <motion.div
         initial={{ x: "100%" }}
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
-        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        transition={overlayTransition}
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={{ left: 0, right: 0.9 }}
-        onDragEnd={(_, info) => {
-          if (info.offset.x > 80) handleBack();
+        dragElastic={{ left: 0, right: 0.5 }}
+        onDragEnd={(_: unknown, info: { offset: { x: number } }) => {
+          if (info.offset.x > 50) handleBack();
         }}
-        className="fixed inset-y-0 right-0 z-100 w-full bg-background shadow-2xl md:hidden"
+        className="fixed inset-y-0 right-0 z-100 w-full bg-background shadow-2xl md:hidden will-change-transform"
       >
-        <header className="flex items-center p-4 sticky top-0 bg-background/90 backdrop-blur-md z-10 border-b">
+        <header className="flex items-center p-4 sticky top-0 bg-background/95 backdrop-blur-sm z-10 border-b">
           <Button
             variant="ghost"
             size="icon"
@@ -71,76 +109,69 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
           <span className="ml-3 font-bold text-lg">Profile</span>
         </header>
 
-        {loading || !user ? (
-          <ProfileSkeleton />
-        ) : (
-          <div className="pb-10 px-4 space-y-5 overflow-y-auto h-[calc(100vh-64px)] scrollbar-none">
-            <div className="flex flex-col items-center py-8">
-              {/* Fix: Added aspect-square and forced object-cover to prevent shrinking */}
-              <Avatar className="h-32 w-32 border-4 border-background shadow-xl rounded-full aspect-square overflow-hidden">
-                <AvatarImage
-                  src={user.photoUrl ?? undefined}
-                  className="object-cover h-full w-full"
-                />
-                <AvatarFallback className="text-4xl bg-primary/10 text-primary font-bold uppercase h-full w-full flex items-center justify-center">
-                  {(user.firstName || user.displayName)?.[0] || "?"}
-                </AvatarFallback>
-              </Avatar>
+        <div className="pb-10 px-4 space-y-5 overflow-y-auto h-[calc(100vh-64px)] scrollbar-none">
+          <div className="flex flex-col items-center py-8">
+            <Avatar className="h-32 w-32 border-4 border-background shadow-xl rounded-full aspect-square overflow-hidden">
+              <AvatarImage
+                src={user.photoUrl ?? undefined}
+                className="object-cover h-full w-full"
+              />
+              <AvatarFallback className="text-4xl bg-primary/10 text-primary font-bold uppercase h-full w-full flex items-center justify-center">
+                {(user.firstName || user.displayName)?.[0] || "?"}
+              </AvatarFallback>
+            </Avatar>
 
-              <div className="mt-4 text-center w-full px-4">
-                <div className="flex items-center justify-center gap-1.5">
-                  <h2 className="text-2xl font-bold tracking-tight truncate">
-                    {user.displayName || `${user.firstName} ${user.lastName}`}
-                  </h2>
-                  {user.isVerified && (
-                    <MdVerified className="text-[#2196f3] shrink-0 text-[24px]" />
+            <div className="mt-4 text-center w-full px-4">
+              <div className="flex items-center justify-center gap-1.5">
+                <h2 className="text-2xl font-bold tracking-tight truncate">
+                  {user.displayName || `${user.firstName} ${user.lastName}`}
+                </h2>
+                {user.isVerified && (
+                  <MdVerified className="text-[#2196f3] shrink-0 text-[24px]" />
+                )}
+              </div>
+              <div className="flex items-center justify-center gap-1.5 mt-1">
+                <div
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    user.status === "online" ? "bg-green-500" : "bg-zinc-400",
                   )}
-                </div>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <div
-                    className={cn(
-                      "h-2 w-2 rounded-full",
-                      user.status === "online" ? "bg-green-500" : "bg-zinc-400",
-                    )}
-                  />
-                  <p className="text-[14px] text-muted-foreground font-medium">
-                    {user.status || "offline"}
-                  </p>
-                </div>
+                />
+                <p className="text-[14px] text-muted-foreground font-medium">
+                  {user.status || "offline"}
+                </p>
               </div>
             </div>
-
-            <div className="rounded-2xl border border-border/40 bg-muted/5 overflow-hidden">
-              <InfoItem label="Bio" value={user.bio ?? "None"} isBio />
-              <InfoItem
-                label="Username"
-                value={user.username ? `@${user.username}` : "None"}
-                onClick={() =>
-                  handleCopy(user.username ?? undefined, "Username")
-                }
-              />
-              <InfoItem
-                label="Email"
-                value={user.email}
-                onClick={() => handleCopy(user.email, "Email")}
-              />
-            </div>
-
-            <div className="rounded-2xl border border-border/40 bg-muted/5 overflow-hidden">
-              <ActionRow
-                icon={MessageCircle}
-                label="Send Message"
-                onClick={handleBack}
-                primary
-              />
-              <ActionRow icon={BellOff} label="Mute Notifications" />
-            </div>
-
-            <div className="rounded-2xl border border-border/40 bg-muted/5 overflow-hidden">
-              <ActionRow icon={Ban} label="Block User" isWarning />
-            </div>
           </div>
-        )}
+
+          <div className="rounded-2xl border border-border/40 bg-muted/5 overflow-hidden">
+            <InfoItem label="Bio" value={user.bio ?? "None"} isBio />
+            <InfoItem
+              label="Username"
+              value={user.username ? `@${user.username}` : "None"}
+              onClick={() => handleCopy(user.username, "Username")}
+            />
+            <InfoItem
+              label="Email"
+              value={user.email ?? "No email"}
+              onClick={() => handleCopy(user.email, "Email")}
+            />
+          </div>
+
+          <div className="rounded-2xl border border-border/40 bg-muted/5 overflow-hidden">
+            <ActionRow
+              icon={MessageCircle}
+              label="Send Message"
+              onClick={handleBack}
+              primary
+            />
+            <ActionRow icon={BellOff} label="Mute Notifications" />
+          </div>
+
+          <div className="rounded-2xl border border-border/40 bg-muted/5 overflow-hidden">
+            <ActionRow icon={Ban} label="Block User" isWarning />
+          </div>
+        </div>
       </motion.div>
     </>
   );
