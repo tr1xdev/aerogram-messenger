@@ -61,12 +61,16 @@ export function useAppTitle(chatsRef: useAppTitle_chats$key | null): void {
   const lastCountRef = useRef<number>(0);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const totalUnread = useMemo(() => {
+  const totalUnread = useMemo((): number => {
     if (!data?.chats) return 0;
-    return data.chats.reduce((acc, chat) => acc + (chat.unreadCount || 0), 0);
+    return data.chats.reduce(
+      (acc: number, chat: { readonly unreadCount: number | null }) =>
+        acc + (chat.unreadCount || 0),
+      0,
+    );
   }, [data]);
 
-  useLayoutEffect(() => {
+  useLayoutEffect((): (() => void) | void => {
     const baseTitle = "Aerogram";
 
     if (!isAuth) {
@@ -75,8 +79,9 @@ export function useAppTitle(chatsRef: useAppTitle_chats$key | null): void {
       return;
     }
 
-    const displayCount = totalUnread > 99 ? "99+" : totalUnread.toString();
-    const formattedTitle =
+    const displayCount: string =
+      totalUnread > 99 ? "99+" : totalUnread.toString();
+    const formattedTitle: string =
       totalUnread > 0 ? `(${displayCount}) ${baseTitle}` : baseTitle;
 
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
@@ -87,7 +92,7 @@ export function useAppTitle(chatsRef: useAppTitle_chats$key | null): void {
       document.hidden
     ) {
       document.title = `• ${formattedTitle}`;
-      flashTimerRef.current = setTimeout(() => {
+      flashTimerRef.current = setTimeout((): void => {
         document.title = formattedTitle;
       }, 3000);
     } else {
@@ -97,13 +102,13 @@ export function useAppTitle(chatsRef: useAppTitle_chats$key | null): void {
     updateFaviconWithBadge(totalUnread);
     lastCountRef.current = totalUnread;
 
-    const onFocus = () => {
+    const onFocus = (): void => {
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
       document.title = formattedTitle;
     };
 
     window.addEventListener("focus", onFocus);
-    return () => {
+    return (): void => {
       window.removeEventListener("focus", onFocus);
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     };

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d2d8e1219f574ae7bb5be4b2743ff106>>
+ * @generated SignedSource<<8a42e6c4bd795f36f2b2043990f8f948>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,6 +16,17 @@ export type useGlobalSubscriptionsMessageAddedSubscription$data = {
   readonly messageAdded: {
     readonly chatId: string;
     readonly id: string;
+    readonly isEdited: boolean;
+    readonly replyTo: {
+      readonly id: string;
+      readonly sender: {
+        readonly displayName: string | null | undefined;
+        readonly firstName: string;
+        readonly id: string;
+        readonly lastName: string | null | undefined;
+      } | null | undefined;
+      readonly text: string;
+    } | null | undefined;
     readonly sender: {
       readonly displayName: string | null | undefined;
       readonly firstName: string;
@@ -48,7 +59,35 @@ v1 = {
   "name": "id",
   "storageKey": null
 },
-v2 = [
+v2 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "text",
+  "storageKey": null
+},
+v3 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "firstName",
+  "storageKey": null
+},
+v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "lastName",
+  "storageKey": null
+},
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "displayName",
+  "storageKey": null
+},
+v6 = [
   {
     "alias": null,
     "args": [
@@ -71,13 +110,7 @@ v2 = [
         "name": "chatId",
         "storageKey": null
       },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "text",
-        "storageKey": null
-      },
+      (v2/*: any*/),
       {
         "alias": null,
         "args": null,
@@ -95,26 +128,21 @@ v2 = [
       {
         "alias": null,
         "args": null,
+        "kind": "ScalarField",
+        "name": "isEdited",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
         "concreteType": "User",
         "kind": "LinkedField",
         "name": "sender",
         "plural": false,
         "selections": [
           (v1/*: any*/),
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "firstName",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "lastName",
-            "storageKey": null
-          },
+          (v3/*: any*/),
+          (v4/*: any*/),
           {
             "alias": null,
             "args": null,
@@ -122,11 +150,33 @@ v2 = [
             "name": "photoUrl",
             "storageKey": null
           },
+          (v5/*: any*/)
+        ],
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "Message",
+        "kind": "LinkedField",
+        "name": "replyTo",
+        "plural": false,
+        "selections": [
+          (v1/*: any*/),
+          (v2/*: any*/),
           {
             "alias": null,
             "args": null,
-            "kind": "ScalarField",
-            "name": "displayName",
+            "concreteType": "User",
+            "kind": "LinkedField",
+            "name": "sender",
+            "plural": false,
+            "selections": [
+              (v1/*: any*/),
+              (v3/*: any*/),
+              (v4/*: any*/),
+              (v5/*: any*/)
+            ],
             "storageKey": null
           }
         ],
@@ -142,7 +192,7 @@ return {
     "kind": "Fragment",
     "metadata": null,
     "name": "useGlobalSubscriptionsMessageAddedSubscription",
-    "selections": (v2/*: any*/),
+    "selections": (v6/*: any*/),
     "type": "Subscription",
     "abstractKey": null
   },
@@ -151,19 +201,19 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
     "name": "useGlobalSubscriptionsMessageAddedSubscription",
-    "selections": (v2/*: any*/)
+    "selections": (v6/*: any*/)
   },
   "params": {
-    "cacheID": "5dc6fa8b873a98a71f4f8e331d4acee6",
+    "cacheID": "53efc5df9f8987796dac1d391dac59ce",
     "id": null,
     "metadata": {},
     "name": "useGlobalSubscriptionsMessageAddedSubscription",
     "operationKind": "subscription",
-    "text": "subscription useGlobalSubscriptionsMessageAddedSubscription(\n  $chatId: ID!\n) {\n  messageAdded(chatId: $chatId) {\n    id\n    chatId\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      photoUrl\n      displayName\n    }\n  }\n}\n"
+    "text": "subscription useGlobalSubscriptionsMessageAddedSubscription(\n  $chatId: ID!\n) {\n  messageAdded(chatId: $chatId) {\n    id\n    chatId\n    text\n    sentAt\n    sequence\n    isEdited\n    sender {\n      id\n      firstName\n      lastName\n      photoUrl\n      displayName\n    }\n    replyTo {\n      id\n      text\n      sender {\n        id\n        firstName\n        lastName\n        displayName\n      }\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "f9c1857ad7bc576a6fa2046a2520b1dd";
+(node as any).hash = "947095cb852e476577b69076a77b094b";
 
 export default node;

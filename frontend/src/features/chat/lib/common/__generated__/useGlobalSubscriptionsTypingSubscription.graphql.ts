@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<8a52bb39d10bebbc155d547d6f91b888>>
+ * @generated SignedSource<<58cb60d0a63d14e8288a68fc2d81ec98>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -10,7 +10,7 @@
 
 import { ConcreteRequest } from 'relay-runtime';
 export type useGlobalSubscriptionsTypingSubscription$variables = {
-  chatID: string;
+  chatId: string;
 };
 export type useGlobalSubscriptionsTypingSubscription$data = {
   readonly userTyping: {
@@ -28,7 +28,7 @@ var v0 = [
   {
     "defaultValue": null,
     "kind": "LocalArgument",
-    "name": "chatID"
+    "name": "chatId"
   }
 ],
 v1 = [
@@ -38,7 +38,7 @@ v1 = [
       {
         "kind": "Variable",
         "name": "chatID",
-        "variableName": "chatID"
+        "variableName": "chatId"
       }
     ],
     "concreteType": "TypingPayload",
@@ -82,16 +82,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "9ea67a06c9d57b16471296a1379ac10a",
+    "cacheID": "136dd832eb5086338c624ebc5ae1ce8e",
     "id": null,
     "metadata": {},
     "name": "useGlobalSubscriptionsTypingSubscription",
     "operationKind": "subscription",
-    "text": "subscription useGlobalSubscriptionsTypingSubscription(\n  $chatID: ID!\n) {\n  userTyping(chatID: $chatID) {\n    userId\n    isTyping\n  }\n}\n"
+    "text": "subscription useGlobalSubscriptionsTypingSubscription(\n  $chatId: ID!\n) {\n  userTyping(chatID: $chatId) {\n    userId\n    isTyping\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "5d4d67d7c5978a3b01ff25e34484d27c";
+(node as any).hash = "a6943a2069a5b85b573e97d1e9646587";
 
 export default node;
