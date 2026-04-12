@@ -159,9 +159,8 @@ export function AppSidebar(): React.ReactNode {
   const navigate = useNavigate();
   const { chatId } = useParams({ strict: false });
   const pathname: string = useRouterState().location.pathname;
-  const isWsConnected: boolean = useConnectionStore(
-    (s: { isWsConnected: boolean }): boolean => s.isWsConnected,
-  );
+  const isWsConnected: boolean = useConnectionStore((s) => s.isWsConnected);
+  const isUpdating: boolean = useConnectionStore((s) => s.isUpdating);
   const isMobile: boolean = useIsMobile();
 
   const data: appSidebarQuery$data = useLazyLoadQuery<AppSidebarQueryType>(
@@ -363,16 +362,23 @@ export function AppSidebar(): React.ReactNode {
       >
         <SidebarHeader className="px-4 pt-3 shrink-0 bg-background border-none">
           <div className="flex items-center justify-between h-8 relative">
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none w-full flex justify-center">
               {!isWsConnected ? (
-                <div className="flex items-center gap-1.5 animate-in fade-in duration-300">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                  <span className="text-[13px] font-bold text-muted-foreground">
+                <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-300">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-[16px] font-bold tracking-tight text-foreground">
                     Connecting
                   </span>
                 </div>
+              ) : isUpdating ? (
+                <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-300">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-[16px] font-bold tracking-tight text-foreground">
+                    Updating
+                  </span>
+                </div>
               ) : (
-                <h1 className="text-[16px] font-bold tracking-tight animate-in fade-in duration-300">
+                <h1 className="text-[16px] font-bold tracking-tight text-foreground animate-in fade-in duration-300">
                   Chats
                 </h1>
               )}

@@ -11,26 +11,26 @@ import {
   type GraphQLSingularResponse,
 } from "relay-runtime";
 import { createClient, type Client } from "graphql-ws";
-import { useConnectionStore } from "@/store/connection";
 import { useAuthStore } from "@/store/auth-store";
+import { useConnectionStore } from "@/store/connection";
 import { toast } from "sonner";
 import { logger } from "@/shared/lib/logger";
 
-interface RefreshResponse {
-  data?: {
-    refreshToken?: {
-      accessToken: string;
-      refreshToken: string;
-    };
-  };
-}
+const HTTP_ENDPOINT: string =
+  import.meta.env.VITE_API_URL || "https://localhost:8080/query";
+const WS_ENDPOINT: string =
+  import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
+const THROTTLE_MS: number = 5000;
 
-const HTTP_ENDPOINT: string = "https://localhost:8080/query";
-const WS_ENDPOINT: string = "wss://localhost:8080/query";
+const inFlightRequests: Map<string, Promise<GraphQLResponse>> = new Map();
 
 let refreshPromise: Promise<string | null> | null = null;
-let lastRateLimitTime: number = 0;
-const THROTTLE_MS: number = 5000;
+let lastRateLimitNotification: number = 0;
+
+const getAuthHeaders = (token: string | null): Record<string, string> => ({
+  "Content-Type": "application/json",
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+});
 
 const wsClient: Client = createClient({
   url: WS_ENDPOINT,
@@ -43,18 +43,20 @@ const wsClient: Client = createClient({
   on: {
     connected: (): void => {
       logger.ws("Handshake established");
-      useConnectionStore.getState().setIsWsConnected(true);
+      Promise.resolve().then((): void => {
+        useConnectionStore.getState().setIsWsConnected(true);
+      });
     },
     closed: (): void => {
-      useConnectionStore.getState().setIsWsConnected(false);
+      Promise.resolve().then((): void => {
+        useConnectionStore.getState().setIsWsConnected(false);
+      });
     },
-    error: (err: unknown): void => {
-      logger.error("WS", "Connection error", err);
-    },
+    error: (err: unknown): void => logger.error("WS", "Connection error", err),
   },
 });
 
-function isUnauthorized(payload: GraphQLResponse): boolean {
+function hasUnauthorizedError(response: GraphQLResponse): boolean {
   const check = (res: GraphQLSingularResponse): boolean => {
     if (
       typeof res === "object" &&
@@ -63,124 +65,147 @@ function isUnauthorized(payload: GraphQLResponse): boolean {
       Array.isArray(res.errors)
     ) {
       return res.errors.some(
-        (e: { message?: string }): boolean =>
-          e.message?.toLowerCase().includes("unauthorized") ?? false,
+        (err: { message?: string }): boolean =>
+          err.message?.toLowerCase().includes("unauthorized") ?? false,
       );
     }
     return false;
   };
 
-  if (Array.isArray(payload)) {
-    return payload.some((item: GraphQLSingularResponse): boolean =>
+  if (Array.isArray(response)) {
+    return response.some((item: GraphQLSingularResponse): boolean =>
       check(item),
     );
   }
-  return check(payload as GraphQLSingularResponse);
+  return check(response as GraphQLSingularResponse);
+}
+
+async function performFetch(
+  params: RequestParameters,
+  variables: Variables,
+  token: string | null,
+): Promise<GraphQLResponse> {
+  const response: Response = await fetch(HTTP_ENDPOINT, {
+    method: "POST",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify({
+      query: params.text,
+      variables,
+    }),
+  });
+
+  if (response.status === 429) {
+    const now: number = Date.now();
+    if (now - lastRateLimitNotification > THROTTLE_MS) {
+      toast.error("Rate limit exceeded. Slow down a bit.");
+      lastRateLimitNotification = now;
+    }
+    throw new Error("RATE_LIMIT");
+  }
+
+  if (!response.ok) {
+    throw new Error(`SERVER_ERROR_${response.status}`);
+  }
+
+  return response.json() as Promise<GraphQLResponse>;
+}
+
+async function executeRefresh(): Promise<string | null> {
+  try {
+    const rt: string | null = useAuthStore.getState().refreshToken;
+    if (!rt) return null;
+
+    const res: Response = await fetch(HTTP_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `mutation RefreshToken($token: String!) {
+          refreshToken(token: $token) { accessToken refreshToken }
+        }`,
+        variables: { token: rt },
+      }),
+    });
+
+    const json: {
+      data?: { refreshToken?: { accessToken: string; refreshToken: string } };
+    } = await res.json();
+    const tokens = json.data?.refreshToken;
+
+    if (tokens) {
+      useAuthStore
+        .getState()
+        .setTokens(tokens.accessToken, tokens.refreshToken);
+      return tokens.accessToken;
+    }
+    return null;
+  } catch (err: unknown) {
+    logger.error("AUTH", "Refresh failed", err);
+    return null;
+  } finally {
+    refreshPromise = null;
+  }
 }
 
 async function fetchRelay(
   params: RequestParameters,
   variables: Variables,
 ): Promise<GraphQLResponse> {
-  const handleRateLimit = (): void => {
-    const now: number = Date.now();
-    if (now - lastRateLimitTime > THROTTLE_MS) {
-      logger.error(
-        "NETWORK",
-        "Rate Limit Exceeded (429) - Throttling notifications",
-      );
-      toast.error("Rate limit exceeded. Please wait a moment.");
-      lastRateLimitTime = now;
-    }
-  };
+  const cacheKey: string = `${params.id ?? params.text}-${JSON.stringify(variables)}`;
+  const setIsUpdating = useConnectionStore.getState().setIsUpdating;
+  const isQuery: boolean = params.operationKind === "query";
 
-  const send = async (t: string | null): Promise<Response> => {
-    const res: Response = await fetch(HTTP_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(t ? { Authorization: `Bearer ${t}` } : {}),
-      },
-      body: JSON.stringify({ query: params.text, variables }),
-    });
-
-    if (res.status === 429) {
-      handleRateLimit();
-      throw new Error("RATE_LIMIT_EXCEEDED");
-    }
-
-    return res;
-  };
-
-  const initialToken: string | null = useAuthStore.getState().accessToken;
-
-  logger.relay(`Fetch: ${params.name}`, { variables });
-
-  const response: Response = await send(initialToken);
-
-  if (!response.ok) {
-    const errorText: string = await response.text();
-    logger.error("NETWORK", `HTTP ${response.status}: ${response.statusText}`, {
-      errorText,
-      operation: params.name,
-    });
-    throw new Error(`NETWORK_ERROR_${response.status}`);
+  const pending: Promise<GraphQLResponse> | undefined =
+    inFlightRequests.get(cacheKey);
+  if (pending) {
+    logger.relay(`Deduplicated: ${params.name}`);
+    return pending;
   }
 
-  const json: GraphQLResponse = (await response.json()) as GraphQLResponse;
+  if (isQuery) {
+    Promise.resolve().then((): void => {
+      setIsUpdating(true);
+    });
+  }
 
-  if (isUnauthorized(json)) {
-    logger.auth("Unauthorized response detected, attempting refresh...");
+  const runExecution = async (): Promise<GraphQLResponse> => {
+    try {
+      const token: string | null = useAuthStore.getState().accessToken;
+      logger.relay(`Fetch: ${params.name}`);
 
-    if (!refreshPromise) {
-      refreshPromise = (async (): Promise<string | null> => {
-        try {
-          const rt: string | null = useAuthStore.getState().refreshToken;
-          if (!rt) return null;
+      let json: GraphQLResponse = await performFetch(params, variables, token);
 
-          const res: Response = await fetch(HTTP_ENDPOINT, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              query: `mutation { refreshToken(token: "${rt}") { accessToken refreshToken } }`,
-            }),
-          });
-
-          if (res.status === 429) {
-            handleRateLimit();
-            return null;
-          }
-
-          const refreshData: RefreshResponse =
-            (await res.json()) as RefreshResponse;
-          const tokens = refreshData.data?.refreshToken;
-
-          if (tokens) {
-            useAuthStore
-              .getState()
-              .setTokens(tokens.accessToken, tokens.refreshToken);
-            logger.auth("Tokens refreshed successfully");
-            return tokens.accessToken;
-          }
-          return null;
-        } catch (e: unknown) {
-          logger.error("AUTH", "Token refresh process failed", e);
-          return null;
-        } finally {
-          refreshPromise = null;
+      if (hasUnauthorizedError(json)) {
+        if (!refreshPromise) {
+          refreshPromise = executeRefresh();
         }
-      })();
-    }
 
-    const newToken: string | null = await refreshPromise;
-    if (newToken) {
-      logger.relay(`Retrying: ${params.name} with new token`);
-      const retryResponse: Response = await send(newToken);
-      return (await retryResponse.json()) as GraphQLResponse;
-    }
-  }
+        const newToken: string | null = await refreshPromise;
+        if (newToken) {
+          logger.auth(`Retrying ${params.name} with new token`);
+          json = await performFetch(params, variables, newToken);
+        }
+      }
 
-  return json;
+      return json;
+    } finally {
+      if (isQuery) {
+        Promise.resolve().then((): void => {
+          setIsUpdating(false);
+        });
+      }
+
+      const current: Promise<GraphQLResponse> | undefined =
+        inFlightRequests.get(cacheKey);
+      if (current === executionPromise) {
+        inFlightRequests.delete(cacheKey);
+      }
+    }
+  };
+
+  const executionPromise: Promise<GraphQLResponse> = runExecution();
+  inFlightRequests.set(cacheKey, executionPromise);
+
+  return executionPromise;
 }
 
 const subscribe: SubscribeFunction = (
@@ -189,35 +214,31 @@ const subscribe: SubscribeFunction = (
 ): Observable<GraphQLResponse> => {
   return Observable.create((sink): (() => void) => {
     if (!operation.text) {
-      sink.error(new Error("Operation text is missing"));
+      sink.error(new Error("No query text"));
       return (): void => {};
     }
 
-    logger.ws(`Subscribing: ${operation.name}`, { variables });
+    logger.ws(`Subscribing: ${operation.name}`);
 
-    const unsubscribe: () => void = wsClient.subscribe(
+    return wsClient.subscribe(
       { query: operation.text, variables },
       {
-        next: (data: unknown): void => {
-          sink.next(data as GraphQLResponse);
-        },
+        next: (data: unknown): void => sink.next(data as GraphQLResponse),
         error: (err: unknown): void => {
-          logger.error("WS", `Subscription error in ${operation.name}`, err);
+          logger.error("WS", `Sub Error: ${operation.name}`, err);
           sink.error(err as Error);
         },
-        complete: (): void => {
-          sink.complete();
-        },
+        complete: (): void => sink.complete(),
       },
     );
-
-    return unsubscribe;
   });
 };
 
-const environment: Environment = new Environment({
+export const environment: Environment = new Environment({
   network: Network.create(fetchRelay, subscribe),
-  store: new Store(new RecordSource()),
+  store: new Store(new RecordSource(), {
+    gcReleaseBufferSize: 10,
+  }),
 });
 
 export default environment;
