@@ -13,6 +13,7 @@ import {
 import { createClient, type Client } from "graphql-ws";
 import { useConnectionStore } from "@/store/connection";
 import { useAuthStore } from "@/store/auth-store";
+import { toast } from "sonner";
 
 interface RefreshResponse {
   data?: {
@@ -27,6 +28,8 @@ const HTTP_ENDPOINT: string = "https://localhost:8080/query";
 const WS_ENDPOINT: string = "wss://localhost:8080/query";
 
 let refreshPromise: Promise<string | null> | null = null;
+let lastRateLimitTime: number = 0;
+const THROTTLE_MS: number = 5000;
 
 const log = {
   info: (ns: string, msg: string, d?: unknown): void => {
@@ -105,10 +108,22 @@ async function fetchRelay(
   params: RequestParameters,
   variables: Variables,
 ): Promise<GraphQLResponse> {
-  const token: string | null = useAuthStore.getState().accessToken;
+  const handleRateLimit = (): void => {
+    const now: number = Date.now();
+    if (now - lastRateLimitTime > THROTTLE_MS) {
+      console.groupCollapsed(
+        "%c[Network] Rate Limit Exceeded (429)",
+        "color: #ef4444",
+      );
+      console.error("Too many requests. Throttling toasts and logs.");
+      console.groupEnd();
+      toast.error("Rate limit exceeded. Please wait a moment.");
+      lastRateLimitTime = now;
+    }
+  };
 
   const send = async (t: string | null): Promise<Response> => {
-    return fetch(HTTP_ENDPOINT, {
+    const res: Response = await fetch(HTTP_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -116,13 +131,26 @@ async function fetchRelay(
       },
       body: JSON.stringify({ query: params.text, variables }),
     });
+
+    if (res.status === 429) {
+      handleRateLimit();
+      throw new Error("RATE_LIMIT_EXCEEDED");
+    }
+
+    return res;
   };
 
-  const response: Response = await send(token);
+  const initialToken: string | null = useAuthStore.getState().accessToken;
+  const response: Response = await send(initialToken);
 
-  if (response.status === 429) {
-    log.error("Network", "HTTP 429: Too Many Requests. Stopping retry cycle.");
-    throw new Error("RATE_LIMIT_EXCEEDED");
+  if (!response.ok) {
+    const errorText: string = await response.text();
+    log.error(
+      "Network",
+      `HTTP ${response.status}: ${response.statusText}`,
+      errorText,
+    );
+    throw new Error(`NETWORK_ERROR_${response.status}`);
   }
 
   const json: GraphQLResponse = (await response.json()) as GraphQLResponse;
@@ -141,6 +169,11 @@ async function fetchRelay(
               query: `mutation { refreshToken(token: "${rt}") { accessToken refreshToken } }`,
             }),
           });
+
+          if (res.status === 429) {
+            handleRateLimit();
+            return null;
+          }
 
           const refreshData: RefreshResponse =
             (await res.json()) as RefreshResponse;
