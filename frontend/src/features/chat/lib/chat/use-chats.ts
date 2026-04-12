@@ -13,21 +13,7 @@ const myChatsQuery = graphql`
         ...useAppTitle_chats
         chats {
           id
-          title
-          photoUrl
-          unreadCount
-          lastMessage {
-            id
-            text
-            sentAt
-            sequence
-            sender {
-              id
-              firstName
-              lastName
-              displayName
-            }
-          }
+          ...chatMenuItem_chat
         }
       }
       ... on ForbiddenError {
@@ -46,11 +32,14 @@ const chatDetailsQuery = graphql`
       __typename
       ... on Chat {
         ...useMarkDialog_chat
+        ...chatMenuItem_chat
         id
         title
         type
         photoUrl
         membersCount
+        unreadCount
+        isPinned
         lastReadSequence
         members {
           user {
@@ -60,6 +49,8 @@ const chatDetailsQuery = graphql`
             photoUrl
             displayName
             isBot
+            status
+            isVerified
             ...chatHeader_user
           }
         }

@@ -42,6 +42,13 @@ interface ExtendedUser extends Omit<User, "lastName"> {
   displayName?: string | null;
 }
 
+interface ChatStoreState {
+  input: string;
+  setInput: (val: string) => void;
+  resetInput: () => void;
+  setActiveChatId: (id: string | null) => void;
+}
+
 export const Route = createFileRoute("/_authenticated/chat/$chatId")({
   component: ChatRoute,
 });
@@ -57,7 +64,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
 
-  const { input, setInput, resetInput, setActiveChatId } = useChatStore();
+  const { input, setInput, resetInput, setActiveChatId } =
+    useChatStore() as ChatStoreState;
   const inputRef: MutableRefObject<string> = useRef<string>(input);
 
   useEffect((): void => {
@@ -69,7 +77,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const chatsData: MyChatsResponse = useMyChats();
 
   const me: User | undefined = meData?.me as unknown as User | undefined;
-
   const chatRaw: ChatDetailsResponse["chat"] = chatData.chat;
   const isChatType: boolean = chatRaw?.__typename === "Chat";
   const chat: Chat | undefined = isChatType
@@ -246,6 +253,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
                 ? (Number(allMessages[allMessages.length - 1].sequence) || 0) +
                   1
                 : 1,
+            isEdited: false,
             sender: {
               id: extendedMe.id,
               firstName: extendedMe.firstName,
@@ -253,6 +261,18 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
               photoUrl: extendedMe.photoUrl ?? null,
               displayName: extendedMe.displayName ?? extendedMe.firstName,
             },
+            replyTo: originalReply
+              ? {
+                  id: originalReply.id,
+                  text: originalReply.text,
+                  sender: {
+                    id: originalReply.sender.id,
+                    firstName: originalReply.sender.firstName,
+                    lastName: originalReply.sender.lastName ?? null,
+                    displayName: originalReply.sender.displayName,
+                  },
+                }
+              : null,
           },
         } as useMessageActionsSendMutation$data,
       }).catch((): void => {
@@ -296,7 +316,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }
 
   return (
-    <div className="flex flex-col h-dvh bg-background w-full fixed inset-0 z-60 md:relative md:z-auto overflow-hidden">
+    <div className="flex flex-col h-full bg-background w-full overflow-hidden">
       <ChatHeader
         title={chat?.title ?? undefined}
         photoUrl={chat?.photoUrl ?? undefined}
@@ -306,11 +326,12 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         isLoading={isInitialLoading}
       />
 
-      <main className="flex-1 relative min-h-0 bg-background overflow-y-auto">
+      <main className="flex-1 relative min-h-0 bg-background overflow-hidden">
         {isInitialLoading ? (
-          <div className="absolute inset-0 p-6 flex flex-col gap-6">
+          <div className="absolute inset-0 p-4 flex flex-col gap-6">
             <Skeleton className="h-10 w-[60%] self-end rounded-2xl rounded-tr-none" />
             <Skeleton className="h-10 w-[50%] self-start rounded-2xl rounded-tl-none" />
+            <Skeleton className="h-10 w-[70%] self-end rounded-2xl rounded-tr-none" />
           </div>
         ) : allMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-6 text-center">

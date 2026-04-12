@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9ef59df4fa2ff47ddbfe23740728855d>>
+ * @generated SignedSource<<1ca2889bdaae7c33b1458c4728f3b035>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,21 +16,7 @@ export type useChatsMyChatsQuery$data = {
     readonly __typename: "ChatList";
     readonly chats: ReadonlyArray<{
       readonly id: string;
-      readonly lastMessage: {
-        readonly id: string;
-        readonly sender: {
-          readonly displayName: string | null | undefined;
-          readonly firstName: string;
-          readonly id: string;
-          readonly lastName: string | null | undefined;
-        } | null | undefined;
-        readonly sentAt: string;
-        readonly sequence: any;
-        readonly text: string;
-      } | null | undefined;
-      readonly photoUrl: string | null | undefined;
-      readonly title: string;
-      readonly unreadCount: number;
+      readonly " $fragmentSpreads": FragmentRefs<"chatMenuItem_chat">;
     }>;
     readonly " $fragmentSpreads": FragmentRefs<"useAppTitle_chats">;
   } | {
@@ -65,94 +51,7 @@ v1 = {
   "name": "id",
   "storageKey": null
 },
-v2 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "title",
-  "storageKey": null
-},
-v3 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "photoUrl",
-  "storageKey": null
-},
-v4 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "unreadCount",
-  "storageKey": null
-},
-v5 = {
-  "alias": null,
-  "args": null,
-  "concreteType": "Message",
-  "kind": "LinkedField",
-  "name": "lastMessage",
-  "plural": false,
-  "selections": [
-    (v1/*: any*/),
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "text",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "sentAt",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "sequence",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "User",
-      "kind": "LinkedField",
-      "name": "sender",
-      "plural": false,
-      "selections": [
-        (v1/*: any*/),
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "firstName",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "lastName",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "displayName",
-          "storageKey": null
-        }
-      ],
-      "storageKey": null
-    }
-  ],
-  "storageKey": null
-},
-v6 = [
+v2 = [
   {
     "alias": null,
     "args": null,
@@ -161,17 +60,45 @@ v6 = [
     "storageKey": null
   }
 ],
-v7 = {
+v3 = {
   "kind": "InlineFragment",
-  "selections": (v6/*: any*/),
+  "selections": (v2/*: any*/),
   "type": "ForbiddenError",
   "abstractKey": null
 },
-v8 = {
+v4 = {
   "kind": "InlineFragment",
-  "selections": (v6/*: any*/),
+  "selections": (v2/*: any*/),
   "type": "InternalError",
   "abstractKey": null
+},
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "photoUrl",
+  "storageKey": null
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "firstName",
+  "storageKey": null
+},
+v7 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "lastName",
+  "storageKey": null
+},
+v8 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "username",
+  "storageKey": null
 };
 return {
   "fragment": {
@@ -206,10 +133,11 @@ return {
                 "plural": true,
                 "selections": [
                   (v1/*: any*/),
-                  (v2/*: any*/),
-                  (v3/*: any*/),
-                  (v4/*: any*/),
-                  (v5/*: any*/)
+                  {
+                    "args": null,
+                    "kind": "FragmentSpread",
+                    "name": "chatMenuItem_chat"
+                  }
                 ],
                 "storageKey": null
               }
@@ -217,8 +145,8 @@ return {
             "type": "ChatList",
             "abstractKey": null
           },
-          (v7/*: any*/),
-          (v8/*: any*/)
+          (v3/*: any*/),
+          (v4/*: any*/)
         ],
         "storageKey": null
       }
@@ -252,11 +180,139 @@ return {
                 "name": "chats",
                 "plural": true,
                 "selections": [
-                  (v4/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "unreadCount",
+                    "storageKey": null
+                  },
                   (v1/*: any*/),
-                  (v2/*: any*/),
-                  (v3/*: any*/),
-                  (v5/*: any*/)
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "title",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "type",
+                    "storageKey": null
+                  },
+                  (v5/*: any*/),
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "isPinned",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "lastReadSequence",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "Message",
+                    "kind": "LinkedField",
+                    "name": "lastMessage",
+                    "plural": false,
+                    "selections": [
+                      (v1/*: any*/),
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "text",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "sentAt",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "sequence",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "sender",
+                        "plural": false,
+                        "selections": [
+                          (v1/*: any*/),
+                          (v6/*: any*/),
+                          (v7/*: any*/),
+                          (v8/*: any*/),
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "displayName",
+                            "storageKey": null
+                          }
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "ChatMember",
+                    "kind": "LinkedField",
+                    "name": "members",
+                    "plural": true,
+                    "selections": [
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "User",
+                        "kind": "LinkedField",
+                        "name": "user",
+                        "plural": false,
+                        "selections": [
+                          (v1/*: any*/),
+                          (v6/*: any*/),
+                          (v7/*: any*/),
+                          (v8/*: any*/),
+                          (v5/*: any*/),
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "isVerified",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "status",
+                            "storageKey": null
+                          }
+                        ],
+                        "storageKey": null
+                      }
+                    ],
+                    "storageKey": null
+                  }
                 ],
                 "storageKey": null
               }
@@ -264,24 +320,24 @@ return {
             "type": "ChatList",
             "abstractKey": null
           },
-          (v7/*: any*/),
-          (v8/*: any*/)
+          (v3/*: any*/),
+          (v4/*: any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "3069401f8f6c3e9e28f55e9d1784e47d",
+    "cacheID": "4df55dba7c2dba6f6b18c42712ba9803",
     "id": null,
     "metadata": {},
     "name": "useChatsMyChatsQuery",
     "operationKind": "query",
-    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      ...useAppTitle_chats\n      chats {\n        id\n        title\n        photoUrl\n        unreadCount\n        lastMessage {\n          id\n          text\n          sentAt\n          sequence\n          sender {\n            id\n            firstName\n            lastName\n            displayName\n          }\n        }\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n\nfragment useAppTitle_chats on ChatList {\n  chats {\n    unreadCount\n    id\n  }\n}\n"
+    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      ...useAppTitle_chats\n      chats {\n        id\n        ...chatMenuItem_chat\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useAppTitle_chats on ChatList {\n  chats {\n    unreadCount\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "37cc639b9844402aa25b455680454f10";
+(node as any).hash = "2f6677c8a166ff8d8b55092182484224";
 
 export default node;

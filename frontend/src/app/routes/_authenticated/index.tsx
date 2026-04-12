@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMyChats, useMe } from "@/features/chat/lib";
 import { ChatMenuItem } from "@/features/chat/ui/chat-menu-item";
 import type { Chat } from "@/entities/chat/model/types";
+import type { chatMenuItem_chat$key } from "@/features/chat/ui/__generated__/chatMenuItem_chat.graphql";
 
 export const Route = createFileRoute("/_authenticated/")({
   component: IndexComponent,
@@ -26,14 +27,16 @@ function IndexComponent(): React.ReactNode {
           <h1 className="text-2xl font-bold tracking-tight">Chats</h1>
         </header>
         <div className="flex-1 overflow-y-auto px-2 pb-20">
-          {chats.map((chat: Chat) => (
-            <ChatMenuItem
-              key={chat.id}
-              chat={chat}
-              isActive={false}
-              myId={userData?.me?.id}
-            />
-          ))}
+          {chats.map(
+            (chat: Chat): React.ReactNode => (
+              <ChatMenuItem
+                key={chat.id}
+                chat={chat as unknown as chatMenuItem_chat$key}
+                isActive={false}
+                myId={userData?.me?.id}
+              />
+            ),
+          )}
         </div>
       </div>
 

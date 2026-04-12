@@ -26,7 +26,7 @@ export function SubscriptionManager(): ReactNode {
 
   const chats: readonly Chat[] =
     chatsData?.myChats?.__typename === "ChatList"
-      ? (chatsData.myChats.chats as readonly Chat[])
+      ? (chatsData.myChats.chats as unknown as readonly Chat[])
       : [];
 
   useEffect((): void => {
