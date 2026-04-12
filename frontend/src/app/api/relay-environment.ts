@@ -71,6 +71,9 @@ const wsClient: Client = createClient({
     closed: (): void => {
       useConnectionStore.getState().setIsWsConnected(false);
     },
+    error: (err: unknown): void => {
+      log.error("Network:WS", "Connection error", err);
+    },
   },
 });
 
@@ -82,15 +85,18 @@ function isUnauthorized(payload: GraphQLResponse): boolean {
       "errors" in res &&
       Array.isArray(res.errors)
     ) {
-      return res.errors.some((e: { message?: string }) =>
-        e.message?.toLowerCase().includes("unauthorized"),
+      return res.errors.some(
+        (e: { message?: string }): boolean =>
+          e.message?.toLowerCase().includes("unauthorized") ?? false,
       );
     }
     return false;
   };
 
   if (Array.isArray(payload)) {
-    return payload.some((item: GraphQLSingularResponse) => check(item));
+    return payload.some((item: GraphQLSingularResponse): boolean =>
+      check(item),
+    );
   }
   return check(payload as GraphQLSingularResponse);
 }
@@ -112,40 +118,55 @@ async function fetchRelay(
     });
   };
 
-  let response: Response = await send(token);
-  let json: GraphQLResponse = (await response.json()) as GraphQLResponse;
+  const response: Response = await send(token);
 
-  if (isUnauthorized(json) && !refreshPromise) {
-    refreshPromise = (async (): Promise<string | null> => {
-      const rt: string | null = useAuthStore.getState().refreshToken;
-      if (!rt) return null;
+  if (response.status === 429) {
+    log.error("Network", "HTTP 429: Too Many Requests. Stopping retry cycle.");
+    throw new Error("RATE_LIMIT_EXCEEDED");
+  }
 
-      const res: Response = await fetch(HTTP_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: `mutation { refreshToken(token: "${rt}") { accessToken refreshToken } }`,
-        }),
-      });
+  const json: GraphQLResponse = (await response.json()) as GraphQLResponse;
 
-      const refreshData: RefreshResponse =
-        (await res.json()) as RefreshResponse;
-      const tokens = refreshData.data?.refreshToken;
-      if (tokens) {
-        useAuthStore
-          .getState()
-          .setTokens(tokens.accessToken, tokens.refreshToken);
-        log.success("Auth", "Tokens refreshed successfully");
-        return tokens.accessToken;
-      }
-      return null;
-    })();
+  if (isUnauthorized(json)) {
+    if (!refreshPromise) {
+      refreshPromise = (async (): Promise<string | null> => {
+        try {
+          const rt: string | null = useAuthStore.getState().refreshToken;
+          if (!rt) return null;
+
+          const res: Response = await fetch(HTTP_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: `mutation { refreshToken(token: "${rt}") { accessToken refreshToken } }`,
+            }),
+          });
+
+          const refreshData: RefreshResponse =
+            (await res.json()) as RefreshResponse;
+          const tokens = refreshData.data?.refreshToken;
+
+          if (tokens) {
+            useAuthStore
+              .getState()
+              .setTokens(tokens.accessToken, tokens.refreshToken);
+            log.success("Auth", "Tokens refreshed");
+            return tokens.accessToken;
+          }
+          return null;
+        } catch (e: unknown) {
+          log.error("Auth", "Refresh failed", e);
+          return null;
+        } finally {
+          refreshPromise = null;
+        }
+      })();
+    }
 
     const newToken: string | null = await refreshPromise;
-    refreshPromise = null;
     if (newToken) {
-      response = await send(newToken);
-      json = (await response.json()) as GraphQLResponse;
+      const retryResponse: Response = await send(newToken);
+      return (await retryResponse.json()) as GraphQLResponse;
     }
   }
 
@@ -156,31 +177,31 @@ const subscribe: SubscribeFunction = (
   operation: RequestParameters,
   variables: Variables,
 ): Observable<GraphQLResponse> => {
-  return Observable.create((sink) => {
+  return Observable.create((sink): (() => void) => {
     if (!operation.text) {
       sink.error(new Error("Operation text is missing"));
-      return;
+      return (): void => {};
     }
 
     log.info("Network:WS", `Subscribing: ${operation.name}`, { variables });
 
-    return wsClient.subscribe(
+    const unsubscribe: () => void = wsClient.subscribe(
       { query: operation.text, variables },
       {
         next: (data: unknown): void => {
-          log.success("Network:WS", `Update: ${operation.name}`, data);
           sink.next(data as GraphQLResponse);
         },
         error: (err: unknown): void => {
-          log.error("Network:WS", `Error: ${operation.name}`, err);
+          log.error("Network:WS", `Error in ${operation.name}`, err);
           sink.error(err as Error);
         },
         complete: (): void => {
-          log.info("Network:WS", `Completed: ${operation.name}`);
           sink.complete();
         },
       },
     );
+
+    return unsubscribe;
   });
 };
 
