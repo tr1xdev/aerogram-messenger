@@ -40,6 +40,11 @@ type MyChatsResult interface {
 	IsMyChatsResult()
 }
 
+type Node interface {
+	IsNode()
+	GetID() string
+}
+
 type PinChatResult interface {
 	IsPinChatResult()
 }
@@ -70,6 +75,9 @@ type Chat struct {
 	Members          []*ChatMember `json:"members,omitempty"`
 	CreatedAt        string        `json:"createdAt"`
 }
+
+func (Chat) IsNode()            {}
+func (this Chat) GetID() string { return this.ID }
 
 func (Chat) IsChatResult() {}
 
@@ -147,6 +155,9 @@ type Message struct {
 	ReplyTo       *Message    `json:"replyTo,omitempty"`
 	ForwardedFrom *Message    `json:"forwardedFrom,omitempty"`
 }
+
+func (Message) IsNode()            {}
+func (this Message) GetID() string { return this.ID }
 
 func (Message) IsSendMessageResult() {}
 
