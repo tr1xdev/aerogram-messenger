@@ -102,9 +102,8 @@ type RateLimitConfig struct {
 }
 
 type GlobalLimitConfig struct {
-	Enabled bool `mapstructure:"enabled"`
-	RPS     int  `mapstructure:"rps"`
-	Burst   int  `mapstructure:"burst"`
+	Limit int `mapstructure:"limit"`
+	Burst int `mapstructure:"burst"`
 }
 
 type AuthLimitConfig struct {

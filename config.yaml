@@ -48,6 +48,9 @@ auth:
         on_sign_in: ${2FA_ON_SIGN_IN:-false} # Trigger 2FA during login
 
 ratelimit:
+    global:
+        limit: ${LIMIT_GLOBAL_RPS:-100} # Global requests per second
+        burst: ${LIMIT_GLOBAL_BURST:-200} # Global maximum burst size
     auth:
         signup:
             limit: 5 # Allowed registration attempts

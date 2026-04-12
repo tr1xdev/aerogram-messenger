@@ -32,7 +32,11 @@ func NewRouter(c RouterConfig) *chi.Mux {
 	r.Use(middleware.AuthMiddleware(c.Cfg, c.DB))
 
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.RateLimit(c.RDB, 10, time.Second))
+		r.Use(middleware.RateLimit(
+			c.RDB,
+			c.Cfg.RateLimit.Global.Limit,
+			time.Second,
+		))
 		r.Handle("/query", c.GQLServer)
 	})
 
