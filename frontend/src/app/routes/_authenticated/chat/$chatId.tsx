@@ -16,7 +16,6 @@ import {
   useMe,
   useChatDetails,
   useMyChats,
-  useTypingSubscription,
   useMessageActions,
   useSendTyping,
   type MyChatsResponse,
@@ -36,6 +35,7 @@ import type {
 import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generated__/useMarkDialog_chat.graphql";
 import type { useMessageActionsSendMutation$data } from "@/features/chat/lib/messages/__generated__/useMessageActionsSendMutation.graphql";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
+import type { chatHeader_user$key } from "@/features/chat/ui/__generated__/chatHeader_user.graphql";
 
 interface ExtendedUser extends Omit<User, "lastName"> {
   lastName?: string | null;
@@ -77,14 +77,12 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     : undefined;
 
   const chatError: unknown = !isChatType ? chatRaw : null;
-  const typingFromSub: { isTyping: boolean; userId: string } | null =
-    useTypingSubscription(chatId);
 
   const { messages: messagesFromHistory, isLoading: historyLoading } =
     useChatHistory(chatId);
 
   const { sendMessage, editMessage, markAsRead } = useMessageActions(chatId);
-  const { sendTyping } = useSendTyping(chatId);
+  const { handleKeyPress, stopTyping } = useSendTyping(chatId);
 
   const isInitialLoading: boolean = isFirstLoad && historyLoading;
   const isNotFound: boolean = !chat && !isInitialLoading && !!chatError;
@@ -123,7 +121,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     setReplyingTo(null);
     setEditingMessage(null);
     resetInput();
-  }, [resetInput]);
+    stopTyping();
+  }, [resetInput, stopTyping]);
 
   const handleEditInitiate = useCallback(
     (msg: Message): void => {
@@ -141,9 +140,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   const handleTyping = useCallback(
     (isTyping: boolean): void => {
-      if (sendTyping) sendTyping(isTyping);
+      if (isTyping) {
+        handleKeyPress();
+      } else {
+        stopTyping();
+      }
     },
-    [sendTyping],
+    [handleKeyPress, stopTyping],
   );
 
   const totalUnread: number = useMemo((): number => {
@@ -163,17 +166,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     return 0;
   }, [chatsData, chatId]);
 
-  const typingUser: User | undefined = useMemo((): User | undefined => {
-    if (!chat?.members || !me || !typingFromSub) return undefined;
-    if (typingFromSub.isTyping && typingFromSub.userId !== me.id) {
-      const members: ChatMember[] = chat.members as ChatMember[];
-      const subUser: User | undefined = members.find(
-        (m: ChatMember): boolean => m.user.id === typingFromSub.userId,
-      )?.user;
-      if (subUser) return subUser;
-    }
-    return undefined;
-  }, [chat, me, typingFromSub]);
+  const partnerUser = useMemo((): chatHeader_user$key | null => {
+    if (!chat?.members || !me) return null;
+    const members: ChatMember[] = chat.members as ChatMember[];
+    const partner: ChatMember | undefined = members.find(
+      (m: ChatMember): boolean => m.user.id !== me.id,
+    );
+    return (partner?.user as unknown as chatHeader_user$key) ?? null;
+  }, [chat, me]);
 
   const isBotChat: boolean = useMemo((): boolean => {
     if (!chat?.members || !me) return false;
@@ -300,11 +300,10 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       <ChatHeader
         title={chat?.title ?? undefined}
         photoUrl={chat?.photoUrl ?? undefined}
+        userRef={partnerUser}
         totalUnread={totalUnread}
-        members={(chat?.members as ChatMember[]) ?? []}
         meId={me?.id}
         isLoading={isInitialLoading}
-        typingUser={typingUser}
       />
 
       <main className="flex-1 relative min-h-0 bg-background overflow-y-auto">

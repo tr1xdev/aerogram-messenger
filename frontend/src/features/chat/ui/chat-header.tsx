@@ -1,4 +1,5 @@
 import { memo, useMemo, useState, useEffect, type ReactNode } from "react";
+import { graphql, useFragment } from "react-relay";
 import {
   ChevronLeft,
   MoreVertical,
@@ -23,69 +24,65 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
-import type { ChatMember, User } from "@/entities/chat/model/types";
 import { ChatUserPopover } from "./chat-user-popover";
+// После запуска npm run relay имя типа тоже изменится на chatHeader_user$key
+import type { chatHeader_user$key } from "./__generated__/chatHeader_user.graphql";
 
-interface TypingUser extends User {
-  isTyping?: boolean;
-}
+const ChatHeaderUserFragment = graphql`
+  fragment chatHeader_user on User {
+    id
+    status
+    photoUrl
+    firstName
+    lastName
+    displayName
+    isTyping
+  }
+`;
 
 interface ChatHeaderProps {
   title?: string;
   photoUrl?: string;
   totalUnread: number;
-  members?: ChatMember[];
-  meId?: string;
+  meId: string | undefined;
   isLoading: boolean;
-  typingUser?: TypingUser;
+  userRef: chatHeader_user$key | null;
 }
 
 export const ChatHeader = memo(function ChatHeader({
   title,
   photoUrl,
   totalUnread,
-  members,
-  meId,
   isLoading,
-  typingUser,
+  userRef,
 }: ChatHeaderProps): ReactNode {
   const navigate = useNavigate();
+  const [now, setNow] = useState<number>((): number => Date.now());
 
-  const [now, setNow] = useState<number>(() => Date.now());
+  const user = useFragment(ChatHeaderUserFragment, userRef);
 
-  const otherMember = useMemo(
-    () => members?.find((m) => m.user.id !== meId),
-    [members, meId],
-  );
-
-  const rawStatus = otherMember?.user.status ?? "offline";
-  const isOnline = useMemo(
-    () => rawStatus.toLowerCase() === "online",
+  const rawStatus: string = user?.status ?? "offline";
+  const isOnline: boolean = useMemo(
+    (): boolean => rawStatus.toLowerCase() === "online",
     [rawStatus],
   );
 
-  const isTyping = useMemo(() => {
-    const memberId = otherMember?.user.id;
-    if (typingUser && memberId && typingUser.id === memberId) {
-      return typingUser.isTyping !== false;
-    }
-    return rawStatus.toLowerCase() === "typing";
-  }, [typingUser, otherMember, rawStatus]);
+  const isTyping: boolean = user?.isTyping ?? false;
 
-  useEffect(() => {
-    const normalized = rawStatus.toLowerCase();
-    if (!["online", "offline", "typing"].includes(normalized)) {
-      const interval = window.setInterval(() => setNow(Date.now()), 30000);
-      return () => clearInterval(interval);
-    }
-  }, [rawStatus]);
+  useEffect((): (() => void) | void => {
+    const interval: ReturnType<typeof setInterval> = setInterval((): void => {
+      setNow(Date.now());
+    }, 30000);
+    return (): void => clearInterval(interval);
+  }, []);
 
-  const statusText = useMemo(() => {
+  const statusText: string = useMemo((): string => {
     if (isTyping) return "typing";
     return formatLastSeen(rawStatus, new Date(now));
   }, [rawStatus, isTyping, now]);
 
-  const effectivePhotoUrl = photoUrl ?? otherMember?.user.photoUrl ?? undefined;
+  const effectivePhotoUrl: string | undefined =
+    photoUrl ?? user?.photoUrl ?? undefined;
 
   return (
     <header className="flex h-16 items-center justify-between px-4 border-b shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -94,7 +91,9 @@ export const ChatHeader = memo(function ChatHeader({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate({ to: "/" })}
+            onClick={(): void => {
+              navigate({ to: "/" }).catch((): void => {});
+            }}
             className="shrink-0"
           >
             <ChevronLeft className="h-6 w-6" />
@@ -114,8 +113,8 @@ export const ChatHeader = memo(function ChatHeader({
               <Skeleton className="h-3 w-16" />
             </div>
           </div>
-        ) : otherMember ? (
-          <ChatUserPopover userId={otherMember.user.id}>
+        ) : user ? (
+          <ChatUserPopover userId={user.id}>
             <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
               <Avatar className="h-10 w-10 border border-border/50 shadow-sm rounded-full overflow-hidden shrink-0">
                 {effectivePhotoUrl && (
@@ -157,25 +156,7 @@ export const ChatHeader = memo(function ChatHeader({
               </div>
             </div>
           </ChatUserPopover>
-        ) : (
-          <div className="flex items-center gap-3 ml-2 md:ml-0">
-            <Avatar className="h-10 w-10 border border-border/50 shadow-sm rounded-full overflow-hidden shrink-0">
-              {effectivePhotoUrl && (
-                <AvatarImage
-                  src={effectivePhotoUrl}
-                  alt={title || "Chat"}
-                  className="object-cover"
-                />
-              )}
-              <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs flex items-center justify-center uppercase">
-                {title?.[0] || "?"}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-[15px] font-bold truncate leading-none">
-              {title}
-            </span>
-          </div>
-        )}
+        ) : null}
       </div>
 
       <div className="flex items-center gap-1">
@@ -207,28 +188,28 @@ export const ChatHeader = memo(function ChatHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={() => {}}>
+            <DropdownMenuItem onClick={(): void => {}}>
               <Search className="mr-2 h-4 w-4" />
               <span>Search messages</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {}}>
+            <DropdownMenuItem onClick={(): void => {}}>
               <BellOff className="mr-2 h-4 w-4" />
               <span>Mute notifications</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {}}>
+            <DropdownMenuItem onClick={(): void => {}}>
               <Shield className="mr-2 h-4 w-4" />
               <span>Start secret chat</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => {}}
+              onClick={(): void => {}}
               className="text-destructive focus:text-destructive"
             >
               <Ban className="mr-2 h-4 w-4" />
               <span>Block user</span>
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => {}}
+              onClick={(): void => {}}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" />

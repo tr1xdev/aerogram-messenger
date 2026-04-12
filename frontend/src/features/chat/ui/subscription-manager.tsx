@@ -6,8 +6,8 @@ import {
 } from "@/features/chat/lib";
 import { useEffect, type ReactNode } from "react";
 import type { Chat } from "@/entities/chat/model/types";
-import type { useAppTitle_chats$key } from "@/features/chat/lib/common/__generated__/useAppTitle_chats.graphql";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
+import type { useAppTitle_chats$key } from "@/features/chat/lib/common/__generated__/useAppTitle_chats.graphql";
 
 const logStyle = (color: string): string =>
   `color: ${color}; font-weight: bold; font-family: "JetBrains Mono", monospace;`;
@@ -20,15 +20,13 @@ export function SubscriptionManager(): ReactNode {
   const myId: string | undefined = meData?.me?.id;
 
   const chatsKey =
-    chatsData?.myChats?.__typename === "ChatList"
-      ? (chatsData.myChats as unknown as useAppTitle_chats$key)
-      : null;
+    chatsData?.myChats as unknown as useAppTitle_chats$key | null;
 
   useAppTitle(chatsKey);
 
   const chats: readonly Chat[] =
     chatsData?.myChats?.__typename === "ChatList"
-      ? (chatsData.myChats.chats as unknown as readonly Chat[])
+      ? (chatsData.myChats.chats as readonly Chat[])
       : [];
 
   useEffect((): void => {
@@ -72,7 +70,6 @@ function ActiveSubscription({
     );
   }, [chatId]);
 
-  console.log("sub called!!");
   useGlobalSubscriptions(chatId, myId);
   return null;
 }
