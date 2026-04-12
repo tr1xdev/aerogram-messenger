@@ -1,4 +1,4 @@
-import { useMemo, memo, useEffect, type ReactNode } from "react";
+import { useMemo, memo, type ReactNode } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
@@ -27,29 +27,7 @@ export const MessageList = memo(function MessageList({
   onReply,
   onEdit,
 }: MessageListProps): ReactNode {
-  const hasUnread: boolean = useMemo((): boolean => {
-    return messages.some(
-      (m: Message): boolean => !m.isRead && m.sender.id !== myId,
-    );
-  }, [messages, myId]);
-
-  const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
-    useChatScroll({
-      messages: messages as Message[],
-      myId,
-      onMarkRead,
-      hasUnread,
-    });
-
-  const messageCount: number = messages.length;
-
-  useEffect((): void => {
-    if (messageCount > 0) {
-      scrollToBottom("auto");
-    }
-  }, [messageCount, scrollToBottom]);
-
-  const groupedMessages = useMemo((): { date: string; items: Message[] }[] => {
+  const groupedMessages = useMemo(() => {
     const groups: { date: string; items: Message[] }[] = [];
 
     messages.forEach((m: Message): void => {
@@ -66,65 +44,73 @@ export const MessageList = memo(function MessageList({
     return groups;
   }, [messages]);
 
-  return (
-    <div className="h-full w-full relative overflow-hidden bg-background">
-      <ScrollArea ref={scrollRef} className="h-full w-full">
-        <div className="px-4 py-6 w-full flex flex-col max-w-4xl mx-auto min-h-full justify-end">
-          {groupedMessages.map(
-            (g): ReactNode => (
-              <div key={g.date} className="flex flex-col mb-6">
-                <DateDivider date={g.items[0].sentAt} />
-                <div className="flex flex-col">
-                  {g.items.map((m, index): ReactNode => {
-                    const prevMessage = g.items[index - 1];
-                    const isFirstInGroup: boolean =
-                      !prevMessage || prevMessage.sender.id !== m.sender.id;
+  const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
+    useChatScroll({
+      messages,
+      myId,
+      onMarkRead,
+    });
 
-                    return (
-                      <div
-                        key={
-                          m.id.startsWith("temp-")
-                            ? m.id
-                            : `${m.id}-${m.isEdited}`
-                        }
-                        className={isFirstInGroup ? "mt-3 first:mt-0" : "mt-1"}
-                      >
-                        <MessageBubble
-                          message={m}
-                          myId={myId ?? ""}
-                          lastReadSequence={lastReadSequence}
-                          isMe={m.sender.id === myId}
-                          isRead={m.isRead}
-                          onReply={onReply}
-                          onEdit={onEdit}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+  return (
+    <div className="h-full w-full relative bg-transparent overflow-hidden">
+      <ScrollArea ref={scrollRef} className="h-full w-full">
+        <div className="px-4 py-6 w-full flex flex-col max-w-4xl mx-auto min-h-full">
+          {groupedMessages.map((g) => (
+            <div key={g.date} className="flex flex-col mb-6">
+              <DateDivider date={g.items[0].sentAt} />
+              <div className="flex flex-col space-y-1">
+                {g.items.map((m, index) => {
+                  const prevMessage = g.items[index - 1];
+                  const isFirstInGroup: boolean =
+                    !prevMessage || prevMessage.sender.id !== m.sender.id;
+
+                  return (
+                    <motion.div
+                      key={
+                        m.id.startsWith("temp-") ? `${m.id}-${m.sentAt}` : m.id
+                      }
+                      initial={
+                        m.id.startsWith("temp-") ? { opacity: 0, y: 10 } : false
+                      }
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className={isFirstInGroup ? "mt-2 first:mt-0" : ""}
+                    >
+                      <MessageBubble
+                        message={m}
+                        myId={myId ?? ""}
+                        lastReadSequence={lastReadSequence}
+                        isMe={m.sender.id === myId}
+                        isRead={m.isRead}
+                        onReply={onReply}
+                        onEdit={onEdit}
+                      />
+                    </motion.div>
+                  );
+                })}
               </div>
-            ),
-          )}
+            </div>
+          ))}
         </div>
       </ScrollArea>
 
       <AnimatePresence>
         {showScrollBtn && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
             className="absolute bottom-6 right-6 z-40"
           >
             <Button
               size="icon"
               variant="secondary"
-              className="rounded-full shadow-2xl border h-10 w-10 bg-background/95 backdrop-blur-sm"
-              onClick={(): void => scrollToBottom("smooth")}
+              className="rounded-full shadow-xl bg-background/95 border h-10 w-10 active:scale-90 transition-all"
+              onClick={() => scrollToBottom("smooth")}
             >
               <ArrowDown className="h-5 w-5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 min-w-[20px] bg-primary text-[10px] text-primary-foreground rounded-full flex items-center justify-center font-bold px-1 border-2 border-background">
+                <span className="absolute -top-1 -right-1 h-5 min-w-[20px] bg-primary text-[10px] text-primary-foreground rounded-full flex items-center justify-center font-bold border-2 border-background px-1">
                   {unreadCount}
                 </span>
               )}
