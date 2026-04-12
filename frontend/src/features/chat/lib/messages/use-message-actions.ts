@@ -98,10 +98,19 @@ export function useMessageActions(chatId: string) {
             const chatRecord: RecordProxy | null | undefined =
               store.get(chatId);
             if (chatRecord) {
-              const seq: string = String(payload.getValue("sequence"));
-              chatRecord.setLinkedRecord(payload, "lastMessage");
+              const newSeq: number = Number(payload.getValue("sequence") ?? 0);
+              const currentLastMsg: RecordProxy | null | undefined =
+                chatRecord.getLinkedRecord("lastMessage");
+              const currentSeq: number = currentLastMsg
+                ? Number(currentLastMsg.getValue("sequence") ?? 0)
+                : -1;
+
+              if (newSeq >= currentSeq) {
+                chatRecord.setLinkedRecord(payload, "lastMessage");
+              }
+
               chatRecord.setValue(0, "unreadCount");
-              chatRecord.setValue(seq, "myReadSequence");
+              chatRecord.setValue(newSeq, "myReadSequence");
 
               const root: RecordProxy = store.getRoot();
               const history: RecordProxy | null | undefined =
@@ -116,10 +125,11 @@ export function useMessageActions(chatId: string) {
                   (history.getLinkedRecords("messages") as
                     | readonly RecordProxy[]
                     | null) ?? [];
+                const messageId: string = payload.getDataID();
+
                 if (
                   !messages.some(
-                    (m: RecordProxy): boolean =>
-                      m.getDataID() === payload.getDataID(),
+                    (m: RecordProxy): boolean => m.getDataID() === messageId,
                   )
                 ) {
                   history.setLinkedRecords([...messages, payload], "messages");
@@ -170,7 +180,8 @@ export function useMessageActions(chatId: string) {
           const lastMsg: RecordProxy | null | undefined =
             chatRecord.getLinkedRecord("lastMessage");
           if (lastMsg) {
-            chatRecord.setValue(lastMsg.getValue("sequence"), "myReadSequence");
+            const seq: number = Number(lastMsg.getValue("sequence") ?? 0);
+            chatRecord.setValue(seq, "myReadSequence");
           }
         }
       },

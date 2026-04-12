@@ -103,7 +103,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }, [messagesFromHistory]);
 
   const { checkAndMarkRead } = useMarkDialog(
-    chatRaw as unknown as useMarkDialog_chat$key,
+    (isChatType ? chatRaw : null) as unknown as useMarkDialog_chat$key,
     lastSequence,
     me?.id,
   );
