@@ -1,59 +1,53 @@
 schema:
-   - internal/graph/schemas/*.graphqls
+    - internal/graph/schemas/*.graphqls
 
 exec:
-   package: graph
-   layout: single-file
-   filename: internal/graph/generated.go
+    package: graph
+    layout: single-file
+    filename: internal/graph/generated.go
 
 model:
-   filename: internal/graph/model/models_gen.go
-   package: model
+    filename: internal/graph/model/models_gen.go
+    package: model
 
 resolver:
-   layout: follow-schema
-   dir: internal/graph/resolvers
-   package: resolvers
-   filename_template: "{name}.resolvers.go"
+    layout: follow-schema
+    dir: internal/graph/resolvers
+    package: resolvers
+    filename_template: "{name}.resolvers.go"
 
 models:
-   ID:
-      model:
-         - github.com/99designs/gqlgen/graphql.ID
-   Long:
-      model:
-         - github.com/99designs/gqlgen/graphql.Int64
+    ID:
+        model:
+            - github.com/99designs/gqlgen/graphql.ID
+    Long:
+        model:
+            - github.com/99designs/gqlgen/graphql.Int64
 
-   User:
-      model: github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen.User
-      fields:
-         firstName: { resolver: true }
-         lastName: { resolver: true }
-         displayName: { resolver: true }
-         photoUrl: { resolver: true }
-         bio: { resolver: true }
-         isVerified: { resolver: true }
-         email: { resolver: true }
-         status: { resolver: true }
-         encryptedPrivKey: { resolver: true }
-         encryptionIv: { resolver: true }
+    User:
+        model: github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen.User
+        fields:
+            id: { resolver: true }
+            isTyping: { resolver: true }
+            firstName: { resolver: true }
+            lastName: { resolver: true }
+            displayName: { resolver: true }
+            photoUrl: { resolver: true }
+            bio: { resolver: true }
+            status: { resolver: true }
 
-   Session:
-      model: github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen.Session
-      fields:
-         device: { resolver: true }
-         location: { resolver: true }
-         isCurrent: { resolver: true }
+    Session:
+        model: github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen.Session
+        fields:
+            id: { resolver: true }
 
-   Message:
-      fields:
-         sender: { resolver: true }
+    Chat:
+        fields:
+            id: { resolver: true }
 
-   Chat:
-      fields:
-         members: { resolver: false }
-         lastMessage: { resolver: false }
-
-   ChatMember:
-      fields:
-         user: { resolver: false }
+    Message:
+        fields:
+            id: { resolver: true }
+            sender: { resolver: true }
+            replyTo: { resolver: true }
+            forwardedFrom: { resolver: true }

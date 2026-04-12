@@ -202,6 +202,7 @@ type User implements Node {
   isVerified: Boolean!
   isPremium: Boolean!
   isBot: Boolean!
+  isTyping: Boolean!
   botDescription: String
   botCommands: String
 }
