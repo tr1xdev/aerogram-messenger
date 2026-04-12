@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<db32c94ac8ee94de8e02901f13e745bd>>
+ * @generated SignedSource<<d71dbaecbe8a154f55afb9ee4674a844>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -61,6 +61,20 @@ v3 = {
   "storageKey": null
 },
 v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "firstName",
+  "storageKey": null
+},
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "lastName",
+  "storageKey": null
+},
+v6 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -171,13 +185,8 @@ return {
                     "plural": false,
                     "selections": [
                       (v2/*: any*/),
-                      {
-                        "alias": null,
-                        "args": null,
-                        "kind": "ScalarField",
-                        "name": "firstName",
-                        "storageKey": null
-                      },
+                      (v4/*: any*/),
+                      (v5/*: any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -185,7 +194,7 @@ return {
                         "name": "photoUrl",
                         "storageKey": null
                       },
-                      (v4/*: any*/)
+                      (v6/*: any*/)
                     ],
                     "storageKey": null
                   },
@@ -207,8 +216,10 @@ return {
                         "name": "sender",
                         "plural": false,
                         "selections": [
+                          (v2/*: any*/),
                           (v4/*: any*/),
-                          (v2/*: any*/)
+                          (v5/*: any*/),
+                          (v6/*: any*/)
                         ],
                         "storageKey": null
                       }
@@ -249,12 +260,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5a4037fac74f53370f1a62dd523fab7a",
+    "cacheID": "2e132daf9052669250c94c0aed7d9e39",
     "id": null,
     "metadata": {},
     "name": "useMessagesQuery",
     "operationKind": "query",
-    "text": "query useMessagesQuery(\n  $chatId: ID!\n  $count: Int!\n  $cursor: Long\n) {\n  ...useMessages_history_2v0QF4\n}\n\nfragment useMessages_history_2v0QF4 on Query {\n  messageHistory(chatId: $chatId, limit: $count, beforeSequence: $cursor) {\n    __typename\n    ... on MessageConnection {\n      messages {\n        id\n        text\n        sentAt\n        sequence\n        isEdited\n        sender {\n          id\n          firstName\n          photoUrl\n          displayName\n        }\n        replyTo {\n          id\n          text\n          sender {\n            displayName\n            id\n          }\n        }\n      }\n      hasMore\n    }\n    ... on NotFoundError {\n      message\n    }\n  }\n}\n"
+    "text": "query useMessagesQuery(\n  $chatId: ID!\n  $count: Int!\n  $cursor: Long\n) {\n  ...useMessages_history_2v0QF4\n}\n\nfragment useMessages_history_2v0QF4 on Query {\n  messageHistory(chatId: $chatId, limit: $count, beforeSequence: $cursor) {\n    __typename\n    ... on MessageConnection {\n      messages {\n        id\n        text\n        sentAt\n        sequence\n        isEdited\n        sender {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n        }\n        replyTo {\n          id\n          text\n          sender {\n            id\n            firstName\n            lastName\n            displayName\n          }\n        }\n      }\n      hasMore\n    }\n    ... on NotFoundError {\n      message\n    }\n  }\n}\n"
   }
 };
 })();

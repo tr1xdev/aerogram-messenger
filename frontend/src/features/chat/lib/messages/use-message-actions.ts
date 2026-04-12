@@ -29,12 +29,23 @@ const sendMessageMutation = graphql`
         text
         sentAt
         sequence
+        isEdited
         sender {
           id
           firstName
           lastName
           photoUrl
           displayName
+        }
+        replyTo {
+          id
+          text
+          sender {
+            id
+            firstName
+            lastName
+            displayName
+          }
         }
       }
     }
@@ -80,50 +91,44 @@ export function useMessageActions(chatId: string) {
             replyToId: config?.variables?.replyToId ?? null,
           },
           updater: (store: RecordSourceSelectorProxy): void => {
-            const payload: RecordProxy | null = store.getRootField(
-              "sendMessage",
-            ) as RecordProxy | null;
-            const chatRecord: RecordProxy | null = store.get(
-              chatId,
-            ) as RecordProxy | null;
-            const root: RecordProxy = store.getRoot();
+            const payload: RecordProxy | null | undefined =
+              store.getRootField("sendMessage");
+            if (!payload || payload.getType() !== "Message") return;
 
-            if (payload && chatRecord) {
+            const chatRecord: RecordProxy | null | undefined =
+              store.get(chatId);
+            if (chatRecord) {
+              const seq: string = String(payload.getValue("sequence"));
               chatRecord.setLinkedRecord(payload, "lastMessage");
               chatRecord.setValue(0, "unreadCount");
-
-              const seq: number = Number(payload.getValue("sequence")) || 0;
               chatRecord.setValue(seq, "myReadSequence");
 
-              // ВНИМАНИЕ: Аргументы должны быть 1-в-1 как в useChatHistory
-              const history: RecordProxy | null = root.getLinkedRecord(
-                "messageHistory",
-                {
+              const root: RecordProxy = store.getRoot();
+              const history: RecordProxy | null | undefined =
+                root.getLinkedRecord("messageHistory", {
                   chatId,
-                  limit: 50, // Было count
-                  beforeSequence: null, // Было cursor
-                },
-              ) as RecordProxy | null;
+                  limit: 50,
+                  beforeSequence: null,
+                });
 
-              if (history) {
+              if (history && history.getType() === "MessageConnection") {
                 const messages: readonly RecordProxy[] =
                   (history.getLinkedRecords("messages") as
                     | readonly RecordProxy[]
                     | null) ?? [];
-
-                const payloadId: string = payload.getDataID();
-                const alreadyExists: boolean = messages.some(
-                  (m: RecordProxy): boolean => m.getDataID() === payloadId,
-                );
-
-                if (!alreadyExists) {
+                if (
+                  !messages.some(
+                    (m: RecordProxy): boolean =>
+                      m.getDataID() === payload.getDataID(),
+                  )
+                ) {
                   history.setLinkedRecords([...messages, payload], "messages");
                 }
               }
             }
           },
           onCompleted: (
-            _response: useMessageActionsSendMutation$data,
+            _: useMessageActionsSendMutation$data,
             err: ReadonlyArray<PayloadError> | null,
           ): void => {
             if (err) reject(err);
@@ -142,7 +147,7 @@ export function useMessageActions(chatId: string) {
         edit({
           variables: { id, text },
           onCompleted: (
-            _response: useMessageActionsEditMutation$data,
+            _: useMessageActionsEditMutation$data,
             err: ReadonlyArray<PayloadError> | null,
           ): void => {
             if (err) reject(err);
@@ -156,7 +161,20 @@ export function useMessageActions(chatId: string) {
   );
 
   const markAsRead = useCallback((): void => {
-    read({ variables: { chatId } });
+    read({
+      variables: { chatId },
+      optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
+        const chatRecord: RecordProxy | null | undefined = store.get(chatId);
+        if (chatRecord) {
+          chatRecord.setValue(0, "unreadCount");
+          const lastMsg: RecordProxy | null | undefined =
+            chatRecord.getLinkedRecord("lastMessage");
+          if (lastMsg) {
+            chatRecord.setValue(lastMsg.getValue("sequence"), "myReadSequence");
+          }
+        }
+      },
+    });
   }, [chatId, read]);
 
   return { sendMessage, editMessage, markAsRead, isSending };

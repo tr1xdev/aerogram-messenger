@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c8fc50d22fecdcd13e86192ff7e8219d>>
+ * @generated SignedSource<<4e122d8a0d50a588591c6d06be9ddf44>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,6 +18,17 @@ export type useMessageActionsSendMutation$data = {
   readonly sendMessage: {
     readonly chatId?: string;
     readonly id?: string;
+    readonly isEdited?: boolean;
+    readonly replyTo?: {
+      readonly id: string;
+      readonly sender: {
+        readonly displayName: string | null | undefined;
+        readonly firstName: string;
+        readonly id: string;
+        readonly lastName: string | null | undefined;
+      } | null | undefined;
+      readonly text: string;
+    } | null | undefined;
     readonly sender?: {
       readonly displayName: string | null | undefined;
       readonly firstName: string;
@@ -76,6 +87,34 @@ v4 = {
   "storageKey": null
 },
 v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "text",
+  "storageKey": null
+},
+v6 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "firstName",
+  "storageKey": null
+},
+v7 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "lastName",
+  "storageKey": null
+},
+v8 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "displayName",
+  "storageKey": null
+},
+v9 = {
   "kind": "InlineFragment",
   "selections": [
     (v4/*: any*/),
@@ -86,13 +125,7 @@ v5 = {
       "name": "chatId",
       "storageKey": null
     },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "text",
-      "storageKey": null
-    },
+    (v5/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -110,26 +143,21 @@ v5 = {
     {
       "alias": null,
       "args": null,
+      "kind": "ScalarField",
+      "name": "isEdited",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "User",
       "kind": "LinkedField",
       "name": "sender",
       "plural": false,
       "selections": [
         (v4/*: any*/),
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "firstName",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "lastName",
-          "storageKey": null
-        },
+        (v6/*: any*/),
+        (v7/*: any*/),
         {
           "alias": null,
           "args": null,
@@ -137,11 +165,33 @@ v5 = {
           "name": "photoUrl",
           "storageKey": null
         },
+        (v8/*: any*/)
+      ],
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "concreteType": "Message",
+      "kind": "LinkedField",
+      "name": "replyTo",
+      "plural": false,
+      "selections": [
+        (v4/*: any*/),
+        (v5/*: any*/),
         {
           "alias": null,
           "args": null,
-          "kind": "ScalarField",
-          "name": "displayName",
+          "concreteType": "User",
+          "kind": "LinkedField",
+          "name": "sender",
+          "plural": false,
+          "selections": [
+            (v4/*: any*/),
+            (v6/*: any*/),
+            (v7/*: any*/),
+            (v8/*: any*/)
+          ],
           "storageKey": null
         }
       ],
@@ -170,7 +220,7 @@ return {
         "name": "sendMessage",
         "plural": false,
         "selections": [
-          (v5/*: any*/)
+          (v9/*: any*/)
         ],
         "storageKey": null
       }
@@ -203,7 +253,7 @@ return {
             "name": "__typename",
             "storageKey": null
           },
-          (v5/*: any*/),
+          (v9/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -218,16 +268,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "58e02133c4e64bda3a67fa5831a2fad8",
+    "cacheID": "d002c5254d5c492990f72822f1cafa49",
     "id": null,
     "metadata": {},
     "name": "useMessageActionsSendMutation",
     "operationKind": "mutation",
-    "text": "mutation useMessageActionsSendMutation(\n  $chatId: ID!\n  $text: String!\n  $replyToId: ID\n) {\n  sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {\n    __typename\n    ... on Message {\n      id\n      chatId\n      text\n      sentAt\n      sequence\n      sender {\n        id\n        firstName\n        lastName\n        photoUrl\n        displayName\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "mutation useMessageActionsSendMutation(\n  $chatId: ID!\n  $text: String!\n  $replyToId: ID\n) {\n  sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {\n    __typename\n    ... on Message {\n      id\n      chatId\n      text\n      sentAt\n      sequence\n      isEdited\n      sender {\n        id\n        firstName\n        lastName\n        photoUrl\n        displayName\n      }\n      replyTo {\n        id\n        text\n        sender {\n          id\n          firstName\n          lastName\n          displayName\n        }\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "27c3d32c70ba439fef43ca56da65cfdf";
+(node as any).hash = "c39f5b3c40bb3255d0cfeb45719df686";
 
 export default node;

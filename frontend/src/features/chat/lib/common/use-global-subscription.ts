@@ -16,12 +16,23 @@ const messageSubscription = graphql`
       text
       sentAt
       sequence
+      isEdited
       sender {
         id
         firstName
         lastName
         photoUrl
         displayName
+      }
+      replyTo {
+        id
+        text
+        sender {
+          id
+          firstName
+          lastName
+          displayName
+        }
       }
     }
   }
@@ -80,22 +91,28 @@ export function useGlobalSubscriptions(
         variables: { chatId: chatId ?? "" },
         skip: !chatId,
         updater: (store: RecordSourceSelectorProxy): void => {
-          const rootField = store.getRootField("messageAdded");
+          const rootField: RecordProxy | null | undefined =
+            store.getRootField("messageAdded");
           if (!rootField) return;
 
-          const msgChatId = String(rootField.getValue("chatId"));
-          const chatRecord = store.get(msgChatId);
+          const msgChatId: string = String(rootField.getValue("chatId"));
+          const chatRecord: RecordProxy | null | undefined =
+            store.get(msgChatId);
 
           if (chatRecord) {
-            const sender = rootField.getLinkedRecord("sender");
-            const isFromMe = sender?.getValue("id") === myId;
-            const isCurrentChatActive =
+            const sender: RecordProxy | null | undefined =
+              rootField.getLinkedRecord("sender");
+            const senderId: string = String(sender?.getValue("id"));
+            const currentMyId: string = String(myId);
+
+            const isFromMe: boolean = senderId === currentMyId;
+            const isCurrentChatActive: boolean =
               msgChatId === activeChatRef.current &&
               document.visibilityState === "visible";
 
             if (!isFromMe && !isCurrentChatActive) {
-              const currentUnread =
-                (chatRecord.getValue("unreadCount") as number) ?? 0;
+              const currentUnread: number =
+                Number(chatRecord.getValue("unreadCount")) || 0;
               chatRecord.setValue(currentUnread + 1, "unreadCount");
             }
 
@@ -108,21 +125,25 @@ export function useGlobalSubscriptions(
 
             chatRecord.setLinkedRecord(rootField, "lastMessage");
 
-            const root = store.getRoot();
-            const history = root.getLinkedRecord("messageHistory", {
-              chatId: msgChatId,
-            });
+            const history: RecordProxy | null | undefined = store
+              .getRoot()
+              .getLinkedRecord("messageHistory", {
+                chatId: msgChatId,
+                limit: 50,
+                beforeSequence: null,
+              });
 
             if (history) {
-              const messages =
+              const messages: readonly RecordProxy[] =
                 (history.getLinkedRecords("messages") as
                   | readonly RecordProxy[]
-                  | null
-                  | undefined) ?? [];
-              const payloadId = rootField.getDataID();
-              const exists = messages.some((m) => m.getDataID() === payloadId);
-
-              if (!exists) {
+                  | null) ?? [];
+              if (
+                !messages.some(
+                  (m: RecordProxy): boolean =>
+                    m.getDataID() === rootField.getDataID(),
+                )
+              ) {
                 history.setLinkedRecords([...messages, rootField], "messages");
               }
             }
@@ -140,11 +161,12 @@ export function useGlobalSubscriptions(
         variables: { chatId: chatId ?? "" },
         skip: !chatId,
         updater: (store: RecordSourceSelectorProxy): void => {
-          const payload = store.getRootField("userStatusChanged");
+          const payload: RecordProxy | null | undefined =
+            store.getRootField("userStatusChanged");
           if (!payload) return;
 
-          const uId = String(payload.getValue("userId"));
-          const userRecord = store.get(uId);
+          const uId: string = String(payload.getValue("userId"));
+          const userRecord: RecordProxy | null | undefined = store.get(uId);
 
           if (userRecord) {
             userRecord.setValue(payload.getValue("status"), "status");
@@ -156,29 +178,23 @@ export function useGlobalSubscriptions(
     ),
   );
 
-  useSubscription<useGlobalSubscriptionsDialogReadSubscription>(
+  useSubscription<useGlobalSubscriptionsTypingSubscription>(
     useMemo(
       () => ({
-        subscription: dialogReadSubscription,
+        subscription: typingSubscription,
         variables: { chatId: chatId ?? "" },
         skip: !chatId,
         updater: (store: RecordSourceSelectorProxy): void => {
-          const payload = store.getRootField("dialogRead");
+          const payload: RecordProxy | null | undefined =
+            store.getRootField("userTyping");
           if (!payload) return;
 
-          const cId = String(payload.getValue("chatId"));
-          const uId = String(payload.getValue("userId"));
-          const lastSeq = (payload.getValue("lastSequence") as number) ?? 0;
+          const uId: string = String(payload.getValue("userId"));
+          if (uId === String(myId)) return;
 
-          const chatRecord = store.get(cId);
-
-          if (chatRecord) {
-            if (uId === myId) {
-              chatRecord.setValue(0, "unreadCount");
-              chatRecord.setValue(lastSeq, "myReadSequence");
-            } else {
-              chatRecord.setValue(lastSeq, "lastReadSequence");
-            }
+          const userRecord: RecordProxy | null | undefined = store.get(uId);
+          if (userRecord) {
+            userRecord.setValue(payload.getValue("isTyping"), "isTyping");
           }
         },
       }),
@@ -186,25 +202,29 @@ export function useGlobalSubscriptions(
     ),
   );
 
-  useSubscription<useGlobalSubscriptionsTypingSubscription>(
+  useSubscription<useGlobalSubscriptionsDialogReadSubscription>(
     useMemo(
       () => ({
-        subscription: typingSubscription,
-        variables: { chatID: chatId ?? "" },
+        subscription: dialogReadSubscription,
+        variables: { chatId: chatId ?? "" },
         skip: !chatId,
         updater: (store: RecordSourceSelectorProxy): void => {
-          const payload = store.getRootField("userTyping");
+          const payload: RecordProxy | null | undefined =
+            store.getRootField("dialogRead");
           if (!payload) return;
 
-          const uId = String(payload.getValue("userId"));
-          const isTyping = payload.getValue("isTyping") as boolean;
+          const cId: string = String(payload.getValue("chatId"));
+          const uId: string = String(payload.getValue("userId"));
+          const lastSeq: string = String(payload.getValue("lastSequence"));
 
-          if (uId === myId) return;
-
-          const userRecord = store.get(uId);
-
-          if (userRecord) {
-            userRecord.setValue(isTyping, "isTyping");
+          const chatRecord: RecordProxy | null | undefined = store.get(cId);
+          if (chatRecord) {
+            if (uId === String(myId)) {
+              chatRecord.setValue(0, "unreadCount");
+              chatRecord.setValue(lastSeq, "myReadSequence");
+            } else {
+              chatRecord.setValue(lastSeq, "lastReadSequence");
+            }
           }
         },
       }),
@@ -219,14 +239,10 @@ export function useGlobalSubscriptions(
         variables: { userId: myId ?? "" },
         skip: !myId,
         updater: (store: RecordSourceSelectorProxy): void => {
-          const deletedChatId = store.getRootField("chatDeleted") as
-            | string
-            | null
-            | undefined;
-
-          if (deletedChatId) {
-            store.delete(deletedChatId);
-          }
+          const deletedId: string | null | undefined = store.getRootField(
+            "chatDeleted",
+          ) as string | null;
+          if (deletedId) store.delete(deletedId);
         },
       }),
       [myId],

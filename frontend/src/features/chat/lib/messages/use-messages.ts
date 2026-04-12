@@ -33,6 +33,7 @@ const messagesFragment = graphql`
           sender {
             id
             firstName
+            lastName
             photoUrl
             displayName
           }
@@ -40,6 +41,9 @@ const messagesFragment = graphql`
             id
             text
             sender {
+              id
+              firstName
+              lastName
               displayName
             }
           }
@@ -69,7 +73,6 @@ export function useChatHistory(chatId: string) {
     useMessagesQuery,
     useMessages_history$key
   >(messagesFragment, queryData);
-
   const history = data?.messageHistory;
 
   const messages = useMemo((): readonly MessageType[] => {
@@ -87,11 +90,8 @@ export function useChatHistory(chatId: string) {
 
   const loadMore = useCallback((): void => {
     if (!hasMore || !messages.length) return;
-
-    const oldestSequence: string | number = messages[0].sequence;
-
     refetch(
-      { chatId, count: 50, cursor: Number(oldestSequence) },
+      { chatId, count: 50, cursor: messages[0].sequence },
       { fetchPolicy: "network-only" },
     );
   }, [hasMore, messages, chatId, refetch]);

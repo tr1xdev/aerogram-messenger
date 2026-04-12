@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<9354fddd914342f732d790e09470ebe8>>
+ * @generated SignedSource<<719c688b1f9c32e9f482c6f59b191917>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -21,6 +21,9 @@ export type useMessages_history$data = {
         readonly id: string;
         readonly sender: {
           readonly displayName: string | null | undefined;
+          readonly firstName: string;
+          readonly id: string;
+          readonly lastName: string | null | undefined;
         } | null | undefined;
         readonly text: string;
       } | null | undefined;
@@ -28,6 +31,7 @@ export type useMessages_history$data = {
         readonly displayName: string | null | undefined;
         readonly firstName: string;
         readonly id: string;
+        readonly lastName: string | null | undefined;
         readonly photoUrl: string | null | undefined;
       } | null | undefined;
       readonly sentAt: string;
@@ -67,6 +71,20 @@ v1 = {
   "storageKey": null
 },
 v2 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "firstName",
+  "storageKey": null
+},
+v3 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "lastName",
+  "storageKey": null
+},
+v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -175,13 +193,8 @@ return {
                   "plural": false,
                   "selections": [
                     (v0/*: any*/),
-                    {
-                      "alias": null,
-                      "args": null,
-                      "kind": "ScalarField",
-                      "name": "firstName",
-                      "storageKey": null
-                    },
+                    (v2/*: any*/),
+                    (v3/*: any*/),
                     {
                       "alias": null,
                       "args": null,
@@ -189,7 +202,7 @@ return {
                       "name": "photoUrl",
                       "storageKey": null
                     },
-                    (v2/*: any*/)
+                    (v4/*: any*/)
                   ],
                   "storageKey": null
                 },
@@ -211,7 +224,10 @@ return {
                       "name": "sender",
                       "plural": false,
                       "selections": [
-                        (v2/*: any*/)
+                        (v0/*: any*/),
+                        (v2/*: any*/),
+                        (v3/*: any*/),
+                        (v4/*: any*/)
                       ],
                       "storageKey": null
                     }
@@ -255,6 +271,6 @@ return {
 };
 })();
 
-(node as any).hash = "1c95ecd62c7d9a5332caa3e749607260";
+(node as any).hash = "935c54edb6c70bd2e25f62dc98e05f54";
 
 export default node;
