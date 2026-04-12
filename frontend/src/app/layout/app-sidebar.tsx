@@ -6,7 +6,7 @@ import {
   useMemo,
   useTransition,
 } from "react";
-import { useRouterState, useNavigate } from "@tanstack/react-router";
+import { useRouterState, useNavigate, useParams } from "@tanstack/react-router";
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import {
   Loader2,
@@ -51,9 +51,12 @@ import type { Chat, User } from "@/entities/chat/model/types";
 import type {
   appSidebarQuery as AppSidebarQueryType,
   appSidebarQuery$data,
-  ChatType,
 } from "./__generated__/appSidebarQuery.graphql";
-import type { appSidebarCreateMutation as AppSidebarCreateMutationType } from "./__generated__/appSidebarCreateMutation.graphql";
+import type {
+  appSidebarCreateMutation as AppSidebarCreateMutationType,
+  appSidebarCreateMutation$variables,
+} from "./__generated__/appSidebarCreateMutation.graphql";
+import type { chatMenuItem_chat$key } from "@/features/chat/ui/__generated__/chatMenuItem_chat.graphql";
 
 const appSidebarQuery = graphql`
   query appSidebarQuery {
@@ -71,10 +74,11 @@ const appSidebarQuery = graphql`
         chats {
           id
           title
+          type
           photoUrl
           unreadCount
           isPinned
-          type
+          ...chatMenuItem_chat
         }
       }
       ... on Error {
@@ -109,18 +113,22 @@ const createChatMutation = graphql`
   }
 `;
 
-type MyChatsUnion = AppSidebarQueryType["response"]["myChats"];
-
 export type SidebarChat = {
   readonly id: string;
   readonly isPinned: boolean;
   readonly photoUrl: string | null | undefined;
   readonly title: string;
-  readonly type: ChatType;
+  readonly type: string;
   readonly unreadCount: number;
 };
 
 type SidebarMe = NonNullable<AppSidebarQueryType["response"]["me"]>;
+
+type Folder = {
+  readonly id: string;
+  readonly label: string;
+  readonly unread: number;
+};
 
 const SEARCH_DEBOUNCE_MS: number = 250;
 
@@ -132,8 +140,8 @@ export function AppSidebar(): React.ReactNode {
   const [isPending, startTransition] = useTransition();
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [indicatorStyle, setIndicatorStyle] = useState<{
-    left: number;
-    width: number;
+    readonly left: number;
+    readonly width: number;
   }>({ left: 0, width: 0 });
   const [isFocused, setIsFocused] = useState<boolean>(false);
 
@@ -149,8 +157,11 @@ export function AppSidebar(): React.ReactNode {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
+  const { chatId } = useParams({ strict: false });
   const pathname: string = useRouterState().location.pathname;
-  const isWsConnected: boolean = useConnectionStore((s) => s.isWsConnected);
+  const isWsConnected: boolean = useConnectionStore(
+    (s: { isWsConnected: boolean }): boolean => s.isWsConnected,
+  );
   const isMobile: boolean = useIsMobile();
 
   const data: appSidebarQuery$data = useLazyLoadQuery<AppSidebarQueryType>(
@@ -159,7 +170,8 @@ export function AppSidebar(): React.ReactNode {
     { fetchPolicy: "store-or-network" },
   );
 
-  const globalSearchData = useSearchUsers(debouncedQuery);
+  const globalSearchData: { searchUsers?: readonly User[] | null } =
+    useSearchUsers(debouncedQuery) as { searchUsers?: readonly User[] | null };
 
   const [commitCreate] =
     useMutation<AppSidebarCreateMutationType>(createChatMutation);
@@ -167,22 +179,24 @@ export function AppSidebar(): React.ReactNode {
   const user: SidebarMe | null = data.me;
 
   const chats: readonly SidebarChat[] = useMemo((): readonly SidebarChat[] => {
-    const myChats: MyChatsUnion = data.myChats;
+    const myChats = data.myChats;
     if (myChats?.__typename === "ChatList" && myChats.chats) {
-      return myChats.chats as readonly SidebarChat[];
+      return myChats.chats as unknown as readonly SidebarChat[];
     }
     return [] as readonly SidebarChat[];
   }, [data.myChats]);
 
-  const pinnedChats = useMemo((): readonly SidebarChat[] => {
-    return chats.filter((c: SidebarChat): boolean => c.isPinned === true);
-  }, [chats]);
+  const pinnedChats: readonly SidebarChat[] =
+    useMemo((): readonly SidebarChat[] => {
+      return chats.filter((c: SidebarChat): boolean => c.isPinned);
+    }, [chats]);
 
-  const otherChats = useMemo((): readonly SidebarChat[] => {
-    return chats.filter((c: SidebarChat): boolean => c.isPinned === false);
-  }, [chats]);
+  const otherChats: readonly SidebarChat[] =
+    useMemo((): readonly SidebarChat[] => {
+      return chats.filter((c: SidebarChat): boolean => !c.isPinned);
+    }, [chats]);
 
-  const fullName = useMemo((): string => {
+  const fullName: string = useMemo((): string => {
     if (!user) return "";
     const first: string = user.firstName?.trim() || "";
     const last: string = user.lastName?.trim() || "";
@@ -190,16 +204,12 @@ export function AppSidebar(): React.ReactNode {
     return `${first} ${last}`.trim();
   }, [user]);
 
-  const avatarFallback = useMemo((): string => {
+  const avatarFallback: string = useMemo((): string => {
     if (!user) return "?";
     return (user.firstName?.[0] || user.username?.[0] || "?").toUpperCase();
   }, [user]);
 
-  const folders: { id: string; label: string; unread: number }[] = useMemo((): {
-    id: string;
-    label: string;
-    unread: number;
-  }[] => {
+  const folders: readonly Folder[] = useMemo((): readonly Folder[] => {
     const totalUnread: number = chats.reduce(
       (acc: number, chat: SidebarChat): number => acc + (chat.unreadCount || 0),
       0,
@@ -207,13 +217,14 @@ export function AppSidebar(): React.ReactNode {
     return [{ id: "all", label: "All chats", unread: totalUnread }];
   }, [chats]);
 
-  const filteredLocalChats = useMemo((): readonly SidebarChat[] => {
-    const q: string = searchQuery.trim().toLowerCase();
-    if (!q) return [] as readonly SidebarChat[];
-    return chats.filter((c: SidebarChat): boolean =>
-      c.title.toLowerCase().includes(q),
-    );
-  }, [searchQuery, chats]);
+  const filteredLocalChats: readonly SidebarChat[] =
+    useMemo((): readonly SidebarChat[] => {
+      const q: string = searchQuery.trim().toLowerCase();
+      if (!q) return [];
+      return chats.filter((c: SidebarChat): boolean =>
+        c.title.toLowerCase().includes(q),
+      );
+    }, [searchQuery, chats]);
 
   useEffect((): (() => void) => {
     const handler: number = window.setTimeout((): void => {
@@ -229,10 +240,10 @@ export function AppSidebar(): React.ReactNode {
     if (!container) return;
     const active: HTMLButtonElement | null = container.querySelector(
       `[data-folder-id="${activeFolder}"]`,
-    ) as HTMLButtonElement;
+    ) as HTMLButtonElement | null;
     const label: HTMLSpanElement | null = active?.querySelector(
       ".folder-label",
-    ) as HTMLSpanElement;
+    ) as HTMLSpanElement | null;
     if (active && label) {
       setIndicatorStyle({
         left: active.offsetLeft + label.offsetLeft,
@@ -283,8 +294,10 @@ export function AppSidebar(): React.ReactNode {
     if (isCreating) return;
     setIsCreating(true);
 
+    const variables: appSidebarCreateMutation$variables = { userID: userId };
+
     commitCreate({
-      variables: { userID: userId },
+      variables,
       updater: (store: RecordSourceSelectorProxy): void => {
         const payload: RecordProxy | null =
           store.getRootField("createDirectChat");
@@ -296,10 +309,8 @@ export function AppSidebar(): React.ReactNode {
         if (myChatsRec?.getType() === "ChatList") {
           const chatList: readonly RecordProxy[] =
             myChatsRec.getLinkedRecords("chats") ?? [];
-          const payloadId = payload.getValue("id") as
+          const payloadId: string | null = payload.getValue("id") as
             | string
-            | number
-            | boolean
             | null;
           const alreadyExists: boolean = chatList.some(
             (c: RecordProxy): boolean => c.getValue("id") === payloadId,
@@ -337,7 +348,7 @@ export function AppSidebar(): React.ReactNode {
     });
   };
 
-  if (isMobile && pathname.startsWith("/chat/")) {
+  if (isMobile && chatId) {
     return null;
   }
 
@@ -345,7 +356,10 @@ export function AppSidebar(): React.ReactNode {
     <>
       <Sidebar
         collapsible="none"
-        className="w-full border-none bg-background flex flex-col h-screen overflow-hidden"
+        className={cn(
+          "border-none bg-background flex flex-col h-screen overflow-hidden transition-all duration-300",
+          isMobile ? "w-full" : "w-[350px] border-r border-border/50",
+        )}
       >
         <SidebarHeader className="px-4 pt-3 shrink-0 bg-background border-none">
           <div className="flex items-center justify-between h-8 relative">
@@ -468,7 +482,7 @@ export function AppSidebar(): React.ReactNode {
                     <HiDownload className="h-5 w-5" />
                   </button>
                   {folders.map(
-                    (f: { id: string; label: string; unread: number }) => (
+                    (f: Folder): React.ReactNode => (
                       <button
                         key={f.id}
                         data-folder-id={f.id}
@@ -587,14 +601,6 @@ export function AppSidebar(): React.ReactNode {
                     </div>
                   )}
                 </div>
-              ) : !data ? (
-                <div className="p-4 space-y-4">
-                  {[...Array(6)].map(
-                    (_: unknown, i: number): React.ReactNode => (
-                      <Skeleton key={i} className="h-16 w-full rounded-xl" />
-                    ),
-                  )}
-                </div>
               ) : chats.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300">
                   <div className="relative mb-6 select-none pointer-events-none">
@@ -635,8 +641,8 @@ export function AppSidebar(): React.ReactNode {
                           (chat: SidebarChat): React.ReactNode => (
                             <ChatMenuItem
                               key={chat.id}
-                              chat={chat as unknown as Chat}
-                              isActive={pathname.includes(chat.id)}
+                              chat={chat as unknown as chatMenuItem_chat$key}
+                              isActive={chatId === chat.id}
                               myId={user?.id}
                             />
                           ),
@@ -654,8 +660,8 @@ export function AppSidebar(): React.ReactNode {
                           (chat: SidebarChat): React.ReactNode => (
                             <ChatMenuItem
                               key={chat.id}
-                              chat={chat as unknown as Chat}
-                              isActive={pathname.includes(chat.id)}
+                              chat={chat as unknown as chatMenuItem_chat$key}
+                              isActive={chatId === chat.id}
                               myId={user?.id}
                             />
                           ),
