@@ -26,6 +26,7 @@ const inFlightRequests: Map<string, Promise<GraphQLResponse>> = new Map();
 
 let refreshPromise: Promise<string | null> | null = null;
 let lastRateLimitNotification: number = 0;
+let lastServerErrorNotification: number = 0;
 
 const getAuthHeaders = (token: string | null): Record<string, string> => ({
   "Content-Type": "application/json",
@@ -103,8 +104,17 @@ async function performFetch(
     throw new Error("RATE_LIMIT");
   }
 
-  if (!response.ok) {
+  if (response.status >= 500) {
+    const now: number = Date.now();
+    if (now - lastServerErrorNotification > THROTTLE_MS) {
+      toast.error(`Server error (${response.status}). Please try again later.`);
+      lastServerErrorNotification = now;
+    }
     throw new Error(`SERVER_ERROR_${response.status}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(`NETWORK_ERROR_${response.status}`);
   }
 
   return response.json() as Promise<GraphQLResponse>;
@@ -187,6 +197,16 @@ async function fetchRelay(
       }
 
       return json;
+    } catch (err: unknown) {
+      const error: Error = err as Error;
+      logger.error("RELAY", `Execution failed: ${params.name}`, error);
+
+      const errorResponse = {
+        data: null,
+        errors: [{ message: error.message }],
+      };
+
+      return errorResponse as unknown as GraphQLResponse;
     } finally {
       if (isQuery) {
         Promise.resolve().then((): void => {
