@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useFragment, graphql } from "react-relay";
 import { SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -18,38 +19,72 @@ import { Trash2, CheckCircle2, BellOff, PinOff } from "lucide-react";
 import { useChatActions, useMessageActions } from "@/features/chat/lib";
 import { DeleteChatDialog } from "./delete-chat-dialog";
 import type {
-  Chat,
-  ChatMember,
-  Message,
-  User,
-} from "@/entities/chat/model/types";
+  chatMenuItem_chat$key,
+  chatMenuItem_chat$data,
+} from "./__generated__/chatMenuItem_chat.graphql";
 
 interface ChatMenuItemProps {
-  chat: Chat;
+  chat: chatMenuItem_chat$key;
   isActive: boolean;
   myId?: string;
 }
 
-export function ChatMenuItem({
-  chat,
-  isActive,
-  myId,
-}: ChatMenuItemProps): React.ReactNode {
+export function ChatMenuItem(props: ChatMenuItemProps): React.ReactNode {
+  const chat: chatMenuItem_chat$data = useFragment(
+    graphql`
+      fragment chatMenuItem_chat on Chat {
+        id
+        title
+        type
+        photoUrl
+        unreadCount
+        isPinned
+        lastReadSequence
+        lastMessage {
+          id
+          text
+          sentAt
+          sequence
+          sender {
+            id
+            firstName
+            lastName
+            username
+            displayName
+          }
+        }
+        members {
+          user {
+            id
+            firstName
+            lastName
+            username
+            photoUrl
+            isVerified
+            status
+          }
+        }
+      }
+    `,
+    props.chat,
+  );
+
+  const { isActive, myId } = props;
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false);
   const { togglePin, deleteChat } = useChatActions(chat.id);
   const { markAsRead } = useMessageActions(chat.id);
 
-  const otherMember: ChatMember | undefined = useMemo(
-    (): ChatMember | undefined =>
+  const otherMember = useMemo(
+    (): NonNullable<chatMenuItem_chat$data["members"]>[number] | undefined =>
       chat.members?.find(
-        (m: ChatMember): boolean =>
+        (m: NonNullable<chatMenuItem_chat$data["members"]>[number]): boolean =>
           m.user?.id !== undefined && m.user.id !== myId,
       ),
     [chat.members, myId],
   );
 
-  const otherUser: User | undefined = otherMember?.user;
-  const chatTitle: string | undefined = chat.title;
+  const otherUser = otherMember?.user;
+  const chatTitle = chat.title;
 
   const displayName: string = useMemo((): string => {
     if (otherUser) {
@@ -73,9 +108,9 @@ export function ChatMenuItem({
     [displayName],
   );
 
-  const lastMessage: Message | undefined = chat.lastMessage ?? undefined;
+  const lastMessage = chat.lastMessage;
   const isMe: boolean = lastMessage?.sender?.id === myId;
-  const sender: User | undefined = lastMessage?.sender;
+  const sender = lastMessage?.sender;
   const isOnline: boolean = otherUser?.status === "online";
 
   const showSenderName: boolean =
@@ -138,7 +173,7 @@ export function ChatMenuItem({
                           isMe={isMe}
                           sequence={lastMessage.sequence ?? 0}
                           lastReadSequence={chat.lastReadSequence}
-                          isSending={lastMessage.isSending}
+                          isSending={false}
                         />
                         <span className="text-xs font-medium text-muted-foreground/70 leading-none">
                           {new Date(lastMessage.sentAt).toLocaleTimeString([], {
@@ -158,10 +193,14 @@ export function ChatMenuItem({
 
                   <div className="flex items-start justify-between gap-2 min-h-4.5">
                     <div className="text-[13.5px] font-normal text-muted-foreground/70 min-w-0 leading-tight">
-                      {lastMessage && myId ? (
+                      {lastMessage ? (
                         <LastMessageContent
-                          message={lastMessage}
-                          myId={myId}
+                          message={
+                            lastMessage as NonNullable<
+                              chatMenuItem_chat$data["lastMessage"]
+                            >
+                          }
+                          myId={myId ?? ""}
                           chat={chat}
                         />
                       ) : (
@@ -173,7 +212,7 @@ export function ChatMenuItem({
                       {chat.isPinned && chat.unreadCount === 0 && (
                         <BsFillPinFill className="h-3.5 w-3.5 text-muted-foreground/40" />
                       )}
-                      {chat.unreadCount > 0 && (
+                      {chat.unreadCount !== null && chat.unreadCount > 0 && (
                         <Badge className="h-5 min-w-5 px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shadow-sm leading-none">
                           {chat.unreadCount}
                         </Badge>
@@ -206,17 +245,19 @@ export function ChatMenuItem({
             )}
           </ContextMenuItem>
 
-          {chat.unreadCount > 0 && lastMessage?.sequence !== undefined && (
-            <ContextMenuItem
-              onClick={(): void => {
-                markAsRead();
-              }}
-              className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
-            >
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground/70" />
-              <span>Mark as read</span>
-            </ContextMenuItem>
-          )}
+          {chat.unreadCount !== null &&
+            chat.unreadCount > 0 &&
+            lastMessage?.sequence !== undefined && (
+              <ContextMenuItem
+                onClick={(): void => {
+                  markAsRead();
+                }}
+                className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
+              >
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground/70" />
+                <span>Mark as read</span>
+              </ContextMenuItem>
+            )}
 
           <ContextMenuItem className="gap-3 py-2.5 cursor-pointer text-sm font-medium">
             <BellOff className="h-4 w-4 text-muted-foreground/70" />
