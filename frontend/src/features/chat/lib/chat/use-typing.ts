@@ -1,9 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import { graphql, useSubscription, useMutation } from "react-relay";
-import type {
-  RecordSourceSelectorProxy,
-  ReadOnlyRecordProxy,
-} from "relay-runtime";
+import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
 import type {
   useTypingSubscription as useTypingSubscriptionType,
   useTypingSubscription$data,
@@ -51,14 +48,14 @@ export function useTypingSubscription(chatId: string): TypingData | null {
       updater: (
         store: RecordSourceSelectorProxy<useTypingSubscription$data>,
       ): void => {
-        const payload: ReadOnlyRecordProxy | null =
+        const payload: RecordProxy | null | undefined =
           store.getRootField("userTyping");
         if (!payload) return;
 
         const userId: string = String(payload.getValue("userId"));
         const isTyping: boolean = Boolean(payload.getValue("isTyping"));
 
-        const userRecord = store.get(userId);
+        const userRecord: RecordProxy | null | undefined = store.get(userId);
         if (userRecord) {
           userRecord.setValue(isTyping, "isTyping");
         }
@@ -73,21 +70,54 @@ export function useTypingSubscription(chatId: string): TypingData | null {
 }
 
 export function useSendTyping(chatId: string): {
-  sendTyping: (isTyping: boolean) => void;
+  handleKeyPress: () => void;
+  stopTyping: () => void;
 } {
   const [commit] = useMutation<useTypingSendMutation>(sendTypingMutation);
+  const isTypingRef = useRef<boolean>(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sendTyping = useCallback(
-    (isTyping: boolean): void => {
+  const sendTypingStatus = useCallback(
+    (status: boolean): void => {
+      if (isTypingRef.current === status) return;
+
+      isTypingRef.current = status;
       commit({
         variables: {
           chatID: chatId,
-          typing: isTyping,
+          typing: status,
         },
       });
     },
     [chatId, commit],
   );
 
-  return { sendTyping };
+  const handleKeyPress = useCallback((): void => {
+    sendTypingStatus(true);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout((): void => {
+      sendTypingStatus(false);
+    }, 3000);
+  }, [sendTypingStatus]);
+
+  const stopTyping = useCallback((): void => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    sendTypingStatus(false);
+  }, [sendTypingStatus]);
+
+  useEffect((): (() => void) => {
+    return (): void => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return { handleKeyPress, stopTyping };
 }

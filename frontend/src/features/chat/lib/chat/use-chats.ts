@@ -10,14 +10,23 @@ const myChatsQuery = graphql`
     myChats {
       __typename
       ... on ChatList {
+        ...useAppTitle_chats
         chats {
           id
           title
           photoUrl
           unreadCount
           lastMessage {
+            id
             text
             sentAt
+            sequence
+            sender {
+              id
+              firstName
+              lastName
+              displayName
+            }
           }
         }
       }
@@ -47,8 +56,11 @@ const chatDetailsQuery = graphql`
           user {
             id
             firstName
+            lastName
             photoUrl
+            displayName
             isBot
+            ...chatHeader_user
           }
         }
       }
