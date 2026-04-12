@@ -171,6 +171,13 @@ export function useChatActions(chatId?: string): {
         const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
         if (chatRecord) chatRecord.setValue(pinned, "isPinned");
       },
+      updater: (store: RecordSourceSelectorProxy): void => {
+        const payload: RecordProxy | null = store.getRootField("pinChat");
+        if (payload && payload.getType() === "SuccessResult") {
+          const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
+          if (chatRecord) chatRecord.setValue(pinned, "isPinned");
+        }
+      },
       onCompleted: (
         response: useChatManagementPinMutation["response"],
       ): void => {
