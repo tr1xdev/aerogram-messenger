@@ -14,6 +14,7 @@ import { createClient, type Client } from "graphql-ws";
 import { useConnectionStore } from "@/store/connection";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
+import { logger } from "@/shared/lib/logger";
 
 interface RefreshResponse {
   data?: {
@@ -31,33 +32,6 @@ let refreshPromise: Promise<string | null> | null = null;
 let lastRateLimitTime: number = 0;
 const THROTTLE_MS: number = 5000;
 
-const log = {
-  info: (ns: string, msg: string, d?: unknown): void => {
-    console.log(
-      `%c[${ns}] %c${msg}`,
-      "color: #3b82f6; font-weight: bold",
-      "color: inherit",
-      d ?? "",
-    );
-  },
-  error: (ns: string, msg: string, d?: unknown): void => {
-    console.error(
-      `%c[${ns}] %c${msg}`,
-      "color: #ef4444; font-weight: bold",
-      "color: inherit",
-      d ?? "",
-    );
-  },
-  success: (ns: string, msg: string, d?: unknown): void => {
-    console.log(
-      `%c[${ns}] %c${msg}`,
-      "color: #10b981; font-weight: bold",
-      "color: inherit",
-      d ?? "",
-    );
-  },
-};
-
 const wsClient: Client = createClient({
   url: WS_ENDPOINT,
   lazy: true,
@@ -68,14 +42,14 @@ const wsClient: Client = createClient({
   },
   on: {
     connected: (): void => {
-      log.success("Network:WS", "Handshake established");
+      logger.ws("Handshake established");
       useConnectionStore.getState().setIsWsConnected(true);
     },
     closed: (): void => {
       useConnectionStore.getState().setIsWsConnected(false);
     },
     error: (err: unknown): void => {
-      log.error("Network:WS", "Connection error", err);
+      logger.error("WS", "Connection error", err);
     },
   },
 });
@@ -111,12 +85,10 @@ async function fetchRelay(
   const handleRateLimit = (): void => {
     const now: number = Date.now();
     if (now - lastRateLimitTime > THROTTLE_MS) {
-      console.groupCollapsed(
-        "%c[Network] Rate Limit Exceeded (429)",
-        "color: #ef4444",
+      logger.error(
+        "NETWORK",
+        "Rate Limit Exceeded (429) - Throttling notifications",
       );
-      console.error("Too many requests. Throttling toasts and logs.");
-      console.groupEnd();
       toast.error("Rate limit exceeded. Please wait a moment.");
       lastRateLimitTime = now;
     }
@@ -141,21 +113,25 @@ async function fetchRelay(
   };
 
   const initialToken: string | null = useAuthStore.getState().accessToken;
+
+  logger.relay(`Fetch: ${params.name}`, { variables });
+
   const response: Response = await send(initialToken);
 
   if (!response.ok) {
     const errorText: string = await response.text();
-    log.error(
-      "Network",
-      `HTTP ${response.status}: ${response.statusText}`,
+    logger.error("NETWORK", `HTTP ${response.status}: ${response.statusText}`, {
       errorText,
-    );
+      operation: params.name,
+    });
     throw new Error(`NETWORK_ERROR_${response.status}`);
   }
 
   const json: GraphQLResponse = (await response.json()) as GraphQLResponse;
 
   if (isUnauthorized(json)) {
+    logger.auth("Unauthorized response detected, attempting refresh...");
+
     if (!refreshPromise) {
       refreshPromise = (async (): Promise<string | null> => {
         try {
@@ -183,12 +159,12 @@ async function fetchRelay(
             useAuthStore
               .getState()
               .setTokens(tokens.accessToken, tokens.refreshToken);
-            log.success("Auth", "Tokens refreshed");
+            logger.auth("Tokens refreshed successfully");
             return tokens.accessToken;
           }
           return null;
         } catch (e: unknown) {
-          log.error("Auth", "Refresh failed", e);
+          logger.error("AUTH", "Token refresh process failed", e);
           return null;
         } finally {
           refreshPromise = null;
@@ -198,6 +174,7 @@ async function fetchRelay(
 
     const newToken: string | null = await refreshPromise;
     if (newToken) {
+      logger.relay(`Retrying: ${params.name} with new token`);
       const retryResponse: Response = await send(newToken);
       return (await retryResponse.json()) as GraphQLResponse;
     }
@@ -216,7 +193,7 @@ const subscribe: SubscribeFunction = (
       return (): void => {};
     }
 
-    log.info("Network:WS", `Subscribing: ${operation.name}`, { variables });
+    logger.ws(`Subscribing: ${operation.name}`, { variables });
 
     const unsubscribe: () => void = wsClient.subscribe(
       { query: operation.text, variables },
@@ -225,7 +202,7 @@ const subscribe: SubscribeFunction = (
           sink.next(data as GraphQLResponse);
         },
         error: (err: unknown): void => {
-          log.error("Network:WS", `Error in ${operation.name}`, err);
+          logger.error("WS", `Subscription error in ${operation.name}`, err);
           sink.error(err as Error);
         },
         complete: (): void => {
