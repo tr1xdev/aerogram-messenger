@@ -8,8 +8,6 @@ CREATE TABLE IF NOT EXISTS messages (
     sequence        BIGSERIAL NOT NULL,
     reply_to_id     UUID REFERENCES messages(id) ON DELETE SET NULL,
     forward_from_id UUID,
-    media_url       VARCHAR(2048),
-    media_type      VARCHAR(100),
     is_edited       BOOLEAN NOT NULL DEFAULT FALSE,
     is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
     is_system       BOOLEAN NOT NULL DEFAULT FALSE,
@@ -21,6 +19,18 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dialog_sequence ON messages(dialog_id, sequence);
 CREATE INDEX IF NOT EXISTS idx_messages_author_id ON messages(author_id);
 CREATE INDEX IF NOT EXISTS idx_messages_deleted_at ON messages(deleted_at);
+
+CREATE TABLE IF NOT EXISTS message_attachments (
+    id           UUID PRIMARY KEY,
+    message_id   UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    type         VARCHAR(50) NOT NULL,
+    file_name    TEXT NOT NULL,
+    file_size    BIGINT NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachments_message_id ON message_attachments(message_id);
 
 CREATE TABLE IF NOT EXISTS message_revisions (
     id          UUID PRIMARY KEY,
