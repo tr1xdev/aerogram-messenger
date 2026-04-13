@@ -51,3 +51,8 @@ models:
             sender: { resolver: true }
             replyTo: { resolver: true }
             forwardedFrom: { resolver: true }
+            attachments: { resolver: true }
+
+    Attachment:
+        fields:
+            url: { resolver: true }
