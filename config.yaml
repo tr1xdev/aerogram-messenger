@@ -36,6 +36,7 @@ s3:
     bucket: ${S3_BUCKET:-aerogram} # Target bucket name for uploads
     use_ssl: ${S3_USE_SSL:-false} # Enable SSL for S3 connection
     region: ${S3_REGION:-us-east-1} # S3 region (default for MinIO is us-east-1)
+    public_host: ${S3_PUBLIC_HOST} # Public host for S3 (from .env)
 
 auth:
     jwt:
