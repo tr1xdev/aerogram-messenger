@@ -5,7 +5,7 @@ type User implements Node {
     lastName: String
     displayName: String
     username: String
-    photoUrl: String
+    photoUrl: String @goField(forceResolver: true)
     bio: String
     status: String!
     isVerified: Boolean!

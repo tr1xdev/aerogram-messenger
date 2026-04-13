@@ -1,3 +1,5 @@
+directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
 type AuthPayload {
   userId: ID!
   accessToken: String
@@ -162,11 +164,21 @@ type SuccessResult {
   success: Boolean!
 }
 
+type Attachment {
+  id: ID!
+  type: String!
+  url: String! @goField(forceResolver: true)
+  fileName: String!
+  fileSize: Long!
+  contentType: String!
+}
+
 type Message implements Node {
   id: ID!
   chatId: ID!
   sender: User
   text: String!
+  attachments: [Attachment!]
   sentAt: String!
   sequence: Long!
   isEdited: Boolean!
@@ -196,7 +208,7 @@ type User implements Node {
   lastName: String
   displayName: String
   username: String
-  photoUrl: String
+  photoUrl: String @goField(forceResolver: true)
   bio: String
   status: String!
   isVerified: Boolean!
