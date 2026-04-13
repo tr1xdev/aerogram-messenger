@@ -37,11 +37,11 @@ export function ProfileContent({
       variables: {},
       onCompleted: (): void => {
         logout();
-        window.location.href = "/login";
+        window.location.href = "/sign-in";
       },
       onError: (): void => {
         logout();
-        window.location.href = "/login";
+        window.location.href = "/sign-in";
       },
     });
   }, [commit, logout, onActionComplete]);
