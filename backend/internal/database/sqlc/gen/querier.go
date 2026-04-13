@@ -17,6 +17,7 @@ type Querier interface {
 	CountBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) (int64, error)
 	CountPinnedDialogs(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUnreadMessages(ctx context.Context, arg CountUnreadMessagesParams) (int64, error)
+	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (MessageAttachment, error)
 	CreateBot(ctx context.Context, arg CreateBotParams) (User, error)
 	CreateDialog(ctx context.Context, arg CreateDialogParams) (Dialog, error)
 	CreateDialogSettings(ctx context.Context, arg CreateDialogSettingsParams) error
@@ -29,6 +30,7 @@ type Querier interface {
 	DeleteBot(ctx context.Context, arg DeleteBotParams) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
+	GetAttachmentsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]MessageAttachment, error)
 	GetBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) ([]User, error)
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error)
 	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)

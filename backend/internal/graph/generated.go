@@ -40,6 +40,7 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Attachment() AttachmentResolver
 	Chat() ChatResolver
 	Message() MessageResolver
 	Mutation() MutationResolver
@@ -53,6 +54,15 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	Attachment struct {
+		ContentType func(childComplexity int) int
+		FileName    func(childComplexity int) int
+		FileSize    func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Type        func(childComplexity int) int
+		URL         func(childComplexity int) int
+	}
+
 	AuthPayload struct {
 		AccessToken          func(childComplexity int) int
 		RefreshToken         func(childComplexity int) int
@@ -99,6 +109,7 @@ type ComplexityRoot struct {
 	}
 
 	Message struct {
+		Attachments   func(childComplexity int) int
 		ChatID        func(childComplexity int) int
 		ForwardedFrom func(childComplexity int) int
 		ID            func(childComplexity int) int
@@ -224,6 +235,9 @@ type ComplexityRoot struct {
 	}
 }
 
+type AttachmentResolver interface {
+	URL(ctx context.Context, obj *model.Attachment) (string, error)
+}
 type ChatResolver interface {
 	ID(ctx context.Context, obj *model.Chat) (string, error)
 }
@@ -231,6 +245,8 @@ type MessageResolver interface {
 	ID(ctx context.Context, obj *model.Message) (string, error)
 
 	Sender(ctx context.Context, obj *model.Message) (*dbgen.User, error)
+
+	Attachments(ctx context.Context, obj *model.Message) ([]*model.Attachment, error)
 
 	ReplyTo(ctx context.Context, obj *model.Message) (*model.Message, error)
 	ForwardedFrom(ctx context.Context, obj *model.Message) (*model.Message, error)
@@ -324,6 +340,43 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "Attachment.contentType":
+		if e.complexity.Attachment.ContentType == nil {
+			break
+		}
+
+		return e.complexity.Attachment.ContentType(childComplexity), true
+	case "Attachment.fileName":
+		if e.complexity.Attachment.FileName == nil {
+			break
+		}
+
+		return e.complexity.Attachment.FileName(childComplexity), true
+	case "Attachment.fileSize":
+		if e.complexity.Attachment.FileSize == nil {
+			break
+		}
+
+		return e.complexity.Attachment.FileSize(childComplexity), true
+	case "Attachment.id":
+		if e.complexity.Attachment.ID == nil {
+			break
+		}
+
+		return e.complexity.Attachment.ID(childComplexity), true
+	case "Attachment.type":
+		if e.complexity.Attachment.Type == nil {
+			break
+		}
+
+		return e.complexity.Attachment.Type(childComplexity), true
+	case "Attachment.url":
+		if e.complexity.Attachment.URL == nil {
+			break
+		}
+
+		return e.complexity.Attachment.URL(childComplexity), true
 
 	case "AuthPayload.accessToken":
 		if e.complexity.AuthPayload.AccessToken == nil {
@@ -476,6 +529,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.InternalError.Message(childComplexity), true
 
+	case "Message.attachments":
+		if e.complexity.Message.Attachments == nil {
+			break
+		}
+
+		return e.complexity.Message.Attachments(childComplexity), true
 	case "Message.chatId":
 		if e.complexity.Message.ChatID == nil {
 			break
@@ -1863,6 +1922,180 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
+func (ec *executionContext) _Attachment_id(ctx context.Context, field graphql.CollectedField, obj *model.Attachment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Attachment_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Attachment_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Attachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Attachment_type(ctx context.Context, field graphql.CollectedField, obj *model.Attachment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Attachment_type,
+		func(ctx context.Context) (any, error) {
+			return obj.Type, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Attachment_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Attachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Attachment_url(ctx context.Context, field graphql.CollectedField, obj *model.Attachment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Attachment_url,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Attachment().URL(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Attachment_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Attachment",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Attachment_fileName(ctx context.Context, field graphql.CollectedField, obj *model.Attachment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Attachment_fileName,
+		func(ctx context.Context) (any, error) {
+			return obj.FileName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Attachment_fileName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Attachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Attachment_fileSize(ctx context.Context, field graphql.CollectedField, obj *model.Attachment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Attachment_fileSize,
+		func(ctx context.Context) (any, error) {
+			return obj.FileSize, nil
+		},
+		nil,
+		ec.marshalNLong2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Attachment_fileSize(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Attachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Long does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Attachment_contentType(ctx context.Context, field graphql.CollectedField, obj *model.Attachment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Attachment_contentType,
+		func(ctx context.Context) (any, error) {
+			return obj.ContentType, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Attachment_contentType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Attachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _AuthPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.AuthPayload) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2301,6 +2534,8 @@ func (ec *executionContext) fieldContext_Chat_lastMessage(_ context.Context, fie
 				return ec.fieldContext_Message_sender(ctx, field)
 			case "text":
 				return ec.fieldContext_Message_text(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Message_attachments(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
 			case "sequence":
@@ -2825,6 +3060,49 @@ func (ec *executionContext) fieldContext_Message_text(_ context.Context, field g
 	return fc, nil
 }
 
+func (ec *executionContext) _Message_attachments(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Message_attachments,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Message().Attachments(ctx, obj)
+		},
+		nil,
+		ec.marshalOAttachment2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAttachmentᚄ,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Message_attachments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Message",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Attachment_id(ctx, field)
+			case "type":
+				return ec.fieldContext_Attachment_type(ctx, field)
+			case "url":
+				return ec.fieldContext_Attachment_url(ctx, field)
+			case "fileName":
+				return ec.fieldContext_Attachment_fileName(ctx, field)
+			case "fileSize":
+				return ec.fieldContext_Attachment_fileSize(ctx, field)
+			case "contentType":
+				return ec.fieldContext_Attachment_contentType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Attachment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Message_sentAt(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2944,6 +3222,8 @@ func (ec *executionContext) fieldContext_Message_replyTo(_ context.Context, fiel
 				return ec.fieldContext_Message_sender(ctx, field)
 			case "text":
 				return ec.fieldContext_Message_text(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Message_attachments(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
 			case "sequence":
@@ -2993,6 +3273,8 @@ func (ec *executionContext) fieldContext_Message_forwardedFrom(_ context.Context
 				return ec.fieldContext_Message_sender(ctx, field)
 			case "text":
 				return ec.fieldContext_Message_text(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Message_attachments(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
 			case "sequence":
@@ -3042,6 +3324,8 @@ func (ec *executionContext) fieldContext_MessageConnection_messages(_ context.Co
 				return ec.fieldContext_Message_sender(ctx, field)
 			case "text":
 				return ec.fieldContext_Message_text(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Message_attachments(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
 			case "sequence":
@@ -5306,6 +5590,8 @@ func (ec *executionContext) fieldContext_Subscription_messageAdded(ctx context.C
 				return ec.fieldContext_Message_sender(ctx, field)
 			case "text":
 				return ec.fieldContext_Message_text(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Message_attachments(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
 			case "sequence":
@@ -5367,6 +5653,8 @@ func (ec *executionContext) fieldContext_Subscription_messageUpdated(ctx context
 				return ec.fieldContext_Message_sender(ctx, field)
 			case "text":
 				return ec.fieldContext_Message_text(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Message_attachments(ctx, field)
 			case "sentAt":
 				return ec.fieldContext_Message_sentAt(ctx, field)
 			case "sequence":
@@ -8208,6 +8496,101 @@ func (ec *executionContext) _SendMessageResult(ctx context.Context, sel ast.Sele
 
 // region    **************************** object.gotpl ****************************
 
+var attachmentImplementors = []string{"Attachment"}
+
+func (ec *executionContext) _Attachment(ctx context.Context, sel ast.SelectionSet, obj *model.Attachment) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, attachmentImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Attachment")
+		case "id":
+			out.Values[i] = ec._Attachment_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "type":
+			out.Values[i] = ec._Attachment_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "url":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Attachment_url(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "fileName":
+			out.Values[i] = ec._Attachment_fileName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "fileSize":
+			out.Values[i] = ec._Attachment_fileSize(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "contentType":
+			out.Values[i] = ec._Attachment_contentType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var authPayloadImplementors = []string{"AuthPayload"}
 
 func (ec *executionContext) _AuthPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AuthPayload) graphql.Marshaler {
@@ -8669,6 +9052,39 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "attachments":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_attachments(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "sentAt":
 			out.Values[i] = ec._Message_sentAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -10567,6 +10983,16 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) marshalNAttachment2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAttachment(ctx context.Context, sel ast.SelectionSet, v *model.Attachment) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Attachment(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNAuthPayload2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v model.AuthPayload) graphql.Marshaler {
 	return ec._AuthPayload(ctx, sel, &v)
 }
@@ -11318,6 +11744,53 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalOAttachment2ᚕᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAttachmentᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Attachment) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNAttachment2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐAttachment(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v any) (bool, error) {

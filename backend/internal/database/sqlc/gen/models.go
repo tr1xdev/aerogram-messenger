@@ -69,8 +69,6 @@ type Message struct {
 	Sequence      int64          `json:"sequence"`
 	ReplyToID     uuid.NullUUID  `json:"reply_to_id"`
 	ForwardFromID uuid.NullUUID  `json:"forward_from_id"`
-	MediaUrl      sql.NullString `json:"media_url"`
-	MediaType     sql.NullString `json:"media_type"`
 	IsEdited      bool           `json:"is_edited"`
 	IsDeleted     bool           `json:"is_deleted"`
 	IsSystem      bool           `json:"is_system"`
@@ -85,6 +83,16 @@ type MessageAction struct {
 	UserID     uuid.UUID `json:"user_id"`
 	ActionType int16     `json:"action_type"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+type MessageAttachment struct {
+	ID          uuid.UUID `json:"id"`
+	MessageID   uuid.UUID `json:"message_id"`
+	Type        string    `json:"type"`
+	FileName    string    `json:"file_name"`
+	FileSize    int64     `json:"file_size"`
+	ContentType string    `json:"content_type"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type MessageRevision struct {

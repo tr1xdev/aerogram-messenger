@@ -53,6 +53,15 @@ type SendMessageResult interface {
 	IsSendMessageResult()
 }
 
+type Attachment struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	URL         string `json:"url"`
+	FileName    string `json:"fileName"`
+	FileSize    int64  `json:"fileSize"`
+	ContentType string `json:"contentType"`
+}
+
 type AuthPayload struct {
 	UserID               string  `json:"userId"`
 	AccessToken          *string `json:"accessToken,omitempty"`
@@ -145,15 +154,16 @@ type LoginInput struct {
 }
 
 type Message struct {
-	ID            string      `json:"id"`
-	ChatID        string      `json:"chatId"`
-	Sender        *dbgen.User `json:"sender,omitempty"`
-	Text          string      `json:"text"`
-	SentAt        string      `json:"sentAt"`
-	Sequence      int64       `json:"sequence"`
-	IsEdited      bool        `json:"isEdited"`
-	ReplyTo       *Message    `json:"replyTo,omitempty"`
-	ForwardedFrom *Message    `json:"forwardedFrom,omitempty"`
+	ID            string        `json:"id"`
+	ChatID        string        `json:"chatId"`
+	Sender        *dbgen.User   `json:"sender,omitempty"`
+	Text          string        `json:"text"`
+	Attachments   []*Attachment `json:"attachments,omitempty"`
+	SentAt        string        `json:"sentAt"`
+	Sequence      int64         `json:"sequence"`
+	IsEdited      bool          `json:"isEdited"`
+	ReplyTo       *Message      `json:"replyTo,omitempty"`
+	ForwardedFrom *Message      `json:"forwardedFrom,omitempty"`
 }
 
 func (Message) IsNode()            {}
