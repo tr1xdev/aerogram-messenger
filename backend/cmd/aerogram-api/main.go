@@ -81,6 +81,7 @@ func main() {
 		cfg.S3.AccessKey,
 		cfg.S3.SecretKey,
 		cfg.S3.Bucket,
+		cfg.S3.PublicHost,
 	)
 	if err != nil {
 		log.Fatalf("failed to init s3 storage: %v", err)

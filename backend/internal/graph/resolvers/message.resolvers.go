@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
@@ -24,6 +25,24 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+// URL is the resolver for the url field.
+func (r *attachmentResolver) URL(ctx context.Context, obj *model.Attachment) (string, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return "", &gqlerror.Error{
+			Message:    "Unauthorized access",
+			Extensions: map[string]interface{}{"code": "UNAUTHORIZED"},
+		}
+	}
+
+	url, err := r.Storage.GetPresignedURL(ctx, obj.ID, 15*time.Minute)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate secure url: %w", err)
+	}
+
+	return url, nil
+}
+
 // ID is the resolver for the id field.
 func (r *messageResolver) ID(ctx context.Context, obj *model.Message) (string, error) {
 	return helpers.EncodeGlobalID("Message", helpers.ToRawID(obj.ID)), nil
@@ -35,6 +54,33 @@ func (r *messageResolver) Sender(ctx context.Context, obj *model.Message) (*dbge
 		return nil, nil
 	}
 	return loaders.LoadUser(ctx, helpers.ToRawID(helpers.EncodeGlobalID("User", obj.Sender.ID.String())))
+}
+
+// Attachments is the resolver for the attachments field.
+func (r *messageResolver) Attachments(ctx context.Context, obj *model.Message) ([]*model.Attachment, error) {
+	rawID := helpers.ToRawID(obj.ID)
+	msgUUID, err := uuid.Parse(rawID)
+	if err != nil {
+		return nil, nil
+	}
+
+	dbAttachments, err := r.Store.GetAttachmentsByMessageIDs(ctx, []uuid.UUID{msgUUID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch attachments: %w", err)
+	}
+
+	result := make([]*model.Attachment, 0, len(dbAttachments))
+	for _, a := range dbAttachments {
+		result = append(result, &model.Attachment{
+			ID:          a.ID.String(),
+			Type:        a.Type,
+			FileName:    a.FileName,
+			FileSize:    a.FileSize,
+			ContentType: a.ContentType,
+		})
+	}
+
+	return result, nil
 }
 
 // ReplyTo is the resolver for the replyTo field.
@@ -364,7 +410,11 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 	return readChan, nil
 }
 
+// Attachment returns graph.AttachmentResolver implementation.
+func (r *Resolver) Attachment() graph.AttachmentResolver { return &attachmentResolver{r} }
+
 // Message returns graph.MessageResolver implementation.
 func (r *Resolver) Message() graph.MessageResolver { return &messageResolver{r} }
 
+type attachmentResolver struct{ *Resolver }
 type messageResolver struct{ *Resolver }
