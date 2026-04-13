@@ -171,10 +171,12 @@ async function fetchRelay(
     return pending;
   }
 
+  let updateTimer: ReturnType<typeof setTimeout> | null = null;
+
   if (isQuery) {
-    Promise.resolve().then((): void => {
+    updateTimer = setTimeout((): void => {
       setIsUpdating(true);
-    });
+    }, 1000);
   }
 
   const runExecution = async (): Promise<GraphQLResponse> => {
@@ -201,22 +203,22 @@ async function fetchRelay(
       const error: Error = err as Error;
       logger.error("RELAY", `Execution failed: ${params.name}`, error);
 
-      const errorResponse = {
+      return {
         data: null,
         errors: [{ message: error.message }],
-      };
-
-      return errorResponse as unknown as GraphQLResponse;
+      } as unknown as GraphQLResponse;
     } finally {
+      if (updateTimer) {
+        clearTimeout(updateTimer);
+      }
+
       if (isQuery) {
         Promise.resolve().then((): void => {
           setIsUpdating(false);
         });
       }
 
-      const current: Promise<GraphQLResponse> | undefined =
-        inFlightRequests.get(cacheKey);
-      if (current === executionPromise) {
+      if (inFlightRequests.get(cacheKey) === executionPromise) {
         inFlightRequests.delete(cacheKey);
       }
     }
