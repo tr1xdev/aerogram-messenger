@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { graphql, useMutation } from "react-relay";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuthStore } from "@/store/auth-store";
@@ -39,13 +39,24 @@ const verifyEmailMutation = graphql`
   }
 `;
 
+function normalizeError(message: string): string {
+  if (!message) return "An unknown error occurred";
+
+  const cleanMessage = message
+    .replace(/^No data returned for operation `\w+`, got error\(s\): /, "")
+    .split("See the error")[0]
+    .trim();
+
+  return cleanMessage.charAt(0).toUpperCase() + cleanMessage.slice(1);
+}
+
 export function parseApiError(error: unknown): string {
-  if (typeof error === "string") return error;
-  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return normalizeError(error);
+  if (error instanceof Error) return normalizeError(error.message);
   if (Array.isArray(error) && error.length > 0) {
-    return error[0]?.message || "An unknown error occurred";
+    return normalizeError(error[0]?.message);
   }
-  return "An unknown error occurred";
+  return normalizeError("");
 }
 
 export const useLogin = (): {
@@ -60,37 +71,32 @@ export const useLogin = (): {
   const [error, setError] = useState<Error | null>(null);
   const [commit, isInFlight] = useMutation<useAuthLoginMutation>(loginMutation);
 
-  const mutate = (params: {
-    input: useAuthLoginMutation["variables"]["input"];
-  }): void => {
-    setError(null);
-    commit({
-      variables: { input: params.input },
-      onCompleted: (
-        response: useAuthLoginMutation["response"],
-        errors,
-      ): void => {
-        if (errors && errors.length > 0) {
-          setError(new Error(errors[0].message));
-          return;
-        }
+  const mutate = useCallback(
+    (params: { input: useAuthLoginMutation["variables"]["input"] }): void => {
+      setError(null);
+      commit({
+        variables: { input: params.input },
+        onCompleted: (response, errors): void => {
+          if (errors && errors.length > 0) {
+            setError(new Error(errors[0].message));
+            return;
+          }
 
-        const data = response.login;
-        if (data.requiresVerification) {
-          navigate({
-            to: "/otp",
-            search: { userId: data.userId },
-          });
-        } else if (data.accessToken && data.refreshToken) {
-          setTokens(data.accessToken, data.refreshToken);
-          navigate({ to: "/" });
-        }
-      },
-      onError: (err: Error): void => {
-        setError(err);
-      },
-    });
-  };
+          const data = response?.login;
+          if (!data) return;
+
+          if (data.requiresVerification) {
+            navigate({ to: "/otp", search: { userId: data.userId } });
+          } else if (data.accessToken && data.refreshToken) {
+            setTokens(data.accessToken, data.refreshToken);
+            navigate({ to: "/" });
+          }
+        },
+        onError: (err: Error): void => setError(err),
+      });
+    },
+    [commit, navigate, setTokens],
+  );
 
   return { mutate, isPending: isInFlight, error };
 };
@@ -108,37 +114,32 @@ export const useSignUp = (): {
   const [commit, isInFlight] =
     useMutation<useAuthSignUpMutation>(signUpMutation);
 
-  const mutate = (params: {
-    input: useAuthSignUpMutation["variables"]["input"];
-  }): void => {
-    setError(null);
-    commit({
-      variables: { input: params.input },
-      onCompleted: (
-        response: useAuthSignUpMutation["response"],
-        errors,
-      ): void => {
-        if (errors && errors.length > 0) {
-          setError(new Error(errors[0].message));
-          return;
-        }
+  const mutate = useCallback(
+    (params: { input: useAuthSignUpMutation["variables"]["input"] }): void => {
+      setError(null);
+      commit({
+        variables: { input: params.input },
+        onCompleted: (response, errors): void => {
+          if (errors && errors.length > 0) {
+            setError(new Error(errors[0].message));
+            return;
+          }
 
-        const data = response.signUp;
-        if (data.requiresVerification) {
-          navigate({
-            to: "/otp",
-            search: { userId: data.userId },
-          });
-        } else if (data.accessToken && data.refreshToken) {
-          setTokens(data.accessToken, data.refreshToken);
-          navigate({ to: "/" });
-        }
-      },
-      onError: (err: Error): void => {
-        setError(err);
-      },
-    });
-  };
+          const data = response?.signUp;
+          if (!data) return;
+
+          if (data.requiresVerification) {
+            navigate({ to: "/otp", search: { userId: data.userId } });
+          } else if (data.accessToken && data.refreshToken) {
+            setTokens(data.accessToken, data.refreshToken);
+            navigate({ to: "/" });
+          }
+        },
+        onError: (err: Error): void => setError(err),
+      });
+    },
+    [commit, navigate, setTokens],
+  );
 
   return { mutate, isPending: isInFlight, error };
 };
@@ -156,32 +157,30 @@ export const useVerifyEmail = (): {
   const [commit, isInFlight] =
     useMutation<useAuthVerifyEmailMutation>(verifyEmailMutation);
 
-  const mutate = (params: {
-    input: useAuthVerifyEmailMutation["variables"]["input"];
-  }): void => {
-    setError(null);
-    commit({
-      variables: { input: params.input },
-      onCompleted: (
-        response: useAuthVerifyEmailMutation["response"],
-        errors,
-      ): void => {
-        if (errors && errors.length > 0) {
-          setError(new Error(errors[0].message));
-          return;
-        }
+  const mutate = useCallback(
+    (params: {
+      input: useAuthVerifyEmailMutation["variables"]["input"];
+    }): void => {
+      setError(null);
+      commit({
+        variables: { input: params.input },
+        onCompleted: (response, errors): void => {
+          if (errors && errors.length > 0) {
+            setError(new Error(errors[0].message));
+            return;
+          }
 
-        const data = response.verifyEmail;
-        if (data.accessToken && data.refreshToken) {
-          setTokens(data.accessToken, data.refreshToken);
-          navigate({ to: "/" });
-        }
-      },
-      onError: (err: Error): void => {
-        setError(err);
-      },
-    });
-  };
+          const data = response?.verifyEmail;
+          if (data?.accessToken && data?.refreshToken) {
+            setTokens(data.accessToken, data.refreshToken);
+            navigate({ to: "/" });
+          }
+        },
+        onError: (err: Error): void => setError(err),
+      });
+    },
+    [commit, navigate, setTokens],
+  );
 
   return { mutate, isPending: isInFlight, error };
 };
