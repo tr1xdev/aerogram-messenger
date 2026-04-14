@@ -65,10 +65,15 @@ function hasUnauthorizedError(response: GraphQLResponse): boolean {
       "errors" in res &&
       Array.isArray(res.errors)
     ) {
-      return res.errors.some(
-        (err: { message?: string }): boolean =>
-          err.message?.toLowerCase().includes("unauthorized") ?? false,
-      );
+      return res.errors.some((err: { message?: string }): boolean => {
+        const msg: string = err.message?.toLowerCase() ?? "";
+        return (
+          msg.includes("unauthorized") ||
+          msg.includes("session expired") ||
+          msg.includes("session terminated") ||
+          msg.includes("not found")
+        );
+      });
     }
     return false;
   };
@@ -117,7 +122,7 @@ async function performFetch(
     throw new Error(`NETWORK_ERROR_${response.status}`);
   }
 
-  return response.json() as Promise<GraphQLResponse>;
+  return (await response.json()) as GraphQLResponse;
 }
 
 async function executeRefresh(): Promise<string | null> {
@@ -195,6 +200,10 @@ async function fetchRelay(
         if (newToken) {
           logger.auth(`Retrying ${params.name} with new token`);
           json = await performFetch(params, variables, newToken);
+        } else {
+          useAuthStore.getState().logout();
+          localStorage.removeItem("recent_searches");
+          window.location.href = "/sign-in";
         }
       }
 

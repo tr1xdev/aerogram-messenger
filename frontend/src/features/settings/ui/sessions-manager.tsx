@@ -1,5 +1,5 @@
 import { useState, useCallback, Suspense, useMemo } from "react";
-import type { ReactElement } from "react";
+import type { ReactElement, FC } from "react";
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import {
   Monitor,
@@ -51,6 +51,10 @@ const TERMINATE_ALL_OTHERS = graphql`
     terminateAllOtherSessions
   }
 `;
+
+interface SessionsManagerProps {
+  userId?: string;
+}
 
 function SessionsSkeleton(): ReactElement {
   return (
@@ -272,10 +276,10 @@ function SessionsManagerContent(): ReactElement {
   );
 }
 
-export function SessionsManager(): ReactElement {
+export const SessionsManager: FC<SessionsManagerProps> = () => {
   return (
     <Suspense fallback={<SessionsSkeleton />}>
       <SessionsManagerContent />
     </Suspense>
   );
-}
+};
