@@ -33,7 +33,7 @@ s3:
     endpoint: ${S3_ENDPOINT:-localhost:9000} # S3 server endpoint (e.g., MinIO or AWS)
     access_key: ${S3_ACCESS_KEY} # S3 access key (from .env)
     secret_key: ${S3_SECRET_KEY} # S3 secret key (from .env)
-    bucket: ${S3_BUCKET:-aerogram} # Target bucket name for uploads
+    bucket: ${S3_BUCKET_NAME:-aerogram} # Target bucket name for uploads
     use_ssl: ${S3_USE_SSL:-false} # Enable SSL for S3 connection
     region: ${S3_REGION:-us-east-1} # S3 region (default for MinIO is us-east-1)
     public_host: ${S3_PUBLIC_HOST} # Public host for S3 (from .env)
