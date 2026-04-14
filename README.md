@@ -2,7 +2,10 @@
 
 # Aerogram
 
-Aerogram is a high-performance, open-source real-time messaging platform built with [Go](https://go.dev/) and [React](https://reactjs.org/). It operates as a modular monolith utilizing a [GraphQL](https://graphql.org/) API for the frontend and [gRPC](https://grpc.io/) with [Protocol Buffers](https://protobuf.dev/) for internal service communication, backed by [PostgreSQL](https://www.postgresql.org/) (via [sqlc](https://sqlc.dev/)) and [Redis](https://redis.io/) for Pub/Sub. The networking stack is designed for modern requirements, serving traffic over [HTTP/2](https://httpwg.org/specs/rfc7540.html) (TLS) with experimental [HTTP/3](https://quicwg.org/) (QUIC) support.
+
+## About
+
+Aerogram is a high-performance, open-source real-time messaging platform built with Go and React. Designed as a modular monolith, it emphasizes end-to-end type safety and system integrity using a gRPC-backed architecture and GraphQL. The project focuses on a modern, low-latency networking stack and architectural scalability, providing a robust foundation for real-time communication.
 
 ---
 
