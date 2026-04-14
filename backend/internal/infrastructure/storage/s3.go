@@ -22,9 +22,11 @@ type S3Storage struct {
 }
 
 func NewS3Storage(ctx context.Context, endpoint, accessKey, secretKey, bucket, publicHost string) (*S3Storage, error) {
+	creds := credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")
+
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion("us-east-1"),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+		config.WithCredentialsProvider(creds),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load SDK config: %w", err)
@@ -35,9 +37,19 @@ func NewS3Storage(ctx context.Context, endpoint, accessKey, secretKey, bucket, p
 		o.UsePathStyle = true
 	})
 
+	signEndpoint := endpoint
+	if publicHost != "" {
+		signEndpoint = publicHost
+	}
+
+	signClient := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(signEndpoint)
+		o.UsePathStyle = true
+	})
+
 	storage := &S3Storage{
 		client:        client,
-		presignClient: s3.NewPresignClient(client),
+		presignClient: s3.NewPresignClient(signClient),
 		bucket:        bucket,
 		publicHost:    publicHost,
 	}
@@ -92,21 +104,13 @@ func (s *S3Storage) GetPresignedURL(ctx context.Context, key string, expires tim
 		return "", fmt.Errorf("failed to generate presigned url: %w", err)
 	}
 
+	finalURL := request.URL
 	if s.publicHost != "" {
-		u, err := url.Parse(request.URL)
-		if err != nil {
-			return request.URL, nil
-		}
-
-		publicURL, _ := url.Parse(s.publicHost)
-		u.Scheme = publicURL.Scheme
-		u.Host = publicURL.Host
-
-		newPath := strings.Replace(u.Path, "/"+s.bucket, "/media", 1)
-		u.Path = newPath
-
-		return u.String(), nil
+		u, _ := url.Parse(finalURL)
+		u.Path = "/media" + u.Path
+		u.Path = strings.ReplaceAll(u.Path, "//", "/")
+		finalURL = u.String()
 	}
 
-	return request.URL, nil
+	return finalURL, nil
 }

@@ -496,14 +496,24 @@ func (r *userResolver) Username(ctx context.Context, obj *dbgen.User) (*string, 
 
 // PhotoURL is the resolver for the photoUrl field.
 func (r *userResolver) PhotoURL(ctx context.Context, obj *dbgen.User) (*string, error) {
-	if obj.PhotoUrl.Valid {
-		return &obj.PhotoUrl.String, nil
+	var path string
+
+	if obj.PhotoUrl.Valid && obj.PhotoUrl.String != "" {
+		path = obj.PhotoUrl.String
+	} else {
+		u, err := loaders.LoadUser(ctx, obj.ID.String())
+		if err != nil || u == nil || !u.PhotoUrl.Valid || u.PhotoUrl.String == "" {
+			return nil, nil
+		}
+		path = u.PhotoUrl.String
 	}
-	u, err := loaders.LoadUser(ctx, obj.ID.String())
+
+	presignedURL, err := r.Storage.GetPresignedURL(ctx, path, 24*time.Hour)
 	if err != nil {
 		return nil, nil
 	}
-	return helpers.ToStringPtr(u.PhotoUrl), nil
+
+	return &presignedURL, nil
 }
 
 // Bio is the resolver for the bio field.
