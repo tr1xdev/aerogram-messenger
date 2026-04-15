@@ -33,19 +33,40 @@ import (
 )
 
 // UploadAvatar is the resolver for the uploadAvatar field.
-func (r *mutationResolver) UploadAvatar(ctx context.Context, file graphql.Upload) (*dbgen.User, error) {
+func (r *mutationResolver) UploadAvatar(ctx context.Context, file graphql.Upload, userID *string) (*dbgen.User, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return nil, errors.New("unauthorized access")
 	}
 
-	uid, err := uuid.Parse(authID)
+	currentUserID, err := uuid.Parse(authID)
 	if err != nil {
-		return nil, errors.New("invalid user id")
+		return nil, errors.New("invalid session user id")
+	}
+
+	targetID := currentUserID
+	if userID != nil {
+		rawID := helpers.ToRawID(*userID)
+		parsedTarget, err := uuid.Parse(rawID)
+		if err != nil {
+			return nil, errors.New("invalid target user id")
+		}
+		targetID = parsedTarget
+	}
+
+	if targetID != currentUserID {
+		targetUser, err := r.Store.GetUserByID(ctx, targetID)
+		if err != nil {
+			return nil, errors.New("target user not found")
+		}
+
+		if !targetUser.IsBot || !targetUser.BotOwnerID.Valid || targetUser.BotOwnerID.UUID != currentUserID {
+			return nil, errors.New("permission denied: you are not the owner of this bot")
+		}
 	}
 
 	ext := filepath.Ext(file.Filename)
-	fileKey := fmt.Sprintf("avatars/%s/avatar_%d%s", authID, time.Now().Unix(), ext)
+	fileKey := fmt.Sprintf("avatars/%s/avatar_%d%s", targetID.String(), time.Now().Unix(), ext)
 
 	_, err = r.Storage.UploadFile(ctx, fileKey, file.File, file.ContentType)
 	if err != nil {
@@ -53,7 +74,7 @@ func (r *mutationResolver) UploadAvatar(ctx context.Context, file graphql.Upload
 	}
 
 	updatedUser, err := r.Store.UpdateUserPhoto(ctx, dbgen.UpdateUserPhotoParams{
-		ID:       uid,
+		ID:       targetID,
 		PhotoUrl: sql.NullString{String: fileKey, Valid: true},
 	})
 	if err != nil {
