@@ -7,7 +7,11 @@ type LogNamespace =
   | "WS"
   | "STORE"
   | "CONFIG"
-  | "APP";
+  | "APP"
+  | "CHAT"
+  | "UI"
+  | "NAV"
+  | "USER_ACTION";
 
 const COLORS: Record<LogNamespace | LogLevel, string> = {
   info: "#3b82f6",
@@ -22,6 +26,10 @@ const COLORS: Record<LogNamespace | LogLevel, string> = {
   STORE: "#14b8a6",
   CONFIG: "#475569",
   APP: "#000000",
+  CHAT: "#10b981",
+  UI: "#6366f1",
+  NAV: "#f43f5e",
+  USER_ACTION: "#ef4444",
 };
 
 class Logger {
@@ -93,6 +101,14 @@ class Logger {
 
   public network(msg: string, data?: unknown): void {
     this.dispatch("NETWORK", msg, data, "info");
+  }
+
+  public chat(msg: string, data?: unknown): void {
+    this.dispatch("CHAT", msg, data, "info");
+  }
+
+  public ui(msg: string, data?: unknown): void {
+    this.dispatch("UI", msg, data, "info");
   }
 
   public info(ns: LogNamespace, msg: string, data?: unknown): void {
