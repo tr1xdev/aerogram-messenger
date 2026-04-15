@@ -300,7 +300,9 @@ func (r *queryResolver) Node(ctx context.Context, id string) (model.Node, error)
 		if err != nil {
 			return nil, helpers.MapGRPCError(err)
 		}
-		return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
+
+		// Убираем r.Store, оставляем только (ctx, authID, pbChat)
+		return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 	default:
 		return nil, fmt.Errorf("unsupported node type: %s", kind)
 	}

@@ -50,7 +50,7 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 		return &model.InternalError{Message: err.Error()}, nil
 	}
 
-	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
+	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
 // CreateDirectChat is the resolver for the createDirectChat field.
@@ -74,7 +74,7 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 		return &model.InternalError{Message: err.Error()}, nil
 	}
 
-	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
+	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
 // PinChat is the resolver for the pinChat field.
@@ -148,7 +148,7 @@ func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error
 
 	chats := make([]*model.Chat, 0, len(resp.Chats))
 	for _, c := range resp.Chats {
-		if enriched, err := helpers.EnrichChat(ctx, r.Store, authID, c); err == nil {
+		if enriched, err := r.Enricher.EnrichChat(ctx, authID, c); err == nil {
 			chats = append(chats, enriched)
 		}
 	}
@@ -178,7 +178,7 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 		return &model.NotFoundError{Message: "chat not found"}, nil
 	}
 
-	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
+	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
 // ChatCreated is the resolver for the chatCreated field.

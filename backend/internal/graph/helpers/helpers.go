@@ -10,10 +10,23 @@ import (
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/storage"
 	"google.golang.org/grpc/status"
 )
 
-func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat *chatv1.Chat) (*model.Chat, error) {
+type ChatEnricher struct {
+	store dbgen.Querier
+	s3    *storage.S3Storage
+}
+
+func NewChatEnricher(store dbgen.Querier, s3 *storage.S3Storage) *ChatEnricher {
+	return &ChatEnricher{
+		store: store,
+		s3:    s3,
+	}
+}
+
+func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *chatv1.Chat) (*model.Chat, error) {
 	parsedAuthID, err := uuid.Parse(authID)
 	if err != nil {
 		return nil, err
@@ -32,7 +45,7 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		chatType = model.ChatTypeChannel
 	}
 
-	dbMembers, err := store.GetDialogMembers(ctx, chatID)
+	dbMembers, err := e.store.GetDialogMembers(ctx, chatID)
 	if err != nil {
 		dbMembers = []dbgen.GetDialogMembersRow{}
 	}
@@ -59,7 +72,7 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 	var lastMsg *model.Message
 	if pbChat.LastMessageId != "" {
 		if mID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
-			if m, err := store.GetMessageByID(ctx, mID); err == nil {
+			if m, err := e.store.GetMessageByID(ctx, mID); err == nil {
 				lastMsg = MapDBMessageToModel(&m)
 				if m.AuthorID != uuid.Nil {
 					idsMap[m.AuthorID] = true
@@ -73,10 +86,16 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		userIDs = append(userIDs, id)
 	}
 
-	dbUsers, _ := store.GetUsersByIDs(ctx, userIDs)
+	dbUsers, _ := e.store.GetUsersByIDs(ctx, userIDs)
 	userMap := make(map[uuid.UUID]*dbgen.User)
 	for i := range dbUsers {
-		userMap[dbUsers[i].ID] = &dbUsers[i]
+		u := dbUsers[i]
+		if u.PhotoUrl.Valid && u.PhotoUrl.String != "" {
+			if signed, err := e.s3.GetPresignedURL(ctx, u.PhotoUrl.String, time.Hour*24); err == nil {
+				u.PhotoUrl.String = signed
+			}
+		}
+		userMap[u.ID] = &u
 	}
 
 	var gqlMembers []*model.ChatMember
@@ -93,7 +112,9 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 	var displayPhoto *string
 
 	if pbChat.PhotoUrl != "" {
-		displayPhoto = &pbChat.PhotoUrl
+		if signed, err := e.s3.GetPresignedURL(ctx, pbChat.PhotoUrl, time.Hour*24); err == nil {
+			displayPhoto = &signed
+		}
 	}
 
 	if chatType == model.ChatTypePrivate {
@@ -101,8 +122,8 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		for id, u := range userMap {
 			if id != parsedAuthID {
 				displayTitle = FormatFullName(u.FirstName, u.LastName)
-				if displayPhoto == nil {
-					displayPhoto = NullStringToStringPtr(u.PhotoUrl)
+				if displayPhoto == nil && u.PhotoUrl.Valid {
+					displayPhoto = &u.PhotoUrl.String
 				}
 				foundPartner = true
 				break
@@ -117,7 +138,7 @@ func EnrichChat(ctx context.Context, store dbgen.Querier, authID string, pbChat 
 		displayTitle = "Untitled Chat"
 	}
 
-	uCount, _ := store.CountUnreadMessages(ctx, dbgen.CountUnreadMessagesParams{
+	uCount, _ := e.store.CountUnreadMessages(ctx, dbgen.CountUnreadMessagesParams{
 		DialogID: chatID,
 		AuthorID: parsedAuthID,
 		Sequence: myReadSeq,
