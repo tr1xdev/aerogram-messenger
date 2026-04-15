@@ -94,6 +94,10 @@ func (s *S3Storage) UploadFile(ctx context.Context, key string, body io.Reader, 
 }
 
 func (s *S3Storage) GetPresignedURL(ctx context.Context, key string, expires time.Duration) (string, error) {
+	if strings.HasPrefix(key, "http") {
+		return key, nil
+	}
+
 	request, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
