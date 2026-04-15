@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode, Suspense } from "react";
 import { graphql, useLazyLoadQuery } from "react-relay";
 import { useNavigate } from "@tanstack/react-router";
 import { MdVerified } from "react-icons/md";
@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import type { chatUserPopoverQuery } from "./__generated__/chatUserPopoverQuery.graphql";
@@ -33,6 +34,39 @@ const UserQuery = graphql`
     }
   }
 `;
+
+function PopoverSkeleton() {
+  return (
+    <div className="flex flex-col">
+      <Skeleton className="h-16 w-full rounded-none bg-muted/50" />
+      <div className="px-4 pb-4">
+        <div className="relative -mt-10 mb-3">
+          <Skeleton className="h-20 w-20 rounded-full border-4 border-background shadow-md" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+        <div className="mt-6 space-y-3">
+          <div className="space-y-1">
+            <Skeleton className="h-3 w-10" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+          <div className="pt-2 border-t border-border/40 space-y-2">
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-12" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-12" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PopoverContentInner({ userId }: { userId: string }): ReactNode {
   const data = useLazyLoadQuery<chatUserPopoverQuery>(
@@ -149,7 +183,9 @@ export function ChatUserPopover({
         className="w-72 p-0 overflow-hidden border-border/50 shadow-xl"
         align="start"
       >
-        {open && <PopoverContentInner userId={userId} />}
+        <Suspense fallback={<PopoverSkeleton />}>
+          {open && <PopoverContentInner userId={userId} />}
+        </Suspense>
       </PopoverContent>
     </Popover>
   );

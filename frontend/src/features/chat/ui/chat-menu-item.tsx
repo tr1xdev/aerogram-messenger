@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useFragment, graphql } from "react-relay";
 import { SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { MdVerified } from "react-icons/md";
 import {
@@ -29,7 +29,7 @@ interface ChatMenuItemProps {
   myId?: string;
 }
 
-export function ChatMenuItem(props: ChatMenuItemProps): React.ReactNode {
+export function ChatMenuItem(props: ChatMenuItemProps): ReactNode {
   const chat: chatMenuItem_chat$data = useFragment(
     graphql`
       fragment chatMenuItem_chat on Chat {
@@ -103,11 +103,6 @@ export function ChatMenuItem(props: ChatMenuItemProps): React.ReactNode {
     return chat.photoUrl || undefined;
   }, [chat.type, chat.photoUrl, otherUser?.photoUrl]);
 
-  const initial: string = useMemo(
-    (): string => (displayName.length > 0 ? displayName[0].toUpperCase() : "?"),
-    [displayName],
-  );
-
   const lastMessage = chat.lastMessage;
   const isMe: boolean = lastMessage?.sender?.id === myId;
   const sender = lastMessage?.sender;
@@ -141,16 +136,12 @@ export function ChatMenuItem(props: ChatMenuItemProps): React.ReactNode {
                 className="flex items-center gap-3 w-full h-full"
               >
                 <div className="relative shrink-0 self-center h-14 w-14">
-                  <Avatar className="h-full w-full border border-border/40 rounded-full overflow-hidden aspect-square">
-                    <AvatarImage
-                      src={avatarUrl}
-                      alt={displayName}
-                      className="h-full w-full object-cover aspect-square"
-                    />
-                    <AvatarFallback className="h-full w-full flex items-center justify-center bg-linear-to-br from-[#54a4f5] to-[#2196f3] text-white/90 font-bold text-lg uppercase aspect-square">
-                      {initial}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    src={avatarUrl}
+                    fallback={displayName}
+                    size={56}
+                    className="border border-border/40"
+                  />
                   {isOnline && (
                     <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500 z-10" />
                   )}

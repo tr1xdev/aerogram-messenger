@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -25,7 +25,6 @@ import {
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import { ChatUserPopover } from "./chat-user-popover";
-// После запуска npm run relay имя типа тоже изменится на chatHeader_user$key
 import type { chatHeader_user$key } from "./__generated__/chatHeader_user.graphql";
 
 const ChatHeaderUserFragment = graphql`
@@ -81,8 +80,11 @@ export const ChatHeader = memo(function ChatHeader({
     return formatLastSeen(rawStatus, new Date(now));
   }, [rawStatus, isTyping, now]);
 
-  const effectivePhotoUrl: string | undefined =
-    photoUrl ?? user?.photoUrl ?? undefined;
+  const effectivePhotoUrl: string | undefined = useMemo(():
+    | string
+    | undefined => {
+    return photoUrl || user?.photoUrl || undefined;
+  }, [user?.photoUrl, photoUrl]);
 
   return (
     <header className="flex h-16 items-center justify-between px-4 border-b shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -99,7 +101,7 @@ export const ChatHeader = memo(function ChatHeader({
             <ChevronLeft className="h-6 w-6" />
           </Button>
           {totalUnread > 0 && (
-            <span className="absolute top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold border-2 border-background px-1 shadow-sm z-60">
+            <span className="absolute top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold border-2 border-background px-1 z-60">
               {totalUnread}
             </span>
           )}
@@ -116,18 +118,12 @@ export const ChatHeader = memo(function ChatHeader({
         ) : user ? (
           <ChatUserPopover userId={user.id}>
             <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
-              <Avatar className="h-10 w-10 border border-border/50 shadow-sm rounded-full overflow-hidden shrink-0">
-                {effectivePhotoUrl && (
-                  <AvatarImage
-                    src={effectivePhotoUrl}
-                    alt={title || "Chat"}
-                    className="aspect-square h-full w-full object-cover"
-                  />
-                )}
-                <AvatarFallback className="font-bold bg-primary/5 text-primary text-xs h-full w-full flex items-center justify-center uppercase">
-                  {title?.[0] || "?"}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                src={effectivePhotoUrl}
+                fallback={title || "Chat"}
+                size={40}
+                className="border border-border/40"
+              />
               <div className="flex flex-col min-w-0">
                 <span className="text-[15px] font-bold truncate leading-none">
                   {title}
@@ -140,18 +136,7 @@ export const ChatHeader = memo(function ChatHeader({
                       : "text-muted-foreground",
                   )}
                 >
-                  {isTyping ? (
-                    <div className="flex items-center gap-0.5">
-                      <div className="flex gap-[1.5px] mr-1">
-                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s]" />
-                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s] [animation-delay:200ms]" />
-                        <span className="w-1 h-1 rounded-full bg-current animate-pulse [animation-duration:1s] [animation-delay:400ms]" />
-                      </div>
-                      <span>typing</span>
-                    </div>
-                  ) : (
-                    statusText
-                  )}
+                  {isTyping ? "typing..." : statusText}
                 </span>
               </div>
             </div>
@@ -188,30 +173,24 @@ export const ChatHeader = memo(function ChatHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={(): void => {}}>
+            <DropdownMenuItem>
               <Search className="mr-2 h-4 w-4" />
               <span>Search messages</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(): void => {}}>
+            <DropdownMenuItem>
               <BellOff className="mr-2 h-4 w-4" />
               <span>Mute notifications</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(): void => {}}>
+            <DropdownMenuItem>
               <Shield className="mr-2 h-4 w-4" />
               <span>Start secret chat</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={(): void => {}}
-              className="text-destructive focus:text-destructive"
-            >
+            <DropdownMenuItem className="text-destructive focus:text-destructive">
               <Ban className="mr-2 h-4 w-4" />
               <span>Block user</span>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(): void => {}}
-              className="text-destructive focus:text-destructive"
-            >
+            <DropdownMenuItem className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               <span>Delete chat</span>
             </DropdownMenuItem>
