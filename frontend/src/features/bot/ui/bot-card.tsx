@@ -1,13 +1,15 @@
 import * as React from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Bot, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserAvatar } from "@/components/user-avatar";
 
 interface BotCardProps {
   id: string;
-  username: string;
-  firstName: string;
-  description?: string;
+  username?: string | null;
+  firstName?: string | null;
+  description?: string | null;
+  photoUrl?: string | null;
 }
 
 export const BotCard: React.FC<BotCardProps> = ({
@@ -15,32 +17,38 @@ export const BotCard: React.FC<BotCardProps> = ({
   username,
   firstName,
   description,
-}) => {
+  photoUrl,
+}): React.ReactNode => {
   const navigate = useNavigate();
 
   return (
     <div
       className={cn(
         "group flex items-center justify-between gap-4 px-5 py-5",
-        "hover:bg-muted/30 cursor-pointer border-b border-muted/20 last:border-0 transition-all duration-200",
+        "hover:bg-muted/30 cursor-pointer transition-all duration-200 relative",
       )}
       onClick={(): void => {
-        navigate({ to: `/bots/${id}` });
+        navigate({ to: `/bots/${id}` }).catch((): void => {});
       }}
     >
       <div className="flex items-start gap-4 flex-1 min-w-0">
-        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20 group-hover:border-primary/40 transition-colors">
-          <Bot className="h-5 w-5 text-primary/60 group-hover:text-primary transition-colors" />
-        </div>
+        <UserAvatar
+          src={photoUrl ?? undefined}
+          fallback={firstName || "B"}
+          size={40}
+          className="rounded-xl border border-muted/20 shrink-0"
+        />
 
-        <div className="flex flex-col min-w-0 flex-1">
+        <div className="flex flex-col min-w-0 flex-1 relative self-stretch justify-center">
           <div className="flex items-center gap-2 leading-none">
-            <span className="text-[15px] font-bold text-foreground group-hover:text-primary/90 transition-colors">
-              {firstName}
+            <span className="text-[15px] font-bold text-foreground group-hover:text-primary/90 transition-colors truncate">
+              {firstName ?? "Unknown Bot"}
             </span>
-            <span className="text-[11px] font-mono text-muted-foreground/40 font-medium tracking-tight pt-0.5">
-              @{username}
-            </span>
+            {username && (
+              <span className="text-[11px] font-mono text-muted-foreground/40 font-medium tracking-tight pt-0.5 truncate">
+                @{username}
+              </span>
+            )}
           </div>
 
           {description && (
@@ -48,6 +56,8 @@ export const BotCard: React.FC<BotCardProps> = ({
               {description}
             </p>
           )}
+
+          <div className="absolute -bottom-5 left-0 right-0 h-[1px] bg-muted/20 group-last:hidden" />
         </div>
       </div>
 
