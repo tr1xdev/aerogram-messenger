@@ -53,7 +53,7 @@ extend type Query {
 }
 
 extend type Mutation {
-    uploadAvatar(file: Upload!): User!
+    uploadAvatar(file: Upload!, userId: ID): User!
     updateUser(input: UpdateUserInput!): User!
     createBot(
         username: String!

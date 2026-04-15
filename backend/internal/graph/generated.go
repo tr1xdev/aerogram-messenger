@@ -147,7 +147,7 @@ type ComplexityRoot struct {
 		UpdateBot                 func(childComplexity int, id string, input model.UpdateUserInput) int
 		UpdateMessage             func(childComplexity int, id string, text string) int
 		UpdateUser                func(childComplexity int, input model.UpdateUserInput) int
-		UploadAvatar              func(childComplexity int, file graphql.Upload) int
+		UploadAvatar              func(childComplexity int, file graphql.Upload, userID *string) int
 		VerifyEmail               func(childComplexity int, input model.VerifyEmailInput) int
 	}
 
@@ -268,7 +268,7 @@ type MutationResolver interface {
 	UpdateMessage(ctx context.Context, id string, text string) (model.SendMessageResult, error)
 	DeleteMessage(ctx context.Context, id string) (bool, error)
 	MarkDialogAsRead(ctx context.Context, chatID string) (bool, error)
-	UploadAvatar(ctx context.Context, file graphql.Upload) (*dbgen.User, error)
+	UploadAvatar(ctx context.Context, file graphql.Upload, userID *string) (*dbgen.User, error)
 	UpdateUser(ctx context.Context, input model.UpdateUserInput) (*dbgen.User, error)
 	CreateBot(ctx context.Context, username string, firstName string, lastName *string, description *string, commands *string) (model.CreateBotResult, error)
 	UpdateBot(ctx context.Context, id string, input model.UpdateUserInput) (*dbgen.User, error)
@@ -823,7 +823,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UploadAvatar(childComplexity, args["file"].(graphql.Upload)), true
+		return e.complexity.Mutation.UploadAvatar(childComplexity, args["file"].(graphql.Upload), args["userId"].(*string)), true
 	case "Mutation.verifyEmail":
 		if e.complexity.Mutation.VerifyEmail == nil {
 			break
@@ -1665,6 +1665,11 @@ func (ec *executionContext) field_Mutation_uploadAvatar_args(ctx context.Context
 		return nil, err
 	}
 	args["file"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "userId", ec.unmarshalOID2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["userId"] = arg1
 	return args, nil
 }
 
@@ -4052,7 +4057,7 @@ func (ec *executionContext) _Mutation_uploadAvatar(ctx context.Context, field gr
 		ec.fieldContext_Mutation_uploadAvatar,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UploadAvatar(ctx, fc.Args["file"].(graphql.Upload))
+			return ec.resolvers.Mutation().UploadAvatar(ctx, fc.Args["file"].(graphql.Upload), fc.Args["userId"].(*string))
 		},
 		nil,
 		ec.marshalNUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUser,
