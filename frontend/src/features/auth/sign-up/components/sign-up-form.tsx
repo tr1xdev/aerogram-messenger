@@ -60,7 +60,7 @@ export function SignUpForm({
     },
   });
 
-  function onSubmit(data: FormValues) {
+  function onSubmit(data: FormValues): void {
     mutate({
       input: {
         firstName: data.firstName,
@@ -85,7 +85,7 @@ export function SignUpForm({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField
             control={form.control}
             name="firstName"
@@ -204,7 +204,7 @@ export function SignUpForm({
         />
 
         <Button className="mt-2" disabled={isPending}>
-          {isPending && <Loader2 className="animate-spin" />}
+          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Create Account
         </Button>
 
@@ -218,10 +218,10 @@ export function SignUpForm({
 
         <div className="grid grid-cols-2 gap-2">
           <Button variant="outline" type="button" disabled={isPending}>
-            <IconGithub className="h-4 w-4" /> GitHub
+            <IconGithub className="mr-2 h-4 w-4" /> GitHub
           </Button>
           <Button variant="outline" type="button" disabled={isPending}>
-            <IconFacebook className="h-4 w-4" /> Facebook
+            <IconFacebook className="mr-2 h-4 w-4" /> Facebook
           </Button>
         </div>
       </form>

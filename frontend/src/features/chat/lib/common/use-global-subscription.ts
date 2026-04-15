@@ -1,320 +1,266 @@
-import {
-  useSubscription,
-  useApolloClient,
-} from "@apollo/client/react/index.js";
-import {
-  type Reference,
-  type ApolloCache,
-  type StoreObject,
-} from "@apollo/client/index.js";
-import { type ModifierDetails } from "@apollo/client/cache/index.js";
+import { useEffect, useMemo, useRef } from "react";
+import { graphql, useSubscription } from "react-relay";
 import { useParams } from "@tanstack/react-router";
-import {
-  MESSAGE_SUBSCRIPTION,
-  DIALOG_READ_SUBSCRIPTION,
-  CHAT_DELETED_SUBSCRIPTION,
-  USER_PRESENCE_SUBSCRIPTION,
-  USER_TYPING_SUBSCRIPTION,
-} from "@/features/chat/api";
-import type { Message } from "@/entities/chat/model/types";
+import type { RecordProxy, RecordSourceSelectorProxy } from "relay-runtime";
+import type {
+  useGlobalSubscriptionsMessageAddedSubscription,
+  useGlobalSubscriptionsMessageAddedSubscription$data,
+} from "./__generated__/useGlobalSubscriptionsMessageAddedSubscription.graphql";
+import type { useGlobalSubscriptionsPresenceSubscription } from "./__generated__/useGlobalSubscriptionsPresenceSubscription.graphql";
+import type { useGlobalSubscriptionsDialogReadSubscription } from "./__generated__/useGlobalSubscriptionsDialogReadSubscription.graphql";
+import type { useGlobalSubscriptionsTypingSubscription } from "./__generated__/useGlobalSubscriptionsTypingSubscription.graphql";
+import type { useGlobalSubscriptionsChatDeletedSubscription } from "./__generated__/useGlobalSubscriptionsChatDeletedSubscription.graphql";
+import { logger } from "@/shared/lib/logger";
 
-interface MyChatsData {
-  chats: Reference[];
-  __typename?: string;
-  [key: string]: unknown;
-}
+const messageSubscription = graphql`
+  subscription useGlobalSubscriptionsMessageAddedSubscription($chatId: ID!) {
+    messageAdded(chatId: $chatId) {
+      id
+      chatId
+      text
+      sentAt
+      sequence
+      isEdited
+      sender {
+        id
+        firstName
+        lastName
+        photoUrl
+        displayName
+      }
+      replyTo {
+        id
+        text
+        sender {
+          id
+          firstName
+          lastName
+          displayName
+        }
+      }
+    }
+  }
+`;
 
-interface MessageAddedData {
-  messageAdded: Message;
-}
+const presenceSubscription = graphql`
+  subscription useGlobalSubscriptionsPresenceSubscription($chatId: ID!) {
+    userStatusChanged(chatId: $chatId) {
+      userId
+      status
+      lastSeen
+    }
+  }
+`;
 
-interface StatusChanged {
-  userStatusChanged: { userId: string; status: string; lastSeen?: string };
-}
+const dialogReadSubscription = graphql`
+  subscription useGlobalSubscriptionsDialogReadSubscription($chatId: ID!) {
+    dialogRead(chatId: $chatId) {
+      chatId
+      userId
+      lastSequence
+    }
+  }
+`;
 
-interface DialogReadData {
-  dialogRead: { chatId: string; userId: string; lastSequence: number };
-}
+const typingSubscription = graphql`
+  subscription useGlobalSubscriptionsTypingSubscription($chatId: ID!) {
+    userTyping(chatID: $chatId) {
+      userId
+      isTyping
+    }
+  }
+`;
 
-interface ChatDeletedData {
-  chatDeleted: { chatId: string; forEveryone: boolean };
-}
-
-interface TypingData {
-  userTyping: {
-    userId: string;
-    isTyping: boolean;
-  };
-}
+const chatDeletedSubscription = graphql`
+  subscription useGlobalSubscriptionsChatDeletedSubscription($userId: ID!) {
+    chatDeleted(userId: $userId)
+  }
+`;
 
 export function useGlobalSubscriptions(
   chatId: string | undefined,
   myId: string | undefined,
 ): void {
-  const client: ReturnType<typeof useApolloClient> = useApolloClient();
   const params: { chatId?: string } = useParams({ strict: false });
-  const activeChatId: string | undefined = params.chatId;
+  const activeChatRef = useRef<string | undefined>(params.chatId);
 
-  useSubscription<MessageAddedData>(MESSAGE_SUBSCRIPTION, {
-    variables: { chatId: chatId ?? "" },
-    skip: !chatId || !myId,
-    onData({ data }): void {
-      const newMessage: Message | undefined = data.data?.messageAdded;
-      if (!newMessage || !myId) return;
+  useEffect((): void => {
+    activeChatRef.current = params.chatId;
+  }, [params.chatId]);
 
-      const cache: ApolloCache = client.cache;
-      const isFromMe: boolean = newMessage.sender?.id === myId;
-      const isCurrentChatActive: boolean =
-        newMessage.chatId === activeChatId &&
-        document.visibilityState === "visible";
+  useSubscription<useGlobalSubscriptionsMessageAddedSubscription>(
+    useMemo(
+      () => ({
+        subscription: messageSubscription,
+        variables: { chatId: chatId ?? "" },
+        skip: !chatId,
+        onNext: (
+          response:
+            | useGlobalSubscriptionsMessageAddedSubscription$data
+            | null
+            | undefined,
+        ): void => {
+          logger.ws("New message received", response);
+        },
+        updater: (store: RecordSourceSelectorProxy): void => {
+          const rootField: RecordProxy | null | undefined =
+            store.getRootField("messageAdded");
+          if (!rootField) return;
 
-      cache.modify({
-        id: "ROOT_QUERY",
-        fields: {
-          messageHistory(
-            existing: StoreObject | Reference | undefined,
-            { storeFieldName, toReference, readField }: ModifierDetails,
-          ): StoreObject | Reference | undefined {
-            if (!existing || !storeFieldName.includes(newMessage.chatId)) {
-              return existing;
+          const msgChatId: string = String(rootField.getValue("chatId"));
+          const chatRecord: RecordProxy | null | undefined =
+            store.get(msgChatId);
+
+          if (chatRecord) {
+            const sender: RecordProxy | null | undefined =
+              rootField.getLinkedRecord("sender");
+            const senderId: string = String(sender?.getValue("id"));
+            const isFromMe: boolean = senderId === String(myId);
+
+            const isCurrentChatActive: boolean =
+              msgChatId === activeChatRef.current &&
+              document.visibilityState === "visible";
+
+            if (!isFromMe && !isCurrentChatActive) {
+              const currentUnread: number =
+                Number(chatRecord.getValue("unreadCount")) || 0;
+              chatRecord.setValue(currentUnread + 1, "unreadCount");
             }
 
-            const messageRef: Reference | null =
-              toReference(newMessage as unknown as StoreObject) ?? null;
-
-            if (!messageRef) return existing;
-
-            const existingMessages: Reference[] =
-              (readField("messages", existing as StoreObject) as Reference[]) ||
-              [];
-
-            const newMessageId: string | undefined = cache.identify(
-              newMessage as unknown as StoreObject,
-            );
-
-            const exists: boolean = existingMessages.some(
-              (ref: Reference): boolean => cache.identify(ref) === newMessageId,
-            );
-
-            if (exists) return existing;
-
-            const newMessages: Reference[] = [
-              ...existingMessages,
-              messageRef,
-            ].sort((a: Reference, b: Reference): number => {
-              const seqA: number = (readField("sequence", a) as number) ?? 0;
-              const seqB: number = (readField("sequence", b) as number) ?? 0;
-              return seqA - seqB;
-            });
-
-            return {
-              ...(existing as StoreObject),
-              messages: newMessages,
-            };
-          },
-        },
-      });
-
-      const chatCacheId: string | undefined = cache.identify({
-        __typename: "Chat",
-        id: newMessage.chatId,
-      } as StoreObject);
-
-      if (chatCacheId) {
-        cache.modify({
-          id: chatCacheId,
-          fields: {
-            lastMessage(
-              existing: Reference | StoreObject | undefined,
-              { readField }: ModifierDetails,
-            ): Reference | Message {
-              const existingSeq: number =
-                (readField("sequence", existing as StoreObject) as number) ?? 0;
-              const newSeq: number = newMessage.sequence ?? 0;
-              return existing && existingSeq > newSeq
-                ? (existing as Reference)
-                : newMessage;
-            },
-            unreadCount(prev: number | undefined): number {
-              const currentCount: number = prev ?? 0;
-              if (isFromMe || isCurrentChatActive) return currentCount;
-              return currentCount + 1;
-            },
-            myReadSequence(prev: number | undefined): number {
-              const currentPrev: number = prev ?? 0;
-              return isFromMe
-                ? Math.max(currentPrev, newMessage.sequence ?? 0)
-                : currentPrev;
-            },
-          },
-        });
-
-        cache.modify({
-          fields: {
-            myChats(
-              existingData: MyChatsData | Reference | undefined,
-              { readField }: ModifierDetails,
-            ): MyChatsData | Reference | undefined {
-              if (!existingData) return existingData;
-
-              const chats: Reference[] =
-                "chats" in (existingData as object)
-                  ? (existingData as MyChatsData).chats
-                  : (readField(
-                      "chats",
-                      existingData as StoreObject,
-                    ) as Reference[]) || [];
-
-              const chatRef: Reference = { __ref: chatCacheId };
-              const filtered: Reference[] = chats.filter(
-                (ref: Reference): boolean =>
-                  readField("id", ref as unknown as StoreObject) !==
-                  newMessage.chatId,
+            if (isFromMe) {
+              chatRecord.setValue(
+                rootField.getValue("sequence"),
+                "myReadSequence",
               );
+            }
 
-              if ("chats" in (existingData as object)) {
-                return {
-                  ...(existingData as MyChatsData),
-                  chats: [chatRef, ...filtered],
-                };
+            chatRecord.setLinkedRecord(rootField, "lastMessage");
+
+            const history: RecordProxy | null | undefined = store
+              .getRoot()
+              .getLinkedRecord("messageHistory", {
+                chatId: msgChatId,
+                limit: 50,
+                beforeSequence: null,
+              });
+
+            if (history) {
+              const messages: readonly RecordProxy[] =
+                (history.getLinkedRecords(
+                  "messages",
+                ) as readonly RecordProxy[]) ?? [];
+              const messageId: string = rootField.getDataID();
+
+              if (
+                !messages.some(
+                  (m: RecordProxy): boolean => m.getDataID() === messageId,
+                )
+              ) {
+                history.setLinkedRecords([...messages, rootField], "messages");
               }
+            }
+          }
+        },
+      }),
+      [chatId, myId],
+    ),
+  );
 
-              return existingData;
-            },
-          },
-        });
-      }
-    },
-  });
+  useSubscription<useGlobalSubscriptionsPresenceSubscription>(
+    useMemo(
+      () => ({
+        subscription: presenceSubscription,
+        variables: { chatId: chatId ?? "" },
+        skip: !chatId,
+        updater: (store: RecordSourceSelectorProxy): void => {
+          const payload: RecordProxy | null | undefined =
+            store.getRootField("userStatusChanged");
+          if (!payload) return;
 
-  useSubscription<DialogReadData>(DIALOG_READ_SUBSCRIPTION, {
-    variables: { chatId: chatId ?? "" },
-    skip: !chatId,
-    onData({ data }): void {
-      const payload: DialogReadData["dialogRead"] | undefined =
-        data.data?.dialogRead;
-      if (!payload) return;
+          const uId: string = String(payload.getValue("userId"));
+          const userRecord: RecordProxy | null | undefined = store.get(uId);
 
-      const chatRef: string | undefined = client.cache.identify({
-        __typename: "Chat",
-        id: payload.chatId,
-      } as StoreObject);
-      if (chatRef) {
-        client.cache.modify({
-          id: chatRef,
-          fields: {
-            lastReadSequence(prev: number = 0): number {
-              return payload.userId !== myId
-                ? Math.max(prev, payload.lastSequence)
-                : prev;
-            },
-            myReadSequence(prev: number = 0): number {
-              return payload.userId === myId
-                ? Math.max(prev, payload.lastSequence)
-                : prev;
-            },
-            unreadCount(prev: number = 0): number {
-              return payload.userId === myId ? 0 : prev;
-            },
-          },
-        });
-      }
-    },
-  });
+          if (userRecord) {
+            userRecord.setValue(payload.getValue("status"), "status");
+            userRecord.setValue(payload.getValue("lastSeen"), "lastSeen");
+            logger.debug("WS", `Status updated for user: ${uId}`);
+          }
+        },
+      }),
+      [chatId],
+    ),
+  );
 
-  useSubscription<TypingData>(USER_TYPING_SUBSCRIPTION, {
-    variables: { chatID: chatId ?? "" },
-    skip: !chatId,
-    onData({ data }): void {
-      const payload: TypingData["userTyping"] | undefined =
-        data.data?.userTyping;
-      if (!payload || payload.userId === myId) return;
-      const userRef: string | undefined = client.cache.identify({
-        __typename: "User",
-        id: payload.userId,
-      } as StoreObject);
-      if (userRef) {
-        client.cache.modify({
-          id: userRef,
-          fields: {
-            isTyping(): boolean {
-              return payload.isTyping;
-            },
-          },
-        });
-      }
-    },
-  });
+  useSubscription<useGlobalSubscriptionsTypingSubscription>(
+    useMemo(
+      () => ({
+        subscription: typingSubscription,
+        variables: { chatId: chatId ?? "" },
+        skip: !chatId,
+        updater: (store: RecordSourceSelectorProxy): void => {
+          const payload: RecordProxy | null | undefined =
+            store.getRootField("userTyping");
+          if (!payload) return;
 
-  useSubscription<StatusChanged>(USER_PRESENCE_SUBSCRIPTION, {
-    variables: { chatId: chatId ?? "" },
-    skip: !chatId,
-    onData({ data }): void {
-      const payload: StatusChanged["userStatusChanged"] | undefined =
-        data.data?.userStatusChanged;
-      if (!payload) return;
-      const userRef: string | undefined = client.cache.identify({
-        __typename: "User",
-        id: payload.userId,
-      } as StoreObject);
-      if (userRef) {
-        client.cache.modify({
-          id: userRef,
-          fields: {
-            status(): string {
-              return payload.status;
-            },
-            lastSeen(): string | undefined {
-              return payload.lastSeen;
-            },
-          },
-        });
-      }
-    },
-  });
+          const uId: string = String(payload.getValue("userId"));
+          if (uId === String(myId)) return;
 
-  useSubscription<ChatDeletedData>(CHAT_DELETED_SUBSCRIPTION, {
-    variables: { userId: myId ?? "" },
-    skip: !myId,
-    onData({ data }): void {
-      const deletedInfo: ChatDeletedData["chatDeleted"] | undefined =
-        data.data?.chatDeleted;
-      if (!deletedInfo) return;
-      const chatCacheId: string | undefined = client.cache.identify({
-        __typename: "Chat",
-        id: deletedInfo.chatId,
-      } as StoreObject);
-      if (chatCacheId) {
-        client.cache.modify({
-          fields: {
-            myChats(
-              existingData: MyChatsData | Reference | undefined,
-              { readField }: ModifierDetails,
-            ): MyChatsData | Reference | undefined {
-              if (!existingData) return existingData;
+          const userRecord: RecordProxy | null | undefined = store.get(uId);
+          if (userRecord) {
+            userRecord.setValue(payload.getValue("isTyping"), "isTyping");
+          }
+        },
+      }),
+      [chatId, myId],
+    ),
+  );
 
-              const chats: Reference[] =
-                "chats" in (existingData as object)
-                  ? (existingData as MyChatsData).chats
-                  : (readField(
-                      "chats",
-                      existingData as StoreObject,
-                    ) as Reference[]) || [];
+  useSubscription<useGlobalSubscriptionsDialogReadSubscription>(
+    useMemo(
+      () => ({
+        subscription: dialogReadSubscription,
+        variables: { chatId: chatId ?? "" },
+        skip: !chatId,
+        updater: (store: RecordSourceSelectorProxy): void => {
+          const payload: RecordProxy | null | undefined =
+            store.getRootField("dialogRead");
+          if (!payload) return;
 
-              return {
-                ...(existingData as object),
-                chats: chats.filter(
-                  (ref: Reference): boolean =>
-                    readField("id", ref as unknown as StoreObject) !==
-                    deletedInfo.chatId,
-                ),
-              } as MyChatsData;
-            },
-          },
-        });
-        client.cache.evict({ id: chatCacheId });
-        client.cache.gc();
-      }
-    },
-  });
+          const cId: string = String(payload.getValue("chatId"));
+          const uId: string = String(payload.getValue("userId"));
+          const lastSeq: number = Number(payload.getValue("lastSequence") ?? 0);
+
+          const chatRecord: RecordProxy | null | undefined = store.get(cId);
+          if (chatRecord) {
+            if (uId === String(myId)) {
+              chatRecord.setValue(0, "unreadCount");
+              chatRecord.setValue(lastSeq, "myReadSequence");
+            } else {
+              chatRecord.setValue(lastSeq, "lastReadSequence");
+            }
+            logger.debug("WS", `Read sequence updated for chat: ${cId}`);
+          }
+        },
+      }),
+      [chatId, myId],
+    ),
+  );
+
+  useSubscription<useGlobalSubscriptionsChatDeletedSubscription>(
+    useMemo(
+      () => ({
+        subscription: chatDeletedSubscription,
+        variables: { userId: myId ?? "" },
+        skip: !myId,
+        updater: (store: RecordSourceSelectorProxy): void => {
+          const deletedId: unknown = store.getRootField("chatDeleted");
+          if (typeof deletedId === "string") {
+            store.delete(deletedId);
+            logger.warn("APP", `Chat deleted: ${deletedId}`);
+          }
+        },
+      }),
+      [myId],
+    ),
+  );
 }

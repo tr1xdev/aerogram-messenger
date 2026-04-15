@@ -1,136 +1,102 @@
-import { useApolloClient, useMutation } from "@apollo/client/react/index.js";
 import { useCallback, useRef } from "react";
-import { type Reference, type StoreObject, gql } from "@apollo/client/index.js";
-import type { Message } from "@/entities/chat/model/types";
-import { MARK_DIALOG_AS_READ } from "@/features/chat/api";
+import { graphql, useMutation, useFragment } from "react-relay";
+import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
+import type { useMarkDialog_chat$key } from "./__generated__/useMarkDialog_chat.graphql";
+import type { useMarkDialogMutation } from "./__generated__/useMarkDialogMutation.graphql";
 
-interface MarkReadResponse {
-  markDialogAsRead: boolean;
-}
+const markDialogMutation = graphql`
+  mutation useMarkDialogMutation($chatId: ID!) {
+    markDialogAsRead(chatId: $chatId)
+  }
+`;
 
-interface ChatReadFields {
-  unreadCount: number;
-  myReadSequence: number;
-}
+const chatReadFragment = graphql`
+  fragment useMarkDialog_chat on Chat {
+    id
+    unreadCount
+    myReadSequence
+    members {
+      user {
+        id
+      }
+      lastReadSequence
+    }
+  }
+`;
 
 export function useMarkDialog(
-  chatId: string,
-  messages: Message[],
-  me?: { id: string },
-) {
-  const client = useApolloClient();
+  chatKey: useMarkDialog_chat$key,
+  lastSequence: number,
+  meId: string | undefined,
+): { checkAndMarkRead: () => void } {
+  const chat = useFragment(chatReadFragment, chatKey);
+  const [commit] = useMutation<useMarkDialogMutation>(markDialogMutation);
   const isPendingRef = useRef<boolean>(false);
-  const [markDialog] = useMutation<MarkReadResponse>(MARK_DIALOG_AS_READ);
 
-  const checkAndMarkRead = useCallback(async (): Promise<void> => {
+  const chatId: string = chat.id;
+  const myReadSequence: number = chat.myReadSequence ?? 0;
+  const unreadCount: number = chat.unreadCount ?? 0;
+
+  const checkAndMarkRead = useCallback((): void => {
     if (
       document.visibilityState !== "visible" ||
-      !me ||
+      !meId ||
       !chatId ||
       isPendingRef.current ||
-      messages.length === 0
+      lastSequence <= myReadSequence ||
+      unreadCount === 0
     ) {
-      return;
-    }
-
-    const cache = client.cache;
-    const chatCacheId: string | undefined = cache.identify({
-      __typename: "Chat",
-      id: chatId,
-    });
-
-    if (!chatCacheId) return;
-
-    const lastValidMessage: Message | undefined = [...messages]
-      .reverse()
-      .find((m: Message): boolean => typeof m.sequence === "number");
-
-    const lastSeqInChat: number = lastValidMessage?.sequence || 0;
-
-    const cachedData: ChatReadFields | null =
-      cache.readFragment<ChatReadFields>({
-        id: chatCacheId,
-        fragment: gql`
-          fragment ChatReadStatus on Chat {
-            unreadCount
-            myReadSequence
-          }
-        `,
-      });
-
-    const currentReadSeq: number = cachedData?.myReadSequence ?? 0;
-    const currentUnreadCount: number = cachedData?.unreadCount ?? 0;
-
-    console.log(`[useMarkDialog] Checking read status`, {
-      chatId,
-      currentUnreadCount,
-      currentReadSeq,
-      lastSeqInChat,
-      isPending: isPendingRef.current,
-    });
-
-    if (currentUnreadCount === 0 && currentReadSeq >= lastSeqInChat) {
       return;
     }
 
     isPendingRef.current = true;
 
-    try {
-      console.log(`[useMarkDialog] Executing markDialog mutation`);
-      await markDialog({
-        variables: { chatId },
-        optimisticResponse: { markDialogAsRead: true },
-        onCompleted: (data: MarkReadResponse): void => {
-          if (!data.markDialogAsRead) return;
+    const updateStore = (store: RecordSourceSelectorProxy): void => {
+      const chatRecord: RecordProxy | null | undefined = store.get(chatId);
+      if (!chatRecord) return;
 
-          console.log(`[useMarkDialog] Mutation completed, modifying cache`);
-          cache.modify({
-            id: chatCacheId,
-            fields: {
-              unreadCount: (): number => 0,
-              myReadSequence: (prev: number = 0): number =>
-                Math.max(prev, lastSeqInChat),
-              members: (
-                existingMembers: ReadonlyArray<Reference | StoreObject> = [],
-                { readField },
-              ): (Reference | StoreObject)[] => {
-                return existingMembers.map(
-                  (memberRefOrObj): Reference | StoreObject => {
-                    const userRecord: Reference | StoreObject | undefined =
-                      readField<Reference | StoreObject>(
-                        "user",
-                        memberRefOrObj,
-                      );
-                    const userId: string | undefined = userRecord
-                      ? readField<string>("id", userRecord)
-                      : undefined;
+      chatRecord.setValue(0, "unreadCount");
 
-                    if (userId === me.id) {
-                      const currentMemberSeq: number =
-                        readField<number>("lastReadSequence", memberRefOrObj) ??
-                        0;
-                      return {
-                        ...memberRefOrObj,
-                        lastReadSequence: Math.max(
-                          currentMemberSeq,
-                          lastSeqInChat,
-                        ),
-                      } as StoreObject;
-                    }
-                    return memberRefOrObj as StoreObject;
-                  },
-                );
-              },
-            },
-          });
-        },
-      });
-    } catch (error: unknown) {
-      console.error(`[useMarkDialog] Error:`, error);
-    } finally {
-      isPendingRef.current = false;
-    }
-  }, [chatId, messages, me, markDialog, client]);
+      const prevSequence: number = Number(
+        chatRecord.getValue("myReadSequence") ?? 0,
+      );
+      chatRecord.setValue(
+        Math.max(prevSequence, lastSequence),
+        "myReadSequence",
+      );
+
+      const members: RecordProxy[] | null | undefined =
+        chatRecord.getLinkedRecords("members");
+
+      if (members) {
+        members.forEach((member: RecordProxy): void => {
+          const user: RecordProxy | null | undefined =
+            member.getLinkedRecord("user");
+          if (user?.getValue("id") === meId) {
+            const prevMemberSeq: number = Number(
+              member.getValue("lastReadSequence") ?? 0,
+            );
+            member.setValue(
+              Math.max(prevMemberSeq, lastSequence),
+              "lastReadSequence",
+            );
+          }
+        });
+      }
+    };
+
+    commit({
+      variables: { chatId },
+      optimisticUpdater: updateStore,
+      updater: updateStore,
+      onCompleted: (): void => {
+        isPendingRef.current = false;
+      },
+      onError: (): void => {
+        isPendingRef.current = false;
+      },
+    });
+  }, [chatId, myReadSequence, unreadCount, lastSequence, meId, commit]);
 
   return { checkAndMarkRead };
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/storage"
 	internal_tls "github.com/tr1xdev/aerogram-messenger/internal/infrastructure/tls"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/auth_svc"
@@ -73,6 +74,19 @@ func main() {
 	defer geoSvc.Close()
 	uaSvc := ua_svc.New()
 
+	ctx := context.Background()
+	s3Storage, err := storage.NewS3Storage(
+		ctx,
+		cfg.S3.Endpoint,
+		cfg.S3.AccessKey,
+		cfg.S3.SecretKey,
+		cfg.S3.Bucket,
+		cfg.S3.PublicHost,
+	)
+	if err != nil {
+		log.Fatalf("failed to init s3 storage: %v", err)
+	}
+
 	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.GRPC.Host, cfg.Server.GRPC.Port)
 	grpcLis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
@@ -95,7 +109,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc)
+	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc, s3Storage)
 
 	router := api.NewRouter(api.RouterConfig{
 		Cfg:            cfg,
@@ -212,6 +226,7 @@ func initGraphQL(
 	geoSvc *geo_svc.Service,
 	uaSvc *ua_svc.Service,
 	pSvc *presence_svc.Server,
+	s3Storage *storage.S3Storage,
 ) *handler.Server {
 	resolver := resolvers.NewResolver(
 		db,
@@ -225,6 +240,7 @@ func initGraphQL(
 		rdb,
 		geoSvc,
 		uaSvc,
+		s3Storage,
 	)
 
 	return graph_api.NewGraphQLServer(resolver, cfg, db)

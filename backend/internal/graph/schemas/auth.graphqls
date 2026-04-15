@@ -5,7 +5,7 @@ type AuthPayload {
     requiresVerification: Boolean!
 }
 
-type Session {
+type Session implements Node {
     id: ID!
     device: String
     ipAddress: String

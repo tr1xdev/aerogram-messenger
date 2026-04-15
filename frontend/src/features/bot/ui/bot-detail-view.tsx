@@ -1,10 +1,8 @@
-/** eslint-disable react-hooks/incompatible-library */
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-  Bot,
   ChevronLeft,
   Copy,
   Eye,
@@ -12,6 +10,7 @@ import {
   RefreshCw,
   Save,
   AlertCircle,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,13 +28,57 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { BotDeleteDialog } from "./bot-delete-dialog";
-import { useMutation, useQuery } from "@apollo/client/react";
-import {
-  UPDATE_BOT,
-  DELETE_BOT,
-  ROTATE_BOT_TOKEN,
-  GET_MY_BOTS,
-} from "@/features/bot/api";
+import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
+import { UserAvatar } from "@/components/user-avatar";
+import type { botDetailViewQuery } from "./__generated__/botDetailViewQuery.graphql";
+import type { botDetailViewUpdateMutation } from "./__generated__/botDetailViewUpdateMutation.graphql";
+import type { botDetailViewDeleteMutation } from "./__generated__/botDetailViewDeleteMutation.graphql";
+import type { botDetailViewRotateTokenMutation } from "./__generated__/botDetailViewRotateTokenMutation.graphql";
+import type { botDetailViewUploadAvatarMutation } from "./__generated__/botDetailViewUploadAvatarMutation.graphql";
+
+const BotDetailQuery = graphql`
+  query botDetailViewQuery($id: ID!) {
+    user(id: $id) {
+      id
+      username
+      firstName
+      botDescription
+      photoUrl
+    }
+  }
+`;
+
+const UpdateBotMutation = graphql`
+  mutation botDetailViewUpdateMutation($id: ID!, $input: UpdateUserInput!) {
+    updateBot(id: $id, input: $input) {
+      id
+      username
+      firstName
+      botDescription
+    }
+  }
+`;
+
+const DeleteBotMutation = graphql`
+  mutation botDetailViewDeleteMutation($id: ID!) {
+    deleteBot(id: $id)
+  }
+`;
+
+const RotateTokenMutation = graphql`
+  mutation botDetailViewRotateTokenMutation($id: ID!) {
+    rotateBotToken(id: $id)
+  }
+`;
+
+const UploadAvatarMutation = graphql`
+  mutation botDetailViewUploadAvatarMutation($file: Upload!, $userId: ID) {
+    uploadAvatar(file: $file, userId: $userId) {
+      id
+      photoUrl
+    }
+  }
+`;
 
 const botSchema = z.object({
   username: z
@@ -44,7 +87,7 @@ const botSchema = z.object({
     .max(32, "Username is too long")
     .regex(/^[a-zA-Z0-9_]+$/, "Only letters, numbers and underscores allowed")
     .refine((val: string): boolean => val.toLowerCase().endsWith("bot"), {
-      message: "Username must end with 'bot' (e.g. MyBot)",
+      message: "Username must end with 'bot'",
     }),
   firstName: z
     .string()
@@ -60,113 +103,105 @@ const botSchema = z.object({
 
 type BotFormValues = z.infer<typeof botSchema>;
 
-interface Bot {
-  id: string;
-  username: string;
-  firstName: string;
-  botDescription?: string;
-}
-
-interface GetMyBotsData {
-  myBots: Bot[];
-}
-
-interface RotateBotTokenData {
-  rotateBotToken: string;
-}
-
-export const BotDetailView: React.FC = () => {
-  const { botId } = useParams({ from: "/_authenticated/bots/$botId" });
+export const BotDetailView: React.FC = (): React.ReactNode => {
+  const { botId } = useParams({ from: "/_authenticated/bots/$botId" }) as {
+    botId: string;
+  };
   const navigate = useNavigate();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [showToken, setShowToken] = React.useState<boolean>(false);
   const [currentToken, setCurrentToken] = React.useState<string>("");
   const [wasTokenExposed, setWasTokenExposed] = React.useState<boolean>(false);
 
-  const { data, loading } = useQuery<GetMyBotsData>(GET_MY_BOTS);
-  const botData: Bot | undefined = data?.myBots?.find(
-    (b: Bot): boolean => b.id === botId,
+  const data = useLazyLoadQuery<botDetailViewQuery>(
+    BotDetailQuery,
+    { id: botId },
+    { fetchPolicy: "store-and-network" },
   );
 
-  const [updateBot] = useMutation(UPDATE_BOT);
-  const [deleteBot] = useMutation(DELETE_BOT, {
-    refetchQueries: [{ query: GET_MY_BOTS }],
-  });
-  const [rotateToken, { loading: isRotating }] =
-    useMutation<RotateBotTokenData>(ROTATE_BOT_TOKEN);
+  const [commitUpdate] =
+    useMutation<botDetailViewUpdateMutation>(UpdateBotMutation);
+  const [commitDelete] =
+    useMutation<botDetailViewDeleteMutation>(DeleteBotMutation);
+  const [commitRotate, isRotating] =
+    useMutation<botDetailViewRotateTokenMutation>(RotateTokenMutation);
+  const [commitUpload, isUploading] =
+    useMutation<botDetailViewUploadAvatarMutation>(UploadAvatarMutation);
 
   const form = useForm<BotFormValues>({
     resolver: zodResolver(botSchema),
     mode: "onChange",
     defaultValues: {
-      username: "",
-      firstName: "",
-      description: "",
+      username: data.user?.username ?? "",
+      firstName: data.user?.firstName ?? "",
+      description: data.user?.botDescription ?? "",
     },
   });
 
-  React.useEffect((): void => {
-    if (botData) {
-      form.reset({
-        username: botData.username || "",
-        firstName: botData.firstName || "",
-        description: botData.botDescription || "",
-      });
-    }
-  }, [botData, form]);
-
   const { isDirty, isSubmitting, isValid } = form.formState;
 
-  const onSubmit = async (values: BotFormValues): Promise<void> => {
-    try {
-      await updateBot({
-        variables: {
-          id: botId,
-          input: {
-            username: values.username,
-            firstName: values.firstName,
-            botDescription: values.description,
-          },
-        },
-      });
-      form.reset(values);
-      toast.success("Settings updated successfully");
-    } catch (err: unknown) {
-      if (
-        err instanceof Error &&
-        (err.message?.includes("unique") || err.message?.includes("taken"))
-      ) {
-        form.setError("username", {
-          message: "This username is already taken",
-        });
-      } else {
-        toast.error("Failed to save changes");
-      }
-    }
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file: File | undefined = e.target.files?.[0];
+    if (!file) return;
+
+    const rawId: string = window.atob(botId).split(":").pop() ?? botId;
+
+    commitUpload({
+      variables: { file: null, userId: rawId },
+      uploadables: { file },
+      onCompleted: (): void => {
+        toast.success("Avatar updated");
+      },
+      onError: (): void => {
+        toast.error("Failed to upload avatar");
+      },
+    });
   };
 
-  const handleRefreshToken = async (): Promise<void> => {
-    try {
-      const { data: rotateData } = await rotateToken({
-        variables: { id: botId },
-      });
-      if (rotateData?.rotateBotToken) {
-        setCurrentToken(rotateData.rotateBotToken);
-        setShowToken(true);
-        setWasTokenExposed(false);
-        toast.success("API Token rotated successfully");
-      }
-    } catch {
-      toast.error("Could not rotate token");
-    }
+  const onSubmit = (values: BotFormValues): void => {
+    commitUpdate({
+      variables: {
+        id: botId,
+        input: {
+          username: values.username,
+          firstName: values.firstName,
+          botDescription: values.description,
+        },
+      },
+      onCompleted: (): void => {
+        form.reset(values);
+        toast.success("Settings updated");
+      },
+      onError: (err: Error): void => {
+        if (err.message.includes("unique") || err.message.includes("taken")) {
+          form.setError("username", { message: "Username already taken" });
+        } else {
+          toast.error("Failed to save changes");
+        }
+      },
+    });
+  };
+
+  const handleRefreshToken = (): void => {
+    commitRotate({
+      variables: { id: botId },
+      onCompleted: (
+        response: botDetailViewRotateTokenMutation["response"],
+      ): void => {
+        if (response.rotateBotToken) {
+          setCurrentToken(response.rotateBotToken);
+          setShowToken(true);
+          setWasTokenExposed(false);
+          toast.success("Token rotated");
+        }
+      },
+    });
   };
 
   const toggleTokenVisibility = (): void => {
     if (!showToken) {
-      const confirmView = window.confirm(
-        "This token can only be viewed once. Are you sure?",
-      );
-      if (confirmView) {
+      if (window.confirm("This token can only be viewed once. Are you sure?")) {
         setShowToken(true);
         setWasTokenExposed(true);
       }
@@ -176,17 +211,15 @@ export const BotDetailView: React.FC = () => {
     }
   };
 
-  const handleDeleteBot = async (): Promise<void> => {
-    try {
-      await deleteBot({ variables: { id: botId } });
-      toast.success("Bot permanently deleted");
-      navigate({ to: "/bots" });
-    } catch {
-      toast.error("Failed to delete bot");
-    }
+  const handleDeleteBot = (): void => {
+    commitDelete({
+      variables: { id: botId },
+      onCompleted: (): void => {
+        toast.success("Bot deleted");
+        navigate({ to: "/bots" });
+      },
+    });
   };
-
-  if (loading) return null;
 
   return (
     <div className="h-screen w-full overflow-y-auto bg-background selection:bg-primary/10">
@@ -202,15 +235,44 @@ export const BotDetailView: React.FC = () => {
           Back to list
         </Button>
 
-        <header className="flex items-center gap-4 mb-12">
-          <div className="h-12 w-12 rounded-2xl bg-muted/20 flex items-center justify-center border border-muted/10">
-            <Bot className="h-6 w-6 text-primary/70" />
+        <header className="flex items-center gap-5 mb-12">
+          <div className="relative group shrink-0">
+            <UserAvatar
+              src={data.user?.photoUrl}
+              fallback={form.watch("firstName") || "B"}
+              size={64}
+              className="rounded-2xl border border-muted/20 shadow-sm transition-all group-hover:opacity-80"
+            />
+            <button
+              type="button"
+              disabled={isUploading}
+              onClick={(): void => fileInputRef.current?.click()}
+              className={cn(
+                "absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-2xl opacity-0 transition-opacity cursor-pointer",
+                !isUploading && "group-hover:opacity-100",
+                isUploading && "opacity-100 bg-black/20",
+              )}
+            >
+              {isUploading ? (
+                <RefreshCw className="h-5 w-5 animate-spin" />
+              ) : (
+                <Camera className="h-5 w-5" />
+              )}
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={handleAvatarChange}
+            />
           </div>
-          <div className="flex flex-col">
-            <h1 className="text-xl font-bold tracking-tight leading-none">
+
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-xl font-bold tracking-tight leading-none truncate">
               {form.watch("firstName") || "Untitled Bot"}
             </h1>
-            <p className="text-[12px] font-mono text-muted-foreground/50 mt-1.5">
+            <p className="text-[12px] font-mono text-muted-foreground/50 mt-1.5 truncate">
               @{form.watch("username")}
             </p>
           </div>
@@ -266,7 +328,7 @@ export const BotDetailView: React.FC = () => {
                 variant="outline"
                 disabled={isRotating}
                 onClick={handleRefreshToken}
-                className="w-fit h-9 text-[12px] font-bold rounded-lg border-muted/20 hover:bg-muted/10 disabled:cursor-not-allowed cursor-pointer"
+                className="w-fit h-9 text-[12px] font-bold rounded-lg border-muted/20 hover:bg-muted/10 cursor-pointer"
               >
                 <RefreshCw
                   className={cn(
@@ -326,7 +388,7 @@ export const BotDetailView: React.FC = () => {
                             className={cn(
                               "bg-muted/10 border-muted/20 h-10 rounded-lg font-mono text-[13px]",
                               form.formState.errors.username &&
-                                "border-destructive/50 focus-visible:ring-destructive/20",
+                                "border-destructive/50",
                             )}
                             {...field}
                           />
@@ -353,7 +415,7 @@ export const BotDetailView: React.FC = () => {
                         />
                       </FormControl>
                       <FormDescription className="text-[10px] text-muted-foreground/40">
-                        Describe the bot's purpose in a few sentences.
+                        Describe the bot's purpose.
                       </FormDescription>
                       <FormMessage className="text-[11px]" />
                     </FormItem>
@@ -366,7 +428,7 @@ export const BotDetailView: React.FC = () => {
                   type="submit"
                   disabled={!isDirty || isSubmitting || !isValid}
                   className={cn(
-                    "h-10 px-6 rounded-xl font-bold text-[13px] transition-all duration-200 shadow-lg shadow-primary/10 disabled:cursor-not-allowed cursor-pointer",
+                    "h-10 px-6 rounded-xl font-bold text-[13px] cursor-pointer",
                     (!isDirty || !isValid) && "opacity-40 grayscale-[0.5]",
                   )}
                 >

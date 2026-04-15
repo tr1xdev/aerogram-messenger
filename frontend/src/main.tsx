@@ -1,19 +1,23 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { ApolloProvider } from "@apollo/client/react";
+import { RelayEnvironmentProvider } from "react-relay";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { client as apolloClient } from "@/app/api/apollo-client";
+import RelayEnvironment from "@/app/api/relay-environment";
 import App from "./App";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient: QueryClient = new QueryClient();
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <ApolloProvider client={apolloClient}>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
-    </ApolloProvider>
-  </React.StrictMode>,
-);
+const rootElement: HTMLElement | null = document.getElementById("root");
+
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <RelayEnvironmentProvider environment={RelayEnvironment}>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </RelayEnvironmentProvider>
+    </React.StrictMode>,
+  );
+}

@@ -1,24 +1,85 @@
-import { useQuery } from "@apollo/client/react/index.js";
-import { GET_MY_CHATS, GET_CHAT_DETAILS } from "@/features/chat/api";
-import type { Chat } from "@/entities/chat/model/types";
+import { useLazyLoadQuery, graphql } from "react-relay";
+import type { useChatsMyChatsQuery } from "./__generated__/useChatsMyChatsQuery.graphql";
+import type { useChatsDetailsQuery } from "./__generated__/useChatsDetailsQuery.graphql";
 
-export interface MyChatsResponse {
-  myChats: {
-    chats: Chat[];
-    __typename?: string;
-  };
+export type MyChatsResponse = useChatsMyChatsQuery["response"];
+export type ChatDetailsResponse = useChatsDetailsQuery["response"];
+
+const myChatsQuery = graphql`
+  query useChatsMyChatsQuery {
+    myChats {
+      __typename
+      ... on ChatList {
+        ...useAppTitle_chats
+        chats {
+          id
+          ...chatMenuItem_chat
+        }
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
+
+const chatDetailsQuery = graphql`
+  query useChatsDetailsQuery($id: ID!) {
+    chat(id: $id) {
+      __typename
+      ... on Chat {
+        ...useMarkDialog_chat
+        ...chatMenuItem_chat
+        id
+        title
+        type
+        photoUrl
+        membersCount
+        unreadCount
+        isPinned
+        lastReadSequence
+        members {
+          user {
+            id
+            firstName
+            lastName
+            photoUrl
+            displayName
+            isBot
+            status
+            isVerified
+            ...chatHeader_user
+          }
+        }
+      }
+      ... on NotFoundError {
+        message
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
+
+export function useMyChats(): MyChatsResponse {
+  return useLazyLoadQuery<useChatsMyChatsQuery>(
+    myChatsQuery,
+    {},
+    { fetchPolicy: "store-and-network" },
+  );
 }
 
-export function useMyChats(): ReturnType<typeof useQuery<MyChatsResponse>> {
-  return useQuery<MyChatsResponse>(GET_MY_CHATS);
-}
-
-export function useChatDetails(
-  chatId: string,
-): ReturnType<typeof useQuery<{ chat: Chat }>> {
-  return useQuery<{ chat: Chat }>(GET_CHAT_DETAILS, {
-    variables: { id: chatId },
-    skip: !chatId,
-    fetchPolicy: "cache-and-network",
-  });
+export function useChatDetails(chatId: string): ChatDetailsResponse {
+  return useLazyLoadQuery<useChatsDetailsQuery>(
+    chatDetailsQuery,
+    { id: chatId },
+    { fetchPolicy: "store-and-network" },
+  );
 }

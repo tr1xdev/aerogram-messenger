@@ -1,9 +1,9 @@
 -- name: CreateMessage :one
 INSERT INTO messages (
     id, dialog_id, author_id, content, is_encrypted,
-    encryption_iv, reply_to_id, is_system, is_deleted, created_at, updated_at
+    encryption_iv, reply_to_id, forward_from_id, is_system, is_deleted, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, false, NOW(), NOW()
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, false, NOW(), NOW()
 ) RETURNING *;
 
 -- name: GetMessageByID :one
@@ -16,11 +16,17 @@ SELECT
     u.username as author_username,
     u.first_name as author_first_name,
     u.last_name as author_last_name,
-    u.public_key as author_public_key,
     u.photo_url as author_photo_url,
-    u.is_bot as author_is_bot
+    u.is_bot as author_is_bot,
+    rm.content as reply_content,
+    rm.author_id as reply_author_id,
+    ru.username as reply_author_username,
+    ru.first_name as reply_author_first_name,
+    ru.last_name as reply_author_last_name
 FROM messages m
 JOIN users u ON m.author_id = u.id
+LEFT JOIN messages rm ON m.reply_to_id = rm.id
+LEFT JOIN users ru ON rm.author_id = ru.id
 WHERE m.dialog_id = $1 AND m.is_deleted = false
 ORDER BY m.sequence DESC
 LIMIT $2 OFFSET $3;
@@ -50,7 +56,7 @@ WHERE dialog_id = $1 AND user_id = $2 AND last_read_sequence < $3;
 
 -- name: CountUnreadMessages :one
 SELECT count(*) FROM messages
-WHERE dialog_id = $1 AND author_id != $2 AND sequence > $3;
+WHERE dialog_id = $1 AND author_id != $2 AND sequence > $3 AND is_deleted = false;
 
 -- name: GetLastSequence :one
 SELECT COALESCE(MAX(sequence), 0)::BIGINT FROM messages
@@ -86,3 +92,15 @@ SET content = $2,
     updated_at = NOW()
 WHERE id = $1 AND author_id = $4
 RETURNING *;
+
+-- name: CreateAttachment :one
+INSERT INTO message_attachments (
+    id, message_id, type, file_name, file_size, content_type, created_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, NOW()
+) RETURNING *;
+
+-- name: GetAttachmentsByMessageIDs :many
+SELECT * FROM message_attachments
+WHERE message_id = ANY($1::uuid[])
+ORDER BY created_at ASC;

@@ -40,12 +40,26 @@ type MyChatsResult interface {
 	IsMyChatsResult()
 }
 
+type Node interface {
+	IsNode()
+	GetID() string
+}
+
 type PinChatResult interface {
 	IsPinChatResult()
 }
 
 type SendMessageResult interface {
 	IsSendMessageResult()
+}
+
+type Attachment struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	URL         string `json:"url"`
+	FileName    string `json:"fileName"`
+	FileSize    int64  `json:"fileSize"`
+	ContentType string `json:"contentType"`
 }
 
 type AuthPayload struct {
@@ -70,6 +84,9 @@ type Chat struct {
 	Members          []*ChatMember `json:"members,omitempty"`
 	CreatedAt        string        `json:"createdAt"`
 }
+
+func (Chat) IsNode()            {}
+func (this Chat) GetID() string { return this.ID }
 
 func (Chat) IsChatResult() {}
 
@@ -137,16 +154,20 @@ type LoginInput struct {
 }
 
 type Message struct {
-	ID            string      `json:"id"`
-	ChatID        string      `json:"chatId"`
-	Sender        *dbgen.User `json:"sender,omitempty"`
-	Text          string      `json:"text"`
-	SentAt        string      `json:"sentAt"`
-	Sequence      int64       `json:"sequence"`
-	IsEdited      bool        `json:"isEdited"`
-	ReplyTo       *Message    `json:"replyTo,omitempty"`
-	ForwardedFrom *Message    `json:"forwardedFrom,omitempty"`
+	ID            string        `json:"id"`
+	ChatID        string        `json:"chatId"`
+	Sender        *dbgen.User   `json:"sender,omitempty"`
+	Text          string        `json:"text"`
+	Attachments   []*Attachment `json:"attachments,omitempty"`
+	SentAt        string        `json:"sentAt"`
+	Sequence      int64         `json:"sequence"`
+	IsEdited      bool          `json:"isEdited"`
+	ReplyTo       *Message      `json:"replyTo,omitempty"`
+	ForwardedFrom *Message      `json:"forwardedFrom,omitempty"`
 }
+
+func (Message) IsNode()            {}
+func (this Message) GetID() string { return this.ID }
 
 func (Message) IsSendMessageResult() {}
 

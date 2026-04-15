@@ -16,23 +16,24 @@ import { UserProfileOverlay } from "@/features/user/ui/user-profile-overlay";
 import { Toaster } from "@/components/ui/sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { SubscriptionManager } from "@/features/chat/ui/subscription-manager";
 
-export function AuthenticatedLayout() {
+export function AuthenticatedLayout(): React.ReactNode {
   const matches = useMatches();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isMobile: boolean = useIsMobile();
 
   const lastChatPath = React.useRef<string | null>(null);
-  const setActiveChatId = useChatStore((state) => state.setActiveChatId);
+  const setActiveChatId = useChatStore(
+    (state: { setActiveChatId: (id: string | null) => void }) =>
+      state.setActiveChatId,
+  );
 
   const userMatch = useMatch({
     from: "/_authenticated/users/$userId",
     shouldThrow: false,
   });
-  // NOTE: Now for secret chats only
-  // const { data: meData } = useMe();
-  // useE2EEInit(meData?.me);
 
   React.useEffect((): void => {
     if (pathname.includes("/chat/")) {
@@ -51,10 +52,12 @@ export function AuthenticatedLayout() {
   }, [isMobile, pathname, navigate]);
 
   const hideSidebarRequested: boolean = matches.some(
-    (m) => m.staticData?.hideSidebar,
+    (m: { staticData?: { hideSidebar?: boolean } }) =>
+      m.staticData?.hideSidebar,
   );
   const hideMobileNavRequested: boolean = matches.some(
-    (m) => m.staticData?.hideMobileNav,
+    (m: { staticData?: { hideMobileNav?: boolean } }) =>
+      m.staticData?.hideMobileNav,
   );
 
   const isProfileOpen: boolean = !!userMatch && isMobile;
@@ -68,22 +71,29 @@ export function AuthenticatedLayout() {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
-        <div className="flex flex-1 overflow-hidden relative">
-          <aside
-            className={cn(
-              "flex-shrink-0 border-r bg-background z-20 transition-[width] duration-200 ease-in-out w-full md:w-80 lg:w-96",
-              isDetailView ? "hidden md:flex" : "flex",
-              hideSidebarRequested && "md:hidden",
-            )}
-          >
-            <AppSidebar />
-          </aside>
-
-          <main className="flex-1 min-w-0 h-full bg-background relative z-10">
+      <SubscriptionManager />
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background">
+        <div className="flex flex-1 overflow-hidden relative min-h-0">
+          {!hideSidebarRequested && (
             <div
               className={cn(
-                "h-full w-full transition-all duration-300",
+                "flex-shrink-0 transition-all duration-200 border-r border-border/50",
+                isDetailView ? "hidden md:block" : "block w-full md:w-auto",
+              )}
+            >
+              <AppSidebar />
+            </div>
+          )}
+
+          <main
+            className={cn(
+              "flex-1 min-w-0 h-full bg-background relative z-10",
+              isMobile && !isDetailView ? "hidden" : "block",
+            )}
+          >
+            <div
+              className={cn(
+                "h-full w-full transition-all duration-300 relative overflow-hidden",
                 isProfileOpen && "pointer-events-none scale-[0.98] opacity-50",
               )}
             >
@@ -101,7 +111,11 @@ export function AuthenticatedLayout() {
           </AnimatePresence>
         </div>
 
-        {!shouldHideNav && <MobileNav />}
+        {!shouldHideNav && isMobile && (
+          <div className="flex-shrink-0 border-t border-border/50">
+            <MobileNav />
+          </div>
+        )}
       </div>
 
       <Toaster

@@ -3,7 +3,6 @@ import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import type { Chat, Message } from "@/entities/chat/model/types";
 import {
   LuTerminal,
   LuTable,
@@ -12,11 +11,12 @@ import {
   LuListOrdered,
   LuQuote,
 } from "react-icons/lu";
+import type { chatMenuItem_chat$data } from "./__generated__/chatMenuItem_chat.graphql";
 
 interface LastMessageContentProps {
-  message: Message;
+  message: NonNullable<chatMenuItem_chat$data["lastMessage"]>;
   myId: string;
-  chat: Chat;
+  chat: chatMenuItem_chat$data;
 }
 
 const previewComponents: Components = {
@@ -72,16 +72,26 @@ export function LastMessageContent({
   message,
 }: LastMessageContentProps): React.ReactNode {
   const content = useMemo((): React.ReactNode => {
-    if (!message.text) return null;
+    const text: string | undefined | null = message?.text;
+    if (!text) return null;
+
     return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={previewComponents}
       >
-        {message.text}
+        {text}
       </ReactMarkdown>
     );
-  }, [message.text]);
+  }, [message?.text]);
+
+  if (!message?.text) {
+    return (
+      <span className="text-muted-foreground/50 italic text-[13px]">
+        No text content
+      </span>
+    );
+  }
 
   return (
     <div

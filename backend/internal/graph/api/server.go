@@ -115,5 +115,10 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 	srv.AddTransport(transport.POST{})
 	srv.AddTransport(transport.MultipartForm{})
 
+	srv.AddTransport(transport.MultipartForm{
+		MaxMemory:     32 << 20, // 32MB
+		MaxUploadSize: 50 << 20, // 50MB
+	})
+
 	return srv
 }

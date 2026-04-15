@@ -11,12 +11,18 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/tr1xdev/aerogram-messenger/internal/graph"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 )
+
+// ID is the resolver for the id field.
+func (r *chatResolver) ID(ctx context.Context, obj *model.Chat) (string, error) {
+	return helpers.EncodeGlobalID("Chat", helpers.ToRawID(obj.ID)), nil
+}
 
 // CreateChat is the resolver for the createChat field.
 func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatType, participantIds []string, slug *string, title *string) (model.CreateChatResult, error) {
@@ -25,10 +31,15 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
+	rawParticipantIds := make([]string, len(participantIds))
+	for i, id := range participantIds {
+		rawParticipantIds[i] = helpers.ToRawID(id)
+	}
+
 	enumKey := "CHAT_TYPE_" + strings.ToUpper(string(typeArg))
 	req := &chatv1.CreateChatRequest{
 		Type:           chatv1.ChatType(chatv1.ChatType_value[enumKey]),
-		ParticipantIds: participantIds,
+		ParticipantIds: rawParticipantIds,
 		CreatorId:      authID,
 		Title:          title,
 		Slug:           slug,
@@ -39,7 +50,7 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 		return &model.InternalError{Message: err.Error()}, nil
 	}
 
-	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
+	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
 // CreateDirectChat is the resolver for the createDirectChat field.
@@ -49,16 +60,21 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
+	rawUserID := helpers.ToRawID(userID)
+	if authID == rawUserID {
+		return &model.InternalError{Message: "you cannot create a chat with yourself"}, nil
+	}
+
 	resp, err := r.ChatClient.CreateChat(ctx, &chatv1.CreateChatRequest{
 		Type:           chatv1.ChatType_CHAT_TYPE_PRIVATE,
-		ParticipantIds: []string{authID, userID},
+		ParticipantIds: []string{authID, rawUserID},
 		CreatorId:      authID,
 	})
 	if err != nil {
 		return &model.InternalError{Message: err.Error()}, nil
 	}
 
-	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
+	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
 // PinChat is the resolver for the pinChat field.
@@ -69,7 +85,7 @@ func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) 
 	}
 
 	resp, err := r.ChatClient.PinChat(ctx, &chatv1.PinChatRequest{
-		ChatId: id,
+		ChatId: helpers.ToRawID(id),
 		UserId: authID,
 		Pinned: pinned,
 	})
@@ -93,7 +109,7 @@ func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryon
 	}
 
 	resp, err := r.ChatClient.DeleteChat(ctx, &chatv1.DeleteChatRequest{
-		ChatId:      id,
+		ChatId:      helpers.ToRawID(id),
 		UserId:      authID,
 		ForEveryone: everyone,
 	})
@@ -111,7 +127,7 @@ func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string, t
 		return false, nil
 	}
 
-	if err := r.PresenceSvc.PublishTyping(ctx, authID, chatID, typing); err != nil {
+	if err := r.PresenceSvc.PublishTyping(ctx, authID, helpers.ToRawID(chatID), typing); err != nil {
 		return false, err
 	}
 
@@ -132,7 +148,7 @@ func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error
 
 	chats := make([]*model.Chat, 0, len(resp.Chats))
 	for _, c := range resp.Chats {
-		if enriched, err := helpers.EnrichChat(ctx, r.Store, authID, c); err == nil {
+		if enriched, err := r.Enricher.EnrichChat(ctx, authID, c); err == nil {
 			chats = append(chats, enriched)
 		}
 	}
@@ -147,8 +163,14 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
+	var rawID *string
+	if id != nil {
+		val := helpers.ToRawID(*id)
+		rawID = &val
+	}
+
 	resp, err := r.ChatClient.GetChat(ctx, &chatv1.GetChatRequest{
-		ChatId: id,
+		ChatId: rawID,
 		Slug:   slug,
 		UserId: authID,
 	})
@@ -156,18 +178,19 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 		return &model.NotFoundError{Message: "chat not found"}, nil
 	}
 
-	return helpers.EnrichChat(ctx, r.Store, authID, resp.Chat)
+	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
 // ChatCreated is the resolver for the chatCreated field.
 func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (<-chan *model.Chat, error) {
 	authID := middleware.GetUserID(ctx)
-	if authID == "" || authID != userID {
+	rawUserID := helpers.ToRawID(userID)
+	if authID == "" || authID != rawUserID {
 		return nil, errors.New("forbidden")
 	}
 
 	chatChan := make(chan *model.Chat, 10)
-	pubsub := r.RedisClient.Subscribe(ctx, "user_chats:"+userID)
+	pubsub := r.RedisClient.Subscribe(ctx, "user_chats:"+rawUserID)
 
 	go func() {
 		defer pubsub.Close()
@@ -190,6 +213,8 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 					continue
 				}
 
+				c.ID = helpers.EncodeGlobalID("Chat", helpers.ToRawID(c.ID))
+
 				select {
 				case chatChan <- &c:
 				case <-ctx.Done():
@@ -204,12 +229,13 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 // ChatDeleted is the resolver for the chatDeleted field.
 func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (<-chan string, error) {
 	authID := middleware.GetUserID(ctx)
-	if authID == "" || authID != userID {
+	rawUserID := helpers.ToRawID(userID)
+	if authID == "" || authID != rawUserID {
 		return nil, errors.New("forbidden")
 	}
 
 	deleteChan := make(chan string, 10)
-	pubsub := r.RedisClient.Subscribe(ctx, "user_chats_deleted:"+userID)
+	pubsub := r.RedisClient.Subscribe(ctx, "user_chats_deleted:"+rawUserID)
 
 	go func() {
 		defer pubsub.Close()
@@ -224,7 +250,7 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 					return
 				}
 				select {
-				case deleteChan <- msg.Payload:
+				case deleteChan <- helpers.EncodeGlobalID("Chat", msg.Payload):
 				case <-ctx.Done():
 					return
 				}
@@ -237,7 +263,8 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 
 // UserTyping is the resolver for the userTyping field.
 func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<-chan *model.TypingPayload, error) {
-	stream, err := r.PresenceClient.SubscribeTyping(ctx, &presencev1.SubscribeTypingRequest{ChatId: chatID})
+	rawChatID := helpers.ToRawID(chatID)
+	stream, err := r.PresenceClient.SubscribeTyping(ctx, &presencev1.SubscribeTypingRequest{ChatId: rawChatID})
 	if err != nil {
 		return nil, err
 	}
@@ -257,6 +284,8 @@ func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<
 				continue
 			}
 
+			payload.UserID = helpers.EncodeGlobalID("User", helpers.ToRawID(payload.UserID))
+
 			select {
 			case out <- &payload:
 			case <-ctx.Done():
@@ -267,3 +296,8 @@ func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<
 
 	return out, nil
 }
+
+// Chat returns graph.ChatResolver implementation.
+func (r *Resolver) Chat() graph.ChatResolver { return &chatResolver{r} }
+
+type chatResolver struct{ *Resolver }

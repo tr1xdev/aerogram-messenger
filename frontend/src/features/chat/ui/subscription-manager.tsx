@@ -1,50 +1,44 @@
-import { useMyChats, useMe } from "@/features/chat/lib";
-import { useGlobalSubscriptions } from "@/features/chat/lib";
-import { useEffect } from "react";
+import {
+  useMyChats,
+  useMe,
+  useAppTitle,
+  useGlobalSubscriptions,
+} from "@/features/chat/lib";
+import { useEffect, type ReactNode } from "react";
 import type { Chat } from "@/entities/chat/model/types";
+import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
+import type { useAppTitle_chats$key } from "@/features/chat/lib/common/__generated__/useAppTitle_chats.graphql";
+import { logger } from "@/shared/lib/logger";
 
-const logStyle = (color: string): string =>
-  `color: ${color}; font-weight: bold; font-family: "JetBrains Mono", monospace;`;
-const dimStyle = `color: #888; font-family: "JetBrains Mono", monospace;`;
+export function SubscriptionManager(): ReactNode {
+  const meData: useMeQuery$data = useMe();
+  const chatsData = useMyChats();
 
-export function SubscriptionManager() {
-  const { data: meData } = useMe();
-  const { data: chatsData, loading, error } = useMyChats();
+  const myId: string | undefined = meData?.me?.id;
 
-  const myId: string | undefined = meData?.me.id;
-  const chats: Chat[] = chatsData?.myChats?.chats || [];
+  const chatsKey =
+    chatsData?.myChats as unknown as useAppTitle_chats$key | null;
 
-  useEffect(() => {
-    if (loading) return;
+  useAppTitle(chatsKey);
 
-    if (error) {
-      console.log(
-        "%c[WS]%c subscription error:%c %s",
-        logStyle("#ff4d4d"),
-        dimStyle,
-        "color: #fca5a5;",
-        error.message,
-      );
-      return;
-    }
+  const chats: readonly Chat[] =
+    chatsData?.myChats?.__typename === "ChatList"
+      ? (chatsData.myChats.chats as unknown as readonly Chat[])
+      : [];
 
+  useEffect((): void => {
     if (chats.length > 0) {
-      console.log(
-        "%c[WS]%c initializing subscriptions for %c%d%c chats",
-        logStyle("#00d4ff"),
-        dimStyle,
-        "color: #fff; font-weight: bold;",
-        chats.length,
-        dimStyle,
-      );
+      logger.ws(`Initializing subscriptions for ${chats.length} chats`);
     }
-  }, [chats.length, loading, error]);
+  }, [chats.length]);
 
   return (
     <>
-      {chats.map((chat: Chat) => (
-        <ActiveSubscription key={chat.id} chatId={chat.id} myId={myId} />
-      ))}
+      {chats.map(
+        (chat: Chat): ReactNode => (
+          <ActiveSubscription key={chat.id} chatId={chat.id} myId={myId} />
+        ),
+      )}
     </>
   );
 }
@@ -54,16 +48,10 @@ function ActiveSubscription({
   myId,
 }: {
   chatId: string;
-  myId?: string;
-}) {
-  useEffect(() => {
-    console.log(
-      "%c[SUB]%c active for chat:%c %s",
-      logStyle("#a855f7"),
-      dimStyle,
-      "color: #e9d5ff;",
-      chatId,
-    );
+  myId: string | undefined;
+}): null {
+  useEffect((): void => {
+    logger.debug("WS", `Active subscription for chat: ${chatId}`);
   }, [chatId]);
 
   useGlobalSubscriptions(chatId, myId);

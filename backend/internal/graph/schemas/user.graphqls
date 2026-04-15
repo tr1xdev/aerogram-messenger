@@ -1,16 +1,17 @@
-type User {
+type User implements Node {
     id: ID!
     email: String
     firstName: String!
     lastName: String
     displayName: String
     username: String
-    photoUrl: String
+    photoUrl: String @goField(forceResolver: true)
     bio: String
     status: String!
     isVerified: Boolean!
     isPremium: Boolean!
     isBot: Boolean!
+    isTyping: Boolean!
     botDescription: String
     botCommands: String
 }
@@ -43,6 +44,7 @@ union CreateBotResult =
     | InternalError
 
 extend type Query {
+    node(id: ID!): Node
     me: User!
     user(id: ID!): User!
     getUser(id: ID!): User!
@@ -51,6 +53,7 @@ extend type Query {
 }
 
 extend type Mutation {
+    uploadAvatar(file: Upload!, userId: ID): User!
     updateUser(input: UpdateUserInput!): User!
     createBot(
         username: String!

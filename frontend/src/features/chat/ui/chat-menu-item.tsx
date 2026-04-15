@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { useFragment, graphql } from "react-relay";
 import { SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { MdVerified } from "react-icons/md";
 import {
@@ -18,54 +19,82 @@ import { Trash2, CheckCircle2, BellOff, PinOff } from "lucide-react";
 import { useChatActions, useMessageActions } from "@/features/chat/lib";
 import { DeleteChatDialog } from "./delete-chat-dialog";
 import type {
-  Chat,
-  ChatMember,
-  Message,
-  User,
-} from "@/entities/chat/model/types";
+  chatMenuItem_chat$key,
+  chatMenuItem_chat$data,
+} from "./__generated__/chatMenuItem_chat.graphql";
 
 interface ChatMenuItemProps {
-  chat: Chat;
+  chat: chatMenuItem_chat$key;
   isActive: boolean;
   myId?: string;
 }
 
-export function ChatMenuItem({
-  chat,
-  isActive,
-  myId,
-}: ChatMenuItemProps): React.ReactNode {
+export function ChatMenuItem(props: ChatMenuItemProps): ReactNode {
+  const chat: chatMenuItem_chat$data = useFragment(
+    graphql`
+      fragment chatMenuItem_chat on Chat {
+        id
+        title
+        type
+        photoUrl
+        unreadCount
+        isPinned
+        lastReadSequence
+        lastMessage {
+          id
+          text
+          sentAt
+          sequence
+          sender {
+            id
+            firstName
+            lastName
+            username
+            displayName
+          }
+        }
+        members {
+          user {
+            id
+            firstName
+            lastName
+            username
+            photoUrl
+            isVerified
+            status
+          }
+        }
+      }
+    `,
+    props.chat,
+  );
+
+  const { isActive, myId } = props;
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false);
   const { togglePin, deleteChat } = useChatActions(chat.id);
   const { markAsRead } = useMessageActions(chat.id);
 
-  const otherMember: ChatMember | undefined = useMemo(
-    (): ChatMember | undefined =>
-      chat.members?.find((m: ChatMember): boolean => m.user.id !== myId),
+  const otherMember = useMemo(
+    (): NonNullable<chatMenuItem_chat$data["members"]>[number] | undefined =>
+      chat.members?.find(
+        (m: NonNullable<chatMenuItem_chat$data["members"]>[number]): boolean =>
+          m.user?.id !== undefined && m.user.id !== myId,
+      ),
     [chat.members, myId],
   );
 
-  const otherUser: User | undefined = otherMember?.user;
-  const otherUserFirstName: string | undefined = otherUser?.firstName;
-  const otherUserLastName: string | undefined = otherUser?.lastName;
-  const otherUserUsername: string | undefined = otherUser?.username;
-  const chatTitle: string | undefined = chat.title;
+  const otherUser = otherMember?.user;
+  const chatTitle = chat.title;
 
   const displayName: string = useMemo((): string => {
     if (otherUser) {
-      const first: string = otherUserFirstName?.trim() || "";
-      const last: string = otherUserLastName?.trim() || "";
+      const first: string = otherUser.firstName?.trim() || "";
+      const last: string = otherUser.lastName?.trim() || "";
       const full: string = `${first} ${last}`.trim();
-      return full || otherUserUsername || "Chat";
+      return full || otherUser.username || "Chat";
     }
     return chatTitle || "Chat";
-  }, [
-    otherUser,
-    otherUserFirstName,
-    otherUserLastName,
-    otherUserUsername,
-    chatTitle,
-  ]);
+  }, [otherUser, chatTitle]);
 
   const avatarUrl: string | undefined = useMemo((): string | undefined => {
     if (chat.type === "PRIVATE") {
@@ -74,38 +103,22 @@ export function ChatMenuItem({
     return chat.photoUrl || undefined;
   }, [chat.type, chat.photoUrl, otherUser?.photoUrl]);
 
-  const initial: string = useMemo(
-    (): string => (displayName.length > 0 ? displayName[0].toUpperCase() : "?"),
-    [displayName],
-  );
-
-  const lastMessage: Message | undefined = chat.lastMessage ?? undefined;
-  const isMe: boolean = lastMessage?.sender.id === myId;
-  const sender: User | undefined = lastMessage?.sender;
+  const lastMessage = chat.lastMessage;
+  const isMe: boolean = lastMessage?.sender?.id === myId;
+  const sender = lastMessage?.sender;
   const isOnline: boolean = otherUser?.status === "online";
 
   const showSenderName: boolean =
     chat.type === "GROUP" || chat.type === "CHANNEL" || isMe;
 
-  const senderFirstName: string | undefined = sender?.firstName;
-  const senderLastName: string | undefined = sender?.lastName;
-  const senderUsername: string | undefined = sender?.username;
-
   const senderName: string | null = useMemo((): string | null => {
     if (!showSenderName || !sender) return null;
     if (isMe) return "You";
-    const first: string = senderFirstName?.trim() || "";
-    const last: string = senderLastName?.trim() || "";
+    const first: string = sender.firstName?.trim() || "";
+    const last: string = sender.lastName?.trim() || "";
     const full: string = `${first} ${last}`.trim();
-    return full || senderUsername || null;
-  }, [
-    showSenderName,
-    sender,
-    isMe,
-    senderFirstName,
-    senderLastName,
-    senderUsername,
-  ]);
+    return full || sender.username || null;
+  }, [showSenderName, sender, isMe]);
 
   return (
     <>
@@ -123,16 +136,12 @@ export function ChatMenuItem({
                 className="flex items-center gap-3 w-full h-full"
               >
                 <div className="relative shrink-0 self-center h-14 w-14">
-                  <Avatar className="h-full w-full border border-border/40 rounded-full overflow-hidden aspect-square">
-                    <AvatarImage
-                      src={avatarUrl}
-                      alt={displayName}
-                      className="h-full w-full object-cover aspect-square"
-                    />
-                    <AvatarFallback className="h-full w-full flex items-center justify-center bg-linear-to-br from-[#54a4f5] to-[#2196f3] text-white/90 font-bold text-lg uppercase aspect-square">
-                      {initial}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    src={avatarUrl}
+                    fallback={displayName}
+                    size={56}
+                    className="border border-border/40"
+                  />
                   {isOnline && (
                     <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500 z-10" />
                   )}
@@ -155,7 +164,7 @@ export function ChatMenuItem({
                           isMe={isMe}
                           sequence={lastMessage.sequence ?? 0}
                           lastReadSequence={chat.lastReadSequence}
-                          isSending={lastMessage.isSending}
+                          isSending={false}
                         />
                         <span className="text-xs font-medium text-muted-foreground/70 leading-none">
                           {new Date(lastMessage.sentAt).toLocaleTimeString([], {
@@ -175,10 +184,14 @@ export function ChatMenuItem({
 
                   <div className="flex items-start justify-between gap-2 min-h-4.5">
                     <div className="text-[13.5px] font-normal text-muted-foreground/70 min-w-0 leading-tight">
-                      {lastMessage && myId ? (
+                      {lastMessage ? (
                         <LastMessageContent
-                          message={lastMessage}
-                          myId={myId}
+                          message={
+                            lastMessage as NonNullable<
+                              chatMenuItem_chat$data["lastMessage"]
+                            >
+                          }
+                          myId={myId ?? ""}
                           chat={chat}
                         />
                       ) : (
@@ -190,7 +203,7 @@ export function ChatMenuItem({
                       {chat.isPinned && chat.unreadCount === 0 && (
                         <BsFillPinFill className="h-3.5 w-3.5 text-muted-foreground/40" />
                       )}
-                      {chat.unreadCount > 0 && (
+                      {chat.unreadCount !== null && chat.unreadCount > 0 && (
                         <Badge className="h-5 min-w-5 px-1 justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold border-none shadow-sm leading-none">
                           {chat.unreadCount}
                         </Badge>
@@ -223,17 +236,19 @@ export function ChatMenuItem({
             )}
           </ContextMenuItem>
 
-          {chat.unreadCount > 0 && lastMessage?.sequence !== undefined && (
-            <ContextMenuItem
-              onClick={(): void => {
-                markAsRead();
-              }}
-              className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
-            >
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground/70" />
-              <span>Mark as read</span>
-            </ContextMenuItem>
-          )}
+          {chat.unreadCount !== null &&
+            chat.unreadCount > 0 &&
+            lastMessage?.sequence !== undefined && (
+              <ContextMenuItem
+                onClick={(): void => {
+                  markAsRead();
+                }}
+                className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
+              >
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground/70" />
+                <span>Mark as read</span>
+              </ContextMenuItem>
+            )}
 
           <ContextMenuItem className="gap-3 py-2.5 cursor-pointer text-sm font-medium">
             <BellOff className="h-4 w-4 text-muted-foreground/70" />

@@ -1,92 +1,106 @@
-import { useQuery } from "@apollo/client/react/index.js";
-import {
-  CombinedGraphQLErrors,
-  ServerError,
-} from "@apollo/client/errors/index.js";
-import { useMemo } from "react";
-import { GET_MESSAGE_HISTORY } from "@/features/chat/api";
-import { useChatDetails } from "@/features/chat/lib";
-import type { Message, Chat } from "@/entities/chat/model/types";
-import type { GraphQLFormattedError } from "graphql";
+import { useMemo, useCallback } from "react";
+import { graphql, useLazyLoadQuery, useRefetchableFragment } from "react-relay";
+import type { useMessagesQuery } from "./__generated__/useMessagesQuery.graphql";
+import type {
+  useMessages_history$key,
+  useMessages_history$data,
+} from "./__generated__/useMessages_history.graphql";
 
-export interface ChatHistoryData {
-  messageHistory: {
-    messages: Message[];
-    hasMore: boolean;
-    __typename?: string;
-  };
-}
+const messagesQuery = graphql`
+  query useMessagesQuery($chatId: ID!, $count: Int!, $cursor: Long) {
+    ...useMessages_history
+      @arguments(chatId: $chatId, count: $count, cursor: $cursor)
+  }
+`;
 
-export interface ChatHistoryVariables {
-  chatId: string;
-  limit: number;
-}
-
-interface ChatHistoryHookResult {
-  messages: Message[];
-  isLoading: boolean;
-  hasMore: boolean;
-  lastReadSequence: number | undefined;
-}
-
-export function useChatHistory(chatId: string): ChatHistoryHookResult {
-  const {
-    data,
-    loading,
-    error,
-  }: {
-    data?: ChatHistoryData;
-    loading: boolean;
-    error?: Error;
-  } = useQuery<ChatHistoryData, ChatHistoryVariables>(GET_MESSAGE_HISTORY, {
-    variables: { chatId, limit: 50 },
-    skip: !chatId,
-    fetchPolicy: "cache-and-network",
-    notifyOnNetworkStatusChange: true,
-  });
-
-  const chatDetails: { data?: { chat?: Chat } } = useChatDetails(chatId);
-
-  if (error) {
-    if (CombinedGraphQLErrors.is(error)) {
-      error.errors.forEach((graphQLError: GraphQLFormattedError): void => {
-        console.error(
-          `[useChatHistory] GraphQL Error: ${graphQLError.message}`,
-        );
-      });
-    } else if (ServerError.is(error)) {
-      console.error(
-        `[useChatHistory] Server Error: ${error.message}`,
-        `Status: ${error.statusCode}`,
-      );
-    } else {
-      console.error(`[useChatHistory] General Error: ${error.message}`);
+const messagesFragment = graphql`
+  fragment useMessages_history on Query
+  @refetchable(queryName: "useMessagesRefetchQuery")
+  @argumentDefinitions(
+    chatId: { type: "ID!" }
+    count: { type: "Int", defaultValue: 50 }
+    cursor: { type: "Long" }
+  ) {
+    messageHistory(chatId: $chatId, limit: $count, beforeSequence: $cursor) {
+      __typename
+      ... on MessageConnection {
+        messages {
+          id
+          text
+          sentAt
+          sequence
+          isEdited
+          sender {
+            id
+            firstName
+            lastName
+            photoUrl
+            displayName
+          }
+          replyTo {
+            id
+            text
+            sender {
+              id
+              firstName
+              lastName
+              displayName
+            }
+          }
+        }
+        hasMore
+      }
+      ... on NotFoundError {
+        message
+      }
     }
   }
+`;
 
-  const messages: Message[] = useMemo((): Message[] => {
-    const history: ChatHistoryData["messageHistory"] | undefined =
-      data?.messageHistory;
-    if (!history?.messages) return [];
+type MessageType = Extract<
+  NonNullable<useMessages_history$data["messageHistory"]>,
+  { __typename: "MessageConnection" }
+>["messages"][number];
 
-    console.log(
-      `[useChatHistory] Processing messages for ${chatId}, count: ${history.messages.length}`,
-    );
-
-    return [...history.messages].sort(
-      (a: Message, b: Message): number => (a.sequence ?? 0) - (b.sequence ?? 0),
-    );
-  }, [data, chatId]);
-
-  const hasMore: boolean = useMemo(
-    (): boolean => data?.messageHistory?.hasMore ?? false,
-    [data],
+export function useChatHistory(chatId: string) {
+  const queryData = useLazyLoadQuery<useMessagesQuery>(
+    messagesQuery,
+    { chatId, count: 50, cursor: null },
+    { fetchPolicy: "store-and-network" },
   );
+
+  const [data, refetch] = useRefetchableFragment<
+    useMessagesQuery,
+    useMessages_history$key
+  >(messagesFragment, queryData);
+  const history = data?.messageHistory;
+
+  const messages = useMemo((): readonly MessageType[] => {
+    if (history?.__typename === "MessageConnection") {
+      return [...(history.messages ?? [])].sort(
+        (a: MessageType, b: MessageType): number =>
+          Number(a.sequence) - Number(b.sequence),
+      );
+    }
+    return [];
+  }, [history]);
+
+  const hasMore: boolean =
+    history?.__typename === "MessageConnection" ? history.hasMore : false;
+
+  const loadMore = useCallback((): void => {
+    if (!hasMore || !messages.length) return;
+    refetch(
+      { chatId, count: 50, cursor: messages[0].sequence },
+      { fetchPolicy: "network-only" },
+    );
+  }, [hasMore, messages, chatId, refetch]);
 
   return {
     messages,
-    isLoading: loading,
+    isLoading: !data,
     hasMore,
-    lastReadSequence: chatDetails.data?.chat?.lastReadSequence,
+    loadMore,
+    error: history?.__typename === "NotFoundError" ? history.message : null,
   };
 }

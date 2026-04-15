@@ -29,6 +29,15 @@ database:
         db: ${REDIS_DB:-0} # Redis database index (0-15)
         password: ${REDIS_PASSWORD} # Redis password (from .env)
 
+s3:
+    endpoint: ${S3_ENDPOINT:-localhost:9000} # S3 server endpoint (e.g., MinIO or AWS)
+    access_key: ${S3_ACCESS_KEY} # S3 access key (from .env)
+    secret_key: ${S3_SECRET_KEY} # S3 secret key (from .env)
+    bucket: ${S3_BUCKET_NAME:-aerogram} # Target bucket name for uploads
+    use_ssl: ${S3_USE_SSL:-false} # Enable SSL for S3 connection
+    region: ${S3_REGION:-us-east-1} # S3 region (default for MinIO is us-east-1)
+    public_host: ${S3_PUBLIC_HOST} # Public host for S3 (from .env)
+
 auth:
     jwt:
         secret: ${JWT_SECRET} # Secret for signing (from .env)
@@ -40,6 +49,9 @@ auth:
         on_sign_in: ${2FA_ON_SIGN_IN:-false} # Trigger 2FA during login
 
 ratelimit:
+    global:
+        limit: ${LIMIT_GLOBAL_RPS:-100} # Global requests per second
+        burst: ${LIMIT_GLOBAL_BURST:-200} # Global maximum burst size
     auth:
         signup:
             limit: 5 # Allowed registration attempts

@@ -1,269 +1,192 @@
-import { useMutation } from "@apollo/client/react/index.js";
-import { type ApolloCache, type Reference } from "@apollo/client/index.js";
-import { type ModifierDetails } from "@apollo/client/cache/index.js";
+import { useCallback } from "react";
+import { graphql, useMutation } from "react-relay";
+import type { UseMutationConfig } from "react-relay";
+import type {
+  RecordSourceSelectorProxy,
+  RecordProxy,
+  PayloadError,
+} from "relay-runtime";
+import type {
+  useMessageActionsSendMutation,
+  useMessageActionsSendMutation$data,
+} from "./__generated__/useMessageActionsSendMutation.graphql";
+import type {
+  useMessageActionsEditMutation,
+  useMessageActionsEditMutation$data,
+} from "./__generated__/useMessageActionsEditMutation.graphql";
+import type { useMessageActionsReadMutation } from "./__generated__/useMessageActionsReadMutation.graphql";
 
-import {
-  SEND_MESSAGE,
-  EDIT_MESSAGE,
-  MARK_DIALOG_AS_READ,
-  MESSAGE_FIELDS,
-} from "@/features/chat/api";
+const sendMessageMutation = graphql`
+  mutation useMessageActionsSendMutation(
+    $chatId: ID!
+    $text: String!
+    $replyToId: ID
+  ) {
+    sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {
+      ... on Message {
+        id
+        chatId
+        text
+        sentAt
+        sequence
+        isEdited
+        sender {
+          id
+          firstName
+          lastName
+          photoUrl
+          displayName
+        }
+        replyTo {
+          id
+          text
+          sender {
+            id
+            firstName
+            lastName
+            displayName
+          }
+        }
+      }
+    }
+  }
+`;
 
-import { useMe } from "../common/use-me";
-import { useChatDetails } from "../chat/use-chats";
-import type { Message, User, Chat } from "@/entities/chat/model/types";
+const editMessageMutation = graphql`
+  mutation useMessageActionsEditMutation($id: ID!, $text: String!) {
+    updateMessage(id: $id, text: $text) {
+      ... on Message {
+        id
+        text
+        isEdited
+      }
+    }
+  }
+`;
 
-interface ValidationError {
-  __typename: "ValidationError";
-  message: string;
-  field?: string;
-}
+const markAsReadMutation = graphql`
+  mutation useMessageActionsReadMutation($chatId: ID!) {
+    markDialogAsRead(chatId: $chatId)
+  }
+`;
 
-type MessageWithTypename = Message & { __typename: "Message" };
+export function useMessageActions(chatId: string) {
+  const [send, isSending] =
+    useMutation<useMessageActionsSendMutation>(sendMessageMutation);
+  const [edit] =
+    useMutation<useMessageActionsEditMutation>(editMessageMutation);
+  const [read] = useMutation<useMessageActionsReadMutation>(markAsReadMutation);
 
-interface SendMutationResult {
-  sendMessage: MessageWithTypename | ValidationError;
-}
+  const sendMessage = useCallback(
+    (
+      text: string,
+      config?: Partial<UseMutationConfig<useMessageActionsSendMutation>>,
+    ): Promise<void> => {
+      return new Promise((resolve, reject): void => {
+        send({
+          ...config,
+          variables: {
+            chatId,
+            text,
+            replyToId: config?.variables?.replyToId ?? null,
+          },
+          updater: (store: RecordSourceSelectorProxy): void => {
+            const payload: RecordProxy | null | undefined =
+              store.getRootField("sendMessage");
+            if (!payload || payload.getType() !== "Message") return;
 
-interface UpdateMutationResult {
-  updateMessage: MessageWithTypename | ValidationError;
-}
+            const chatRecord: RecordProxy | null | undefined =
+              store.get(chatId);
+            if (chatRecord) {
+              const newSeq: number = Number(payload.getValue("sequence") ?? 0);
+              const currentLastMsg: RecordProxy | null | undefined =
+                chatRecord.getLinkedRecord("lastMessage");
+              const currentSeq: number = currentLastMsg
+                ? Number(currentLastMsg.getValue("sequence") ?? 0)
+                : -1;
 
-interface SendMessageVariables {
-  chatId: string;
-  text: string;
-  replyToId: string | null;
-}
+              if (newSeq >= currentSeq) {
+                chatRecord.setLinkedRecord(payload, "lastMessage");
+              }
 
-interface SendMessageOptions {
-  variables?: Partial<SendMessageVariables>;
-  optimisticResponse?: SendMutationResult;
-  update?: (
-    cache: ApolloCache,
-    result: { data?: SendMutationResult | null },
-  ) => void;
-}
+              chatRecord.setValue(0, "unreadCount");
+              chatRecord.setValue(newSeq, "myReadSequence");
 
-interface MessageActions {
-  sendMessage: (text: string, options?: SendMessageOptions) => Promise<void>;
-  editMessage: (id: string, text: string) => Promise<void>;
-  markAsRead: () => void;
-  isSending: boolean;
-}
+              const root: RecordProxy = store.getRoot();
+              const history: RecordProxy | null | undefined =
+                root.getLinkedRecord("messageHistory", {
+                  chatId,
+                  limit: 50,
+                  beforeSequence: null,
+                });
 
-interface MessageConnection {
-  messages: Reference[];
-  hasMore: boolean;
-}
+              if (history && history.getType() === "MessageConnection") {
+                const messages: readonly RecordProxy[] =
+                  (history.getLinkedRecords("messages") as
+                    | readonly RecordProxy[]
+                    | null) ?? [];
+                const messageId: string = payload.getDataID();
 
-interface PaginatedChats {
-  chats: Reference[];
-}
-
-export function useMessageActions(chatId: string): MessageActions {
-  const { data: meData } = useMe();
-  const { data: chatData } = useChatDetails(chatId);
-
-  const [send, { loading: isSending }] = useMutation<
-    SendMutationResult,
-    SendMessageVariables
-  >(SEND_MESSAGE);
-
-  const [edit] = useMutation<
-    UpdateMutationResult,
-    { id: string; text: string }
-  >(EDIT_MESSAGE);
-
-  const [read] = useMutation<{ markDialogAsRead: boolean }, { chatId: string }>(
-    MARK_DIALOG_AS_READ,
+                if (
+                  !messages.some(
+                    (m: RecordProxy): boolean => m.getDataID() === messageId,
+                  )
+                ) {
+                  history.setLinkedRecords([...messages, payload], "messages");
+                }
+              }
+            }
+          },
+          onCompleted: (
+            _: useMessageActionsSendMutation$data,
+            err: ReadonlyArray<PayloadError> | null,
+          ): void => {
+            if (err) reject(err);
+            else resolve();
+          },
+          onError: (err: Error): void => reject(err),
+        });
+      });
+    },
+    [chatId, send],
   );
 
-  const sendMessage = async (
-    text: string,
-    options?: SendMessageOptions,
-  ): Promise<void> => {
-    const me: User | undefined = meData?.me;
-    const chat: Chat | undefined = chatData?.chat;
-
-    if (!me || !chat) return;
-
-    const finalVariables: SendMessageVariables = {
-      chatId,
-      text,
-      replyToId: options?.variables?.replyToId ?? null,
-    };
-
-    const patchedOptions = { ...options };
-
-    if (
-      patchedOptions.optimisticResponse?.sendMessage?.__typename === "Message"
-    ) {
-      const optMsg = patchedOptions.optimisticResponse.sendMessage;
-      patchedOptions.optimisticResponse = {
-        sendMessage: {
-          ...optMsg,
-          sequence: optMsg.sequence ?? 0,
-          forwardedFrom: optMsg.forwardedFrom ?? null,
-          replyTo: optMsg.replyTo
-            ? {
-                ...optMsg.replyTo,
-                __typename: "Message",
-              }
-            : null,
-        } as unknown as MessageWithTypename,
-      };
-    }
-
-    await send({
-      ...patchedOptions,
-      variables: finalVariables,
-      update: (cache: ApolloCache, { data: mutationData }) => {
-        const result = mutationData?.sendMessage;
-        if (!result || result.__typename !== "Message") return;
-
-        const newMessage: MessageWithTypename = {
-          ...result,
-          replyTo: result.replyTo ?? null,
-          forwardedFrom: result.forwardedFrom ?? null,
-        };
-
-        const msgId: string | undefined = cache.identify({
-          __typename: "Message",
-          id: newMessage.id,
-        });
-
-        if (!msgId) return;
-
-        cache.writeFragment({
-          data: newMessage,
-          fragment: MESSAGE_FIELDS,
-        });
-
-        const chatRef: string | undefined = cache.identify({
-          __typename: "Chat",
-          id: chatId,
-        });
-
-        if (chatRef) {
-          cache.modify({
-            id: chatRef,
-            fields: {
-              lastMessage: (): Reference => ({ __ref: msgId }),
-              unreadCount: (): number => 0,
-              myReadSequence: (prev: unknown): number => {
-                const currentSeq: number = typeof prev === "number" ? prev : 0;
-                return Math.max(currentSeq, Number(newMessage.sequence) || 0);
-              },
-            },
-          });
-        }
-
-        cache.modify({
-          fields: {
-            messageHistory(
-              existing: MessageConnection | Reference | undefined,
-              { storeFieldName, readField }: ModifierDetails,
-            ): MessageConnection | Reference | undefined {
-              if (!storeFieldName.includes(chatId) || !existing)
-                return existing;
-              if ("__ref" in existing) return existing;
-
-              const messages: Reference[] =
-                (existing as MessageConnection).messages ?? [];
-              if (
-                messages.some(
-                  (ref: Reference) => readField("id", ref) === newMessage.id,
-                )
-              ) {
-                return existing;
-              }
-
-              return {
-                ...existing,
-                messages: [...messages, { __ref: msgId }],
-              };
-            },
+  const editMessage = useCallback(
+    (id: string, text: string): Promise<void> => {
+      return new Promise((resolve, reject): void => {
+        edit({
+          variables: { id, text },
+          onCompleted: (
+            _: useMessageActionsEditMutation$data,
+            err: ReadonlyArray<PayloadError> | null,
+          ): void => {
+            if (err) reject(err);
+            else resolve();
           },
+          onError: (err: Error): void => reject(err),
         });
+      });
+    },
+    [edit],
+  );
 
-        cache.modify({
-          fields: {
-            myChats(
-              existing: PaginatedChats | Reference | undefined,
-              { readField }: ModifierDetails,
-            ): PaginatedChats | Reference | undefined {
-              if (!existing || !chatRef) return existing;
-              if ("__ref" in existing) return existing;
-
-              const chats: Reference[] =
-                (existing as PaginatedChats).chats ?? [];
-              const chatRefObj: Reference = { __ref: chatRef };
-              const filtered: Reference[] = chats.filter(
-                (ref: Reference) => readField("id", ref) !== chatId,
-              );
-              return { ...existing, chats: [chatRefObj, ...filtered] };
-            },
-          },
-        });
-
-        if (options?.update) options.update(cache, { data: mutationData });
-      },
-    });
-  };
-
-  const editMessage = async (id: string, text: string): Promise<void> => {
-    const me: User | undefined = meData?.me;
-    if (!me) return;
-
-    await edit({
-      variables: { id, text },
-      optimisticResponse: {
-        updateMessage: {
-          __typename: "Message",
-          id,
-          chatId,
-          text,
-          sentAt: new Date().toISOString(),
-          isEdited: true,
-          replyTo: null,
-          forwardedFrom: null,
-          sequence: 0,
-          sender: me,
-        } as unknown as MessageWithTypename,
-      },
-    });
-  };
-
-  const markAsRead = (): void => {
-    const chat: Chat | undefined = chatData?.chat;
-    const lastSeq: number = Number(
-      chat?.lastMessage?.sequence ?? chat?.lastReadSequence ?? 0,
-    );
-
+  const markAsRead = useCallback((): void => {
     read({
       variables: { chatId },
-      optimisticResponse: { markDialogAsRead: true },
-      update: (cache: ApolloCache) => {
-        const chatRef: string | undefined = cache.identify({
-          __typename: "Chat",
-          id: chatId,
-        });
-
-        if (chatRef) {
-          cache.modify({
-            id: chatRef,
-            fields: {
-              unreadCount: (): number => 0,
-              myReadSequence: (prev: unknown): number => {
-                const currentSeq: number = typeof prev === "number" ? prev : 0;
-                return Math.max(currentSeq, lastSeq);
-              },
-            },
-          });
+      optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
+        const chatRecord: RecordProxy | null | undefined = store.get(chatId);
+        if (chatRecord) {
+          chatRecord.setValue(0, "unreadCount");
+          const lastMsg: RecordProxy | null | undefined =
+            chatRecord.getLinkedRecord("lastMessage");
+          if (lastMsg) {
+            const seq: number = Number(lastMsg.getValue("sequence") ?? 0);
+            chatRecord.setValue(seq, "myReadSequence");
+          }
         }
       },
     });
-  };
+  }, [chatId, read]);
 
   return { sendMessage, editMessage, markAsRead, isSending };
 }

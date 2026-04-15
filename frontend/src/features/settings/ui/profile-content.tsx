@@ -1,5 +1,8 @@
-import { LogOut, ChevronDown } from "lucide-react";
+import { type ReactNode, useCallback, useRef } from "react";
+import { LogOut, ChevronDown, Camera, Loader2 } from "lucide-react";
 import { MdVerified } from "react-icons/md";
+import { graphql, useMutation } from "react-relay";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,14 +10,23 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useMutation } from "@apollo/client/react";
-import { gql } from "@apollo/client";
-import { logoutAll } from "@/app/api/apollo-client";
+import { useAuthStore } from "@/store/auth-store";
 import type { User } from "@/entities/chat/model/types";
+import type { profileContentLogoutMutation } from "./__generated__/profileContentLogoutMutation.graphql";
+import type { profileContentUploadAvatarMutation } from "./__generated__/profileContentUploadAvatarMutation.graphql";
 
-const LOGOUT = gql`
-  mutation Logout {
+const logoutMutation = graphql`
+  mutation profileContentLogoutMutation {
     logout
+  }
+`;
+
+const uploadAvatarMutation = graphql`
+  mutation profileContentUploadAvatarMutation($file: Upload!) {
+    uploadAvatar(file: $file) {
+      id
+      photoUrl
+    }
   }
 `;
 
@@ -26,35 +38,98 @@ interface ProfileContentProps {
 export function ProfileContent({
   user,
   onActionComplete,
-}: ProfileContentProps) {
-  const [logoutMutation] = useMutation(LOGOUT);
+}: ProfileContentProps): ReactNode {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoutAction = useAuthStore((state) => state.logout);
+  const [commitLogout] =
+    useMutation<profileContentLogoutMutation>(logoutMutation);
+  const [commitUpload, isUploading] =
+    useMutation<profileContentUploadAvatarMutation>(uploadAvatarMutation);
 
-  const handleLogout = async (): Promise<void> => {
+  const handleLogout = useCallback((): void => {
     onActionComplete?.();
-    try {
-      await logoutMutation().catch((): void => {});
-    } finally {
-      logoutAll();
-    }
+    const navigateToSignIn = () => {
+      logoutAction();
+      window.location.href = "/sign-in";
+    };
+    commitLogout({
+      variables: {},
+      onCompleted: navigateToSignIn,
+      onError: navigateToSignIn,
+    });
+  }, [commitLogout, logoutAction, onActionComplete]);
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
   };
 
-  const initial: string = (user?.firstName ||
-    user?.username ||
-    "?")[0].toUpperCase();
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>): void => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("File is too large (max 10MB)");
+        return;
+      }
+
+      commitUpload({
+        variables: { file },
+        uploadables: { file },
+        onCompleted: () => {
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          toast.success("Avatar updated");
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to upload avatar");
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        },
+      });
+    },
+    [commitUpload],
+  );
+
+  const initial = (user?.firstName || user?.username || "?")[0].toUpperCase();
 
   return (
     <div className="space-y-6 py-6 outline-none">
       <div className="flex items-center gap-5">
-        <Avatar className="h-20 w-20 border border-border shadow-sm shrink-0 rounded-full overflow-hidden">
-          <AvatarImage
-            src={user?.photoUrl || undefined}
-            alt={`${user?.firstName} ${user?.lastName}`}
-            className="aspect-square h-full w-full object-cover"
+        <div className="relative shrink-0 group">
+          <Avatar
+            className={`h-20 w-20 border border-border shadow-sm rounded-full overflow-hidden transition-all duration-300 ${
+              isUploading
+                ? "opacity-50 scale-95"
+                : "group-hover:ring-4 group-hover:ring-primary/10"
+            }`}
+          >
+            <AvatarImage
+              src={user?.photoUrl || undefined}
+              alt={user?.displayName || "User avatar"}
+              className="aspect-square h-full w-full object-cover"
+            />
+            <AvatarFallback className="text-2xl bg-primary/5 text-primary font-bold h-full w-full flex items-center justify-center">
+              {initial}
+            </AvatarFallback>
+          </Avatar>
+          <button
+            onClick={handleAvatarClick}
+            disabled={isUploading}
+            className="absolute bottom-0 right-0 p-2 rounded-full bg-primary text-primary-foreground shadow-lg border-2 border-background transition-transform active:scale-90 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUploading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Camera className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={handleFileChange}
           />
-          <AvatarFallback className="text-2xl bg-primary/5 text-primary font-bold h-full w-full flex items-center justify-center uppercase">
-            {initial}
-          </AvatarFallback>
-        </Avatar>
+        </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             <h3 className="font-bold text-lg leading-tight truncate">
@@ -72,16 +147,14 @@ export function ProfileContent({
           </p>
         </div>
       </div>
-
       <div className="space-y-2">
         <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
           Bio
         </label>
         <div className="w-full p-3 rounded-xl border bg-muted/30 text-sm text-muted-foreground italic">
-          Add a few words about yourself...
+          {user?.bio || "Add a few words about yourself..."}
         </div>
       </div>
-
       <div className="pt-4 border-t space-y-4">
         <Collapsible>
           <CollapsibleTrigger className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground transition-colors uppercase tracking-widest group">
@@ -99,7 +172,6 @@ export function ProfileContent({
             </div>
           </CollapsibleContent>
         </Collapsible>
-
         <Button
           variant="ghost"
           onClick={handleLogout}

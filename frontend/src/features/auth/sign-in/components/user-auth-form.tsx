@@ -27,7 +27,6 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
 type UserAuthFormProps = React.HTMLAttributes<HTMLFormElement>;
 
 export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
@@ -38,7 +37,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     defaultValues: { email: "", password: "" },
   });
 
-  function onSubmit(data: FormValues) {
+  function onSubmit(data: FormValues): void {
     mutate({ input: data });
   }
 

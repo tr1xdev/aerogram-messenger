@@ -1,7 +1,22 @@
-import { useQuery } from "@apollo/client/react/index.js";
-import { GET_ME } from "../../api";
-import type { User } from "@/entities/chat/model/types";
+import { useLazyLoadQuery, graphql } from "react-relay";
+import type { useMeQuery } from "./__generated__/useMeQuery.graphql";
 
-export function useMe(): ReturnType<typeof useQuery<{ me: User }>> {
-  return useQuery<{ me: User }>(GET_ME);
+const meQuery = graphql`
+  query useMeQuery {
+    me {
+      id
+      username
+      firstName
+      lastName
+      photoUrl
+    }
+  }
+`;
+
+export function useMe(): useMeQuery["response"] {
+  return useLazyLoadQuery<useMeQuery>(
+    meQuery,
+    {},
+    { fetchPolicy: "store-or-network" },
+  );
 }

@@ -161,22 +161,32 @@ func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
 
 // MySessions is the resolver for the mySessions field.
 func (r *queryResolver) MySessions(ctx context.Context) ([]*dbgen.Session, error) {
-	panic(fmt.Errorf("not implemented: MySessions - mySessions"))
+	userIDStr := middleware.GetUserID(ctx)
+	if userIDStr == "" {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	uid, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id")
+	}
+
+	sessions, err := r.Store.GetSessionsByUserID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]*dbgen.Session, len(sessions))
+	for i := range sessions {
+		results[i] = &sessions[i]
+	}
+
+	return results, nil
 }
 
 // ID is the resolver for the id field.
 func (r *sessionResolver) ID(ctx context.Context, obj *dbgen.Session) (string, error) {
 	return obj.ID.String(), nil
-}
-
-// Device is the resolver for the device field.
-func (r *sessionResolver) Device(ctx context.Context, obj *dbgen.Session) (*string, error) {
-	if obj.Device == "" {
-		res := "Unknown Device"
-		return &res, nil
-	}
-	name := r.UaService.Parse(obj.Device)
-	return &name, nil
 }
 
 // Location is the resolver for the location field.
@@ -203,34 +213,3 @@ func (r *sessionResolver) CreatedAt(ctx context.Context, obj *dbgen.Session) (st
 func (r *Resolver) Session() graph.SessionResolver { return &sessionResolver{r} }
 
 type sessionResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *queryResolver) Sessions(ctx context.Context, userID string) ([]*dbgen.Session, error) {
-	authID := middleware.GetUserID(ctx)
-	if authID != userID {
-		return nil, fmt.Errorf("permission denied")
-	}
-
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user id")
-	}
-
-	dbSessions, err := r.Store.GetSessionsByUserID(ctx, uid)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]*dbgen.Session, len(dbSessions))
-	for i := range dbSessions {
-		res[i] = &dbSessions[i]
-	}
-	return res, nil
-}
-*/

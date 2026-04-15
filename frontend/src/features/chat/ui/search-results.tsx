@@ -4,12 +4,12 @@ import type { Chat, User, ChatMember } from "@/entities/chat/model/types";
 import { Globe, MessageSquare, Search } from "lucide-react";
 
 interface SearchResultsProps {
-  query: string;
-  localChats: Chat[];
-  globalUsers: User[];
-  isLoading: boolean;
-  onSelectChat: (chatId: string) => void;
-  onSelectUser: (userId: string) => void;
+  readonly query: string;
+  readonly localChats: readonly Chat[];
+  readonly globalUsers: readonly User[];
+  readonly isLoading: boolean;
+  readonly onSelectChat: (chatId: string) => void;
+  readonly onSelectUser: (userId: string) => void;
 }
 
 export function SearchResults({
@@ -19,17 +19,17 @@ export function SearchResults({
   isLoading,
   onSelectChat,
   onSelectUser,
-}: SearchResultsProps) {
+}: SearchResultsProps): React.ReactNode {
   if (!query && !isLoading) return null;
 
   const localUserIds: Set<string> = new Set(
-    localChats.flatMap((c: Chat) =>
-      (c.members ?? []).map((m: ChatMember) => m.user.id),
+    localChats.flatMap((c: Chat): string[] =>
+      (c.members ?? []).map((m: ChatMember): string => m.user.id),
     ),
   );
 
-  const uniqueGlobalUsers: User[] = globalUsers.filter(
-    (u: User) => !localUserIds.has(u.id),
+  const uniqueGlobalUsers: readonly User[] = globalUsers.filter(
+    (u: User): boolean => !localUserIds.has(u.id),
   );
 
   const hasLocal: boolean = localChats.length > 0;
@@ -63,9 +63,8 @@ export function SearchResults({
     <div className="flex flex-col h-full bg-background">
       {isLoading ? (
         <div className="px-2 space-y-0.5 pt-2 animate-in fade-in duration-200">
-          {Array(8)
-            .fill(0)
-            .map((_, i: number) => (
+          {[...Array(8)].map(
+            (_: unknown, i: number): React.ReactNode => (
               <div key={i} className="flex items-center gap-3 px-3 py-3.5">
                 <Skeleton className="h-12 w-12 rounded-full shrink-0" />
                 <div className="flex-1 space-y-2">
@@ -73,7 +72,8 @@ export function SearchResults({
                   <Skeleton className="h-3 w-[55%] opacity-30" />
                 </div>
               </div>
-            ))}
+            ),
+          )}
         </div>
       ) : (
         <div className="pb-10 animate-in fade-in duration-300">
@@ -84,27 +84,29 @@ export function SearchResults({
                 <span>Chats and Contacts</span>
               </div>
               <div className="space-y-0.5">
-                {localChats.map((chat: Chat) => (
-                  <button
-                    key={chat.id}
-                    onClick={(): void => onSelectChat(chat.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
-                  >
-                    <Avatar className="h-12 w-12 border border-border/40">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                        {chat.title?.[0]?.toUpperCase() || "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14.5px] font-medium truncate text-foreground">
-                        {chat.title}
-                      </p>
-                      <p className="text-[12px] text-muted-foreground/80">
-                        Recent interaction
-                      </p>
-                    </div>
-                  </button>
-                ))}
+                {localChats.map(
+                  (chat: Chat): React.ReactNode => (
+                    <button
+                      key={chat.id}
+                      onClick={(): void => onSelectChat(chat.id)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
+                    >
+                      <Avatar className="h-12 w-12 border border-border/40">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                          {chat.title?.[0]?.toUpperCase() || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14.5px] font-medium truncate text-foreground">
+                          {chat.title}
+                        </p>
+                        <p className="text-[12px] text-muted-foreground/80">
+                          Recent interaction
+                        </p>
+                      </div>
+                    </button>
+                  ),
+                )}
               </div>
             </div>
           )}
@@ -116,29 +118,31 @@ export function SearchResults({
                 <span>Global Search</span>
               </div>
               <div className="space-y-0.5">
-                {uniqueGlobalUsers.map((user: User) => (
-                  <button
-                    key={user.id}
-                    onClick={(): void => onSelectUser(user.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
-                  >
-                    <Avatar className="h-12 w-12 border border-border/40">
-                      <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
-                        {user.firstName?.[0] || user.username?.[0] || "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14.5px] font-medium truncate text-foreground">
-                        {user.firstName} {user.lastName || ""}
-                      </p>
-                      {user.username && (
-                        <p className="text-[12px] text-muted-foreground/80">
-                          @{user.username}
+                {uniqueGlobalUsers.map(
+                  (user: User): React.ReactNode => (
+                    <button
+                      key={user.id}
+                      onClick={(): void => onSelectUser(user.id)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
+                    >
+                      <Avatar className="h-12 w-12 border border-border/40">
+                        <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
+                          {user.firstName?.[0] || user.username?.[0] || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14.5px] font-medium truncate text-foreground">
+                          {user.firstName} {user.lastName || ""}
                         </p>
-                      )}
-                    </div>
-                  </button>
-                ))}
+                        {user.username && (
+                          <p className="text-[12px] text-muted-foreground/80">
+                            @{user.username}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ),
+                )}
               </div>
             </div>
           )}

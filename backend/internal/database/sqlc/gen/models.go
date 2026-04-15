@@ -69,8 +69,6 @@ type Message struct {
 	Sequence      int64          `json:"sequence"`
 	ReplyToID     uuid.NullUUID  `json:"reply_to_id"`
 	ForwardFromID uuid.NullUUID  `json:"forward_from_id"`
-	MediaUrl      sql.NullString `json:"media_url"`
-	MediaType     sql.NullString `json:"media_type"`
 	IsEdited      bool           `json:"is_edited"`
 	IsDeleted     bool           `json:"is_deleted"`
 	IsSystem      bool           `json:"is_system"`
@@ -85,6 +83,16 @@ type MessageAction struct {
 	UserID     uuid.UUID `json:"user_id"`
 	ActionType int16     `json:"action_type"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+type MessageAttachment struct {
+	ID          uuid.UUID `json:"id"`
+	MessageID   uuid.UUID `json:"message_id"`
+	Type        string    `json:"type"`
+	FileName    string    `json:"file_name"`
+	FileSize    int64     `json:"file_size"`
+	ContentType string    `json:"content_type"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type MessageRevision struct {
@@ -122,14 +130,12 @@ type User struct {
 	Password           sql.NullString        `json:"password"`
 	Status             string                `json:"status"`
 	PhotoUrl           sql.NullString        `json:"photo_url"`
+	Bio                sql.NullString        `json:"bio"`
 	IsPremium          bool                  `json:"is_premium"`
 	IsEmailVerified    bool                  `json:"is_email_verified"`
 	IsVerified         bool                  `json:"is_verified"`
 	VerificationToken  sql.NullString        `json:"verification_token"`
 	VerificationExpiry sql.NullTime          `json:"verification_expiry"`
-	PublicKey          sql.NullString        `json:"public_key"`
-	EncryptedPrivKey   sql.NullString        `json:"encrypted_priv_key"`
-	EncryptionIv       sql.NullString        `json:"encryption_iv"`
 	IsBot              bool                  `json:"is_bot"`
 	BotTokenHash       sql.NullString        `json:"bot_token_hash"`
 	BotOwnerID         uuid.NullUUID         `json:"bot_owner_id"`

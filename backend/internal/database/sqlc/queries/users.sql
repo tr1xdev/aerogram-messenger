@@ -13,12 +13,13 @@ WHERE bot_token_hash = $1 AND is_bot = TRUE AND deleted_at IS NULL LIMIT 1;
 -- name: CreateUser :one
 INSERT INTO users (
     id, username, first_name, last_name, email, password,
-    status, public_key, encrypted_priv_key, encryption_iv,
-    photo_url, is_bot, bot_token_hash, bot_owner_id, bot_description, bot_commands,
+    status, bio, photo_url, is_bot, bot_token_hash,
+    bot_owner_id, bot_description, bot_commands,
     created_at, updated_at, is_premium, is_email_verified, is_verified
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-    $11, $12, $13, $14, $15, $16,
+    $1, $2, $3, $4, $5, $6,
+    $7, $8, $9, $10, $11,
+    $12, $13, $14,
     NOW(), NOW(), DEFAULT, DEFAULT, DEFAULT
 )
 RETURNING *;
@@ -76,15 +77,19 @@ SET
     first_name = COALESCE(sqlc.narg('first_name'), first_name),
     last_name = COALESCE(sqlc.narg('last_name'), last_name),
     username = COALESCE(sqlc.narg('username'), username),
-    public_key = COALESCE(sqlc.narg('public_key'), public_key),
-    encrypted_priv_key = COALESCE(sqlc.narg('encrypted_priv_key'), encrypted_priv_key),
-    encryption_iv = COALESCE(sqlc.narg('encryption_iv'), encryption_iv),
+    bio = COALESCE(sqlc.narg('bio'), bio),
     photo_url = COALESCE(sqlc.narg('photo_url'), photo_url),
     is_verified = COALESCE(sqlc.narg('is_verified'), is_verified),
     bot_description = COALESCE(sqlc.narg('bot_description'), bot_description),
     bot_commands = COALESCE(sqlc.narg('bot_commands'), bot_commands),
     updated_at = NOW()
 WHERE id = sqlc.arg('id')
+RETURNING *;
+
+-- name: UpdateUserPhoto :one
+UPDATE users
+SET photo_url = $2, updated_at = NOW()
+WHERE id = $1
 RETURNING *;
 
 -- name: GetUserByUsername :one
@@ -97,12 +102,10 @@ SET
     first_name = COALESCE(sqlc.narg('first_name'), first_name),
     last_name = COALESCE(sqlc.narg('last_name'), last_name),
     username = COALESCE(sqlc.narg('username'), username),
-    public_key = COALESCE(sqlc.narg('public_key'), public_key),
-    encrypted_priv_key = COALESCE(sqlc.narg('encrypted_priv_key'), encrypted_priv_key),
-    encryption_iv = COALESCE(sqlc.narg('encryption_iv'), encryption_iv),
     photo_url = COALESCE(sqlc.narg('photo_url'), photo_url),
     bot_description = COALESCE(sqlc.narg('bot_description'), bot_description),
-    bot_commands = COALESCE(sqlc.narg('bot_commands'), bot_commands)
+    bot_commands = COALESCE(sqlc.narg('bot_commands'), bot_commands),
+    updated_at = NOW()
 WHERE id = $1 AND bot_owner_id = $2
 RETURNING *;
 

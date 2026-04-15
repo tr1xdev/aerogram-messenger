@@ -3,10 +3,29 @@
 **/node_modules/
 **/dist/
 **/vendor/
+
+# Backend artifacts
 backend/bin/
 backend/main
+backend/internal/database/sqlc/gen/ # если генеришь код внутри докера
+*.exe
+*.test
+
+# Frontend artifacts
+frontend/build/
+frontend/.next/
+frontend/out/
+
+# Infrastructure & Secrets
 certs/
 pgdata/
+redisdata/
+miniodata/
 .env
+*.pem
+*.key
+
+# Logs & OS trash
 *.log
 **/.DS_Store
+Thumbs.db

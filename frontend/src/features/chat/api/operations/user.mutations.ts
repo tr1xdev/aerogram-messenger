@@ -1,6 +1,15 @@
 import { gql } from "@apollo/client";
 import { USER_FIELDS } from "../fragments/message.fragments";
 
+export const UPLOAD_AVATAR = gql`
+  mutation UploadAvatar($file: Upload!) {
+    uploadAvatar(file: $file) {
+      ...UserFields
+    }
+  }
+  ${USER_FIELDS}
+`;
+
 export const UPDATE_PROFILE = gql`
   mutation UpdateUser($input: UpdateUserInput!) {
     updateUser(input: $input) {

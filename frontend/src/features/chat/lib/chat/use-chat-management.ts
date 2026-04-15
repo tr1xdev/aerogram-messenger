@@ -1,178 +1,228 @@
-import { useMutation, useQuery } from "@apollo/client/react/index.js";
-import { type ApolloCache } from "@apollo/client/index.js";
+import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import { toast } from "sonner";
-import {
-  CREATE_DIRECT_CHAT,
-  PIN_CHAT,
-  DELETE_CHAT,
-  GET_MY_CHATS,
-  SEARCH_USERS,
-} from "@/features/chat/api";
-import { useMyChats, type MyChatsResponse } from "./use-chats";
-import type { Chat, User } from "@/entities/chat/model/types";
+import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
+import type { useChatManagementSearchQuery } from "./__generated__/useChatManagementSearchQuery.graphql";
+import type { useChatManagementCreateMutation } from "./__generated__/useChatManagementCreateMutation.graphql";
+import type { useChatManagementPinMutation } from "./__generated__/useChatManagementPinMutation.graphql";
+import type { useChatManagementDeleteMutation } from "./__generated__/useChatManagementDeleteMutation.graphql";
 
-interface ChatError {
-  __typename: "ForbiddenError" | "ValidationError" | "InternalError";
-  message: string;
-}
+const searchUsersQuery = graphql`
+  query useChatManagementSearchQuery($username: String!) {
+    searchUsers(username: $username) {
+      id
+      username
+      firstName
+      lastName
+      photoUrl
+    }
+  }
+`;
 
-type CreateChatResponse = {
-  createDirectChat: (Chat & { __typename: "Chat" }) | ChatError;
-};
+const createChatMutation = graphql`
+  mutation useChatManagementCreateMutation($userID: ID!) {
+    createDirectChat(userID: $userID) {
+      __typename
+      ... on Chat {
+        id
+        type
+        title
+        photoUrl
+        unreadCount
+        isPinned
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on ValidationError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
 
-export function useSearchUsers(username: string) {
-  return useQuery<{ searchUsers: User[] }, { username: string }>(SEARCH_USERS, {
-    variables: { username },
-    skip: username.length < 2,
-  });
-}
+const pinChatMutation = graphql`
+  mutation useChatManagementPinMutation($id: ID!, $pinned: Boolean!) {
+    pinChat(id: $id, pinned: $pinned) {
+      __typename
+      ... on SuccessResult {
+        success
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
 
-export function useChatActions(chatId?: string) {
-  const { data: myChatsData } = useMyChats();
+const deleteChatMutation = graphql`
+  mutation useChatManagementDeleteMutation($id: ID!, $forEveryone: Boolean!) {
+    deleteChat(id: $id, forEveryone: $forEveryone) {
+      __typename
+      ... on SuccessResult {
+        success
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
 
-  const [createDirect] = useMutation<CreateChatResponse, { userID: string }>(
-    CREATE_DIRECT_CHAT,
+export function useSearchUsers(
+  username: string,
+): useChatManagementSearchQuery["response"] | null {
+  const isEnabled: boolean = username.trim().length > 0;
+
+  const data = useLazyLoadQuery<useChatManagementSearchQuery>(
+    searchUsersQuery,
+    { username: isEnabled ? username : "" },
+    {
+      fetchPolicy: "store-or-network",
+      fetchKey: isEnabled ? username : "disabled",
+    },
   );
 
-  const [pin] = useMutation<
-    { pinChat: { success?: boolean } },
-    { id: string; pinned: boolean }
-  >(PIN_CHAT);
+  return isEnabled ? data : null;
+}
 
-  const [remove] = useMutation<
-    { deleteChat: { success?: boolean } },
-    { id: string; forEveryone: boolean }
-  >(DELETE_CHAT);
+export function useChatActions(chatId?: string): {
+  createChat: (
+    userID: string,
+    options?: {
+      onCompleted?: (
+        response: useChatManagementCreateMutation["response"],
+      ) => void;
+      onError?: (error: Error) => void;
+    },
+  ) => void;
+  togglePin: (pinned: boolean) => void;
+  deleteChat: (forEveryone?: boolean) => void;
+} {
+  const [createDirect] =
+    useMutation<useChatManagementCreateMutation>(createChatMutation);
+  const [pin] = useMutation<useChatManagementPinMutation>(pinChatMutation);
+  const [remove] =
+    useMutation<useChatManagementDeleteMutation>(deleteChatMutation);
 
-  const createChat = async (userID: string): Promise<Chat | undefined> => {
-    try {
-      const { data: mutationData } = await createDirect({
-        variables: { userID },
-        update: (cache: ApolloCache, { data: result }): void => {
-          const response = result?.createDirectChat;
+  const createChat = (
+    userID: string,
+    options?: {
+      onCompleted?: (
+        response: useChatManagementCreateMutation["response"],
+      ) => void;
+      onError?: (error: Error) => void;
+    },
+  ): void => {
+    createDirect({
+      variables: { userID },
+      updater: (store: RecordSourceSelectorProxy): void => {
+        const payload: RecordProxy | null =
+          store.getRootField("createDirectChat") ?? null;
+        if (!payload || payload.getType() !== "Chat") return;
 
-          if (!response || response.__typename !== "Chat") {
-            return;
+        const root: RecordProxy = store.getRoot();
+        const myChats: RecordProxy | null =
+          root.getLinkedRecord("myChats") ?? null;
+
+        if (myChats && myChats.getType() === "ChatList") {
+          const chats: ReadonlyArray<RecordProxy> =
+            myChats.getLinkedRecords("chats") ?? [];
+          const alreadyExists: boolean = chats.some(
+            (c: RecordProxy): boolean =>
+              c.getValue("id") === payload.getValue("id"),
+          );
+
+          if (!alreadyExists) {
+            myChats.setLinkedRecords([payload, ...chats], "chats");
           }
-
-          const newChat: Chat = response;
-
-          const queryData = cache.readQuery<MyChatsResponse>({
-            query: GET_MY_CHATS,
-          });
-
-          if (queryData?.myChats && "chats" in queryData.myChats) {
-            const existingChats: Chat[] = queryData.myChats.chats;
-
-            if (!existingChats.some((c) => c.id === newChat.id)) {
-              cache.writeQuery<MyChatsResponse>({
-                query: GET_MY_CHATS,
-                data: {
-                  myChats: {
-                    ...queryData.myChats,
-                    __typename: "ChatList",
-                    chats: [newChat, ...existingChats],
-                  },
-                },
-              });
-            }
-          }
-        },
-      });
-
-      const finalResponse = mutationData?.createDirectChat;
-
-      if (finalResponse?.__typename === "Chat") {
-        return finalResponse;
-      }
-
-      if (finalResponse) {
-        toast.error(finalResponse.message);
-      }
-
-      return undefined;
-    } catch {
-      toast.error("Failed to create chat");
-      return undefined;
-    }
+        }
+      },
+      onCompleted: (
+        response: useChatManagementCreateMutation["response"],
+      ): void => {
+        const res = response.createDirectChat;
+        if (res.__typename !== "Chat" && "message" in res) {
+          toast.error(res.message as string);
+        } else {
+          options?.onCompleted?.(response);
+        }
+      },
+      onError: (err: Error): void => {
+        toast.error("Failed to create chat");
+        options?.onError?.(err);
+      },
+    });
   };
 
-  const togglePin = async (pinned: boolean): Promise<void> => {
+  const togglePin = (pinned: boolean): void => {
     if (!chatId) return;
-    if (pinned) {
-      const chats =
-        myChatsData?.myChats && "chats" in myChatsData.myChats
-          ? myChatsData.myChats.chats
-          : [];
-
-      const pinnedCount = chats.filter((c: Chat) => c.isPinned).length;
-
-      if (pinnedCount >= 5) {
-        toast.error("Limit reached", {
-          description: "You can pin up to 5 chats maximum.",
-        });
-        return;
-      }
-    }
-    try {
-      await pin({
-        variables: { id: chatId, pinned },
-        update: (cache: ApolloCache): void => {
-          const chatRef = cache.identify({ __typename: "Chat", id: chatId });
-          if (chatRef) {
-            cache.modify({
-              id: chatRef,
-              fields: {
-                isPinned: () => pinned,
-              },
-            });
-          }
-        },
-      });
-    } catch {
-      toast.error("Action failed");
-    }
+    pin({
+      variables: { id: chatId, pinned },
+      optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
+        const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
+        if (chatRecord) chatRecord.setValue(pinned, "isPinned");
+      },
+      updater: (store: RecordSourceSelectorProxy): void => {
+        const payload: RecordProxy | null = store.getRootField("pinChat");
+        if (payload && payload.getType() === "SuccessResult") {
+          const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
+          if (chatRecord) chatRecord.setValue(pinned, "isPinned");
+        }
+      },
+      onCompleted: (
+        response: useChatManagementPinMutation["response"],
+      ): void => {
+        const res = response.pinChat;
+        if (res.__typename !== "SuccessResult" && "message" in res) {
+          toast.error(res.message as string);
+        }
+      },
+      onError: (): void => {
+        toast.error("Action failed");
+      },
+    });
   };
 
-  const deleteChat = async (forEveryone = false): Promise<boolean> => {
-    if (!chatId) return false;
-    try {
-      const { data: mutationData } = await remove({
-        variables: { id: chatId, forEveryone },
-        update: (cache: ApolloCache): void => {
-          const queryData = cache.readQuery<MyChatsResponse>({
-            query: GET_MY_CHATS,
-          });
-
-          if (queryData?.myChats && "chats" in queryData.myChats) {
-            cache.writeQuery<MyChatsResponse>({
-              query: GET_MY_CHATS,
-              data: {
-                myChats: {
-                  ...queryData.myChats,
-                  chats: queryData.myChats.chats.filter(
-                    (c: Chat) => c.id !== chatId,
-                  ),
-                },
-              },
-            });
-          }
-
-          const chatRef = cache.identify({ __typename: "Chat", id: chatId });
-          if (chatRef) {
-            cache.evict({ id: chatRef });
-            cache.gc();
-          }
-        },
-      });
-      return !!mutationData;
-    } catch {
-      toast.error("Failed to delete chat");
-      return false;
-    }
+  const deleteChat = (forEveryone: boolean = false): void => {
+    if (!chatId) return;
+    remove({
+      variables: { id: chatId, forEveryone },
+      updater: (store: RecordSourceSelectorProxy): void => {
+        const root: RecordProxy = store.getRoot();
+        const myChats: RecordProxy | null =
+          root.getLinkedRecord("myChats") ?? null;
+        if (myChats && myChats.getType() === "ChatList") {
+          const chats: ReadonlyArray<RecordProxy> =
+            myChats.getLinkedRecords("chats") ?? [];
+          const nextChats: RecordProxy[] = chats.filter(
+            (c: RecordProxy): boolean => c.getValue("id") !== chatId,
+          );
+          myChats.setLinkedRecords(nextChats, "chats");
+        }
+        store.delete(chatId);
+      },
+      onCompleted: (
+        response: useChatManagementDeleteMutation["response"],
+      ): void => {
+        const res = response.deleteChat;
+        if (res.__typename !== "SuccessResult" && "message" in res) {
+          toast.error(res.message as string);
+        }
+      },
+      onError: (): void => {
+        toast.error("Failed to delete chat");
+      },
+    });
   };
 
   return { createChat, togglePin, deleteChat };
 }
-
-export const useChatManagement = useChatActions;

@@ -1,8 +1,23 @@
-type Message {
+directive @goField(
+    forceResolver: Boolean
+    name: String
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+type Attachment {
+    id: ID!
+    type: String!
+    url: String! @goField(forceResolver: true)
+    fileName: String!
+    fileSize: Long!
+    contentType: String!
+}
+
+type Message implements Node {
     id: ID!
     chatId: ID!
     sender: User
     text: String!
+    attachments: [Attachment!]
     sentAt: String!
     sequence: Long!
     isEdited: Boolean!
@@ -36,9 +51,7 @@ extend type Query {
 
 extend type Mutation {
     sendMessage(chatId: ID!, text: String!, replyToId: ID): SendMessageResult!
-
     updateMessage(id: ID!, text: String!): SendMessageResult!
-
     deleteMessage(id: ID!): Boolean!
     markDialogAsRead(chatId: ID!): Boolean!
 }

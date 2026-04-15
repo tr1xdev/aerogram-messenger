@@ -9,17 +9,16 @@ import {
 } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/store/chat";
 import {
   useChatHistory,
   useMe,
   useChatDetails,
   useMyChats,
-  useTypingSubscription,
   useMessageActions,
   useSendTyping,
   type MyChatsResponse,
+  type ChatDetailsResponse,
 } from "@/features/chat/lib";
 import { useMarkDialog } from "@/features/chat/lib";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
@@ -32,13 +31,29 @@ import type {
   User,
   ChatMember,
 } from "@/entities/chat/model/types";
+import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generated__/useMarkDialog_chat.graphql";
+import type { useMessageActionsSendMutation$data } from "@/features/chat/lib/messages/__generated__/useMessageActionsSendMutation.graphql";
+import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
+import type { chatHeader_user$key } from "@/features/chat/ui/__generated__/chatHeader_user.graphql";
+
+interface ExtendedUser extends Omit<User, "lastName"> {
+  lastName?: string | null;
+  displayName?: string | null;
+}
+
+interface ChatStoreState {
+  input: string;
+  setInput: (val: string) => void;
+  resetInput: () => void;
+  setActiveChatId: (id: string | null) => void;
+}
 
 export const Route = createFileRoute("/_authenticated/chat/$chatId")({
   component: ChatRoute,
 });
 
 function ChatRoute(): ReactNode {
-  const { chatId } = Route.useParams();
+  const { chatId }: { chatId: string } = Route.useParams();
   return <ChatPage key={chatId} chatId={chatId} />;
 }
 
@@ -48,52 +63,65 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
 
-  const { input, setInput, resetInput, setActiveChatId } = useChatStore();
+  const { input, setInput, resetInput, setActiveChatId } =
+    useChatStore() as ChatStoreState;
   const inputRef: MutableRefObject<string> = useRef<string>(input);
 
   useEffect((): void => {
     inputRef.current = input;
   }, [input]);
 
-  const { data: meData } = useMe();
-  const {
-    data: chatData,
-    loading: chatLoading,
-    error: chatError,
-  } = useChatDetails(chatId);
+  const meData: useMeQuery$data = useMe();
+  const chatData: ChatDetailsResponse = useChatDetails(chatId);
+  const chatsData: MyChatsResponse = useMyChats();
 
-  const me: User | undefined = meData?.me;
-  const chat: Chat | undefined = chatData?.chat;
+  const me: User | undefined = meData?.me as unknown as User | undefined;
+  const chatRaw: ChatDetailsResponse["chat"] = chatData.chat;
 
-  const typingFromSub = useTypingSubscription(chatId);
+  const partnerUser = useMemo((): chatHeader_user$key | null => {
+    if (chatRaw?.__typename !== "Chat" || !chatRaw.members || !me) return null;
+    const partner = chatRaw.members.find((m): boolean => m.user?.id !== me.id);
+    return (partner?.user as unknown as chatHeader_user$key) ?? null;
+  }, [chatRaw, me]);
 
-  const {
-    messages: messagesFromHistory,
-    isLoading: historyLoading,
-    lastReadSequence,
-  } = useChatHistory(chatId);
+  const isChatType: boolean = chatRaw?.__typename === "Chat";
+  const chat: Chat | undefined = isChatType
+    ? (chatRaw as unknown as Chat)
+    : undefined;
 
-  const { sendMessage, editMessage } = useMessageActions(chatId);
-  const { sendTyping } = useSendTyping(chatId);
+  const chatError: unknown = !isChatType ? chatRaw : null;
 
-  const { data: chatsData } = useMyChats() as {
-    data: MyChatsResponse | undefined;
-  };
+  const { messages: messagesFromHistory, isLoading: historyLoading } =
+    useChatHistory(chatId);
 
-  const isInitialLoading: boolean =
-    (!chat && chatLoading) || (historyLoading && isFirstLoad);
-  const isNotFound: boolean =
-    (!chat && !chatLoading && !!chatError) ||
-    (!chat && !chatLoading && !!chatData && !chatData.chat);
+  const { sendMessage, editMessage, markAsRead } = useMessageActions(chatId);
+  const { handleKeyPress, stopTyping } = useSendTyping(chatId);
+
+  const isInitialLoading: boolean = isFirstLoad && historyLoading;
+  const isNotFound: boolean = !chat && !isInitialLoading && !!chatError;
+
+  const lastSequence: number = useMemo((): number => {
+    if (!messagesFromHistory || messagesFromHistory.length === 0) return 0;
+    const lastMsg: Message = messagesFromHistory[
+      messagesFromHistory.length - 1
+    ] as unknown as Message;
+    return Number(lastMsg.sequence) || 0;
+  }, [messagesFromHistory]);
+
+  const { checkAndMarkRead } = useMarkDialog(
+    (isChatType ? chatRaw : null) as unknown as useMarkDialog_chat$key,
+    lastSequence,
+    me?.id,
+  );
 
   useEffect((): void | (() => void) => {
-    if (!historyLoading && !chatLoading && chat) {
-      const timer = setTimeout((): void => {
+    if (!historyLoading && chat) {
+      const timer: ReturnType<typeof setTimeout> = setTimeout((): void => {
         setIsFirstLoad(false);
       }, 100);
       return (): void => clearTimeout(timer);
     }
-  }, [historyLoading, chatLoading, chat]);
+  }, [historyLoading, chat]);
 
   useEffect((): (() => void) => {
     setActiveChatId(chatId);
@@ -106,7 +134,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     setReplyingTo(null);
     setEditingMessage(null);
     resetInput();
-  }, [resetInput]);
+    stopTyping();
+  }, [resetInput, stopTyping]);
 
   const handleEditInitiate = useCallback(
     (msg: Message): void => {
@@ -124,62 +153,57 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   const handleTyping = useCallback(
     (isTyping: boolean): void => {
-      if (sendTyping) sendTyping(isTyping);
+      if (isTyping) {
+        handleKeyPress();
+      } else {
+        stopTyping();
+      }
     },
-    [sendTyping],
+    [handleKeyPress, stopTyping],
   );
 
-  const totalUnread = useMemo((): number => {
-    const chats: Chat[] = chatsData?.myChats?.chats || [];
-    return chats.reduce((acc: number, c: Chat): number => {
-      return c.id === chatId ? acc : acc + (c.unreadCount ?? 0);
-    }, 0);
+  const totalUnread: number = useMemo((): number => {
+    const myChats: MyChatsResponse["myChats"] = chatsData.myChats;
+    if (myChats?.__typename === "ChatList") {
+      return (myChats.chats ?? []).reduce(
+        (
+          acc: number,
+          c: { readonly id: string; readonly unreadCount?: number | null },
+        ): number => {
+          const unread: number = c.unreadCount ?? 0;
+          return c.id === chatId ? acc : acc + unread;
+        },
+        0,
+      );
+    }
+    return 0;
   }, [chatsData, chatId]);
 
-  const typingUser = useMemo((): User | undefined => {
-    if (!chat?.members || !me) return undefined;
-    if (typingFromSub?.isTyping && typingFromSub.id !== me.id) {
-      const subUser: User | undefined = chat.members.find(
-        (m: ChatMember): boolean => m.user.id === typingFromSub.id,
-      )?.user;
-      if (subUser) return subUser;
-    }
-    const typingMember: ChatMember | undefined = chat.members.find(
-      (m: ChatMember): boolean =>
-        m.user.id !== me.id && m.user.isTyping === true,
-    );
-    return typingMember?.user;
-  }, [chat, me, typingFromSub]);
-
-  const isBotChat = useMemo((): boolean => {
+  const isBotChat: boolean = useMemo((): boolean => {
     if (!chat?.members || !me) return false;
-    const otherMember: ChatMember | undefined = chat.members.find(
+    const members: ChatMember[] = chat.members as ChatMember[];
+    const otherMember: ChatMember | undefined = members.find(
       (m: ChatMember): boolean => m.user.id !== me.id,
     );
     return otherMember?.user.isBot ?? false;
   }, [chat, me]);
 
-  const allMessages = useMemo((): Message[] => {
-    return [...messagesFromHistory].sort((a: Message, b: Message): number => {
+  const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
+    const rawMessages: Message[] = (messagesFromHistory ??
+      []) as unknown as Message[];
+    return [...rawMessages].sort((a: Message, b: Message): number => {
       const timeA: number = new Date(a.sentAt).getTime();
       const timeB: number = new Date(b.sentAt).getTime();
       if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
-      if (a.sequence !== undefined && b.sequence !== undefined)
-        return a.sequence - b.sequence;
-      return timeA - timeB;
+      return (Number(a.sequence) || 0) - (Number(b.sequence) || 0);
     });
   }, [messagesFromHistory]);
-
-  const { checkAndMarkRead } = useMarkDialog(
-    chatId,
-    allMessages,
-    me ?? undefined,
-  );
 
   useEffect((): void | (() => void) => {
     const handleVisibilityChange = (): void => {
       if (document.visibilityState === "visible") {
         checkAndMarkRead();
+        markAsRead();
       }
     };
     window.addEventListener("visibilitychange", handleVisibilityChange);
@@ -188,64 +212,70 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       window.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleVisibilityChange);
     };
-  }, [checkAndMarkRead]);
+  }, [checkAndMarkRead, markAsRead]);
 
   const handleSend = useCallback(
-    async (overrideText?: string): Promise<void> => {
-      const val: string = (overrideText ?? inputRef.current).trim();
+    (text?: string): void => {
+      const val: string = (text ?? inputRef.current).trim();
       if (!val || !me) return;
 
       if (editingMessage) {
-        try {
-          await editMessage(editingMessage.id, val);
-          cancelAction();
-        } catch (err: unknown) {
-          console.error(err);
-        }
+        editMessage(editingMessage.id, val)
+          .then((): void => cancelAction())
+          .catch((err: Error): void => console.error(err));
         return;
       }
 
       const originalReply: Message | null = replyingTo;
       const tempId: string = `temp-${Date.now()}`;
+      const extendedMe: ExtendedUser = me as unknown as ExtendedUser;
 
       cancelAction();
 
-      try {
-        await sendMessage(val, {
-          variables: { replyToId: originalReply?.id },
-          optimisticResponse: {
-            sendMessage: {
-              __typename: "Message",
-              id: tempId,
-              chatId,
-              text: val,
-              sentAt: new Date().toISOString(),
-              isRead: false,
-              isEdited: false,
-              isEncrypted: false,
-              isSending: true,
-              forwardedFrom: null,
-              sequence:
-                allMessages.length > 0
-                  ? (allMessages[allMessages.length - 1].sequence ?? 0) + 1
-                  : 1,
-              sender: {
-                ...me,
-              },
-              replyTo: originalReply
-                ? {
-                    ...originalReply,
-                    __typename: "Message",
-                  }
-                : null,
-            } as Message & { __typename: "Message" },
+      sendMessage(val, {
+        variables: {
+          chatId,
+          text: val,
+          replyToId: originalReply?.id ?? null,
+        },
+        optimisticResponse: {
+          sendMessage: {
+            __typename: "Message",
+            id: tempId,
+            chatId,
+            text: val,
+            sentAt: new Date().toISOString(),
+            sequence:
+              allMessages.length > 0
+                ? (Number(allMessages[allMessages.length - 1].sequence) || 0) +
+                  1
+                : 1,
+            isEdited: false,
+            sender: {
+              id: extendedMe.id,
+              firstName: extendedMe.firstName,
+              lastName: extendedMe.lastName ?? null,
+              photoUrl: extendedMe.photoUrl ?? null,
+              displayName: extendedMe.displayName ?? extendedMe.firstName,
+            },
+            replyTo: originalReply
+              ? {
+                  id: originalReply.id,
+                  text: originalReply.text,
+                  sender: {
+                    id: originalReply.sender.id,
+                    firstName: originalReply.sender.firstName,
+                    lastName: originalReply.sender.lastName ?? null,
+                    displayName: originalReply.sender.displayName,
+                  },
+                }
+              : null,
           },
-        });
-      } catch (err: unknown) {
-        console.error(err);
+        } as useMessageActionsSendMutation$data,
+      }).catch((): void => {
         setInput(val);
         if (originalReply) setReplyingTo(originalReply);
-      }
+      });
     },
     [
       me,
@@ -270,60 +300,53 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         <p className="text-muted-foreground text-sm max-w-70 mb-8">
           The chat doesn't exist or you don't have permission to view it.
         </p>
-        <Button
-          variant="outline"
+        <button
+          className="gap-2 rounded-xl flex items-center px-4 py-2 border hover:bg-muted"
           onClick={(): Promise<void> => navigate({ to: "/" })}
-          className="gap-2 rounded-xl"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to chats
-        </Button>
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-dvh bg-background w-full fixed inset-0 z-60 md:relative md:z-auto overflow-hidden">
+    <div className="flex flex-col h-full bg-background w-full overflow-hidden">
       <ChatHeader
         title={chat?.title ?? undefined}
         photoUrl={chat?.photoUrl ?? undefined}
+        userRef={partnerUser}
         totalUnread={totalUnread}
-        members={chat?.members}
         meId={me?.id}
         isLoading={isInitialLoading}
-        typingUser={typingUser}
       />
 
-      <main className="flex-1 relative min-h-0 bg-background">
+      <main className="flex-1 relative min-h-0 bg-background overflow-hidden">
         {isInitialLoading ? (
-          <div className="absolute inset-0 p-6 flex flex-col gap-6">
-            <Skeleton className="h-10 w-[60%] self-end rounded-2xl rounded-tr-none" />
-            <Skeleton className="h-10 w-[50%] self-start rounded-2xl rounded-tl-none" />
+          <div className="absolute inset-0 p-4 flex flex-col gap-6">
+            <Skeleton className="h-10 w-[60%] self-end rounded-2xl" />
+            <Skeleton className="h-10 w-[50%] self-start rounded-2xl" />
           </div>
         ) : allMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-6 text-center">
             <div className="relative mb-6">
-              <div className="relative h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center border border-border/50">
+              <div className="relative h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center border">
                 <MessageSquare className="h-10 w-10 text-muted-foreground/40" />
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">
+            <h3 className="text-lg font-semibold mb-2">
               {isBotChat ? `Chat with ${chat?.title}` : "No messages yet"}
             </h3>
-            <p className="text-sm text-muted-foreground max-w-60">
-              {isBotChat
-                ? "Send a message to start."
-                : "Start by sending a message."}
-            </p>
           </div>
         ) : (
           <MessageList
             chatId={chatId}
             messages={allMessages}
-            members={chat?.members}
+            members={(chat?.members as ChatMember[]) ?? []}
             myId={me?.id}
-            lastReadSequence={lastReadSequence ?? 0}
-            onMarkRead={checkAndMarkRead}
+            lastReadSequence={chat?.lastReadSequence ?? 0}
+            onMarkRead={markAsRead}
             onReply={handleReplyInitiate}
             onEdit={handleEditInitiate}
           />

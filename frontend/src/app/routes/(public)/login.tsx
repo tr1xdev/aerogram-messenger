@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { type ReactNode } from "react";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email" }),
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/(public)/login")({
   component: LoginPage,
 });
 
-export function LoginPage() {
+export function LoginPage(): ReactNode {
   const navigate = useNavigate();
   const { mutate, isPending, error } = useLogin();
 
@@ -41,7 +42,7 @@ export function LoginPage() {
     defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = (data: LoginInputs) => {
+  const onSubmit = (data: LoginInputs): void => {
     mutate({ input: data });
   };
 
@@ -106,7 +107,9 @@ export function LoginPage() {
                 <FieldDescription className="text-center mt-4">
                   Don&apos;t have an account?{" "}
                   <a
-                    onClick={() => navigate({ to: "/signup" })}
+                    onClick={(): void => {
+                      void navigate({ to: "/signup" });
+                    }}
                     className="cursor-pointer text-primary underline"
                   >
                     Sign up

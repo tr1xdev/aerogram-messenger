@@ -14,23 +14,24 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 		return nil
 	}
 
-	senderID, _ := uuid.Parse(m.SenderId)
-
 	msg := &model.Message{
 		ID:       m.Id,
-		ChatID:   m.ChatId,
+		ChatID:   EncodeGlobalID("Chat", m.ChatId),
 		Text:     m.Text,
 		SentAt:   m.SentAt,
 		Sequence: m.Sequence,
 		IsEdited: m.IsEdited,
-		Sender: &dbgen.User{
-			ID: senderID,
-		},
+	}
+
+	if m.SenderId != "" {
+		msg.Sender = &dbgen.User{
+			ID: uuid.MustParse(ToRawID(m.SenderId)),
+		}
 	}
 
 	if m.ReplyToId != nil && *m.ReplyToId != "" {
 		msg.ReplyTo = &model.Message{
-			ID: *m.ReplyToId,
+			ID: EncodeGlobalID("Message", ToRawID(*m.ReplyToId)),
 		}
 	}
 
@@ -42,26 +43,24 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 		return nil
 	}
 
-	var sender *dbgen.User
-	if m.AuthorID != uuid.Nil {
-		sender = &dbgen.User{
-			ID: m.AuthorID,
-		}
-	}
-
 	msg := &model.Message{
-		ID:       m.ID.String(),
-		ChatID:   m.DialogID.String(),
+		ID:       EncodeGlobalID("Message", m.ID.String()),
+		ChatID:   EncodeGlobalID("Chat", m.DialogID.String()),
 		Text:     m.Content,
 		SentAt:   m.CreatedAt.Format(time.RFC3339),
 		Sequence: m.Sequence,
 		IsEdited: m.IsEdited,
-		Sender:   sender,
+	}
+
+	if m.AuthorID != uuid.Nil {
+		msg.Sender = &dbgen.User{
+			ID: m.AuthorID,
+		}
 	}
 
 	if m.ReplyToID.Valid {
 		msg.ReplyTo = &model.Message{
-			ID: m.ReplyToID.UUID.String(),
+			ID: EncodeGlobalID("Message", m.ReplyToID.UUID.String()),
 		}
 	}
 

@@ -10,8 +10,8 @@ import { useChatScroll } from "../lib/chat/use-chat-scroll";
 
 interface MessageListProps {
   chatId: string;
-  messages: Message[];
-  members?: ChatMember[];
+  messages: readonly Message[];
+  members?: readonly ChatMember[];
   myId?: string;
   lastReadSequence?: number;
   onMarkRead: () => void;
@@ -27,6 +27,23 @@ export const MessageList = memo(function MessageList({
   onReply,
   onEdit,
 }: MessageListProps): ReactNode {
+  const groupedMessages = useMemo(() => {
+    const groups: { date: string; items: Message[] }[] = [];
+
+    messages.forEach((m: Message): void => {
+      const dateKey: string = new Date(m.sentAt).toDateString();
+      const lastGroup = groups[groups.length - 1];
+
+      if (lastGroup?.date === dateKey) {
+        lastGroup.items.push(m);
+      } else {
+        groups.push({ date: dateKey, items: [m] });
+      }
+    });
+
+    return groups;
+  }, [messages]);
+
   const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
     useChatScroll({
       messages,
@@ -34,41 +51,30 @@ export const MessageList = memo(function MessageList({
       onMarkRead,
     });
 
-  const groupedMessages = useMemo(() => {
-    const groups: { date: string; items: Message[] }[] = [];
-    messages.forEach((m) => {
-      const dateKey = new Date(m.sentAt).toDateString();
-      const lastGroup = groups[groups.length - 1];
-      if (lastGroup?.date === dateKey) {
-        lastGroup.items.push(m);
-      } else {
-        groups.push({ date: dateKey, items: [m] });
-      }
-    });
-    return groups;
-  }, [messages]);
-
   return (
-    <div className="h-full w-full relative overflow-hidden bg-background">
+    <div className="h-full w-full relative bg-transparent overflow-hidden">
       <ScrollArea ref={scrollRef} className="h-full w-full">
-        <div className="px-4 py-6 w-full flex flex-col max-w-4xl mx-auto min-h-full justify-end">
+        <div className="px-4 py-6 w-full flex flex-col max-w-4xl mx-auto min-h-full">
           {groupedMessages.map((g) => (
             <div key={g.date} className="flex flex-col mb-6">
               <DateDivider date={g.items[0].sentAt} />
-              <div className="flex flex-col">
+              <div className="flex flex-col space-y-1">
                 {g.items.map((m, index) => {
                   const prevMessage = g.items[index - 1];
-                  const isFirstInGroup =
+                  const isFirstInGroup: boolean =
                     !prevMessage || prevMessage.sender.id !== m.sender.id;
 
                   return (
-                    <div
+                    <motion.div
                       key={
-                        m.id.startsWith("temp-")
-                          ? `temp-${m.sentAt}-${m.text.slice(0, 5)}`
-                          : m.id
+                        m.id.startsWith("temp-") ? `${m.id}-${m.sentAt}` : m.id
                       }
-                      className={isFirstInGroup ? "mt-3 first:mt-0" : "mt-1"}
+                      initial={
+                        m.id.startsWith("temp-") ? { opacity: 0, y: 10 } : false
+                      }
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className={isFirstInGroup ? "mt-2 first:mt-0" : ""}
                     >
                       <MessageBubble
                         message={m}
@@ -79,7 +85,7 @@ export const MessageList = memo(function MessageList({
                         onReply={onReply}
                         onEdit={onEdit}
                       />
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
@@ -91,20 +97,20 @@ export const MessageList = memo(function MessageList({
       <AnimatePresence>
         {showScrollBtn && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
             className="absolute bottom-6 right-6 z-40"
           >
             <Button
               size="icon"
               variant="secondary"
-              className="rounded-full shadow-2xl border h-10 w-10 bg-background/95 backdrop-blur-sm"
+              className="rounded-full shadow-xl bg-background/95 border h-10 w-10 active:scale-90 transition-all"
               onClick={() => scrollToBottom("smooth")}
             >
               <ArrowDown className="h-5 w-5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 min-w-[20px] bg-primary text-[10px] text-primary-foreground rounded-full flex items-center justify-center font-bold px-1 border-2 border-background">
+                <span className="absolute -top-1 -right-1 h-5 min-w-[20px] bg-primary text-[10px] text-primary-foreground rounded-full flex items-center justify-center font-bold border-2 border-background px-1">
                   {unreadCount}
                 </span>
               )}

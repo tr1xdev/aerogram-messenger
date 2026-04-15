@@ -1,10 +1,6 @@
-import { useState } from "react";
+import { useState, useCallback, type ReactNode, type ChangeEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useApolloClient } from "@apollo/client/react";
-import {
-  useSearchUsers,
-  useChatActions,
-} from "@/features/chat/lib";
+import { useSearchUsers, useChatActions } from "@/features/chat/lib";
 import {
   Dialog,
   DialogContent,
@@ -18,85 +14,53 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Loader2 } from "lucide-react";
 import { FiEdit2 } from "react-icons/fi";
-import { GET_MY_CHATS } from "../api";
-import type { User, Chat, ChatMember } from "@/entities/chat/model/types";
+import type { User } from "@/entities/chat/model/types";
+import type { useChatManagementCreateMutation } from "@/features/chat/lib/chat/__generated__/useChatManagementCreateMutation.graphql";
 
-interface MyChatsResponse {
-  myChats: {
-    __typename: string;
-    chats: Chat[];
-  };
-}
-
-export function NewChatDialog() {
+export function NewChatDialog(): ReactNode {
   const [open, setOpen] = useState<boolean>(false);
   const [search, setSearch] = useState<string>("");
   const [isCreating, setIsCreating] = useState<boolean>(false);
-  const { data, loading: isSearching } = useSearchUsers(search);
+
+  const searchData = useSearchUsers(search);
+  const users: readonly User[] =
+    (searchData?.searchUsers as unknown as readonly User[]) || [];
+
   const { createChat } = useChatActions("");
   const navigate = useNavigate();
-  const client = useApolloClient();
 
-  const users: User[] = data?.searchUsers || [];
+  const handleCreate = useCallback(
+    async (userID: string): Promise<void> => {
+      if (isCreating) return;
+      setIsCreating(true);
 
-  const handleCreate = async (userID: string): Promise<void> => {
-    if (isCreating) return;
-    setIsCreating(true);
-
-    try {
-      const newChat: Chat | undefined = await createChat(userID);
-      if (newChat) {
-        const existingData: MyChatsResponse | null = client.readQuery({
-          query: GET_MY_CHATS,
+      try {
+        createChat(userID, {
+          onCompleted: (
+            response: useChatManagementCreateMutation["response"],
+          ): void => {
+            const res = response.createDirectChat;
+            if (res.__typename === "Chat") {
+              setOpen(false);
+              setSearch("");
+              void navigate({
+                to: "/chat/$chatId",
+                params: { chatId: res.id },
+              });
+            }
+          },
+          onError: (err: Error): void => {
+            console.error("Failed to create chat:", err);
+          },
         });
-
-        const completeChat: Chat = {
-          ...newChat,
-          isPinned: false,
-          photoUrl: newChat.photoUrl ?? null,
-          lastMessage: newChat.lastMessage ?? null,
-          members:
-            newChat.members?.map(
-              (m: ChatMember): ChatMember => ({
-                ...m,
-                user: {
-                  ...m.user,
-                  email: m.user.email ?? "",
-                  status: m.user.status ?? "OFFLINE",
-                },
-              }),
-            ) || [],
-        };
-
-        if (existingData?.myChats?.chats) {
-          const chatsArray: Chat[] = existingData.myChats.chats;
-          const alreadyExists: boolean = chatsArray.some(
-            (c: Chat): boolean => c.id === completeChat.id,
-          );
-
-          if (!alreadyExists) {
-            client.writeQuery({
-              query: GET_MY_CHATS,
-              data: {
-                myChats: {
-                  ...existingData.myChats,
-                  chats: [completeChat, ...chatsArray],
-                },
-              },
-            });
-          }
-        }
-
-        setOpen(false);
-        setSearch("");
-        navigate({ to: "/chat/$chatId", params: { chatId: completeChat.id } });
+      } catch (error: unknown) {
+        console.error("Critical error:", error);
+      } finally {
+        setIsCreating(false);
       }
-    } catch (error: unknown) {
-      console.error("Failed to create chat:", error);
-    } finally {
-      setIsCreating(false);
-    }
-  };
+    },
+    [isCreating, createChat, navigate],
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -121,7 +85,7 @@ export function NewChatDialog() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>): void =>
+              onChange={(e: ChangeEvent<HTMLInputElement>): void =>
                 setSearch(e.target.value)
               }
               placeholder="Search users"
@@ -132,39 +96,37 @@ export function NewChatDialog() {
         </div>
 
         <div className="max-h-[320px] overflow-y-auto">
-          {isSearching || isCreating ? (
+          {isCreating ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              {isCreating && (
-                <p className="text-xs text-muted-foreground">
-                  Creating chat...
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">Creating chat...</p>
             </div>
           ) : users.length ? (
-            users.map((user: User) => (
-              <button
-                key={user.id}
-                type="button"
-                onClick={(): Promise<void> => handleCreate(user.id)}
-                disabled={isCreating}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/70 transition text-left disabled:opacity-50"
-              >
-                <Avatar className="h-9 w-9 border border-border/50">
-                  <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
-                    {user.firstName?.[0].toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate text-foreground">
-                    {user.firstName} {user.lastName}
-                  </p>
-                  <p className="text-[12px] text-muted-foreground truncate">
-                    @{user.username}
-                  </p>
-                </div>
-              </button>
-            ))
+            users.map(
+              (user: User): ReactNode => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={(): Promise<void> => handleCreate(user.id)}
+                  disabled={isCreating}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/70 transition text-left disabled:opacity-50"
+                >
+                  <Avatar className="h-9 w-9 border border-border/50">
+                    <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
+                      {user.firstName?.[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate text-foreground">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    <p className="text-[12px] text-muted-foreground truncate">
+                      @{user.username}
+                    </p>
+                  </div>
+                </button>
+              ),
+            )
           ) : (
             <div className="text-center py-10">
               <p className="text-sm text-muted-foreground">
