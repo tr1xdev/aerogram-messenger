@@ -9,6 +9,7 @@ import {
   type GraphQLResponse,
   type SubscribeFunction,
   type GraphQLSingularResponse,
+  type UploadableMap,
 } from "relay-runtime";
 import { createClient, type Client } from "graphql-ws";
 import { useAuthStore } from "@/store/auth-store";
@@ -29,7 +30,6 @@ let lastRateLimitNotification: number = 0;
 let lastServerErrorNotification: number = 0;
 
 const getAuthHeaders = (token: string | null): Record<string, string> => ({
-  "Content-Type": "application/json",
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 });
 
@@ -90,14 +90,44 @@ async function performFetch(
   params: RequestParameters,
   variables: Variables,
   token: string | null,
+  uploadables?: UploadableMap | null,
 ): Promise<GraphQLResponse> {
-  const response: Response = await fetch(HTTP_ENDPOINT, {
-    method: "POST",
-    headers: getAuthHeaders(token),
-    body: JSON.stringify({
+  const headers = getAuthHeaders(token);
+  let body: BodyInit;
+
+  if (uploadables) {
+    const formData = new FormData();
+    formData.append(
+      "operations",
+      JSON.stringify({
+        query: params.text,
+        variables,
+      }),
+    );
+
+    const map: Record<string, string[]> = {};
+    Object.keys(uploadables).forEach((key) => {
+      map[key] = [`variables.${key}`];
+    });
+    formData.append("map", JSON.stringify(map));
+
+    Object.keys(uploadables).forEach((key) => {
+      formData.append(key, uploadables[key]);
+    });
+
+    body = formData;
+  } else {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify({
       query: params.text,
       variables,
-    }),
+    });
+  }
+
+  const response: Response = await fetch(HTTP_ENDPOINT, {
+    method: "POST",
+    headers,
+    body,
   });
 
   if (response.status === 429) {
@@ -141,9 +171,7 @@ async function executeRefresh(): Promise<string | null> {
       }),
     });
 
-    const json: {
-      data?: { refreshToken?: { accessToken: string; refreshToken: string } };
-    } = await res.json();
+    const json = await res.json();
     const tokens = json.data?.refreshToken;
 
     if (tokens) {
@@ -164,15 +192,15 @@ async function executeRefresh(): Promise<string | null> {
 async function fetchRelay(
   params: RequestParameters,
   variables: Variables,
+  _cacheConfig: unknown,
+  uploadables?: UploadableMap | null,
 ): Promise<GraphQLResponse> {
   const cacheKey: string = `${params.id ?? params.text}-${JSON.stringify(variables)}`;
   const setIsUpdating = useConnectionStore.getState().setIsUpdating;
   const isQuery: boolean = params.operationKind === "query";
 
-  const pending: Promise<GraphQLResponse> | undefined =
-    inFlightRequests.get(cacheKey);
-  if (pending) {
-    logger.relay(`Deduplicated: ${params.name}`);
+  const pending = inFlightRequests.get(cacheKey);
+  if (pending && !uploadables) {
     return pending;
   }
 
@@ -187,9 +215,12 @@ async function fetchRelay(
   const runExecution = async (): Promise<GraphQLResponse> => {
     try {
       const token: string | null = useAuthStore.getState().accessToken;
-      logger.relay(`Fetch: ${params.name}`);
-
-      let json: GraphQLResponse = await performFetch(params, variables, token);
+      let json: GraphQLResponse = await performFetch(
+        params,
+        variables,
+        token,
+        uploadables,
+      );
 
       if (hasUnauthorizedError(json)) {
         if (!refreshPromise) {
@@ -198,8 +229,7 @@ async function fetchRelay(
 
         const newToken: string | null = await refreshPromise;
         if (newToken) {
-          logger.auth(`Retrying ${params.name} with new token`);
-          json = await performFetch(params, variables, newToken);
+          json = await performFetch(params, variables, newToken, uploadables);
         } else {
           useAuthStore.getState().logout();
           localStorage.removeItem("recent_searches");
@@ -210,31 +240,25 @@ async function fetchRelay(
       return json;
     } catch (err: unknown) {
       const error: Error = err as Error;
-      logger.error("RELAY", `Execution failed: ${params.name}`, error);
-
       return {
         data: null,
         errors: [{ message: error.message }],
       } as unknown as GraphQLResponse;
     } finally {
-      if (updateTimer) {
-        clearTimeout(updateTimer);
-      }
-
+      if (updateTimer) clearTimeout(updateTimer);
       if (isQuery) {
         Promise.resolve().then((): void => {
           setIsUpdating(false);
         });
       }
-
-      if (inFlightRequests.get(cacheKey) === executionPromise) {
-        inFlightRequests.delete(cacheKey);
-      }
+      inFlightRequests.delete(cacheKey);
     }
   };
 
   const executionPromise: Promise<GraphQLResponse> = runExecution();
-  inFlightRequests.set(cacheKey, executionPromise);
+  if (!uploadables) {
+    inFlightRequests.set(cacheKey, executionPromise);
+  }
 
   return executionPromise;
 }
@@ -249,16 +273,11 @@ const subscribe: SubscribeFunction = (
       return (): void => {};
     }
 
-    logger.ws(`Subscribing: ${operation.name}`);
-
     return wsClient.subscribe(
       { query: operation.text, variables },
       {
         next: (data: unknown): void => sink.next(data as GraphQLResponse),
-        error: (err: unknown): void => {
-          logger.error("WS", `Sub Error: ${operation.name}`, err);
-          sink.error(err as Error);
-        },
+        error: (err: unknown): void => sink.error(err as Error),
         complete: (): void => sink.complete(),
       },
     );

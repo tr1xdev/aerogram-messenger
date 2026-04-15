@@ -1,7 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import { graphql, useFragment, useLazyLoadQuery } from "react-relay";
 import { motion } from "framer-motion";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MdVerified } from "react-icons/md";
+import type { ReactNode } from "react";
 import type { userProfileOverlay_user$key } from "./__generated__/userProfileOverlay_user.graphql";
 import type { userProfileOverlayQuery } from "./__generated__/userProfileOverlayQuery.graphql";
 
@@ -40,7 +41,7 @@ const UserProfileQuery = graphql`
   }
 `;
 
-export function UserProfileOverlay({ userId }: { userId: string }) {
+export function UserProfileOverlay({ userId }: { userId: string }): ReactNode {
   const router = useRouter();
 
   const data = useLazyLoadQuery<userProfileOverlayQuery>(
@@ -74,6 +75,9 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
     return <ProfileSkeleton />;
   }
 
+  const fullName: string =
+    user.displayName || `${user.firstName} ${user.lastName}`;
+
   return (
     <>
       <motion.div
@@ -92,39 +96,36 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0, right: 0.5 }}
-        onDragEnd={(_: unknown, info: { offset: { x: number } }) => {
+        onDragEnd={(_: unknown, info: { offset: { x: number } }): void => {
           if (info.offset.x > 50) handleBack();
         }}
-        className="fixed inset-y-0 right-0 z-100 w-full bg-background shadow-2xl md:hidden will-change-transform"
+        className="fixed inset-y-0 right-0 z-100 w-full bg-background shadow-2xl md:hidden will-change-transform overflow-hidden"
       >
         <header className="flex items-center p-4 sticky top-0 bg-background/95 backdrop-blur-sm z-10 border-b">
           <Button
             variant="ghost"
             size="icon"
             onClick={handleBack}
-            className="rounded-full -ml-2"
+            className="rounded-full -ml-2 shrink-0"
           >
             <ChevronLeft className="h-6 w-6" />
           </Button>
-          <span className="ml-3 font-bold text-lg">Profile</span>
+          <span className="ml-3 font-bold text-lg truncate">Profile</span>
         </header>
 
         <div className="pb-10 px-4 space-y-5 overflow-y-auto h-[calc(100vh-64px)] scrollbar-none">
           <div className="flex flex-col items-center py-8">
-            <Avatar className="h-32 w-32 border-4 border-background shadow-xl rounded-full aspect-square overflow-hidden">
-              <AvatarImage
-                src={user.photoUrl ?? undefined}
-                className="object-cover h-full w-full"
-              />
-              <AvatarFallback className="text-4xl bg-primary/10 text-primary font-bold uppercase h-full w-full flex items-center justify-center">
-                {(user.firstName || user.displayName)?.[0] || "?"}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              src={user.photoUrl}
+              fallback={fullName}
+              size={128}
+              className="border-4 border-background shadow-xl"
+            />
 
             <div className="mt-4 text-center w-full px-4">
-              <div className="flex items-center justify-center gap-1.5">
+              <div className="flex items-center justify-center gap-1.5 overflow-hidden">
                 <h2 className="text-2xl font-bold tracking-tight truncate">
-                  {user.displayName || `${user.firstName} ${user.lastName}`}
+                  {fullName}
                 </h2>
                 {user.isVerified && (
                   <MdVerified className="text-[#2196f3] shrink-0 text-[24px]" />
@@ -133,11 +134,11 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
               <div className="flex items-center justify-center gap-1.5 mt-1">
                 <div
                   className={cn(
-                    "h-2 w-2 rounded-full",
+                    "h-2 w-2 rounded-full shrink-0",
                     user.status === "online" ? "bg-green-500" : "bg-zinc-400",
                   )}
                 />
-                <p className="text-[14px] text-muted-foreground font-medium">
+                <p className="text-[14px] text-muted-foreground font-medium truncate">
                   {user.status || "offline"}
                 </p>
               </div>
@@ -149,12 +150,12 @@ export function UserProfileOverlay({ userId }: { userId: string }) {
             <InfoItem
               label="Username"
               value={user.username ? `@${user.username}` : "None"}
-              onClick={() => handleCopy(user.username, "Username")}
+              onClick={(): void => handleCopy(user.username, "Username")}
             />
             <InfoItem
               label="Email"
               value={user.email ?? "No email"}
-              onClick={() => handleCopy(user.email, "Email")}
+              onClick={(): void => handleCopy(user.email, "Email")}
             />
           </div>
 
@@ -187,7 +188,7 @@ function InfoItem({
   value: string;
   onClick?: () => void;
   isBio?: boolean;
-}) {
+}): ReactNode {
   return (
     <button
       onClick={onClick}
@@ -197,12 +198,12 @@ function InfoItem({
         onClick && "hover:bg-accent/40 active:bg-accent/60",
       )}
     >
-      <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
+      <span className="text-[11px] font-bold text-primary uppercase tracking-wider shrink-0">
         {label}
       </span>
       <span
         className={cn(
-          "text-[15px] text-foreground leading-snug mt-1",
+          "text-[15px] text-foreground leading-snug mt-1 break-words",
           isBio && "italic opacity-80",
         )}
       >
@@ -224,7 +225,7 @@ function ActionRow({
   onClick?: () => void;
   isWarning?: boolean;
   primary?: boolean;
-}) {
+}): ReactNode {
   return (
     <button
       onClick={onClick}
@@ -232,14 +233,14 @@ function ActionRow({
     >
       <Icon
         className={cn(
-          "h-5 w-5",
+          "h-5 w-5 shrink-0",
           primary ? "text-primary" : "text-muted-foreground",
           isWarning && "text-destructive",
         )}
       />
       <span
         className={cn(
-          "ml-4 text-[15px] font-semibold",
+          "ml-4 text-[15px] font-semibold truncate",
           isWarning ? "text-destructive" : "text-foreground",
           primary && "text-primary",
         )}
@@ -250,7 +251,7 @@ function ActionRow({
   );
 }
 
-function ProfileSkeleton() {
+function ProfileSkeleton(): ReactNode {
   return (
     <div className="px-4 space-y-6 animate-pulse pt-6">
       <div className="flex flex-col items-center">

@@ -14,11 +14,9 @@ const meQuery = graphql`
 `;
 
 export function useMe(): useMeQuery["response"] {
-  const response: useMeQuery["response"] = useLazyLoadQuery<useMeQuery>(
+  return useLazyLoadQuery<useMeQuery>(
     meQuery,
     {},
-    { fetchPolicy: "store-and-network" },
+    { fetchPolicy: "store-or-network" },
   );
-
-  return response;
 }

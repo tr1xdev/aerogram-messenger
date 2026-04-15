@@ -9,7 +9,6 @@ import {
 } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/store/chat";
 import {
   useChatHistory,
@@ -78,6 +77,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   const me: User | undefined = meData?.me as unknown as User | undefined;
   const chatRaw: ChatDetailsResponse["chat"] = chatData.chat;
+
+  const partnerUser = useMemo((): chatHeader_user$key | null => {
+    if (chatRaw?.__typename !== "Chat" || !chatRaw.members || !me) return null;
+    const partner = chatRaw.members.find((m): boolean => m.user?.id !== me.id);
+    return (partner?.user as unknown as chatHeader_user$key) ?? null;
+  }, [chatRaw, me]);
+
   const isChatType: boolean = chatRaw?.__typename === "Chat";
   const chat: Chat | undefined = isChatType
     ? (chatRaw as unknown as Chat)
@@ -172,15 +178,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     }
     return 0;
   }, [chatsData, chatId]);
-
-  const partnerUser = useMemo((): chatHeader_user$key | null => {
-    if (!chat?.members || !me) return null;
-    const members: ChatMember[] = chat.members as ChatMember[];
-    const partner: ChatMember | undefined = members.find(
-      (m: ChatMember): boolean => m.user.id !== me.id,
-    );
-    return (partner?.user as unknown as chatHeader_user$key) ?? null;
-  }, [chat, me]);
 
   const isBotChat: boolean = useMemo((): boolean => {
     if (!chat?.members || !me) return false;
@@ -303,14 +300,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         <p className="text-muted-foreground text-sm max-w-70 mb-8">
           The chat doesn't exist or you don't have permission to view it.
         </p>
-        <Button
-          variant="outline"
+        <button
+          className="gap-2 rounded-xl flex items-center px-4 py-2 border hover:bg-muted"
           onClick={(): Promise<void> => navigate({ to: "/" })}
-          className="gap-2 rounded-xl"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to chats
-        </Button>
+        </button>
       </div>
     );
   }
@@ -329,25 +325,19 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       <main className="flex-1 relative min-h-0 bg-background overflow-hidden">
         {isInitialLoading ? (
           <div className="absolute inset-0 p-4 flex flex-col gap-6">
-            <Skeleton className="h-10 w-[60%] self-end rounded-2xl rounded-tr-none" />
-            <Skeleton className="h-10 w-[50%] self-start rounded-2xl rounded-tl-none" />
-            <Skeleton className="h-10 w-[70%] self-end rounded-2xl rounded-tr-none" />
+            <Skeleton className="h-10 w-[60%] self-end rounded-2xl" />
+            <Skeleton className="h-10 w-[50%] self-start rounded-2xl" />
           </div>
         ) : allMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-6 text-center">
             <div className="relative mb-6">
-              <div className="relative h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center border border-border/50">
+              <div className="relative h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center border">
                 <MessageSquare className="h-10 w-10 text-muted-foreground/40" />
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">
+            <h3 className="text-lg font-semibold mb-2">
               {isBotChat ? `Chat with ${chat?.title}` : "No messages yet"}
             </h3>
-            <p className="text-sm text-muted-foreground max-w-60">
-              {isBotChat
-                ? "Send a message to start."
-                : "Start by sending a message."}
-            </p>
           </div>
         ) : (
           <MessageList
