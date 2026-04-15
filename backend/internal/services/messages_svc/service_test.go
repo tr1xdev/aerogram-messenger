@@ -3,7 +3,6 @@ package messages_svc
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type testEnv struct {
@@ -116,24 +116,26 @@ func TestMessagesServer_SendMessage(t *testing.T) {
 	})
 
 	t.Run("rate_limit_exceeded", func(t *testing.T) {
+		env.mr.FlushAll()
 		req := &messagespb.SendMessageRequest{
 			ChatId:   chatID.String(),
 			SenderId: userID.String(),
 			Text:     "Spam",
 		}
 
-		for range 3 {
+		for i := 0; i < env.cfg.Send.Limit; i++ {
 			_, err := env.server.SendMessage(ctx, req)
 			require.NoError(t, err)
 		}
 
 		res, err := env.server.SendMessage(ctx, req)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, res)
 
 		st, ok := status.FromError(err)
-		assert.True(t, ok)
+		require.True(t, ok)
 		assert.Equal(t, codes.ResourceExhausted, st.Code())
+		assert.Equal(t, "too many messages", st.Message())
 	})
 
 	t.Run("publish_to_redis", func(t *testing.T) {
@@ -155,9 +157,10 @@ func TestMessagesServer_SendMessage(t *testing.T) {
 		require.NoError(t, err)
 
 		var received messagespb.Message
-		err = json.Unmarshal([]byte(msg.Payload), &received)
+		err = protojson.Unmarshal([]byte(msg.Payload), &received)
 		require.NoError(t, err)
 		assert.Equal(t, res.Message.Id, received.Id)
+		assert.Equal(t, res.Message.Sequence, received.Sequence)
 	})
 }
 
@@ -172,7 +175,7 @@ func TestMessagesServer_GetHistory(t *testing.T) {
 	seedUser(t, env.db, userID, "history_user")
 	seedChat(t, env.db, chatID, userID)
 
-	for range 3 {
+	for i := 0; i < 3; i++ {
 		_, err := env.server.SendMessage(ctx, &messagespb.SendMessageRequest{
 			ChatId:   chatID.String(),
 			SenderId: userID.String(),
