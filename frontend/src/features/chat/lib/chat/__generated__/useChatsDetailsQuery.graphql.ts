@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<476fbcd1cef7d4a8dddce3c2c93e4a7a>>
+ * @generated SignedSource<<72653e99dfa93a50cb88fa3ad1b39e9d>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -441,12 +441,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "2c5d23834d76c3e37677848c7b1a7716",
+    "cacheID": "e9442accadfc8ddb3262d40b25d09061",
     "id": null,
     "metadata": {},
     "name": "useChatsDetailsQuery",
     "operationKind": "query",
-    "text": "query useChatsDetailsQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      ...useMarkDialog_chat\n      ...chatMenuItem_chat\n      id\n      title\n      type\n      photoUrl\n      membersCount\n      unreadCount\n      isPinned\n      lastReadSequence\n      members {\n        user {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n          isBot\n          status\n          isVerified\n          ...chatHeader_user\n        }\n      }\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment chatHeader_user on User {\n  id\n  status\n  photoUrl\n  firstName\n  lastName\n  displayName\n  isTyping\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useMarkDialog_chat on Chat {\n  id\n  unreadCount\n  myReadSequence\n  members {\n    user {\n      id\n    }\n    lastReadSequence\n  }\n}\n"
+    "text": "query useChatsDetailsQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      ...useMarkDialog_chat\n      ...chatMenuItem_chat\n      id\n      title\n      type\n      photoUrl\n      membersCount\n      unreadCount\n      isPinned\n      lastReadSequence\n      members {\n        user {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n          isBot\n          status\n          isVerified\n          ...chatHeader_user\n        }\n      }\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment chatHeader_user on User {\n  id\n  status\n  photoUrl\n  firstName\n  lastName\n  displayName\n  isTyping\n  isVerified\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useMarkDialog_chat on Chat {\n  id\n  unreadCount\n  myReadSequence\n  members {\n    user {\n      id\n    }\n    lastReadSequence\n  }\n}\n"
   }
 };
 })();

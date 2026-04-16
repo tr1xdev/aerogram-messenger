@@ -11,6 +11,7 @@ import {
   Trash2,
   Shield,
 } from "lucide-react";
+import { MdVerified } from "react-icons/md";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
@@ -36,6 +37,7 @@ const ChatHeaderUserFragment = graphql`
     lastName
     displayName
     isTyping
+    isVerified
   }
 `;
 
@@ -125,9 +127,14 @@ export const ChatHeader = memo(function ChatHeader({
                 className="border border-border/40"
               />
               <div className="flex flex-col min-w-0">
-                <span className="text-[15px] font-bold truncate leading-none">
-                  {title}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[15px] font-bold truncate leading-none">
+                    {title}
+                  </span>
+                  {user.isVerified && (
+                    <MdVerified className="text-[#2196f3] shrink-0 text-[16px]" />
+                  )}
+                </div>
                 <span
                   className={cn(
                     "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",

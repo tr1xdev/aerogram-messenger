@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<91c2c07cb0d12bccff989e589941481d>>
+ * @generated SignedSource<<a34c9da3f4994201bfd6fe5f8426658b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,6 +15,7 @@ export type chatHeader_user$data = {
   readonly firstName: string;
   readonly id: string;
   readonly isTyping: boolean;
+  readonly isVerified: boolean;
   readonly lastName: string | null | undefined;
   readonly photoUrl: string | null | undefined;
   readonly status: string;
@@ -79,12 +80,19 @@ const node: ReaderFragment = {
       "kind": "ScalarField",
       "name": "isTyping",
       "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "isVerified",
+      "storageKey": null
     }
   ],
   "type": "User",
   "abstractKey": null
 };
 
-(node as any).hash = "d41c5276239bcb491878ab2118a6db2d";
+(node as any).hash = "7cd31190d956534a515a3479262ed42c";
 
 export default node;
