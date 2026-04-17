@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<240a29f2b46f21487938324728456cba>>
+ * @generated SignedSource<<8d333f2ec9b6b36ba91fad3368055294>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,10 +15,12 @@ export type chatUserPopoverQuery$variables = {
 export type chatUserPopoverQuery$data = {
   readonly user: {
     readonly bio: string | null | undefined;
+    readonly botDescription: string | null | undefined;
     readonly displayName: string | null | undefined;
     readonly email: string | null | undefined;
     readonly firstName: string;
     readonly id: string;
+    readonly isBot: boolean;
     readonly isVerified: boolean;
     readonly lastName: string | null | undefined;
     readonly photoUrl: string | null | undefined;
@@ -107,6 +109,20 @@ v1 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
+        "name": "isBot",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "botDescription",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
         "name": "bio",
         "storageKey": null
       },
@@ -146,16 +162,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "dee451cfec3df64dfe2e6457549914bb",
+    "cacheID": "ed8c0430026bd5a29251efa8d025d269",
     "id": null,
     "metadata": {},
     "name": "chatUserPopoverQuery",
     "operationKind": "query",
-    "text": "query chatUserPopoverQuery(\n  $id: ID!\n) {\n  user(id: $id) {\n    id\n    username\n    firstName\n    lastName\n    displayName\n    photoUrl\n    isVerified\n    bio\n    status\n    email\n  }\n}\n"
+    "text": "query chatUserPopoverQuery(\n  $id: ID!\n) {\n  user(id: $id) {\n    id\n    username\n    firstName\n    lastName\n    displayName\n    photoUrl\n    isVerified\n    isBot\n    botDescription\n    bio\n    status\n    email\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "6b4abd62e8be1132ae4494dd8aa0b0d6";
+(node as any).hash = "d91a3120b3b2e236f71a09de77310768";
 
 export default node;
