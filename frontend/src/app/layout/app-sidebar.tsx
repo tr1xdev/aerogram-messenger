@@ -68,6 +68,7 @@ const appSidebarQuery = graphql`
       lastName
       photoUrl
       isVerified
+      ...settingsDialog_user
     }
     myChats {
       __typename
@@ -759,7 +760,7 @@ function AppSidebarInner(): React.ReactNode {
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        user={user as unknown as User}
+        user={user}
       />
     </>
   );

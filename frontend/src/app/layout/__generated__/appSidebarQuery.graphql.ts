@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<fd9e2416021e1407de6dc16388890add>>
+ * @generated SignedSource<<e02645ff18492c657a1ca82d0b377e29>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -20,6 +20,7 @@ export type appSidebarQuery$data = {
     readonly lastName: string | null | undefined;
     readonly photoUrl: string | null | undefined;
     readonly username: string | null | undefined;
+    readonly " $fragmentSpreads": FragmentRefs<"settingsDialog_user">;
   };
   readonly myChats: {
     readonly __typename: string;
@@ -86,56 +87,39 @@ v5 = {
 v6 = {
   "alias": null,
   "args": null,
-  "concreteType": "User",
-  "kind": "LinkedField",
-  "name": "me",
-  "plural": false,
-  "selections": [
-    (v0/*: any*/),
-    (v1/*: any*/),
-    (v2/*: any*/),
-    (v3/*: any*/),
-    (v4/*: any*/),
-    (v5/*: any*/)
-  ],
+  "kind": "ScalarField",
+  "name": "__typename",
   "storageKey": null
 },
 v7 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "__typename",
+  "name": "title",
   "storageKey": null
 },
 v8 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "title",
+  "name": "type",
   "storageKey": null
 },
 v9 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "type",
+  "name": "unreadCount",
   "storageKey": null
 },
 v10 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "unreadCount",
-  "storageKey": null
-},
-v11 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
   "name": "isPinned",
   "storageKey": null
 },
-v12 = {
+v11 = {
   "kind": "InlineFragment",
   "selections": [
     {
@@ -148,6 +132,13 @@ v12 = {
   ],
   "type": "Error",
   "abstractKey": "__isError"
+},
+v12 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "displayName",
+  "storageKey": null
 };
 return {
   "fragment": {
@@ -156,7 +147,28 @@ return {
     "metadata": null,
     "name": "appSidebarQuery",
     "selections": [
-      (v6/*: any*/),
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "User",
+        "kind": "LinkedField",
+        "name": "me",
+        "plural": false,
+        "selections": [
+          (v0/*: any*/),
+          (v1/*: any*/),
+          (v2/*: any*/),
+          (v3/*: any*/),
+          (v4/*: any*/),
+          (v5/*: any*/),
+          {
+            "args": null,
+            "kind": "FragmentSpread",
+            "name": "settingsDialog_user"
+          }
+        ],
+        "storageKey": null
+      },
       {
         "alias": null,
         "args": null,
@@ -165,7 +177,7 @@ return {
         "name": "myChats",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
+          (v6/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -178,11 +190,11 @@ return {
                 "plural": true,
                 "selections": [
                   (v0/*: any*/),
+                  (v7/*: any*/),
                   (v8/*: any*/),
-                  (v9/*: any*/),
                   (v4/*: any*/),
+                  (v9/*: any*/),
                   (v10/*: any*/),
-                  (v11/*: any*/),
                   {
                     "args": null,
                     "kind": "FragmentSpread",
@@ -195,7 +207,7 @@ return {
             "type": "ChatList",
             "abstractKey": null
           },
-          (v12/*: any*/)
+          (v11/*: any*/)
         ],
         "storageKey": null
       }
@@ -209,7 +221,59 @@ return {
     "kind": "Operation",
     "name": "appSidebarQuery",
     "selections": [
-      (v6/*: any*/),
+      {
+        "alias": null,
+        "args": null,
+        "concreteType": "User",
+        "kind": "LinkedField",
+        "name": "me",
+        "plural": false,
+        "selections": [
+          (v0/*: any*/),
+          (v1/*: any*/),
+          (v2/*: any*/),
+          (v3/*: any*/),
+          (v4/*: any*/),
+          (v5/*: any*/),
+          (v12/*: any*/),
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "bio",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "isBot",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "botDescription",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "botCommands",
+            "storageKey": null
+          },
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "createdAt",
+            "storageKey": null
+          }
+        ],
+        "storageKey": null
+      },
       {
         "alias": null,
         "args": null,
@@ -218,7 +282,7 @@ return {
         "name": "myChats",
         "plural": false,
         "selections": [
-          (v7/*: any*/),
+          (v6/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -231,11 +295,11 @@ return {
                 "plural": true,
                 "selections": [
                   (v0/*: any*/),
+                  (v7/*: any*/),
                   (v8/*: any*/),
-                  (v9/*: any*/),
                   (v4/*: any*/),
+                  (v9/*: any*/),
                   (v10/*: any*/),
-                  (v11/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -285,13 +349,7 @@ return {
                           (v2/*: any*/),
                           (v3/*: any*/),
                           (v1/*: any*/),
-                          {
-                            "alias": null,
-                            "args": null,
-                            "kind": "ScalarField",
-                            "name": "displayName",
-                            "storageKey": null
-                          }
+                          (v12/*: any*/)
                         ],
                         "storageKey": null
                       }
@@ -340,23 +398,23 @@ return {
             "type": "ChatList",
             "abstractKey": null
           },
-          (v12/*: any*/)
+          (v11/*: any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "58b8b610cb56b6c2fee0e9d0c7592a44",
+    "cacheID": "dc5dc92acba16818cf3f06b28f39098b",
     "id": null,
     "metadata": {},
     "name": "appSidebarQuery",
     "operationKind": "query",
-    "text": "query appSidebarQuery {\n  me {\n    id\n    username\n    firstName\n    lastName\n    photoUrl\n    isVerified\n  }\n  myChats {\n    __typename\n    ... on ChatList {\n      chats {\n        id\n        title\n        type\n        photoUrl\n        unreadCount\n        isPinned\n        ...chatMenuItem_chat\n      }\n    }\n    ... on Error {\n      __isError: __typename\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n"
+    "text": "query appSidebarQuery {\n  me {\n    id\n    username\n    firstName\n    lastName\n    photoUrl\n    isVerified\n    ...settingsDialog_user\n  }\n  myChats {\n    __typename\n    ... on ChatList {\n      chats {\n        id\n        title\n        type\n        photoUrl\n        unreadCount\n        isPinned\n        ...chatMenuItem_chat\n      }\n    }\n    ... on Error {\n      __isError: __typename\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment profileContent_user on User {\n  id\n  firstName\n  lastName\n  username\n  displayName\n  photoUrl\n  bio\n  isBot\n  isVerified\n  botDescription\n  botCommands\n  createdAt\n}\n\nfragment settingsDialog_user on User {\n  id\n  ...profileContent_user\n}\n"
   }
 };
 })();
 
-(node as any).hash = "c9b915de52be8855ae9a10928bc0d392";
+(node as any).hash = "5a39035deafe00b8b7e3fe3a41d49874";
 
 export default node;
