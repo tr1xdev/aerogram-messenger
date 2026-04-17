@@ -1,7 +1,14 @@
 import { type ReactNode, useCallback, useRef } from "react";
-import { LogOut, ChevronDown, Camera, Loader2 } from "lucide-react";
+import {
+  LogOut,
+  ChevronDown,
+  Camera,
+  Loader2,
+  Bot,
+  Terminal,
+} from "lucide-react";
 import { MdVerified } from "react-icons/md";
-import { graphql, useMutation } from "react-relay";
+import { graphql, useMutation, useFragment } from "react-relay";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,9 +18,26 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useAuthStore } from "@/store/auth-store";
-import type { User } from "@/entities/chat/model/types";
+import type { profileContent_user$key } from "./__generated__/profileContent_user.graphql";
 import type { profileContentLogoutMutation } from "./__generated__/profileContentLogoutMutation.graphql";
 import type { profileContentUploadAvatarMutation } from "./__generated__/profileContentUploadAvatarMutation.graphql";
+
+const userFragment = graphql`
+  fragment profileContent_user on User {
+    id
+    firstName
+    lastName
+    username
+    displayName
+    photoUrl
+    bio
+    isBot
+    isVerified
+    botDescription
+    botCommands
+    createdAt
+  }
+`;
 
 const logoutMutation = graphql`
   mutation profileContentLogoutMutation {
@@ -31,16 +55,18 @@ const uploadAvatarMutation = graphql`
 `;
 
 interface ProfileContentProps {
-  user?: User;
+  user: profileContent_user$key;
   onActionComplete?: () => void;
 }
 
 export function ProfileContent({
-  user,
+  user: userRef,
   onActionComplete,
 }: ProfileContentProps): ReactNode {
+  const user = useFragment(userFragment, userRef);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoutAction = useAuthStore((state) => state.logout);
+
   const [commitLogout] =
     useMutation<profileContentLogoutMutation>(logoutMutation);
   const [commitUpload, isUploading] =
@@ -89,7 +115,7 @@ export function ProfileContent({
     [commitUpload],
   );
 
-  const initial = (user?.firstName || user?.username || "?")[0].toUpperCase();
+  const initial = (user.firstName || user.username || "?")[0].toUpperCase();
 
   return (
     <div className="space-y-6 py-6 outline-none">
@@ -103,8 +129,8 @@ export function ProfileContent({
             }`}
           >
             <AvatarImage
-              src={user?.photoUrl || undefined}
-              alt={user?.displayName || "User avatar"}
+              src={user.photoUrl || undefined}
+              alt={user.displayName || "User avatar"}
               className="aspect-square h-full w-full object-cover"
             />
             <AvatarFallback className="text-2xl bg-primary/5 text-primary font-bold h-full w-full flex items-center justify-center">
@@ -133,28 +159,50 @@ export function ProfileContent({
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             <h3 className="font-bold text-lg leading-tight truncate">
-              {user?.firstName} {user?.lastName}
+              {user.firstName} {user.lastName}
             </h3>
-            {user?.isVerified && (
+            {user.isVerified && (
               <MdVerified
                 className="text-[#2196f3] shrink-0 text-[20px]"
                 title="Verified Account"
               />
             )}
+            {user.isBot && (
+              <div className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
+                <Bot className="h-2.5 w-2.5" />
+                Bot
+              </div>
+            )}
           </div>
           <p className="text-sm text-muted-foreground font-medium truncate">
-            @{user?.username}
+            @{user.username}
           </p>
         </div>
       </div>
+
       <div className="space-y-2">
         <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
-          Bio
+          {user.isBot ? "Bot Description" : "Bio"}
         </label>
         <div className="w-full p-3 rounded-xl border bg-muted/30 text-sm text-muted-foreground italic">
-          {user?.bio || "Add a few words about yourself..."}
+          {user.isBot
+            ? user.botDescription || "No description provided for this bot..."
+            : user.bio || "Add a few words about yourself..."}
         </div>
       </div>
+
+      {user.isBot && user.botCommands && (
+        <div className="space-y-2">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1 flex items-center gap-1.5">
+            <Terminal className="h-3 w-3" />
+            Bot Commands
+          </label>
+          <div className="w-full p-3 rounded-xl border bg-muted/20 font-mono text-[12px] text-muted-foreground whitespace-pre-wrap">
+            {user.botCommands}
+          </div>
+        </div>
+      )}
+
       <div className="pt-4 border-t space-y-4">
         <Collapsible>
           <CollapsibleTrigger className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground transition-colors uppercase tracking-widest group">
@@ -162,13 +210,25 @@ export function ProfileContent({
             Technical Details
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-2">
-            <div className="p-3 rounded-lg bg-muted/50 border border-dashed flex flex-col gap-1">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                User ID
-              </span>
-              <code className="text-[11px] font-mono break-all leading-relaxed select-all">
-                {user?.id}
-              </code>
+            <div className="p-3 rounded-lg bg-muted/50 border border-dashed flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                  User ID
+                </span>
+                <code className="text-[11px] font-mono break-all leading-relaxed select-all">
+                  {user.id}
+                </code>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                  Created At
+                </span>
+                <span className="text-[11px] font-medium">
+                  {user.createdAt
+                    ? new Date(user.createdAt).toLocaleString()
+                    : "Unknown"}
+                </span>
+              </div>
             </div>
           </CollapsibleContent>
         </Collapsible>
