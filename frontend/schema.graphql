@@ -217,6 +217,7 @@ type User implements Node {
   isTyping: Boolean!
   botDescription: String
   botCommands: String
+  createdAt: String!
 }
 
 input UpdateUserInput {
