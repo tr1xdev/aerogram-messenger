@@ -45,9 +45,11 @@ interface ChatHeaderProps {
   title?: string;
   photoUrl?: string;
   totalUnread: number;
-  meId: string | undefined;
+  meId?: string;
   isLoading: boolean;
   userRef: chatHeader_user$key | null;
+  type?: "DIRECT" | "PRIVATE" | "GROUP" | "CHANNEL";
+  membersCount?: number;
 }
 
 export const ChatHeader = memo(function ChatHeader({
@@ -56,19 +58,20 @@ export const ChatHeader = memo(function ChatHeader({
   totalUnread,
   isLoading,
   userRef,
+  type = "DIRECT",
+  membersCount = 0,
 }: ChatHeaderProps): ReactNode {
   const navigate = useNavigate();
   const [now, setNow] = useState<number>((): number => Date.now());
 
   const user = useFragment(ChatHeaderUserFragment, userRef);
 
+  const isTyping: boolean = user?.isTyping ?? false;
   const rawStatus: string = user?.status ?? "offline";
   const isOnline: boolean = useMemo(
     (): boolean => rawStatus.toLowerCase() === "online",
     [rawStatus],
   );
-
-  const isTyping: boolean = user?.isTyping ?? false;
 
   useEffect((): (() => void) | void => {
     const interval: ReturnType<typeof setInterval> = setInterval((): void => {
@@ -78,15 +81,51 @@ export const ChatHeader = memo(function ChatHeader({
   }, []);
 
   const statusText: string = useMemo((): string => {
-    if (isTyping) return "typing";
+    if (type === "CHANNEL" || type === "GROUP") {
+      const count: number = membersCount ?? 0;
+      return `${count} ${count === 1 ? "member" : "members"}`;
+    }
+
+    if (isTyping) return "typing...";
     return formatLastSeen(rawStatus, new Date(now));
-  }, [rawStatus, isTyping, now]);
+  }, [type, membersCount, isTyping, rawStatus, now]);
 
   const effectivePhotoUrl: string | undefined = useMemo(():
     | string
     | undefined => {
     return photoUrl || user?.photoUrl || undefined;
   }, [user?.photoUrl, photoUrl]);
+
+  const renderContent = (): ReactNode => (
+    <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
+      <UserAvatar
+        src={effectivePhotoUrl}
+        fallback={title || "Chat"}
+        size={40}
+        className="border border-border/40"
+      />
+      <div className="flex flex-col min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[15px] font-bold truncate leading-none">
+            {title}
+          </span>
+          {(user?.isVerified || type === "CHANNEL") && (
+            <MdVerified className="text-[#2196f3] shrink-0 text-[16px]" />
+          )}
+        </div>
+        <span
+          className={cn(
+            "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",
+            (type === "DIRECT" || type === "PRIVATE") && (isTyping || isOnline)
+              ? "text-primary"
+              : "text-muted-foreground",
+          )}
+        >
+          {statusText}
+        </span>
+      </div>
+    </div>
+  );
 
   return (
     <header className="flex h-16 items-center justify-between px-4 border-b shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -117,38 +156,11 @@ export const ChatHeader = memo(function ChatHeader({
               <Skeleton className="h-3 w-16" />
             </div>
           </div>
-        ) : user ? (
-          <ChatUserPopover userId={user.id}>
-            <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
-              <UserAvatar
-                src={effectivePhotoUrl}
-                fallback={title || "Chat"}
-                size={40}
-                className="border border-border/40"
-              />
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-[15px] font-bold truncate leading-none">
-                    {title}
-                  </span>
-                  {user.isVerified && (
-                    <MdVerified className="text-[#2196f3] shrink-0 text-[16px]" />
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",
-                    isTyping || isOnline
-                      ? "text-primary"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {isTyping ? "typing..." : statusText}
-                </span>
-              </div>
-            </div>
-          </ChatUserPopover>
-        ) : null}
+        ) : (type === "DIRECT" || type === "PRIVATE") && user ? (
+          <ChatUserPopover userId={user.id}>{renderContent()}</ChatUserPopover>
+        ) : (
+          renderContent()
+        )}
       </div>
 
       <div className="flex items-center gap-1">
