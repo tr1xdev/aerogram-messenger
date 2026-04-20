@@ -119,22 +119,31 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 
 	if chatType == model.ChatTypePrivate {
 		foundPartner := false
-		for id, u := range userMap {
-			if id != parsedAuthID {
-				displayTitle = FormatFullName(u.FirstName, u.LastName)
-				if displayPhoto == nil && u.PhotoUrl.Valid {
-					displayPhoto = &u.PhotoUrl.String
+		for _, m := range dbMembers {
+			if m.UserID != parsedAuthID {
+				if u, ok := userMap[m.UserID]; ok {
+					displayTitle = FormatFullName(u.FirstName, u.LastName)
+					if (displayPhoto == nil || *displayPhoto == "") && u.PhotoUrl.Valid {
+						displayPhoto = &u.PhotoUrl.String
+					}
+					foundPartner = true
+					break
 				}
-				foundPartner = true
-				break
 			}
 		}
-		if !foundPartner && displayTitle == "" {
-			displayTitle = "Deleted Account"
+		if !foundPartner {
+			if u, ok := userMap[parsedAuthID]; ok {
+				displayTitle = FormatFullName(u.FirstName, u.LastName)
+				if (displayPhoto == nil || *displayPhoto == "") && u.PhotoUrl.Valid {
+					displayPhoto = &u.PhotoUrl.String
+				}
+			} else if displayTitle == "" {
+				displayTitle = "Deleted Account"
+			}
 		}
 	}
 
-	if displayTitle == "" && chatType != model.ChatTypePrivate {
+	if displayTitle == "" {
 		displayTitle = "Untitled Chat"
 	}
 
@@ -176,16 +185,6 @@ func MapGRPCError(err error) error {
 		return errors.New(st.Message())
 	}
 	return err
-}
-
-func MapDBMemberToModel(m *dbgen.GetDialogMembersRow, u *dbgen.User) *model.ChatMember {
-	if m == nil {
-		return nil
-	}
-	return &model.ChatMember{
-		User:             u,
-		LastReadSequence: m.LastReadSequence,
-	}
 }
 
 func FormatFullName(firstName string, lastName sql.NullString) string {
