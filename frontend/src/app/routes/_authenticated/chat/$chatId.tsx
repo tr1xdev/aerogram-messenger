@@ -314,12 +314,26 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   return (
     <div className="flex flex-col h-full bg-background w-full overflow-hidden">
       <ChatHeader
-        title={chat?.title ?? undefined}
-        photoUrl={chat?.photoUrl ?? undefined}
-        userRef={partnerUser}
+        title={chatRaw?.__typename === "Chat" ? chatRaw.title : undefined}
+        photoUrl={
+          chatRaw?.__typename === "Chat"
+            ? (chatRaw.photoUrl ?? undefined)
+            : undefined
+        }
+        userRef={
+          chatRaw?.__typename === "Chat" && chatRaw.type === "PRIVATE"
+            ? partnerUser
+            : null
+        }
         totalUnread={totalUnread}
         meId={me?.id}
         isLoading={isInitialLoading}
+        type={
+          chatRaw?.__typename === "Chat"
+            ? (chatRaw.type as "DIRECT" | "GROUP" | "CHANNEL")
+            : undefined
+        }
+        membersCount={chatRaw?.__typename === "Chat" ? chatRaw.membersCount : 0}
       />
 
       <main className="flex-1 relative min-h-0 bg-background overflow-hidden">
