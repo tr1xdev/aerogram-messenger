@@ -7,6 +7,12 @@ import {
   useTransition,
   Suspense,
 } from "react";
+import type {
+  ReactElement,
+  ChangeEvent,
+  KeyboardEvent,
+  MouseEvent,
+} from "react";
 import { useRouterState, useNavigate, useParams } from "@tanstack/react-router";
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import {
@@ -126,6 +132,7 @@ export type SidebarChat = {
 
 type SidebarMe = NonNullable<AppSidebarQueryType["response"]["me"]>;
 type MyChatsType = AppSidebarQueryType["response"]["myChats"];
+type ChatDialogMode = "SELECT" | "GROUP" | "CHANNEL";
 
 type Folder = {
   readonly id: string;
@@ -142,8 +149,10 @@ const SEARCH_DEBOUNCE_MS: number = 250;
 const RECENT_SEARCHES_KEY: string = "recent_searches";
 const MAX_RECENT_SEARCHES: number = 10;
 
-function AppSidebarInner(): React.ReactNode {
+function AppSidebarInner(): ReactElement {
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
+  const [isNewChatOpen, setIsNewChatOpen] = useState<boolean>(false);
+  const [newChatMode, setNewChatMode] = useState<ChatDialogMode>("SELECT");
   const [activeFolder, setActiveFolder] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedQuery, setDebouncedQuery] = useState<string>("");
@@ -175,9 +184,11 @@ function AppSidebarInner(): React.ReactNode {
   const pathname: string = useRouterState().location.pathname;
 
   const isWsConnected: boolean = useConnectionStore(
-    (s): boolean => s.isWsConnected,
+    (s: { readonly isWsConnected: boolean }): boolean => s.isWsConnected,
   );
-  const isUpdating: boolean = useConnectionStore((s): boolean => s.isUpdating);
+  const isUpdating: boolean = useConnectionStore(
+    (s: { readonly isUpdating: boolean }): boolean => s.isUpdating,
+  );
   const isMobile: boolean = useIsMobile();
 
   const data: appSidebarQuery$data = useLazyLoadQuery<AppSidebarQueryType>(
@@ -186,8 +197,10 @@ function AppSidebarInner(): React.ReactNode {
     { fetchPolicy: "store-and-network" },
   );
 
-  const globalSearchData: { searchUsers?: readonly User[] | null } =
-    useSearchUsers(debouncedQuery) as { searchUsers?: readonly User[] | null };
+  const globalSearchData: { readonly searchUsers?: readonly User[] | null } =
+    useSearchUsers(debouncedQuery) as {
+      readonly searchUsers?: readonly User[] | null;
+    };
 
   const [commitCreate] =
     useMutation<AppSidebarCreateMutationType>(createChatMutation);
@@ -288,7 +301,7 @@ function AppSidebarInner(): React.ReactNode {
   }, []);
 
   const removeFromRecent = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>, query: string): void => {
+    (e: MouseEvent, query: string): void => {
       e.stopPropagation();
       const updated: string[] = recentSearches.filter(
         (s: string): boolean => s !== query,
@@ -299,15 +312,17 @@ function AppSidebarInner(): React.ReactNode {
     [recentSearches],
   );
 
-  const handleClearAll = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>): void => {
-      e.preventDefault();
-      e.stopPropagation();
-      setRecentSearches([]);
-      localStorage.removeItem(RECENT_SEARCHES_KEY);
-    },
-    [],
-  );
+  const handleClearAll = useCallback((e: MouseEvent): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setRecentSearches([]);
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  }, []);
+
+  const openNewChat = (mode: ChatDialogMode): void => {
+    setNewChatMode(mode);
+    setIsNewChatOpen(true);
+  };
 
   const handleSelectUser = useCallback(
     (userId: string): void => {
@@ -409,7 +424,11 @@ function AppSidebarInner(): React.ReactNode {
               )}
             </div>
             <div className="flex-1 flex justify-end items-center gap-1 z-10">
-              <NewChatDialog />
+              <NewChatDialog
+                open={isNewChatOpen}
+                onOpenChange={setIsNewChatOpen}
+                initialMode={newChatMode}
+              />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="p-2 rounded-full hover:bg-muted/80 transition-colors outline-none text-foreground">
@@ -420,9 +439,25 @@ function AppSidebarInner(): React.ReactNode {
                   align="end"
                   className="w-56 rounded-xl shadow-xl"
                 >
-                  <DropdownMenuItem className="py-2.5">
+                  <DropdownMenuItem
+                    className="py-2.5"
+                    onClick={(): void => openNewChat("GROUP")}
+                  >
                     New group
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="py-2.5"
+                    onClick={(): void => openNewChat("CHANNEL")}
+                  >
+                    New channel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="py-2.5"
+                    onClick={(): void => openNewChat("SELECT")}
+                  >
+                    New private chat
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem className="py-2.5">
                     Saved messages
                   </DropdownMenuItem>
@@ -452,12 +487,10 @@ function AppSidebarInner(): React.ReactNode {
                     onBlur={(): void => {
                       if (!searchQuery) setIsFocused(false);
                     }}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>): void =>
+                    onChange={(e: ChangeEvent<HTMLInputElement>): void =>
                       setSearchQuery(e.target.value)
                     }
-                    onKeyDown={(
-                      e: React.KeyboardEvent<HTMLInputElement>,
-                    ): void => {
+                    onKeyDown={(e: KeyboardEvent<HTMLInputElement>): void => {
                       if (e.key === "Enter" && searchQuery) {
                         addToRecent(searchQuery);
                         inputRef.current?.blur();
@@ -476,12 +509,8 @@ function AppSidebarInner(): React.ReactNode {
                   {searchQuery && (
                     <button
                       type="button"
-                      onMouseDown={(
-                        e: React.MouseEvent<HTMLButtonElement>,
-                      ): void => e.preventDefault()}
-                      onClick={(
-                        e: React.MouseEvent<HTMLButtonElement>,
-                      ): void => {
+                      onMouseDown={(e: MouseEvent): void => e.preventDefault()}
+                      onClick={(e: MouseEvent): void => {
                         e.preventDefault();
                         setSearchQuery("");
                         inputRef.current?.focus();
@@ -518,7 +547,7 @@ function AppSidebarInner(): React.ReactNode {
                     <HiDownload className="h-5 w-5" />
                   </button>
                   {folders.map(
-                    (f: Folder): React.ReactNode => (
+                    (f: Folder): ReactElement => (
                       <button
                         key={f.id}
                         data-folder-id={f.id}
@@ -582,9 +611,9 @@ function AppSidebarInner(): React.ReactNode {
                               RECENT SEARCHES
                             </span>
                             <button
-                              onMouseDown={(
-                                e: React.MouseEvent<HTMLButtonElement>,
-                              ): void => e.preventDefault()}
+                              onMouseDown={(e: MouseEvent): void =>
+                                e.preventDefault()
+                              }
                               onClick={handleClearAll}
                               className="text-[11px] font-bold text-sky-500 hover:text-sky-400 transition-colors"
                             >
@@ -593,7 +622,7 @@ function AppSidebarInner(): React.ReactNode {
                           </div>
                           <div className="flex flex-col gap-0.5">
                             {recentSearches.map(
-                              (s: string, i: number): React.ReactNode => (
+                              (s: string, i: number): ReactElement => (
                                 <div
                                   key={i}
                                   onClick={(): void => setSearchQuery(s)}
@@ -606,12 +635,12 @@ function AppSidebarInner(): React.ReactNode {
                                     </span>
                                   </div>
                                   <button
-                                    onMouseDown={(
-                                      e: React.MouseEvent<HTMLButtonElement>,
-                                    ): void => e.preventDefault()}
-                                    onClick={(
-                                      e: React.MouseEvent<HTMLButtonElement>,
-                                    ): void => removeFromRecent(e, s)}
+                                    onMouseDown={(e: MouseEvent): void =>
+                                      e.preventDefault()
+                                    }
+                                    onClick={(e: MouseEvent): void =>
+                                      removeFromRecent(e, s)
+                                    }
                                     className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded-full transition-all"
                                   >
                                     <X className="h-3.5 w-3.5 text-muted-foreground" />
@@ -674,7 +703,7 @@ function AppSidebarInner(): React.ReactNode {
                       </div>
                       <SidebarMenu>
                         {pinnedChats.map(
-                          (chat: SidebarChat): React.ReactNode => (
+                          (chat: SidebarChat): ReactElement => (
                             <ChatMenuItem
                               key={chat.id}
                               chat={chat as unknown as chatMenuItem_chat$key}
@@ -693,7 +722,7 @@ function AppSidebarInner(): React.ReactNode {
                       </div>
                       <SidebarMenu>
                         {otherChats.map(
-                          (chat: SidebarChat): React.ReactNode => (
+                          (chat: SidebarChat): ReactElement => (
                             <ChatMenuItem
                               key={chat.id}
                               chat={chat as unknown as chatMenuItem_chat$key}
@@ -766,7 +795,7 @@ function AppSidebarInner(): React.ReactNode {
   );
 }
 
-function AppSidebarSkeleton(): React.ReactNode {
+function AppSidebarSkeleton(): ReactElement {
   return (
     <Sidebar
       collapsible="none"
@@ -785,7 +814,7 @@ function AppSidebarSkeleton(): React.ReactNode {
           <Skeleton className="h-3 w-20 mb-4" />
           <div className="space-y-4">
             {Array.from({ length: 6 }).map(
-              (_, i: number): React.ReactNode => (
+              (_, i: number): ReactElement => (
                 <div key={i} className="flex items-center gap-3">
                   <Skeleton className="h-12 w-12 rounded-full shrink-0" />
                   <div className="space-y-2 flex-1">
@@ -811,7 +840,7 @@ function AppSidebarSkeleton(): React.ReactNode {
   );
 }
 
-export function AppSidebar(): React.ReactNode {
+export function AppSidebar(): ReactElement | null {
   const { chatId } = useParams({ strict: false });
   const isMobile: boolean = useIsMobile();
 
