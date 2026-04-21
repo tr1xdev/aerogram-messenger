@@ -44,6 +44,7 @@ models:
     Chat:
         fields:
             id: { resolver: true }
+            canWrite: { resolver: true }
 
     Message:
         fields:

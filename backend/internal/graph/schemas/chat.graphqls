@@ -4,8 +4,17 @@ enum ChatType {
     CHANNEL
 }
 
+type ChatPermissions {
+    canSendMessage: Boolean!
+    canInviteUsers: Boolean!
+    canEditMetadata: Boolean!
+    canDeleteMessages: Boolean!
+    canAssignAdmins: Boolean!
+}
+
 type ChatMember {
     user: User!
+    role: String!
     lastReadSequence: Long!
 }
 
@@ -20,6 +29,8 @@ type Chat implements Node {
     myReadSequence: Long!
     lastReadSequence: Long!
     isPinned: Boolean!
+    canWrite: Boolean!
+    permissions: ChatPermissions!
     lastMessage: Message
     members: [ChatMember!]
     createdAt: String!
@@ -34,6 +45,11 @@ union MyChatsResult = ChatList | ForbiddenError | InternalError
 union CreateChatResult = Chat | ValidationError | ForbiddenError | InternalError
 union PinChatResult = SuccessResult | ForbiddenError | InternalError
 union DeleteChatResult = SuccessResult | ForbiddenError | InternalError
+union InviteResult =
+    | SuccessResult
+    | ValidationError
+    | ForbiddenError
+    | InternalError
 
 extend type Query {
     myChats: MyChatsResult!
@@ -55,6 +71,7 @@ extend type Mutation {
     createDirectChat(userID: ID!): CreateChatResult!
     pinChat(id: ID!, pinned: Boolean!): PinChatResult!
     deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
+    inviteToChat(chatID: ID!, userIds: [ID!]!): InviteResult!
     sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
 }
 
