@@ -153,6 +153,22 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 		Sequence: myReadSeq,
 	})
 
+	permissions := &model.ChatPermissions{
+		CanSendMessage:    true,
+		CanInviteUsers:    true,
+		CanEditMetadata:   true,
+		CanDeleteMessages: true,
+		CanAssignAdmins:   true,
+	}
+
+	if pbChat.Permissions != nil {
+		permissions.CanSendMessage = pbChat.Permissions.CanSendMessage
+		permissions.CanInviteUsers = pbChat.Permissions.CanInviteUsers
+		permissions.CanEditMetadata = pbChat.Permissions.CanEditMetadata
+		permissions.CanDeleteMessages = pbChat.Permissions.CanDeleteMessages
+		permissions.CanAssignAdmins = pbChat.Permissions.CanAssignAdmins
+	}
+
 	return &model.Chat{
 		ID:               pbChat.Id,
 		Type:             chatType,
@@ -166,6 +182,8 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 		IsPinned:         isPinned,
 		MyReadSequence:   myReadSeq,
 		LastReadSequence: pReadSeq,
+		CanWrite:         pbChat.CanWrite,
+		Permissions:      permissions,
 		CreatedAt:        time.Now().Format(time.RFC3339),
 	}, nil
 }

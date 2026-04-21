@@ -148,3 +148,7 @@ WHERE d.type = 'private'
   AND dm2.user_id = $2
   AND d.is_active = true
 LIMIT 1;
+
+-- name: GetDialogSettings :one
+SELECT * FROM dialog_settings
+WHERE dialog_id = $1 LIMIT 1;

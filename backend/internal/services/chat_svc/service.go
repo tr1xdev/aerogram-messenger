@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"strings"
 	"time"
 
@@ -78,7 +79,10 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	}
 
 	newID := uuid.New()
-	creatorUUID, _ := uuid.Parse(creatorIDStr)
+	creatorUUID, err := uuid.Parse(creatorIDStr)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid creator id")
+	}
 
 	dParams := dbgen.CreateDialogParams{
 		ID:           newID,
@@ -125,10 +129,15 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	}
 
 	if err := s.dialogRepo.CreateDialog(ctx, dParams, mParams, sParams); err != nil {
+		log.Printf("[CreateChat] DB Error: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	dialog, _ := s.dialogRepo.GetDialogByID(ctx, newID.String())
+	dialog, err := s.dialogRepo.GetDialogByID(ctx, newID.String())
+	if err != nil {
+		log.Printf("[CreateChat] Retrieval DB Error: %v", err)
+		return nil, status.Error(codes.Internal, "failed to retrieve created chat")
+	}
 	protoChat := s.mapDBDialogToProto(dialog)
 
 	chatType := strings.ToUpper(strings.TrimPrefix(req.Type.String(), "CHAT_TYPE_"))
@@ -156,21 +165,97 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	return &chatpb.CreateChatResponse{Chat: protoChat}, nil
 }
 
+func (s *Server) InviteToChat(ctx context.Context, req *chatpb.InviteToChatRequest) (*chatpb.InviteToChatResponse, error) {
+	inviterID := s.getUserID(ctx, "")
+	if inviterID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
+
+	did, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+	iuid, err := uuid.Parse(inviterID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid inviter id")
+	}
+
+	canInvite, err := s.checkPermission(ctx, did, iuid, 2)
+	if err != nil {
+		return nil, err
+	}
+	if !canInvite {
+		return nil, status.Error(codes.PermissionDenied, "no permission to invite")
+	}
+
+	for _, targetID := range req.UserIds {
+		tuid, err := uuid.Parse(targetID)
+		if err != nil {
+			continue
+		}
+
+		err = s.db.Queries.AddDialogMember(ctx, dbgen.AddDialogMemberParams{
+			DialogID:         did,
+			UserID:           tuid,
+			Role:             "member",
+			NotificationsOn:  true,
+			IsPinned:         false,
+			LastReadSequence: 0,
+		})
+		if err != nil {
+			log.Printf("[InviteToChat] DB Error adding member %s: %v", targetID, err)
+			continue
+		}
+
+		s.rdb.Publish(ctx, "user_chats:"+targetID, "{}")
+	}
+
+	return &chatpb.InviteToChatResponse{Success: true}, nil
+}
+
+func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID uuid.UUID, bit int32) (bool, error) {
+	member, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: dialogID,
+		UserID:   userID,
+	})
+	if err != nil {
+		return false, status.Error(codes.NotFound, "member not found")
+	}
+
+	if member.Role == "owner" || member.Role == "admin" {
+		return true, nil
+	}
+
+	settings, err := s.db.Queries.GetDialogSettings(ctx, dialogID)
+	if err != nil {
+		return false, nil
+	}
+
+	return (settings.Permissions & int64(bit)) == 0, nil
+}
+
 func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chatpb.PinChatResponse, error) {
 	userID := s.getUserID(ctx, req.UserId)
 	if userID == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
 	}
 
-	uUUID, _ := uuid.Parse(userID)
-	cUUID, _ := uuid.Parse(req.ChatId)
+	uUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid user id")
+	}
+	cUUID, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
 
-	err := s.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
+	err = s.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
 		IsPinned: req.Pinned,
 		DialogID: cUUID,
 		UserID:   uUUID,
 	})
 	if err != nil {
+		log.Printf("[PinChat] DB Error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to pin chat")
 	}
 
@@ -187,8 +272,14 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 		return nil, status.Error(codes.ResourceExhausted, "too many chat deletion requests")
 	}
 
-	uid, _ := uuid.Parse(userID)
-	did, _ := uuid.Parse(req.ChatId)
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid user id")
+	}
+	did, err := uuid.Parse(req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
 	if err != nil {
@@ -218,6 +309,7 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 	}
 
 	if err != nil {
+		log.Printf("[DeleteChat] DB Error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to delete chat")
 	}
 
@@ -232,6 +324,7 @@ func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) 
 
 	dialogs, err := s.dialogRepo.GetUserDialogs(ctx, userID)
 	if err != nil {
+		log.Printf("[GetMyChats] DB Error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to retrieve conversation list")
 	}
 
@@ -250,6 +343,9 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 	userID := s.getUserID(ctx, req.UserId)
 
 	if req.ChatId != nil && *req.ChatId != "" {
+		if _, uuidErr := uuid.Parse(*req.ChatId); uuidErr != nil {
+			return nil, status.Error(codes.InvalidArgument, "invalid chat uuid")
+		}
 		dialog, err = s.dialogRepo.GetDialogByID(ctx, *req.ChatId)
 	} else if req.Slug != nil && *req.Slug != "" {
 		slug, _ := strings.CutPrefix(*req.Slug, "@")
@@ -292,6 +388,7 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 	}
 
 	if err != nil {
+		log.Printf("[GetChat] DB Error: %v", err)
 		return nil, status.Error(codes.NotFound, "chat not found")
 	}
 
@@ -312,6 +409,10 @@ func (s *Server) mapProtoTypeToDB(t chatpb.ChatType) string {
 }
 
 func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatpb.Chat {
+	if d.ID == uuid.Nil {
+		return &chatpb.Chat{}
+	}
+
 	res := &chatpb.Chat{
 		Id:           d.ID.String(),
 		MembersCount: int32(d.MembersCount),

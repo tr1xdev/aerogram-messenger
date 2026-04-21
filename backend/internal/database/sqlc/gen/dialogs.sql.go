@@ -332,6 +332,26 @@ func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]G
 	return items, nil
 }
 
+const getDialogSettings = `-- name: GetDialogSettings :one
+SELECT dialog_id, permissions, slow_mode_delay, is_history_hidden, is_signatures_enabled, created_at, updated_at FROM dialog_settings
+WHERE dialog_id = $1 LIMIT 1
+`
+
+func (q *Queries) GetDialogSettings(ctx context.Context, dialogID uuid.UUID) (DialogSetting, error) {
+	row := q.db.QueryRowContext(ctx, getDialogSettings, dialogID)
+	var i DialogSetting
+	err := row.Scan(
+		&i.DialogID,
+		&i.Permissions,
+		&i.SlowModeDelay,
+		&i.IsHistoryHidden,
+		&i.IsSignaturesEnabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getPrivateDialogByMembers = `-- name: GetPrivateDialogByMembers :one
 SELECT d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at, d.deleted_at
 FROM dialogs d

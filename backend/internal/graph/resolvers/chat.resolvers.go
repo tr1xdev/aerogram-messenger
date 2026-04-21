@@ -17,11 +17,18 @@ import (
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ID is the resolver for the id field.
 func (r *chatResolver) ID(ctx context.Context, obj *model.Chat) (string, error) {
 	return helpers.EncodeGlobalID("Chat", helpers.ToRawID(obj.ID)), nil
+}
+
+// CanWrite is the resolver for the canWrite field.
+func (r *chatResolver) CanWrite(ctx context.Context, obj *model.Chat) (bool, error) {
+	return true, nil
 }
 
 // CreateChat is the resolver for the createChat field.
@@ -50,7 +57,12 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 		return &model.InternalError{Message: err.Error()}, nil
 	}
 
-	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
+	result, err := r.Enricher.EnrichChat(ctx, authID, resp.Chat)
+	if err != nil {
+		return &model.InternalError{Message: "failed to enrich chat"}, nil
+	}
+
+	return result, nil
 }
 
 // CreateDirectChat is the resolver for the createDirectChat field.
@@ -74,7 +86,12 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 		return &model.InternalError{Message: err.Error()}, nil
 	}
 
-	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
+	result, err := r.Enricher.EnrichChat(ctx, authID, resp.Chat)
+	if err != nil {
+		return &model.InternalError{Message: "failed to enrich chat"}, nil
+	}
+
+	return result, nil
 }
 
 // PinChat is the resolver for the pinChat field.
@@ -120,6 +137,29 @@ func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryon
 	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
 }
 
+// InviteToChat is the resolver for the inviteToChat field.
+func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, userIds []string) (model.InviteResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+
+	rawUserIds := make([]string, len(userIds))
+	for i, id := range userIds {
+		rawUserIds[i] = helpers.ToRawID(id)
+	}
+
+	resp, err := r.ChatClient.InviteToChat(ctx, &chatv1.InviteToChatRequest{
+		ChatId:  helpers.ToRawID(chatID),
+		UserIds: rawUserIds,
+	})
+	if err != nil {
+		return &model.InternalError{Message: err.Error()}, nil
+	}
+
+	return &model.SuccessResult{Success: resp.Success}, nil
+}
+
 // SendTypingEvent is the resolver for the sendTypingEvent field.
 func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string, typing bool) (bool, error) {
 	authID := middleware.GetUserID(ctx)
@@ -143,12 +183,12 @@ func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error
 
 	resp, err := r.ChatClient.GetMyChats(ctx, &chatv1.GetMyChatsRequest{UserId: authID})
 	if err != nil {
-		return &model.InternalError{Message: err.Error()}, nil
+		return &model.InternalError{Message: "failed to load chats"}, nil
 	}
 
 	chats := make([]*model.Chat, 0, len(resp.Chats))
 	for _, c := range resp.Chats {
-		if enriched, err := r.Enricher.EnrichChat(ctx, authID, c); err == nil {
+		if enriched, err := r.Enricher.EnrichChat(ctx, authID, c); err == nil && enriched != nil {
 			chats = append(chats, enriched)
 		}
 	}
@@ -174,8 +214,18 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 		Slug:   slug,
 		UserId: authID,
 	})
+
 	if err != nil {
-		return &model.NotFoundError{Message: "chat not found"}, nil
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.NotFound:
+				return &model.NotFoundError{Message: "chat not found"}, nil
+			case codes.PermissionDenied:
+				return &model.ForbiddenError{Message: "access denied"}, nil
+			}
+		}
+		return &model.InternalError{Message: "internal error"}, nil
 	}
 
 	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
@@ -203,18 +253,11 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 				if !ok {
 					return
 				}
-
 				var c model.Chat
 				if err := json.Unmarshal([]byte(msg.Payload), &c); err != nil {
 					continue
 				}
-
-				if c.ID == "" {
-					continue
-				}
-
 				c.ID = helpers.EncodeGlobalID("Chat", helpers.ToRawID(c.ID))
-
 				select {
 				case chatChan <- &c:
 				case <-ctx.Done():
@@ -240,7 +283,6 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 	go func() {
 		defer pubsub.Close()
 		defer close(deleteChan)
-
 		for {
 			select {
 			case <-ctx.Done():
@@ -257,7 +299,6 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 			}
 		}
 	}()
-
 	return deleteChan, nil
 }
 
@@ -278,14 +319,11 @@ func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<
 			if err != nil {
 				return
 			}
-
 			var payload model.TypingPayload
 			if err := json.Unmarshal([]byte(resp.Payload), &payload); err != nil {
 				continue
 			}
-
 			payload.UserID = helpers.EncodeGlobalID("User", helpers.ToRawID(payload.UserID))
-
 			select {
 			case out <- &payload:
 			case <-ctx.Done():
@@ -293,7 +331,6 @@ func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<
 			}
 		}
 	}()
-
 	return out, nil
 }
 
