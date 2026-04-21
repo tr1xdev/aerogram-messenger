@@ -13,13 +13,15 @@ type SearchedUser = NonNullable<SearchData["searchUsers"]>[number];
 interface ParticipantSelectorProps {
   isMulti?: boolean;
   onSelect: (ids: string[]) => void;
-  onBack: () => void;
+  onBack?: () => void;
+  excludeIds?: string[];
 }
 
 export function ParticipantSelector({
   isMulti,
   onSelect,
   onBack,
+  excludeIds = [],
 }: ParticipantSelectorProps): ReactElement {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedQuery, setDebouncedQuery] = useState<string>("");
@@ -46,7 +48,9 @@ export function ParticipantSelector({
     );
   };
 
-  const users: readonly SearchedUser[] = data?.searchUsers ?? [];
+  const users: readonly SearchedUser[] = (data?.searchUsers ?? []).filter(
+    (u: SearchedUser): boolean => !excludeIds.includes(u.id),
+  );
 
   return (
     <div className="space-y-4 py-4">
@@ -68,20 +72,25 @@ export function ParticipantSelector({
             (user: SearchedUser): ReactElement => (
               <button
                 key={user.id}
+                type="button"
                 onClick={(): void => toggleUser(user.id)}
                 className="flex w-full items-center gap-3 rounded-lg p-2 transition-colors hover:bg-accent text-left"
               >
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={user.photoUrl ?? undefined} />
                   <AvatarFallback>
-                    {user.firstName?.[0] || user.username?.[0] || "?"}
+                    {(
+                      user.firstName?.[0] ||
+                      user.username?.[0] ||
+                      "?"
+                    ).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 overflow-hidden">
-                  <p className="text-sm font-medium leading-none truncate">
+                  <p className="text-sm font-bold leading-none truncate">
                     {user.firstName} {user.lastName ?? ""}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                  <p className="text-[10px] text-muted-foreground mt-1 truncate uppercase font-medium">
                     {user.username ? `@${user.username}` : ""}
                   </p>
                 </div>
@@ -93,9 +102,8 @@ export function ParticipantSelector({
               </button>
             ),
           )}
-
           {debouncedQuery && users.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground py-8">
+            <p className="text-center text-xs text-muted-foreground py-8 font-bold uppercase">
               No users found
             </p>
           )}
@@ -103,12 +111,18 @@ export function ParticipantSelector({
       </ScrollArea>
 
       <div className="flex gap-3 pt-2 border-t">
-        <Button variant="ghost" className="flex-1" onClick={onBack}>
-          Back
-        </Button>
+        {onBack && (
+          <Button
+            variant="ghost"
+            className="flex-1 text-[10px] font-black uppercase"
+            onClick={onBack}
+          >
+            Back
+          </Button>
+        )}
         {isMulti && (
           <Button
-            className="flex-[2]"
+            className="flex-1 text-[10px] font-black uppercase"
             disabled={selected.length === 0}
             onClick={(): void => onSelect(selected)}
           >

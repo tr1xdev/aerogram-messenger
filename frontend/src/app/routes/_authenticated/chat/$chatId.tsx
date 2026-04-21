@@ -191,15 +191,23 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }, [messagesFromHistory]);
 
   useEffect((): void | (() => void) => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const handleVisibilityChange = (): void => {
       if (document.visibilityState === "visible") {
-        checkAndMarkRead();
-        markAsRead();
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout((): void => {
+          checkAndMarkRead();
+          markAsRead();
+        }, 100);
       }
     };
+
     window.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleVisibilityChange);
+
     return (): void => {
+      clearTimeout(timeoutId);
       window.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleVisibilityChange);
     };
@@ -305,13 +313,22 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   return (
     <div className="flex flex-col h-full bg-background w-full overflow-hidden">
       <ChatHeader
+        id={chatId}
         title={chatNode?.title}
         photoUrl={chatNode?.photoUrl ?? undefined}
-        userRef={chatNode?.type === "PRIVATE" ? partnerUser : null}
+        userRef={
+          (chatNode?.type as string) === "PRIVATE" ||
+          (chatNode?.type as string) === "DIRECT"
+            ? partnerUser
+            : null
+        }
         totalUnread={totalUnread}
-        meId={me?.id}
         isLoading={isInitialLoading}
-        type={chatNode?.type as "DIRECT" | "GROUP" | "CHANNEL" | undefined}
+        type={
+          ((chatNode?.type as string) === "DIRECT"
+            ? "PRIVATE"
+            : chatNode?.type) as "PRIVATE" | "GROUP" | "CHANNEL"
+        }
         membersCount={chatNode?.membersCount ?? 0}
       />
 
