@@ -32,6 +32,10 @@ type Error interface {
 	GetMessage() string
 }
 
+type InviteResult interface {
+	IsInviteResult()
+}
+
 type MessageHistoryResult interface {
 	IsMessageHistoryResult()
 }
@@ -70,19 +74,21 @@ type AuthPayload struct {
 }
 
 type Chat struct {
-	ID               string        `json:"id"`
-	Type             ChatType      `json:"type"`
-	Slug             *string       `json:"slug,omitempty"`
-	Title            string        `json:"title"`
-	PhotoURL         *string       `json:"photoUrl,omitempty"`
-	MembersCount     int           `json:"membersCount"`
-	UnreadCount      int           `json:"unreadCount"`
-	MyReadSequence   int64         `json:"myReadSequence"`
-	LastReadSequence int64         `json:"lastReadSequence"`
-	IsPinned         bool          `json:"isPinned"`
-	LastMessage      *Message      `json:"lastMessage,omitempty"`
-	Members          []*ChatMember `json:"members,omitempty"`
-	CreatedAt        string        `json:"createdAt"`
+	ID               string           `json:"id"`
+	Type             ChatType         `json:"type"`
+	Slug             *string          `json:"slug,omitempty"`
+	Title            string           `json:"title"`
+	PhotoURL         *string          `json:"photoUrl,omitempty"`
+	MembersCount     int              `json:"membersCount"`
+	UnreadCount      int              `json:"unreadCount"`
+	MyReadSequence   int64            `json:"myReadSequence"`
+	LastReadSequence int64            `json:"lastReadSequence"`
+	IsPinned         bool             `json:"isPinned"`
+	CanWrite         bool             `json:"canWrite"`
+	Permissions      *ChatPermissions `json:"permissions"`
+	LastMessage      *Message         `json:"lastMessage,omitempty"`
+	Members          []*ChatMember    `json:"members,omitempty"`
+	CreatedAt        string           `json:"createdAt"`
 }
 
 func (Chat) IsNode()            {}
@@ -100,7 +106,16 @@ func (ChatList) IsMyChatsResult() {}
 
 type ChatMember struct {
 	User             *dbgen.User `json:"user"`
+	Role             string      `json:"role"`
 	LastReadSequence int64       `json:"lastReadSequence"`
+}
+
+type ChatPermissions struct {
+	CanSendMessage    bool `json:"canSendMessage"`
+	CanInviteUsers    bool `json:"canInviteUsers"`
+	CanEditMetadata   bool `json:"canEditMetadata"`
+	CanDeleteMessages bool `json:"canDeleteMessages"`
+	CanAssignAdmins   bool `json:"canAssignAdmins"`
 }
 
 type CreateBotPayload struct {
@@ -124,6 +139,8 @@ func (ForbiddenError) IsPinChatResult() {}
 
 func (ForbiddenError) IsDeleteChatResult() {}
 
+func (ForbiddenError) IsInviteResult() {}
+
 func (ForbiddenError) IsError()                {}
 func (this ForbiddenError) GetMessage() string { return this.Message }
 
@@ -142,6 +159,8 @@ func (InternalError) IsCreateChatResult() {}
 func (InternalError) IsPinChatResult() {}
 
 func (InternalError) IsDeleteChatResult() {}
+
+func (InternalError) IsInviteResult() {}
 
 func (InternalError) IsError()                {}
 func (this InternalError) GetMessage() string { return this.Message }
@@ -220,6 +239,8 @@ func (SuccessResult) IsPinChatResult() {}
 
 func (SuccessResult) IsDeleteChatResult() {}
 
+func (SuccessResult) IsInviteResult() {}
+
 type TypingPayload struct {
 	UserID   string `json:"userId"`
 	IsTyping bool   `json:"isTyping"`
@@ -247,6 +268,8 @@ type ValidationError struct {
 }
 
 func (ValidationError) IsCreateChatResult() {}
+
+func (ValidationError) IsInviteResult() {}
 
 func (ValidationError) IsError()                {}
 func (this ValidationError) GetMessage() string { return this.Message }

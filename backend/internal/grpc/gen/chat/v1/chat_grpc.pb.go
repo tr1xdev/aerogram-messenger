@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ChatService_CreateChat_FullMethodName = "/chat.v1.ChatService/CreateChat"
-	ChatService_GetMyChats_FullMethodName = "/chat.v1.ChatService/GetMyChats"
-	ChatService_PinChat_FullMethodName    = "/chat.v1.ChatService/PinChat"
-	ChatService_GetChat_FullMethodName    = "/chat.v1.ChatService/GetChat"
-	ChatService_DeleteChat_FullMethodName = "/chat.v1.ChatService/DeleteChat"
+	ChatService_CreateChat_FullMethodName   = "/chat.v1.ChatService/CreateChat"
+	ChatService_GetMyChats_FullMethodName   = "/chat.v1.ChatService/GetMyChats"
+	ChatService_PinChat_FullMethodName      = "/chat.v1.ChatService/PinChat"
+	ChatService_GetChat_FullMethodName      = "/chat.v1.ChatService/GetChat"
+	ChatService_DeleteChat_FullMethodName   = "/chat.v1.ChatService/DeleteChat"
+	ChatService_InviteToChat_FullMethodName = "/chat.v1.ChatService/InviteToChat"
 )
 
 // ChatServiceClient is the client API for ChatService service.
@@ -35,6 +36,7 @@ type ChatServiceClient interface {
 	PinChat(ctx context.Context, in *PinChatRequest, opts ...grpc.CallOption) (*PinChatResponse, error)
 	GetChat(ctx context.Context, in *GetChatRequest, opts ...grpc.CallOption) (*GetChatResponse, error)
 	DeleteChat(ctx context.Context, in *DeleteChatRequest, opts ...grpc.CallOption) (*DeleteChatResponse, error)
+	InviteToChat(ctx context.Context, in *InviteToChatRequest, opts ...grpc.CallOption) (*InviteToChatResponse, error)
 }
 
 type chatServiceClient struct {
@@ -95,6 +97,16 @@ func (c *chatServiceClient) DeleteChat(ctx context.Context, in *DeleteChatReques
 	return out, nil
 }
 
+func (c *chatServiceClient) InviteToChat(ctx context.Context, in *InviteToChatRequest, opts ...grpc.CallOption) (*InviteToChatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InviteToChatResponse)
+	err := c.cc.Invoke(ctx, ChatService_InviteToChat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChatServiceServer is the server API for ChatService service.
 // All implementations must embed UnimplementedChatServiceServer
 // for forward compatibility.
@@ -104,6 +116,7 @@ type ChatServiceServer interface {
 	PinChat(context.Context, *PinChatRequest) (*PinChatResponse, error)
 	GetChat(context.Context, *GetChatRequest) (*GetChatResponse, error)
 	DeleteChat(context.Context, *DeleteChatRequest) (*DeleteChatResponse, error)
+	InviteToChat(context.Context, *InviteToChatRequest) (*InviteToChatResponse, error)
 	mustEmbedUnimplementedChatServiceServer()
 }
 
@@ -128,6 +141,9 @@ func (UnimplementedChatServiceServer) GetChat(context.Context, *GetChatRequest) 
 }
 func (UnimplementedChatServiceServer) DeleteChat(context.Context, *DeleteChatRequest) (*DeleteChatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteChat not implemented")
+}
+func (UnimplementedChatServiceServer) InviteToChat(context.Context, *InviteToChatRequest) (*InviteToChatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InviteToChat not implemented")
 }
 func (UnimplementedChatServiceServer) mustEmbedUnimplementedChatServiceServer() {}
 func (UnimplementedChatServiceServer) testEmbeddedByValue()                     {}
@@ -240,6 +256,24 @@ func _ChatService_DeleteChat_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChatService_InviteToChat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InviteToChatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).InviteToChat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_InviteToChat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).InviteToChat(ctx, req.(*InviteToChatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ChatService_ServiceDesc is the grpc.ServiceDesc for ChatService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +300,10 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteChat",
 			Handler:    _ChatService_DeleteChat_Handler,
+		},
+		{
+			MethodName: "InviteToChat",
+			Handler:    _ChatService_InviteToChat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
