@@ -24,17 +24,18 @@ import { useMarkDialog } from "@/features/chat/lib";
 import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
-import { MessageSquare, AlertCircle, ArrowLeft } from "lucide-react";
-import type {
-  Message,
-  Chat,
-  User,
-  ChatMember,
-} from "@/entities/chat/model/types";
+import { AlertCircle, ArrowLeft } from "lucide-react";
+import type { Message, User, ChatMember } from "@/entities/chat/model/types";
 import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generated__/useMarkDialog_chat.graphql";
 import type { useMessageActionsSendMutation$data } from "@/features/chat/lib/messages/__generated__/useMessageActionsSendMutation.graphql";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 import type { chatHeader_user$key } from "@/features/chat/ui/__generated__/chatHeader_user.graphql";
+import type { useChatsDetailsQuery$data } from "@/features/chat/lib/chat/__generated__/useChatsDetailsQuery.graphql";
+
+type ChatNode = Extract<
+  useChatsDetailsQuery$data["chat"],
+  { readonly __typename: "Chat" }
+>;
 
 interface ExtendedUser extends Omit<User, "lastName"> {
   lastName?: string | null;
@@ -76,20 +77,15 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const chatsData: MyChatsResponse = useMyChats();
 
   const me: User | undefined = meData?.me as unknown as User | undefined;
-  const chatRaw: ChatDetailsResponse["chat"] = chatData.chat;
+  const chatRaw = chatData.chat;
+  const isChatType: boolean = chatRaw?.__typename === "Chat";
+  const chatNode: ChatNode | null = isChatType ? (chatRaw as ChatNode) : null;
 
   const partnerUser = useMemo((): chatHeader_user$key | null => {
-    if (chatRaw?.__typename !== "Chat" || !chatRaw.members || !me) return null;
-    const partner = chatRaw.members.find((m): boolean => m.user?.id !== me.id);
+    if (!chatNode?.members || !me) return null;
+    const partner = chatNode.members.find((m): boolean => m.user?.id !== me.id);
     return (partner?.user as unknown as chatHeader_user$key) ?? null;
-  }, [chatRaw, me]);
-
-  const isChatType: boolean = chatRaw?.__typename === "Chat";
-  const chat: Chat | undefined = isChatType
-    ? (chatRaw as unknown as Chat)
-    : undefined;
-
-  const chatError: unknown = !isChatType ? chatRaw : null;
+  }, [chatNode, me]);
 
   const { messages: messagesFromHistory, isLoading: historyLoading } =
     useChatHistory(chatId);
@@ -97,8 +93,10 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const { sendMessage, editMessage, markAsRead } = useMessageActions(chatId);
   const { handleKeyPress, stopTyping } = useSendTyping(chatId);
 
+  const canWrite: boolean = chatNode ? chatNode.canWrite : true;
   const isInitialLoading: boolean = isFirstLoad && historyLoading;
-  const isNotFound: boolean = !chat && !isInitialLoading && !!chatError;
+  const isNotFound: boolean =
+    !chatNode && !isInitialLoading && chatRaw?.__typename !== "InternalError";
 
   const lastSequence: number = useMemo((): number => {
     if (!messagesFromHistory || messagesFromHistory.length === 0) return 0;
@@ -115,13 +113,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   );
 
   useEffect((): void | (() => void) => {
-    if (!historyLoading && chat) {
+    if (!historyLoading && chatNode) {
       const timer: ReturnType<typeof setTimeout> = setTimeout((): void => {
         setIsFirstLoad(false);
       }, 100);
       return (): void => clearTimeout(timer);
     }
-  }, [historyLoading, chat]);
+  }, [historyLoading, chatNode]);
 
   useEffect((): (() => void) => {
     setActiveChatId(chatId);
@@ -163,30 +161,23 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   );
 
   const totalUnread: number = useMemo((): number => {
-    const myChats: MyChatsResponse["myChats"] = chatsData.myChats;
-    if (myChats?.__typename === "ChatList") {
-      return (myChats.chats ?? []).reduce(
-        (
-          acc: number,
-          c: { readonly id: string; readonly unreadCount?: number | null },
-        ): number => {
-          const unread: number = c.unreadCount ?? 0;
-          return c.id === chatId ? acc : acc + unread;
-        },
-        0,
-      );
+    const myChatsResult = chatsData.myChats;
+    if (myChatsResult?.__typename === "ChatList") {
+      return myChatsResult.chats.reduce((acc: number, c): number => {
+        const unread: number = c.unreadCount;
+        return c.id === chatId ? acc : acc + unread;
+      }, 0);
     }
     return 0;
-  }, [chatsData, chatId]);
+  }, [chatsData.myChats, chatId]);
 
   const isBotChat: boolean = useMemo((): boolean => {
-    if (!chat?.members || !me) return false;
-    const members: ChatMember[] = chat.members as ChatMember[];
-    const otherMember: ChatMember | undefined = members.find(
-      (m: ChatMember): boolean => m.user.id !== me.id,
+    if (!chatNode?.members || !me) return false;
+    const otherMember = chatNode.members.find(
+      (m): boolean => m.user.id !== me.id,
     );
     return otherMember?.user.isBot ?? false;
-  }, [chat, me]);
+  }, [chatNode, me]);
 
   const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
     const rawMessages: Message[] = (messagesFromHistory ??
@@ -314,26 +305,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   return (
     <div className="flex flex-col h-full bg-background w-full overflow-hidden">
       <ChatHeader
-        title={chatRaw?.__typename === "Chat" ? chatRaw.title : undefined}
-        photoUrl={
-          chatRaw?.__typename === "Chat"
-            ? (chatRaw.photoUrl ?? undefined)
-            : undefined
-        }
-        userRef={
-          chatRaw?.__typename === "Chat" && chatRaw.type === "PRIVATE"
-            ? partnerUser
-            : null
-        }
+        title={chatNode?.title}
+        photoUrl={chatNode?.photoUrl ?? undefined}
+        userRef={chatNode?.type === "PRIVATE" ? partnerUser : null}
         totalUnread={totalUnread}
         meId={me?.id}
         isLoading={isInitialLoading}
-        type={
-          chatRaw?.__typename === "Chat"
-            ? (chatRaw.type as "DIRECT" | "GROUP" | "CHANNEL")
-            : undefined
-        }
-        membersCount={chatRaw?.__typename === "Chat" ? chatRaw.membersCount : 0}
+        type={chatNode?.type as "DIRECT" | "GROUP" | "CHANNEL" | undefined}
+        membersCount={chatNode?.membersCount ?? 0}
       />
 
       <main className="flex-1 relative min-h-0 bg-background overflow-hidden">
@@ -342,24 +321,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
             <Skeleton className="h-10 w-[60%] self-end rounded-2xl" />
             <Skeleton className="h-10 w-[50%] self-start rounded-2xl" />
           </div>
-        ) : allMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-            <div className="relative mb-6">
-              <div className="relative h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center border">
-                <MessageSquare className="h-10 w-10 text-muted-foreground/40" />
-              </div>
-            </div>
-            <h3 className="text-lg font-semibold mb-2">
-              {isBotChat ? `Chat with ${chat?.title}` : "No messages yet"}
-            </h3>
-          </div>
         ) : (
           <MessageList
             chatId={chatId}
             messages={allMessages}
-            members={(chat?.members as ChatMember[]) ?? []}
+            members={(chatNode?.members as unknown as ChatMember[]) ?? []}
             myId={me?.id}
-            lastReadSequence={chat?.lastReadSequence ?? 0}
+            lastReadSequence={Number(chatNode?.lastReadSequence) || 0}
             onMarkRead={markAsRead}
             onReply={handleReplyInitiate}
             onEdit={handleEditInitiate}
@@ -379,6 +347,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           replyingTo={replyingTo}
           editingMessage={editingMessage}
           onCancelAction={cancelAction}
+          canWrite={canWrite}
         />
       )}
     </div>

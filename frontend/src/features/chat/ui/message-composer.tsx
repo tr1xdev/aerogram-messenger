@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { X, Pencil, Reply, ArrowUp, Paperclip } from "lucide-react";
+import { X, Pencil, Reply, ArrowUp, Paperclip, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,6 +24,7 @@ interface MessageComposerProps {
   onCancelAction: () => void;
   isBot: boolean;
   isEmpty: boolean;
+  canWrite: boolean;
 }
 
 export const MessageComposer = memo(function MessageComposer({
@@ -37,6 +38,7 @@ export const MessageComposer = memo(function MessageComposer({
   onCancelAction,
   isBot,
   isEmpty,
+  canWrite,
 }: MessageComposerProps): ReactNode {
   const activeAction: Message | null = editingMessage || replyingTo;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -122,12 +124,12 @@ export const MessageComposer = memo(function MessageComposer({
     (e: KeyboardEvent<HTMLTextAreaElement>): void => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        if (input.trim().length > 0 && !disabled) {
+        if (input.trim().length > 0 && !disabled && canWrite) {
           handleSendAndStopTyping();
         }
       }
     },
-    [input, disabled, handleSendAndStopTyping],
+    [input, disabled, canWrite, handleSendAndStopTyping],
   );
 
   const handleAttachmentClick = useCallback((): void => {
@@ -177,7 +179,16 @@ export const MessageComposer = memo(function MessageComposer({
           )}
         </AnimatePresence>
 
-        {showStartButton ? (
+        {!canWrite ? (
+          <div className="flex items-center justify-center w-full px-1 h-10 bg-muted/20 rounded-xl border border-dashed border-border/60">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              <span className="text-sm font-medium">
+                Writing messages is restricted
+              </span>
+            </div>
+          </div>
+        ) : showStartButton ? (
           <div className="flex justify-center w-full px-1">
             <Button
               onClick={handleStartBot}
@@ -194,6 +205,7 @@ export const MessageComposer = memo(function MessageComposer({
               type="button"
               size="icon"
               onClick={handleAttachmentClick}
+              disabled={disabled}
               className="h-[38px] w-[38px] rounded-full shrink-0 bg-muted/40 text-muted-foreground hover:text-primary transition-colors"
             >
               <Paperclip className="h-5 w-5" />

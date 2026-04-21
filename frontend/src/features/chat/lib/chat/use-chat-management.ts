@@ -5,6 +5,7 @@ import type { useChatManagementSearchQuery } from "./__generated__/useChatManage
 import type { useChatManagementCreateMutation } from "./__generated__/useChatManagementCreateMutation.graphql";
 import type { useChatManagementPinMutation } from "./__generated__/useChatManagementPinMutation.graphql";
 import type { useChatManagementDeleteMutation } from "./__generated__/useChatManagementDeleteMutation.graphql";
+import type { useChatManagementInviteMutation } from "./__generated__/useChatManagementInviteMutation.graphql";
 import type {
   useChatManagementCreateComplexMutation,
   ChatType,
@@ -116,6 +117,23 @@ const deleteChatMutation = graphql`
   }
 `;
 
+const inviteToChatMutation = graphql`
+  mutation useChatManagementInviteMutation($chatID: ID!, $userIds: [ID!]!) {
+    inviteToChat(chatID: $chatID, userIds: $userIds) {
+      __typename
+      ... on SuccessResult {
+        success
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
+
 export function useSearchUsers(
   username: string,
 ): useChatManagementSearchQuery["response"] | null {
@@ -141,6 +159,8 @@ export function useChatActions(chatId?: string) {
   const [pin] = useMutation<useChatManagementPinMutation>(pinChatMutation);
   const [remove] =
     useMutation<useChatManagementDeleteMutation>(deleteChatMutation);
+  const [invite] =
+    useMutation<useChatManagementInviteMutation>(inviteToChatMutation);
 
   const updateStoreAfterCreate = (
     store: RecordSourceSelectorProxy,
@@ -249,10 +269,23 @@ export function useChatActions(chatId?: string) {
     });
   };
 
+  const inviteUsers = (userIds: string[]): void => {
+    if (!chatId) return;
+    invite({
+      variables: { chatID: chatId, userIds },
+      onCompleted: (response): void => {
+        const res = response.inviteToChat;
+        if (res.__typename === "SuccessResult") toast.success("Users invited");
+        else if ("message" in res) toast.error(res.message);
+      },
+    });
+  };
+
   return {
     createChat,
     createGroupOrChannel,
     togglePin,
     deleteChat,
+    inviteUsers,
   };
 }
