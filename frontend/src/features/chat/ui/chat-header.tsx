@@ -94,6 +94,13 @@ export const ChatHeader = memo(function ChatHeader({
     return photoUrl || user?.photoUrl || undefined;
   }, [user?.photoUrl, photoUrl]);
 
+  const showVerifiedBadge: boolean = useMemo((): boolean => {
+    if (type === "PRIVATE") {
+      return user?.isVerified ?? false;
+    }
+    return false;
+  }, [type, user?.isVerified]);
+
   const renderInfo = (): ReactNode => (
     <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
       <UserAvatar
@@ -102,13 +109,13 @@ export const ChatHeader = memo(function ChatHeader({
         size={40}
         className="border border-border/40"
       />
-      <div className="flex flex-col min-w-0">
+      <div className="flex flex-col min-w-0 py-0.5">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[15px] font-bold truncate leading-none">
+          <span className="text-[15px] font-bold truncate leading-tight">
             {title}
           </span>
-          {(user?.isVerified || type === "CHANNEL") && (
-            <MdVerified className="text-[#2196f3] shrink-0 text-[16px]" />
+          {showVerifiedBadge && (
+            <MdVerified className="text-[#2196f3] shrink-0 text-[16px] self-center" />
           )}
         </div>
         <span

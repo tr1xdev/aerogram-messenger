@@ -84,24 +84,24 @@ export function ChatMenuItem(props: ChatMenuItemProps): ReactNode {
   );
 
   const otherUser = otherMember?.user;
-  const chatTitle = chat.title;
+  const chatTitle: string = chat.title || "";
 
   const displayName: string = useMemo((): string => {
-    if (otherUser) {
+    if (chat.type === "PRIVATE" && otherUser) {
       const first: string = otherUser.firstName?.trim() || "";
       const last: string = otherUser.lastName?.trim() || "";
       const full: string = `${first} ${last}`.trim();
-      return full || otherUser.username || "Chat";
+      return full || otherUser.username || chatTitle || "Chat";
     }
     return chatTitle || "Chat";
-  }, [otherUser, chatTitle]);
+  }, [chat.type, otherUser, chatTitle]);
 
   const avatarUrl: string | undefined = useMemo((): string | undefined => {
     if (chat.type === "PRIVATE") {
       return otherUser?.photoUrl || undefined;
     }
     return chat.photoUrl || undefined;
-  }, [chat.type, chat.photoUrl, otherUser?.photoUrl]);
+  }, [chat.type, chat.photoUrl, otherUser]);
 
   const lastMessage = chat.lastMessage;
   const isMe: boolean = lastMessage?.sender?.id === myId;
@@ -109,7 +109,7 @@ export function ChatMenuItem(props: ChatMenuItemProps): ReactNode {
   const isOnline: boolean = otherUser?.status === "online";
 
   const showSenderName: boolean =
-    chat.type === "GROUP" || chat.type === "CHANNEL" || isMe;
+    chat.type !== "CHANNEL" && (chat.type === "GROUP" || isMe);
 
   const senderName: string | null = useMemo((): string | null => {
     if (!showSenderName || !sender) return null;
@@ -142,7 +142,7 @@ export function ChatMenuItem(props: ChatMenuItemProps): ReactNode {
                     size={56}
                     className="border border-border/40"
                   />
-                  {isOnline && (
+                  {chat.type === "PRIVATE" && isOnline && (
                     <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500 z-10" />
                   )}
                 </div>

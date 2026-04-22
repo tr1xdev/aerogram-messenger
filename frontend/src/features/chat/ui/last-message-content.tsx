@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -70,8 +70,8 @@ const previewComponents: Components = {
 
 export function LastMessageContent({
   message,
-}: LastMessageContentProps): React.ReactNode {
-  const content = useMemo((): React.ReactNode => {
+}: LastMessageContentProps): ReactNode {
+  const content: ReactNode = useMemo((): ReactNode => {
     const text: string | undefined | null = message?.text;
     if (!text) return null;
 
