@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useState, useMemo } from "react";
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import {
   Plus,
@@ -7,8 +7,9 @@ import {
   Image as ImageIcon,
   Users,
 } from "lucide-react";
+import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -84,45 +85,110 @@ export function GroupContent({
   isPreview?: boolean;
 }): ReactNode {
   const data = useLazyLoadQuery<groupContentQuery>(GroupQuery, { id });
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState<boolean>(false);
   const { inviteUsers } = useChatActions(id);
-
   const [commitUpdateRole] = useMutation(UpdateRoleMutation);
   const [commitRemove] = useMutation(RemoveMemberMutation);
 
   const chat = data.chat;
+
+  const sortedMembers = useMemo(() => {
+    if (!chat || chat.__typename !== "Chat" || !chat.members) return [];
+
+    const getWeight = (role: string): number => {
+      if (role === "owner") return 3;
+      if (role === "admin") return 2;
+      return 1;
+    };
+
+    return [...chat.members].sort(
+      (a, b): number => getWeight(b.role) - getWeight(a.role),
+    );
+  }, [chat]);
+
   if (!chat || chat.__typename !== "Chat") return null;
 
-  const isSelfAdmin = chat.myRole === "owner" || chat.myRole === "admin";
+  const isSelfAdmin: boolean =
+    chat.myRole === "owner" || chat.myRole === "admin";
 
-  const handleUpdateRole = (userID: string, currentRole: string) => {
-    const newRole = currentRole === "admin" ? "member" : "admin";
-    commitUpdateRole({ variables: { chatID: id, userID, role: newRole } });
+  const handleUpdateRole = (userID: string, currentRole: string): void => {
+    const newRole: string = currentRole === "admin" ? "member" : "admin";
+
+    commitUpdateRole({
+      variables: { chatID: id, userID, role: newRole },
+      optimisticResponse: {
+        updateMemberRole: {
+          __typename: "SuccessResult",
+          success: true,
+        },
+      },
+      updater: (store: RecordSourceSelectorProxy): void => {
+        const chatRecord: RecordProxy | null = store.get(id) ?? null;
+        if (!chatRecord) return;
+        const members: readonly RecordProxy[] | null =
+          chatRecord.getLinkedRecords("members") ?? null;
+        if (!members) return;
+
+        members.forEach((member: RecordProxy): void => {
+          const user: RecordProxy | null =
+            member.getLinkedRecord("user") ?? null;
+          if (user && user.getDataID() === userID) {
+            member.setValue(newRole, "role");
+          }
+        });
+      },
+    });
   };
 
-  const handleRemoveMember = (userID: string) => {
-    commitRemove({ variables: { chatID: id, userID } });
+  const handleRemoveMember = (userID: string): void => {
+    commitRemove({
+      variables: { chatID: id, userID },
+      optimisticResponse: {
+        removeChatMember: {
+          __typename: "SuccessResult",
+          success: true,
+        },
+      },
+      updater: (store: RecordSourceSelectorProxy): void => {
+        const chatRecord: RecordProxy | null = store.get(id) ?? null;
+        if (!chatRecord) return;
+
+        const members: readonly RecordProxy[] | null =
+          chatRecord.getLinkedRecords("members") ?? null;
+        if (members) {
+          const nextMembers: RecordProxy[] = members.filter(
+            (m: RecordProxy): boolean =>
+              (m.getLinkedRecord("user") ?? null)?.getDataID() !== userID,
+          );
+          chatRecord.setLinkedRecords(nextMembers, "members");
+
+          const currentCount = chatRecord.getValue("membersCount");
+          if (typeof currentCount === "number") {
+            chatRecord.setValue(Math.max(0, currentCount - 1), "membersCount");
+          }
+        }
+      },
+    });
   };
 
   return (
     <div className="flex flex-col h-full bg-background select-none">
-      {/* Header Banner */}
       <div className="relative h-32 bg-gradient-to-b from-primary/10 to-background">
         <div className="absolute inset-0 bg-grid-white/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
       </div>
 
-      <div className="px-8 pb-8 -mt-12 relative z-10">
+      <div className="px-8 pb-8 -mt-12 relative z-10 flex-1 flex flex-col min-h-0">
         <div className="flex justify-between items-end">
-          <Avatar className="h-28 w-28 border-[6px] border-background shadow-2xl rounded-[32px]">
-            <AvatarImage src={chat.photoUrl ?? ""} className="object-cover" />
-            <AvatarFallback className="text-3xl font-bold bg-secondary text-secondary-foreground">
-              {chat.title?.[0]?.toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            src={chat.photoUrl ?? null}
+            fallback={chat.title}
+            size={112}
+            className="h-28 w-28 border-[6px] border-background shadow-2xl rounded-[32px] object-cover"
+          />
 
           {!isPreview && chat.permissions?.canInviteUsers && (
             <Button
-              onClick={() => setIsInviteOpen(true)}
+              onClick={(): void => setIsInviteOpen(true)}
               className="rounded-2xl font-bold px-6 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4 mr-2 stroke-[3]" />
@@ -149,8 +215,11 @@ export function GroupContent({
         </div>
 
         {!isPreview && (
-          <Tabs defaultValue="members" className="mt-10">
-            <TabsList className="w-full justify-start bg-transparent border-b rounded-none h-auto p-0 gap-8">
+          <Tabs
+            defaultValue="members"
+            className="mt-10 flex-1 flex flex-col min-h-0"
+          >
+            <TabsList className="w-full justify-start bg-transparent border-b rounded-none h-auto p-0 gap-8 shrink-0">
               <TabsTrigger
                 value="members"
                 className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-1 pb-3 bg-transparent font-bold text-sm transition-none"
@@ -167,69 +236,90 @@ export function GroupContent({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent
-              value="members"
-              className="mt-6 focus-visible:outline-none"
-            >
-              <ScrollArea className="h-[320px]">
-                <div className="grid gap-1">
-                  {chat.members?.map((m) => (
-                    <ContextMenu key={m.user.id}>
-                      <ContextMenuTrigger>
-                        <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-secondary/50 transition-all cursor-pointer group active:bg-secondary/80">
-                          <Avatar className="h-11 w-11 rounded-2xl shadow-sm">
-                            <AvatarImage src={m.user.photoUrl ?? ""} />
-                            <AvatarFallback className="font-bold text-xs">
-                              {m.user.firstName?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
+            <div className="flex-1 min-h-0 mt-6">
+              <TabsContent
+                value="members"
+                className="h-full m-0 focus-visible:outline-none"
+              >
+                <ScrollArea className="h-full">
+                  <div className="grid gap-1 pr-4">
+                    {sortedMembers.map(
+                      (m): ReactNode => (
+                        <ContextMenu key={m.user.id}>
+                          <ContextMenuTrigger>
+                            <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-secondary/50 transition-all cursor-pointer group active:bg-secondary/80">
+                              <UserAvatar
+                                src={m.user.photoUrl ?? null}
+                                fallback={
+                                  m.user.firstName || m.user.displayName || "?"
+                                }
+                                userId={m.user.id}
+                                size={44}
+                                className="h-11 w-11 rounded-2xl shadow-sm"
+                              />
 
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-foreground/90">
-                                {m.user.displayName || m.user.firstName}
-                              </span>
-                              {m.role !== "member" && (
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                                  {m.role}
-                                </span>
-                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-semibold text-foreground/90 truncate mr-2">
+                                    {m.user.displayName || m.user.firstName}
+                                  </span>
+                                  {m.role !== "member" && (
+                                    <span className="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
+                                      {m.role}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-tighter mt-0.5">
+                                  {m.role === "member" ? "Participant" : m.role}
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-xs text-muted-foreground font-medium mt-0.5">
-                              online
-                            </p>
-                          </div>
-                        </div>
-                      </ContextMenuTrigger>
+                          </ContextMenuTrigger>
 
-                      {isSelfAdmin && m.role !== "owner" && (
-                        <ContextMenuContent className="w-64 rounded-xl p-1.5 shadow-xl border-muted/40">
-                          <ContextMenuItem
-                            className="rounded-lg font-semibold text-sm py-2 px-3 gap-3"
-                            onClick={() => handleUpdateRole(m.user.id, m.role)}
-                          >
-                            <Shield className="w-4 h-4 text-muted-foreground" />
-                            {m.role === "admin"
-                              ? "Dismiss as Admin"
-                              : "Make Group Admin"}
-                          </ContextMenuItem>
+                          {isSelfAdmin && m.role !== "owner" && (
+                            <ContextMenuContent className="w-64 rounded-xl p-1.5 shadow-xl border-muted/40">
+                              <ContextMenuItem
+                                className="rounded-lg font-semibold text-sm py-2 px-3 gap-3"
+                                onClick={(): void =>
+                                  handleUpdateRole(m.user.id, m.role)
+                                }
+                              >
+                                <Shield className="w-4 h-4 text-muted-foreground" />
+                                {m.role === "admin"
+                                  ? "Dismiss as Admin"
+                                  : "Make Group Admin"}
+                              </ContextMenuItem>
 
-                          <ContextMenuSeparator className="my-1" />
+                              <ContextMenuSeparator className="my-1" />
 
-                          <ContextMenuItem
-                            className="rounded-lg font-semibold text-sm py-2 px-3 gap-3 text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onClick={() => handleRemoveMember(m.user.id)}
-                          >
-                            <UserMinus className="w-4 h-4" />
-                            Remove from Group
-                          </ContextMenuItem>
-                        </ContextMenuContent>
-                      )}
-                    </ContextMenu>
-                  ))}
+                              <ContextMenuItem
+                                className="rounded-lg font-semibold text-sm py-2 px-3 gap-3 text-destructive focus:text-destructive focus:bg-destructive/10"
+                                onClick={(): void =>
+                                  handleRemoveMember(m.user.id)
+                                }
+                              >
+                                <UserMinus className="w-4 h-4" />
+                                Remove from Group
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          )}
+                        </ContextMenu>
+                      ),
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent
+                value="media"
+                className="h-full m-0 focus-visible:outline-none"
+              >
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 border-2 border-dashed border-muted/20 rounded-[32px]">
+                  <ImageIcon className="w-12 h-12 mb-4 opacity-20" />
+                  <p className="text-sm font-medium">No media found</p>
                 </div>
-              </ScrollArea>
-            </TabsContent>
+              </TabsContent>
+            </div>
           </Tabs>
         )}
       </div>
@@ -244,11 +334,11 @@ export function GroupContent({
           <div className="px-8 pb-8">
             <ParticipantSelector
               isMulti
-              onSelect={(uids) => {
+              onSelect={(uids: string[]): void => {
                 inviteUsers(uids);
                 setIsInviteOpen(false);
               }}
-              excludeIds={chat.members?.map((m) => m.user.id) ?? []}
+              excludeIds={chat.members?.map((m): string => m.user.id) ?? []}
             />
           </div>
         </DialogContent>

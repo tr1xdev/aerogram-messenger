@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import {
   Image as ImageIcon,
@@ -8,7 +8,7 @@ import {
   ShieldOff,
   Crown,
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import type { RecordSourceSelectorProxy } from "relay-runtime";
+import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
 import type { channelContentQuery } from "./__generated__/channelContentQuery.graphql";
 
 const ChannelQuery = graphql`
@@ -71,42 +71,48 @@ export function ChannelContent({
 
   const chat = data.chat;
 
+  const sortedMembers = useMemo(() => {
+    if (!chat || chat.__typename !== "Chat" || !chat.members) return [];
+
+    const getRoleWeight = (role: string): number => {
+      switch (role) {
+        case "owner":
+          return 3;
+        case "admin":
+          return 2;
+        default:
+          return 1;
+      }
+    };
+
+    return [...chat.members].sort(
+      (a, b): number => getRoleWeight(b.role) - getRoleWeight(a.role),
+    );
+  }, [chat]);
+
   if (!chat || chat.__typename !== "Chat") {
     return null;
   }
 
   const chatId: string = chat.id;
-  const myRole: string = chat.myRole;
-  const isSelfAdmin: boolean = myRole === "owner" || myRole === "admin";
-
-  const getRoleWeight = (role: string): number => {
-    switch (role) {
-      case "owner":
-        return 3;
-      case "admin":
-        return 2;
-      default:
-        return 1;
-    }
-  };
-
-  const sortedMembers = [...(chat.members ?? [])].sort(
-    (a, b) => getRoleWeight(b.role) - getRoleWeight(a.role),
-  );
+  const isSelfAdmin: boolean =
+    chat.myRole === "owner" || chat.myRole === "admin";
 
   const applyRoleUpdate = (
     store: RecordSourceSelectorProxy,
     userID: string,
     newRole: string,
   ): void => {
-    const chatRecord = store.get(chatId);
+    const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
     if (!chatRecord) return;
 
-    const members = chatRecord.getLinkedRecords("members");
+    const members: readonly RecordProxy[] | null =
+      chatRecord.getLinkedRecords("members") ?? null;
     if (!members) return;
 
-    members.forEach((memberProxy) => {
-      const userProxy = memberProxy.getLinkedRecord("user");
+    members.forEach((memberProxy: RecordProxy): void => {
+      const userProxy: RecordProxy | null =
+        memberProxy.getLinkedRecord("user") ?? null;
       if (userProxy?.getDataID() === userID) {
         memberProxy.setValue(newRole, "role");
       }
@@ -124,8 +130,10 @@ export function ChannelContent({
           success: true,
         },
       },
-      optimisticUpdater: (store) => applyRoleUpdate(store, userID, newRole),
-      updater: (store) => applyRoleUpdate(store, userID, newRole),
+      optimisticUpdater: (store: RecordSourceSelectorProxy): void =>
+        applyRoleUpdate(store, userID, newRole),
+      updater: (store: RecordSourceSelectorProxy): void =>
+        applyRoleUpdate(store, userID, newRole),
     });
   };
 
@@ -137,12 +145,12 @@ export function ChannelContent({
 
       <div className="px-6 pb-6 -mt-16 relative z-10 flex-1 flex flex-col min-h-0">
         <div className="flex items-end gap-5">
-          <Avatar className="h-32 w-32 border-[4px] border-background shadow-xl rounded-[40px] shrink-0">
-            <AvatarImage src={chat.photoUrl ?? ""} className="object-cover" />
-            <AvatarFallback className="text-4xl font-bold bg-muted text-muted-foreground">
-              {chat.title?.[0]?.toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            src={chat.photoUrl ?? null}
+            fallback={chat.title}
+            size={128}
+            className="h-32 w-32 border-[4px] border-background shadow-xl rounded-[40px] shrink-0 object-cover"
+          />
           <div className="mb-2 min-w-0 flex-1">
             <h3 className="text-2xl font-bold tracking-tight text-foreground truncate">
               {chat.title}
@@ -183,102 +191,102 @@ export function ChannelContent({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent
-              value="members"
-              className="mt-4 flex-1 min-h-0 focus-visible:outline-none"
-            >
-              <ScrollArea className="h-full pr-2">
-                <div className="grid gap-0.5 pb-6">
-                  {sortedMembers.map((m) => {
-                    const isOwner: boolean = m.role === "owner";
-                    const isAdmin: boolean = m.role === "admin";
-                    const isMe: boolean = m.role === myRole;
+            <div className="flex-1 min-h-0 mt-4">
+              <TabsContent
+                value="members"
+                className="h-full m-0 focus-visible:outline-none"
+              >
+                <ScrollArea className="h-full">
+                  <div className="grid gap-0.5 pb-6 pr-4">
+                    {sortedMembers.map((m): ReactNode => {
+                      const isOwner: boolean = m.role === "owner";
+                      const isAdmin: boolean = m.role === "admin";
 
-                    return (
-                      <ContextMenu key={m.user.id}>
-                        <ContextMenuTrigger>
-                          <div className="flex items-center gap-4 p-2.5 rounded-xl transition-all duration-200 hover:bg-secondary/40 group cursor-default">
-                            <Avatar className="h-10 w-10 rounded-xl shadow-sm shrink-0">
-                              <AvatarImage src={m.user.photoUrl ?? ""} />
-                              <AvatarFallback className="font-bold text-xs bg-secondary">
-                                {m.user.firstName?.[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="text-[14px] font-semibold truncate text-foreground/90 leading-none">
-                                    {m.user.displayName || m.user.firstName}
-                                  </span>
-                                  {isOwner && (
-                                    <Crown className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-                                  )}
-                                  {isAdmin && !isOwner && (
-                                    <Shield className="w-3 h-3 text-primary shrink-0" />
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {isMe && (
-                                    <Badge
-                                      variant="default"
-                                      className="h-4 px-1 text-[9px] uppercase font-bold tracking-tight"
+                      return (
+                        <ContextMenu key={m.user.id}>
+                          <ContextMenuTrigger>
+                            <div className="flex items-center gap-4 p-2.5 rounded-xl transition-all duration-200 hover:bg-secondary/40 group cursor-default">
+                              <UserAvatar
+                                src={m.user.photoUrl ?? null}
+                                fallback={
+                                  m.user.firstName || m.user.displayName || "?"
+                                }
+                                userId={m.user.id}
+                                size={40}
+                                className="h-10 w-10 rounded-xl shadow-sm shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-[14px] font-semibold truncate text-foreground/90 leading-none">
+                                      {m.user.displayName || m.user.firstName}
+                                    </span>
+                                    {isOwner && (
+                                      <Crown className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
+                                    )}
+                                    {isAdmin && !isOwner && (
+                                      <Shield className="w-3 h-3 text-primary shrink-0" />
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span
+                                      className={`text-[10px] font-bold uppercase tracking-wider ${
+                                        isOwner
+                                          ? "text-yellow-600"
+                                          : isAdmin
+                                            ? "text-primary"
+                                            : "text-muted-foreground/60"
+                                      }`}
                                     >
-                                      You
-                                    </Badge>
-                                  )}
-                                  <span
-                                    className={`text-[10px] font-bold uppercase tracking-wider ${isOwner ? "text-yellow-600" : isAdmin ? "text-primary" : "text-muted-foreground/60"}`}
-                                  >
-                                    {m.role}
-                                  </span>
+                                      {m.role}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        </ContextMenuTrigger>
+                          </ContextMenuTrigger>
 
-                        {isSelfAdmin && !isOwner && (
-                          <ContextMenuContent className="w-52 rounded-xl shadow-xl border-muted/40">
-                            <ContextMenuItem
-                              className="gap-3 font-semibold py-2.5 cursor-pointer"
-                              onClick={() =>
-                                handleToggleAdmin(m.user.id, m.role)
-                              }
-                            >
-                              {isAdmin ? (
-                                <>
-                                  <ShieldOff className="w-4 h-4 text-muted-foreground" />
-                                  Dismiss admin
-                                </>
-                              ) : (
-                                <>
-                                  <Shield className="w-4 h-4 text-primary" />
-                                  Promote to admin
-                                </>
-                              )}
-                            </ContextMenuItem>
-                          </ContextMenuContent>
-                        )}
-                      </ContextMenu>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </TabsContent>
+                          {isSelfAdmin && !isOwner && (
+                            <ContextMenuContent className="w-52 rounded-xl shadow-xl border-muted/40">
+                              <ContextMenuItem
+                                className="gap-3 font-semibold py-2.5 cursor-pointer"
+                                onClick={(): void =>
+                                  handleToggleAdmin(m.user.id, m.role)
+                                }
+                              >
+                                {isAdmin ? (
+                                  <>
+                                    <ShieldOff className="w-4 h-4 text-muted-foreground" />
+                                    Dismiss admin
+                                  </>
+                                ) : (
+                                  <>
+                                    <Shield className="w-4 h-4 text-primary" />
+                                    Promote to admin
+                                  </>
+                                )}
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          )}
+                        </ContextMenu>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
 
-            <TabsContent
-              value="media"
-              className="mt-4 flex-1 min-h-0 focus-visible:outline-none"
-            >
-              <ScrollArea className="h-full">
-                <div className="flex flex-col items-center justify-center py-24 text-muted-foreground/40">
-                  <Megaphone className="w-12 h-12 mb-3" />
+              <TabsContent
+                value="media"
+                className="h-full m-0 focus-visible:outline-none"
+              >
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 border-2 border-dashed border-muted/20 rounded-[32px]">
+                  <Megaphone className="w-12 h-12 mb-3 opacity-20" />
                   <p className="text-sm font-semibold tracking-tight">
                     No media content yet
                   </p>
                 </div>
-              </ScrollArea>
-            </TabsContent>
+              </TabsContent>
+            </div>
           </Tabs>
         )}
       </div>

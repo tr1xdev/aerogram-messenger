@@ -25,6 +25,7 @@ interface MessageComposerProps {
   isBot: boolean;
   isEmpty: boolean;
   canWrite: boolean;
+  chatType?: "PRIVATE" | "GROUP" | "CHANNEL";
 }
 
 export const MessageComposer = memo(function MessageComposer({
@@ -39,6 +40,7 @@ export const MessageComposer = memo(function MessageComposer({
   isBot,
   isEmpty,
   canWrite,
+  chatType,
 }: MessageComposerProps): ReactNode {
   const activeAction: Message | null = editingMessage || replyingTo;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -136,7 +138,7 @@ export const MessageComposer = memo(function MessageComposer({
     fileInputRef.current?.click();
   }, []);
 
-  const showStartButton: boolean = isBot && isEmpty;
+  const showStartButton: boolean = isBot && isEmpty && chatType === "PRIVATE";
 
   return (
     <footer className="p-2 md:p-3 bg-background shrink-0 border-t border-border/40">
