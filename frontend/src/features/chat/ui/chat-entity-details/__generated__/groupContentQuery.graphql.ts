@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<acf258649d955e8cb82ebff4fb17b896>>
+ * @generated SignedSource<<f04c26f28012f175a4bda6d554b08eef>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -26,7 +26,9 @@ export type groupContentQuery$data = {
       };
     }> | null | undefined;
     readonly membersCount: number;
+    readonly myRole: string;
     readonly permissions: {
+      readonly canAssignAdmins: boolean;
       readonly canInviteUsers: boolean;
     };
     readonly photoUrl: string | null | undefined;
@@ -100,6 +102,13 @@ v5 = {
     {
       "alias": null,
       "args": null,
+      "kind": "ScalarField",
+      "name": "myRole",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "ChatPermissions",
       "kind": "LinkedField",
       "name": "permissions",
@@ -110,6 +119,13 @@ v5 = {
           "args": null,
           "kind": "ScalarField",
           "name": "canInviteUsers",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "canAssignAdmins",
           "storageKey": null
         }
       ],
@@ -218,16 +234,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "5a5f8a222076efbcf3fe19eeba377d4b",
+    "cacheID": "3d3b54f44bc557902d4d9e4041db11d9",
     "id": null,
     "metadata": {},
     "name": "groupContentQuery",
     "operationKind": "query",
-    "text": "query groupContentQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      id\n      title\n      photoUrl\n      membersCount\n      permissions {\n        canInviteUsers\n      }\n      members {\n        user {\n          id\n          displayName\n          firstName\n          photoUrl\n        }\n        role\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "query groupContentQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      id\n      title\n      photoUrl\n      membersCount\n      myRole\n      permissions {\n        canInviteUsers\n        canAssignAdmins\n      }\n      members {\n        user {\n          id\n          displayName\n          firstName\n          photoUrl\n        }\n        role\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "bdefe6414b2c26201c5743a3d6e722ef";
+(node as any).hash = "ce67de612c29b9dea146f9c43d8478fe";
 
 export default node;
