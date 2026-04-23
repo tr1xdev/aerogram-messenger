@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { useFragment, graphql } from "react-relay";
+import { useFragment, graphql, useMutation } from "react-relay";
 import { SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,16 @@ import type {
   chatMenuItem_chat$key,
   chatMenuItem_chat$data,
 } from "./__generated__/chatMenuItem_chat.graphql";
+
+const PinChatMutation = graphql`
+  mutation chatMenuItemPinChatMutation($id: ID!, $pinned: Boolean!) {
+    pinChat(id: $id, pinned: $pinned) {
+      ... on SuccessResult {
+        success
+      }
+    }
+  }
+`;
 
 interface ChatMenuItemProps {
   chat: chatMenuItem_chat$key;
@@ -71,8 +81,9 @@ export function ChatMenuItem(props: ChatMenuItemProps): ReactNode {
 
   const { isActive, myId } = props;
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false);
-  const { togglePin, deleteChat } = useChatActions(chat.id);
+  const { deleteChat } = useChatActions(chat.id);
   const { markAsRead } = useMessageActions(chat.id);
+  const [commitPin] = useMutation(PinChatMutation);
 
   const otherMember = useMemo(
     (): NonNullable<chatMenuItem_chat$data["members"]>[number] | undefined =>
@@ -119,6 +130,24 @@ export function ChatMenuItem(props: ChatMenuItemProps): ReactNode {
     const full: string = `${first} ${last}`.trim();
     return full || sender.username || null;
   }, [showSenderName, sender, isMe]);
+
+  const handleTogglePin = (pinned: boolean): void => {
+    commitPin({
+      variables: { id: chat.id, pinned },
+      optimisticUpdater: (store) => {
+        const record = store.get(chat.id);
+        if (record) {
+          record.setValue(pinned, "isPinned");
+        }
+      },
+      updater: (store) => {
+        const record = store.get(chat.id);
+        if (record) {
+          record.setValue(pinned, "isPinned");
+        }
+      },
+    });
+  };
 
   return (
     <>
@@ -218,9 +247,7 @@ export function ChatMenuItem(props: ChatMenuItemProps): ReactNode {
 
         <ContextMenuContent className="w-56 rounded-xl shadow-xl">
           <ContextMenuItem
-            onClick={(): void => {
-              togglePin(!chat.isPinned);
-            }}
+            onClick={(): void => handleTogglePin(!chat.isPinned)}
             className="gap-3 py-2.5 cursor-pointer text-sm font-medium"
           >
             {chat.isPinned ? (

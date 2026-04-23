@@ -180,7 +180,7 @@ function AppSidebarInner(): ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
-  const { chatId } = useParams({ strict: false });
+  const { chatId }: { chatId?: string } = useParams({ strict: false });
   const pathname: string = useRouterState().location.pathname;
 
   const isWsConnected: boolean = useConnectionStore(
@@ -474,7 +474,7 @@ function AppSidebarInner(): ReactElement {
           </div>
         </SidebarHeader>
 
-        <SidebarContent className="flex-1 overflow-y-auto scrollbar-hide">
+        <SidebarContent className="flex-1 overflow-y-auto scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex flex-col min-h-full pb-24 md:pb-0">
             <div className="px-4 py-2 sticky top-0 bg-background z-20">
               <div className="flex items-center gap-2 h-10">
@@ -806,7 +806,7 @@ function AppSidebarSkeleton(): ReactElement {
           <Skeleton className="h-5 w-16 mx-auto" />
         </div>
       </SidebarHeader>
-      <SidebarContent className="flex-1 overflow-y-auto">
+      <SidebarContent className="flex-1 overflow-y-auto scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="px-4 py-2 sticky top-0">
           <Skeleton className="h-10 w-full rounded-xl" />
         </div>
@@ -814,7 +814,7 @@ function AppSidebarSkeleton(): ReactElement {
           <Skeleton className="h-3 w-20 mb-4" />
           <div className="space-y-4">
             {Array.from({ length: 6 }).map(
-              (_, i: number): ReactElement => (
+              (_: unknown, i: number): ReactElement => (
                 <div key={i} className="flex items-center gap-3">
                   <Skeleton className="h-12 w-12 rounded-full shrink-0" />
                   <div className="space-y-2 flex-1">
@@ -841,7 +841,7 @@ function AppSidebarSkeleton(): ReactElement {
 }
 
 export function AppSidebar(): ReactElement | null {
-  const { chatId } = useParams({ strict: false });
+  const { chatId }: { chatId?: string } = useParams({ strict: false });
   const isMobile: boolean = useIsMobile();
 
   if (isMobile && chatId) {
