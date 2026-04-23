@@ -66,6 +66,8 @@ type Querier interface {
 	UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error
 	UpdateBot(ctx context.Context, arg UpdateBotParams) (User, error)
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
+	UpdateDialogMemberRole(ctx context.Context, arg UpdateDialogMemberRoleParams) error
+	UpdateDialogSettings(ctx context.Context, arg UpdateDialogSettingsParams) error
 	UpdateMemberPinStatus(ctx context.Context, arg UpdateMemberPinStatusParams) error
 	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error
 	UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error)

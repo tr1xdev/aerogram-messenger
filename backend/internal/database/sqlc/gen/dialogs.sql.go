@@ -18,9 +18,9 @@ INSERT INTO dialog_members (
     dialog_id, user_id, role, joined_at, notifications_on,
     is_pinned, last_read_sequence, is_hidden, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, NOW(), $4, $5, $6, FALSE, NOW(), NOW()
+    $1, $2, $3, NOW(), $4, $5, $6, $7, NOW(), NOW()
 ) ON CONFLICT (dialog_id, user_id) DO UPDATE SET
-    is_hidden = FALSE,
+    is_hidden = EXCLUDED.is_hidden,
     updated_at = NOW()
 `
 
@@ -31,6 +31,7 @@ type AddDialogMemberParams struct {
 	NotificationsOn  bool      `json:"notifications_on"`
 	IsPinned         bool      `json:"is_pinned"`
 	LastReadSequence int64     `json:"last_read_sequence"`
+	IsHidden         bool      `json:"is_hidden"`
 }
 
 func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams) error {
@@ -41,6 +42,7 @@ func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams
 		arg.NotificationsOn,
 		arg.IsPinned,
 		arg.LastReadSequence,
+		arg.IsHidden,
 	)
 	return err
 }
@@ -275,6 +277,7 @@ SELECT dm.dialog_id, dm.user_id, dm.role, dm.joined_at, dm.last_read_message_id,
 FROM dialog_members dm
 JOIN users u ON dm.user_id = u.id
 WHERE dm.dialog_id = $1
+  AND dm.is_hidden = false
 `
 
 type GetDialogMembersRow struct {
@@ -404,8 +407,10 @@ SELECT
     d.photo_url,
     d.members_count,
     d.is_verified,
+    d.is_active,
     d.last_message_id,
     d.last_message_at,
+    dm.role,
     dm.is_pinned,
     dm.last_read_sequence,
     m.content AS msg_content,
@@ -442,8 +447,10 @@ type GetUserDialogsRow struct {
 	PhotoUrl           sql.NullString `json:"photo_url"`
 	MembersCount       int32          `json:"members_count"`
 	IsVerified         bool           `json:"is_verified"`
+	IsActive           bool           `json:"is_active"`
 	LastMessageID      uuid.NullUUID  `json:"last_message_id"`
 	LastMessageAt      sql.NullTime   `json:"last_message_at"`
+	Role               string         `json:"role"`
 	IsPinned           bool           `json:"is_pinned"`
 	LastReadSequence   int64          `json:"last_read_sequence"`
 	MsgContent         sql.NullString `json:"msg_content"`
@@ -474,8 +481,10 @@ func (q *Queries) GetUserDialogs(ctx context.Context, authorID uuid.UUID) ([]Get
 			&i.PhotoUrl,
 			&i.MembersCount,
 			&i.IsVerified,
+			&i.IsActive,
 			&i.LastMessageID,
 			&i.LastMessageAt,
+			&i.Role,
 			&i.IsPinned,
 			&i.LastReadSequence,
 			&i.MsgContent,
@@ -595,6 +604,39 @@ WHERE dialog_id = $1
 
 func (q *Queries) UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, unhideDialogForMembers, dialogID)
+	return err
+}
+
+const updateDialogMemberRole = `-- name: UpdateDialogMemberRole :exec
+UPDATE dialog_members
+SET role = $3, updated_at = NOW()
+WHERE dialog_id = $1 AND user_id = $2
+`
+
+type UpdateDialogMemberRoleParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+	Role     string    `json:"role"`
+}
+
+func (q *Queries) UpdateDialogMemberRole(ctx context.Context, arg UpdateDialogMemberRoleParams) error {
+	_, err := q.db.ExecContext(ctx, updateDialogMemberRole, arg.DialogID, arg.UserID, arg.Role)
+	return err
+}
+
+const updateDialogSettings = `-- name: UpdateDialogSettings :exec
+UPDATE dialog_settings
+SET permissions = $2, updated_at = NOW()
+WHERE dialog_id = $1
+`
+
+type UpdateDialogSettingsParams struct {
+	DialogID    uuid.UUID `json:"dialog_id"`
+	Permissions int64     `json:"permissions"`
+}
+
+func (q *Queries) UpdateDialogSettings(ctx context.Context, arg UpdateDialogSettingsParams) error {
+	_, err := q.db.ExecContext(ctx, updateDialogSettings, arg.DialogID, arg.Permissions)
 	return err
 }
 

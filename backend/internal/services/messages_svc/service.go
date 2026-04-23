@@ -23,6 +23,10 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+const (
+	PermSendMessages = 1
+)
+
 type Server struct {
 	messagespb.UnimplementedMessagesServiceServer
 	db          *database.DB
@@ -57,34 +61,96 @@ func (s *Server) getUserID(ctx context.Context, reqID string) string {
 	return ""
 }
 
+func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID uuid.UUID, bit int64) (bool, error) {
+	dialog, err := s.db.Queries.GetDialogByID(ctx, dialogID)
+	if err != nil {
+		log.Printf("[CHECK-PERM] Dialog %s not found: %v", dialogID, err)
+		return false, status.Error(codes.NotFound, "chat not found")
+	}
+
+	if dialog.Type == "private" {
+		return true, nil
+	}
+
+	member, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: dialogID,
+		UserID:   userID,
+	})
+	if err != nil {
+		log.Printf("[CHECK-PERM] User %s is not a member of %s: %v", userID, dialogID, err)
+		return false, status.Error(codes.PermissionDenied, "not a member")
+	}
+
+	if member.Role == "owner" || member.Role == "admin" {
+		return true, nil
+	}
+
+	if dialog.Type == "channel" {
+		log.Printf("[CHECK-PERM] User %s is not admin in channel %s", userID, dialogID)
+		return false, status.Error(codes.PermissionDenied, "only admins can post in channels")
+	}
+
+	settings, err := s.db.Queries.GetDialogSettings(ctx, dialogID)
+	if err != nil {
+		return true, nil
+	}
+
+	if (settings.Permissions & bit) != 0 {
+		log.Printf("[CHECK-PERM] Action restricted by bitmask %d for user %s in chat %s", bit, userID, dialogID)
+		return false, status.Error(codes.PermissionDenied, "restricted action")
+	}
+
+	return true, nil
+}
+
 func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageRequest) (*messagespb.SendMessageResponse, error) {
 	senderIDStr := s.getUserID(ctx, req.SenderId)
+	log.Printf("[SEND-MESSAGE] Request from user %s to chat %s", senderIDStr, req.ChatId)
+
 	if senderIDStr == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
-	log.Printf("[MSG_SVC] Processing SendMessage from %s to chat %s", senderIDStr, req.ChatId)
-
-	if err := s.limiter.Check(ctx, "msg:send:"+senderIDStr, s.cfg.Send.Limit, s.cfg.Send.Window); err != nil {
-		return nil, status.Error(codes.ResourceExhausted, "too many messages")
-	}
-
 	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
+		log.Printf("[SEND-MESSAGE] Invalid ChatID: %v", err)
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
 	senderID, err := uuid.Parse(senderIDStr)
 	if err != nil {
+		log.Printf("[SEND-MESSAGE] Invalid SenderID: %v", err)
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
+	}
+
+	allowed, err := s.checkPermission(ctx, chatID, senderID, PermSendMessages)
+	if err != nil {
+		log.Printf("[SEND-MESSAGE] Permission check failed: %v", err)
+		return nil, err
+	}
+	if !allowed {
+		return nil, status.Error(codes.PermissionDenied, "no permission to send messages")
+	}
+
+	if err := s.limiter.Check(ctx, "msg:send:"+senderIDStr, s.cfg.Send.Limit, s.cfg.Send.Window); err != nil {
+		log.Printf("[SEND-MESSAGE] Rate limit exceeded for %s", senderIDStr)
+		return nil, status.Error(codes.ResourceExhausted, "too many messages")
+	}
+
+	var replyToID uuid.NullUUID
+	if req.ReplyToId != nil && *req.ReplyToId != "" {
+		if rUUID, err := uuid.Parse(*req.ReplyToId); err == nil {
+			replyToID = uuid.NullUUID{UUID: rUUID, Valid: true}
+		} else {
+			log.Printf("[SEND-MESSAGE] Warning: Invalid ReplyToID %s", *req.ReplyToId)
+		}
 	}
 
 	tx, err := s.db.Conn.BeginTx(ctx, nil)
 	if err != nil {
+		log.Printf("[SEND-MESSAGE] DB Transaction error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to begin transaction")
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+	defer tx.Rollback()
 
 	qtx := s.db.Queries.WithTx(tx)
 
@@ -95,64 +161,56 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		Content:      req.Text,
 		IsEncrypted:  false,
 		EncryptionIv: sql.NullString{Valid: false},
-		ReplyToID:    database.ToNullUUIDPtr(req.ReplyToId),
+		ReplyToID:    replyToID,
 		IsSystem:     false,
 	})
 	if err != nil {
-		log.Printf("[MSG_SVC] Error saving to DB: %v", err)
+		log.Printf("[SEND-MESSAGE] CreateMessage error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to save message")
 	}
 
-	_ = qtx.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
+	err = qtx.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
 		DialogID:         chatID,
 		UserID:           senderID,
 		LastReadSequence: msg.Sequence,
 	})
+	if err != nil {
+		log.Printf("[SEND-MESSAGE] UpdateReadSequence error: %v", err)
+		return nil, status.Error(codes.Internal, "failed to update read sequence")
+	}
 
-	_ = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
+	err = qtx.UpdateDialogLastMessage(ctx, dbgen.UpdateDialogLastMessageParams{
 		ID:            chatID,
-		LastMessageID: database.UUIDToNullUUID(msg.ID),
-		LastMessageAt: database.TimeToNullTime(msg.CreatedAt),
+		LastMessageID: uuid.NullUUID{UUID: msg.ID, Valid: true},
+		LastMessageAt: sql.NullTime{Time: msg.CreatedAt, Valid: true},
 	})
+	if err != nil {
+		log.Printf("[SEND-MESSAGE] UpdateDialogLastMessage error: %v", err)
+		return nil, status.Error(codes.Internal, "failed to update last message")
+	}
 
 	_ = qtx.UnhideDialogForMembers(ctx, chatID)
 
 	if err := tx.Commit(); err != nil {
+		log.Printf("[SEND-MESSAGE] Commit error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
-	log.Printf("[MSG_SVC] Message saved to DB with ID: %s", msg.ID)
-
 	protoMsg := s.mapDBToProto(msg)
-
-	marshaller := protojson.MarshalOptions{
-		UseProtoNames:   true,
-		EmitUnpopulated: true,
-	}
+	marshaller := protojson.MarshalOptions{UseProtoNames: true, EmitUnpopulated: true}
 	msgPayload, err := marshaller.Marshal(protoMsg)
 	if err == nil {
-		channel := "chat:" + req.ChatId
-		errPub := s.rdb.Publish(context.Background(), channel, msgPayload).Err()
-		if errPub != nil {
-			log.Printf("[MSG_SVC] Redis Publish Error (chat): %v", errPub)
-		} else {
-			log.Printf("[MSG_SVC] Successfully published to Redis channel: %s", channel)
-		}
+		s.rdb.Publish(context.Background(), "chat:"+req.ChatId, msgPayload)
 	}
 
-	readPayload := map[string]interface{}{
-		"chatId":       req.ChatId,
-		"userId":       senderIDStr,
-		"lastSequence": msg.Sequence,
-	}
+	readPayload := map[string]interface{}{"chatId": req.ChatId, "userId": senderIDStr, "lastSequence": msg.Sequence}
 	readData, _ := json.Marshal(readPayload)
-	_ = s.rdb.Publish(context.Background(), "chat:"+req.ChatId+":read", readData)
+	s.rdb.Publish(context.Background(), "chat:"+req.ChatId+":read", readData)
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
 	if err == nil {
 		protoChat := s.mapDBDialogToProto(dialog)
 		chatType := strings.ToUpper(strings.TrimPrefix(protoChat.Type.String(), "CHAT_TYPE_"))
-
 		chatNotification := map[string]interface{}{
 			"id":           protoChat.Id,
 			"title":        protoChat.Title,
@@ -161,16 +219,16 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 			"membersCount": protoChat.MembersCount,
 			"lastMessage":  protoMsg,
 		}
-
 		chatJson, _ := json.Marshal(chatNotification)
 		members, err := s.db.Queries.GetDialogMembers(ctx, chatID)
 		if err == nil {
 			for _, m := range members {
-				_ = s.rdb.Publish(context.Background(), "user_chats:"+m.UserID.String(), chatJson)
+				s.rdb.Publish(context.Background(), "user_chats:"+m.UserID.String(), chatJson)
 			}
 		}
 	}
 
+	log.Printf("[SEND-MESSAGE] Success: Message %s sent to chat %s", msg.ID, chatID)
 	return &messagespb.SendMessageResponse{Message: protoMsg}, nil
 }
 
@@ -179,27 +237,22 @@ func (s *Server) GetHistory(ctx context.Context, req *messagespb.GetHistoryReque
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
-
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 50
 	}
-
 	var beforeSeq int64
 	if req.BeforeSequence != nil {
 		beforeSeq = *req.BeforeSequence
 	}
-
 	msgs, err := s.messageRepo.GetHistory(ctx, cid, limit, int32(beforeSeq))
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to fetch history")
 	}
-
 	res := make([]*messagespb.Message, len(msgs))
 	for i, m := range msgs {
 		res[i] = s.mapHistoryRowToProto(m)
 	}
-
 	return &messagespb.GetHistoryResponse{Messages: res}, nil
 }
 
@@ -208,7 +261,6 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 	if userIDStr == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
-
 	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
@@ -221,12 +273,10 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid message id")
 	}
-
 	msg, err := s.messageRepo.GetByID(ctx, msgID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "message not found")
 	}
-
 	err = s.db.Queries.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
 		DialogID:         chatID,
 		UserID:           userID,
@@ -235,7 +285,6 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update read sequence")
 	}
-
 	return &messagespb.MarkAsReadResponse{Success: true}, nil
 }
 
@@ -244,7 +293,6 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 	if senderIDStr == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
-
 	id, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid message id")
@@ -253,7 +301,6 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
-
 	msg, err := s.messageRepo.UpdateExtended(ctx, dbgen.UpdateMessageExtendedParams{
 		ID:           id,
 		AuthorID:     sid,
@@ -263,11 +310,9 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update message")
 	}
-
 	protoMsg := s.mapDBToProto(msg)
 	msgPayload, _ := protojson.Marshal(protoMsg)
-	_ = s.rdb.Publish(context.Background(), "chat:"+msg.DialogID.String()+":updated", msgPayload)
-
+	s.rdb.Publish(context.Background(), "chat:"+msg.DialogID.String()+":updated", msgPayload)
 	return &messagespb.UpdateMessageResponse{Message: protoMsg}, nil
 }
 
@@ -276,7 +321,6 @@ func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessag
 	if senderIDStr == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
-
 	id, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid message id")
@@ -285,15 +329,13 @@ func (s *Server) DeleteMessage(ctx context.Context, req *messagespb.DeleteMessag
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
-
 	msg, err := s.messageRepo.GetByID(ctx, id)
 	if err == nil {
 		if err := s.messageRepo.Delete(ctx, id, sid); err != nil {
 			return nil, status.Error(codes.Internal, "failed to delete message")
 		}
-		_ = s.rdb.Publish(context.Background(), "chat:"+msg.DialogID.String()+":deleted", id.String())
+		s.rdb.Publish(context.Background(), "chat:"+msg.DialogID.String()+":deleted", id.String())
 	}
-
 	return &messagespb.DeleteMessageResponse{Success: true}, nil
 }
 
@@ -307,9 +349,7 @@ func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 		Sequence: m.Sequence,
 		IsEdited: m.IsEdited,
 		IsSystem: m.IsSystem,
-		Sender: &messagespb.User{
-			Id: m.AuthorID.String(),
-		},
+		Sender:   &messagespb.User{Id: m.AuthorID.String()},
 	}
 	if m.ReplyToID.Valid {
 		rid := m.ReplyToID.UUID.String()
@@ -344,11 +384,7 @@ func (s *Server) mapHistoryRowToProto(m dbgen.GetChatHistoryRow) *messagespb.Mes
 }
 
 func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatv1.Chat {
-	res := &chatv1.Chat{
-		Id:           d.ID.String(),
-		MembersCount: int32(d.MembersCount),
-		IsVerified:   d.IsVerified,
-	}
+	res := &chatv1.Chat{Id: d.ID.String(), MembersCount: int32(d.MembersCount), IsVerified: d.IsVerified}
 	if d.Name.Valid {
 		res.Title = d.Name.String
 	}

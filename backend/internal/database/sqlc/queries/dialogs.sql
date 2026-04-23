@@ -12,9 +12,9 @@ INSERT INTO dialog_members (
     dialog_id, user_id, role, joined_at, notifications_on,
     is_pinned, last_read_sequence, is_hidden, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, NOW(), $4, $5, $6, FALSE, NOW(), NOW()
+    $1, $2, $3, NOW(), $4, $5, $6, $7, NOW(), NOW()
 ) ON CONFLICT (dialog_id, user_id) DO UPDATE SET
-    is_hidden = FALSE,
+    is_hidden = EXCLUDED.is_hidden,
     updated_at = NOW();
 
 -- name: PinDialog :exec
@@ -43,8 +43,10 @@ SELECT
     d.photo_url,
     d.members_count,
     d.is_verified,
+    d.is_active,
     d.last_message_id,
     d.last_message_at,
+    dm.role,
     dm.is_pinned,
     dm.last_read_sequence,
     m.content AS msg_content,
@@ -86,7 +88,8 @@ WHERE dialog_id = $1;
 SELECT dm.*, u.is_bot
 FROM dialog_members dm
 JOIN users u ON dm.user_id = u.id
-WHERE dm.dialog_id = $1;
+WHERE dm.dialog_id = $1
+  AND dm.is_hidden = false;
 
 -- name: GetDialogMember :one
 SELECT * FROM dialog_members
@@ -152,3 +155,13 @@ LIMIT 1;
 -- name: GetDialogSettings :one
 SELECT * FROM dialog_settings
 WHERE dialog_id = $1 LIMIT 1;
+
+-- name: UpdateDialogMemberRole :exec
+UPDATE dialog_members
+SET role = $3, updated_at = NOW()
+WHERE dialog_id = $1 AND user_id = $2;
+
+-- name: UpdateDialogSettings :exec
+UPDATE dialog_settings
+SET permissions = $2, updated_at = NOW()
+WHERE dialog_id = $1;

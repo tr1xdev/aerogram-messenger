@@ -2,9 +2,8 @@ package chat_svc
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,6 +19,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+)
+
+const (
+	PermSendMessages = 1
+	PermSendMedia    = 2
+	PermAddMembers   = 4
+	PermPinMessages  = 8
+	PermChangeInfo   = 16
 )
 
 type Server struct {
@@ -54,6 +61,24 @@ func (s *Server) getUserID(ctx context.Context, reqID string) string {
 	return ""
 }
 
+func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID uuid.UUID, bit int32) (bool, error) {
+	member, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: dialogID,
+		UserID:   userID,
+	})
+	if err != nil {
+		return false, status.Error(codes.NotFound, "member not found")
+	}
+	if member.Role == "owner" || member.Role == "admin" {
+		return true, nil
+	}
+	settings, err := s.db.Queries.GetDialogSettings(ctx, dialogID)
+	if err != nil {
+		return true, nil
+	}
+	return (settings.Permissions & int64(bit)) == 0, nil
+}
+
 func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) (*chatpb.CreateChatResponse, error) {
 	creatorIDStr := s.getUserID(ctx, req.CreatorId)
 	if creatorIDStr == "" {
@@ -61,20 +86,16 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	}
 
 	if err := s.limiter.Check(ctx, "chat:create:"+creatorIDStr, s.cfg.Create.Limit, s.cfg.Create.Window); err != nil {
-		return nil, status.Error(codes.ResourceExhausted, "too many chat creation requests")
+		return nil, status.Error(codes.ResourceExhausted, "limit exceeded")
 	}
 
 	if req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
 		if len(req.ParticipantIds) != 2 {
-			return nil, status.Error(codes.InvalidArgument, "private chat must have exactly 2 participants")
+			return nil, status.Error(codes.InvalidArgument, "invalid participants count")
 		}
-		if req.ParticipantIds[0] == req.ParticipantIds[1] {
-			return nil, status.Error(codes.InvalidArgument, "cannot create a private chat with yourself")
-		}
-
 		existingDialog, err := s.dialogRepo.GetPrivateDialogByMembers(ctx, req.ParticipantIds[0], req.ParticipantIds[1])
 		if err == nil {
-			return &chatpb.CreateChatResponse{Chat: s.mapDBDialogToProto(existingDialog)}, nil
+			return &chatpb.CreateChatResponse{Chat: s.mapDBDialogToProto(existingDialog, 0, "member")}, nil
 		}
 	}
 
@@ -84,81 +105,65 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		return nil, status.Error(codes.InvalidArgument, "invalid creator id")
 	}
 
+	participantsMap := make(map[string]bool)
+	participantsMap[creatorIDStr] = true
+	for _, pid := range req.ParticipantIds {
+		participantsMap[pid] = true
+	}
+
 	dParams := dbgen.CreateDialogParams{
 		ID:           newID,
 		Type:         s.mapProtoTypeToDB(req.Type),
 		Name:         database.ToNullString(req.Title),
 		Username:     database.ToNullString(req.Slug),
-		PhotoUrl:     sql.NullString{Valid: false},
-		Bio:          sql.NullString{Valid: false},
-		Description:  sql.NullString{Valid: false},
-		InviteLink:   sql.NullString{Valid: false},
 		CreatorID:    uuid.NullUUID{UUID: creatorUUID, Valid: true},
-		MembersCount: int32(len(req.ParticipantIds)),
+		MembersCount: int32(len(participantsMap)),
 		IsActive:     true,
-		IsVerified:   false,
 	}
 
-	mParams := make([]dbgen.AddDialogMemberParams, len(req.ParticipantIds))
-	for i, pID := range req.ParticipantIds {
-		pUUID, err := uuid.Parse(pID)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, "invalid participant id")
-		}
-
+	mParams := make([]dbgen.AddDialogMemberParams, 0, len(participantsMap))
+	for pID := range participantsMap {
+		pUUID, _ := uuid.Parse(pID)
 		role := "member"
 		if pID == creatorIDStr {
 			role = "owner"
 		}
-		mParams[i] = dbgen.AddDialogMemberParams{
-			DialogID:         newID,
-			UserID:           pUUID,
-			Role:             role,
-			NotificationsOn:  true,
-			IsPinned:         false,
-			LastReadSequence: 0,
-		}
+		mParams = append(mParams, dbgen.AddDialogMemberParams{
+			DialogID:        newID,
+			UserID:          pUUID,
+			Role:            role,
+			NotificationsOn: true,
+		})
+	}
+
+	var defaultPerms int64 = 0
+	if req.Type == chatpb.ChatType_CHAT_TYPE_CHANNEL {
+		defaultPerms = PermSendMessages | PermSendMedia | PermAddMembers | PermPinMessages | PermChangeInfo
 	}
 
 	sParams := dbgen.CreateDialogSettingsParams{
-		DialogID:            newID,
-		Permissions:         0,
-		SlowModeDelay:       0,
-		IsHistoryHidden:     false,
-		IsSignaturesEnabled: false,
+		DialogID:    newID,
+		Permissions: defaultPerms,
 	}
 
 	if err := s.dialogRepo.CreateDialog(ctx, dParams, mParams, sParams); err != nil {
-		log.Printf("[CreateChat] DB Error: %v", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, "database error")
 	}
 
-	dialog, err := s.dialogRepo.GetDialogByID(ctx, newID.String())
-	if err != nil {
-		log.Printf("[CreateChat] Retrieval DB Error: %v", err)
-		return nil, status.Error(codes.Internal, "failed to retrieve created chat")
-	}
-	protoChat := s.mapDBDialogToProto(dialog)
-
-	chatType := strings.ToUpper(strings.TrimPrefix(req.Type.String(), "CHAT_TYPE_"))
-	displayTitle := protoChat.Title
-	if displayTitle == "" && req.Type == chatpb.ChatType_CHAT_TYPE_PRIVATE {
-		displayTitle = "New Chat"
-	}
+	dialog, _ := s.dialogRepo.GetDialogByID(ctx, newID.String())
+	protoChat := s.mapDBDialogToProto(dialog, defaultPerms, "owner")
+	protoChat.CanWrite = true
+	protoChat.Permissions = s.calculatePermissions(dialog.Type, defaultPerms, "owner")
 
 	notification := map[string]interface{}{
-		"id":           protoChat.Id,
-		"title":        displayTitle,
-		"type":         chatType,
-		"slug":         protoChat.Slug,
-		"membersCount": protoChat.MembersCount,
-		"isVerified":   protoChat.IsVerified,
-		"createdAt":    time.Now().Format(time.RFC3339),
-		"unreadCount":  0,
+		"id":        protoChat.Id,
+		"title":     protoChat.Title,
+		"type":      strings.ToUpper(strings.TrimPrefix(req.Type.String(), "CHAT_TYPE_")),
+		"createdAt": time.Now().Format(time.RFC3339),
 	}
 
 	payload, _ := json.Marshal(notification)
-	for _, pID := range req.ParticipantIds {
+	for pID := range participantsMap {
 		s.rdb.Publish(ctx, "user_chats:"+pID, payload)
 	}
 
@@ -175,226 +180,251 @@ func (s *Server) InviteToChat(ctx context.Context, req *chatpb.InviteToChatReque
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
-	iuid, err := uuid.Parse(inviterID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid inviter id")
+	iuid, _ := uuid.Parse(inviterID)
+
+	canInvite, err := s.checkPermission(ctx, did, iuid, PermAddMembers)
+	if err != nil || !canInvite {
+		return nil, status.Error(codes.PermissionDenied, "access denied")
 	}
 
-	canInvite, err := s.checkPermission(ctx, did, iuid, 2)
-	if err != nil {
-		return nil, err
-	}
-	if !canInvite {
-		return nil, status.Error(codes.PermissionDenied, "no permission to invite")
-	}
-
+	addedCount := 0
 	for _, targetID := range req.UserIds {
-		tuid, err := uuid.Parse(targetID)
-		if err != nil {
+		if targetID == inviterID {
 			continue
 		}
-
-		err = s.db.Queries.AddDialogMember(ctx, dbgen.AddDialogMemberParams{
-			DialogID:         did,
-			UserID:           tuid,
-			Role:             "member",
-			NotificationsOn:  true,
-			IsPinned:         false,
-			LastReadSequence: 0,
-		})
-		if err != nil {
-			log.Printf("[InviteToChat] DB Error adding member %s: %v", targetID, err)
-			continue
+		tuid, _ := uuid.Parse(targetID)
+		_, checkErr := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: tuid})
+		if checkErr != nil {
+			_ = s.db.Queries.AddDialogMember(ctx, dbgen.AddDialogMemberParams{
+				DialogID: did, UserID: tuid, Role: "member", NotificationsOn: true,
+			})
+			addedCount++
+			s.rdb.Publish(ctx, "user_chats:"+targetID, "{}")
 		}
+	}
 
-		s.rdb.Publish(ctx, "user_chats:"+targetID, "{}")
+	for i := 0; i < addedCount; i++ {
+		_ = s.db.Queries.IncrementMembersCount(ctx, did)
 	}
 
 	return &chatpb.InviteToChatResponse{Success: true}, nil
 }
 
-func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID uuid.UUID, bit int32) (bool, error) {
-	member, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
-		DialogID: dialogID,
-		UserID:   userID,
-	})
-	if err != nil {
-		return false, status.Error(codes.NotFound, "member not found")
+func (s *Server) JoinChatBySlug(ctx context.Context, req *chatpb.JoinChatBySlugRequest) (*chatpb.JoinChatBySlugResponse, error) {
+	userIDStr := s.getUserID(ctx, "")
+	if userIDStr == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
-	if member.Role == "owner" || member.Role == "admin" {
-		return true, nil
-	}
-
-	settings, err := s.db.Queries.GetDialogSettings(ctx, dialogID)
-	if err != nil {
-		return false, nil
-	}
-
-	return (settings.Permissions & int64(bit)) == 0, nil
-}
-
-func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chatpb.PinChatResponse, error) {
-	userID := s.getUserID(ctx, req.UserId)
-	if userID == "" {
-		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
-	}
-
-	uUUID, err := uuid.Parse(userID)
+	uID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid user id")
 	}
-	cUUID, err := uuid.Parse(req.ChatId)
+
+	slug := strings.TrimPrefix(req.Slug, "@")
+	dialog, err := s.dialogRepo.GetDialogByUsername(ctx, slug)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+		return nil, status.Error(codes.NotFound, "chat not found")
 	}
 
-	err = s.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
-		IsPinned: req.Pinned,
-		DialogID: cUUID,
-		UserID:   uUUID,
+	_, checkErr := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: dialog.ID,
+		UserID:   uID,
+	})
+	if checkErr == nil {
+		return &chatpb.JoinChatBySlugResponse{
+			ChatId:  dialog.ID.String(),
+			Success: true,
+		}, nil
+	}
+
+	err = s.db.Queries.AddDialogMember(ctx, dbgen.AddDialogMemberParams{
+		DialogID:        dialog.ID,
+		UserID:          uID,
+		Role:            "member",
+		NotificationsOn: true,
 	})
 	if err != nil {
-		log.Printf("[PinChat] DB Error: %v", err)
-		return nil, status.Error(codes.Internal, "failed to pin chat")
+		return nil, status.Error(codes.Internal, "failed to join")
 	}
 
-	return &chatpb.PinChatResponse{Success: true}, nil
+	_ = s.db.Queries.IncrementMembersCount(ctx, dialog.ID)
+	s.rdb.Publish(ctx, "user_chats:"+userIDStr, "{}")
+
+	return &chatpb.JoinChatBySlugResponse{
+		ChatId:  dialog.ID.String(),
+		Success: true,
+	}, nil
 }
 
-func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) (*chatpb.DeleteChatResponse, error) {
-	userID := s.getUserID(ctx, req.UserId)
-	if userID == "" {
-		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+func (s *Server) GetChatMembers(ctx context.Context, req *chatpb.GetChatMembersRequest) (*chatpb.GetChatMembersResponse, error) {
+	authID := s.getUserID(ctx, "")
+	if authID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
-	if err := s.limiter.Check(ctx, "chat:delete:"+userID, s.cfg.Delete.Limit, s.cfg.Delete.Window); err != nil {
-		return nil, status.Error(codes.ResourceExhausted, "too many chat deletion requests")
-	}
-
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid user id")
-	}
 	did, err := uuid.Parse(req.ChatId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
+	auid, _ := uuid.Parse(authID)
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "chat not found")
 	}
 
-	if req.ForEveryone {
-		isOwner := dialog.CreatorID.Valid && dialog.CreatorID.UUID == uid
-		isPrivate := dialog.Type == "private"
-
-		if isPrivate || isOwner {
-			err = s.db.Queries.DeleteDialog(ctx, did)
-			if err == nil {
-				s.rdb.Publish(ctx, "user_chats_deleted:"+req.ChatId, req.ChatId)
-			}
-		} else {
-			return nil, status.Error(codes.PermissionDenied, "only owner can delete for everyone")
-		}
-	} else {
-		err = s.db.Queries.HideDialogMember(ctx, dbgen.HideDialogMemberParams{
-			DialogID: did,
-			UserID:   uid,
-		})
-		if err == nil {
-			s.rdb.Publish(ctx, "user_chats_deleted:"+userID, req.ChatId)
-		}
-	}
-
+	member, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: auid})
 	if err != nil {
-		log.Printf("[DeleteChat] DB Error: %v", err)
-		return nil, status.Error(codes.Internal, "failed to delete chat")
+		return nil, status.Error(codes.PermissionDenied, "not a member")
 	}
 
-	return &chatpb.DeleteChatResponse{Success: true}, nil
+	if dialog.Type == "channel" && member.Role != "owner" && member.Role != "admin" {
+		return nil, status.Error(codes.PermissionDenied, "only admins can view channel members")
+	}
+
+	dbMembers, err := s.db.Queries.GetDialogMembers(ctx, did)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "database error")
+	}
+
+	settings, _ := s.db.Queries.GetDialogSettings(ctx, did)
+
+	sort.Slice(dbMembers, func(i, j int) bool {
+		roles := map[string]int{"owner": 0, "admin": 1, "member": 2}
+		return roles[dbMembers[i].Role] < roles[dbMembers[j].Role]
+	})
+
+	total := len(dbMembers)
+	start := min(int(req.Offset), total)
+	end := start + int(req.Limit)
+	if req.Limit == 0 {
+		end = start + 50
+	}
+	if end > total {
+		end = total
+	}
+
+	slice := dbMembers[start:end]
+	res := make([]*chatpb.ChatMember, 0, len(slice))
+	for _, m := range slice {
+		res = append(res, &chatpb.ChatMember{
+			UserId:      m.UserID.String(),
+			Role:        m.Role,
+			Permissions: s.calculatePermissions(dialog.Type, settings.Permissions, m.Role),
+		})
+	}
+
+	return &chatpb.GetChatMembersResponse{
+		Members:    res,
+		TotalCount: int32(total),
+	}, nil
 }
 
 func (s *Server) GetMyChats(ctx context.Context, req *chatpb.GetMyChatsRequest) (*chatpb.GetMyChatsResponse, error) {
 	userID := s.getUserID(ctx, req.UserId)
 	if userID == "" {
-		return nil, status.Error(codes.Unauthenticated, "unauthorized access")
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
 	dialogs, err := s.dialogRepo.GetUserDialogs(ctx, userID)
 	if err != nil {
-		log.Printf("[GetMyChats] DB Error: %v", err)
-		return nil, status.Error(codes.Internal, "failed to retrieve conversation list")
+		return nil, status.Error(codes.Internal, "retrieval failed")
 	}
 
 	res := make([]*chatpb.Chat, 0, len(dialogs))
 	for _, d := range dialogs {
-		res = append(res, s.mapGetUserDialogsRowToProto(d))
+		settings, _ := s.db.Queries.GetDialogSettings(ctx, d.ID)
+		proto := s.mapGetUserDialogsRowToProto(d)
+		proto.CanWrite = s.calculateCanWrite(d.Type, settings.Permissions, d.Role, d.IsActive)
+		proto.Permissions = s.calculatePermissions(d.Type, settings.Permissions, d.Role)
+		res = append(res, proto)
 	}
 
 	return &chatpb.GetMyChatsResponse{Chats: res}, nil
 }
 
 func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chatpb.GetChatResponse, error) {
+	userID := s.getUserID(ctx, req.UserId)
 	var dialog dbgen.Dialog
 	var err error
 
-	userID := s.getUserID(ctx, req.UserId)
-
 	if req.ChatId != nil && *req.ChatId != "" {
-		if _, uuidErr := uuid.Parse(*req.ChatId); uuidErr != nil {
-			return nil, status.Error(codes.InvalidArgument, "invalid chat uuid")
-		}
 		dialog, err = s.dialogRepo.GetDialogByID(ctx, *req.ChatId)
 	} else if req.Slug != nil && *req.Slug != "" {
 		slug, _ := strings.CutPrefix(*req.Slug, "@")
 		dialog, err = s.dialogRepo.GetDialogByUsername(ctx, slug)
-
 		if err != nil && userID != "" {
 			userRepo := repositories.NewUserRepository(s.db)
 			targetUser, userErr := userRepo.GetByUsername(ctx, slug)
-
 			if userErr == nil {
 				targetUserID := targetUser.ID.String()
-				existingDialog, diagErr := s.dialogRepo.GetPrivateDialogByMembers(ctx, userID, targetUserID)
+				existing, diagErr := s.dialogRepo.GetPrivateDialogByMembers(ctx, userID, targetUserID)
 				if diagErr == nil {
-					return &chatpb.GetChatResponse{
-						Chat: s.mapDBDialogToProto(existingDialog),
-					}, nil
+					dialog = existing
+				} else {
+					return &chatpb.GetChatResponse{Chat: &chatpb.Chat{
+						Id: targetUserID, Type: chatpb.ChatType_CHAT_TYPE_PRIVATE, Title: targetUser.FirstName,
+						MembersCount: 2, Slug: targetUser.Username.String, CanWrite: true,
+						Permissions: s.calculatePermissions("private", 0, "member"),
+					}}, nil
 				}
-
-				title := targetUser.FirstName
-				if targetUser.LastName.Valid {
-					title += " " + targetUser.LastName.String
-				}
-
-				chatRes := &chatpb.Chat{
-					Id:           targetUserID,
-					Type:         chatpb.ChatType_CHAT_TYPE_PRIVATE,
-					Title:        title,
-					MembersCount: 2,
-				}
-
-				if targetUser.Username.Valid {
-					chatRes.Slug = targetUser.Username.String
-				}
-
-				return &chatpb.GetChatResponse{Chat: chatRes}, nil
 			}
 		}
-	} else {
-		return nil, status.Error(codes.InvalidArgument, "chat_id or slug required")
 	}
 
 	if err != nil {
-		log.Printf("[GetChat] DB Error: %v", err)
 		return nil, status.Error(codes.NotFound, "chat not found")
 	}
 
-	return &chatpb.GetChatResponse{
-		Chat: s.mapDBDialogToProto(dialog),
-	}, nil
+	var role string = "guest"
+	var perms int64 = 0
+	if userID != "" {
+		uUUID, _ := uuid.Parse(userID)
+		m, getErr := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: dialog.ID, UserID: uUUID})
+		if getErr == nil {
+			role = m.Role
+		}
+		settings, setErr := s.db.Queries.GetDialogSettings(ctx, dialog.ID)
+		if setErr == nil {
+			perms = settings.Permissions
+		}
+	}
+
+	protoChat := s.mapDBDialogToProto(dialog, perms, role)
+	protoChat.CanWrite = s.calculateCanWrite(dialog.Type, perms, role, dialog.IsActive)
+	protoChat.Permissions = s.calculatePermissions(dialog.Type, perms, role)
+
+	return &chatpb.GetChatResponse{Chat: protoChat}, nil
+}
+
+func (s *Server) calculateCanWrite(chatType string, permissions int64, role string, isActive bool) bool {
+	if !isActive {
+		return false
+	}
+	if role == "owner" || role == "admin" {
+		return true
+	}
+	if chatType == "channel" || role == "guest" {
+		return false
+	}
+	return (permissions & PermSendMessages) == 0
+}
+
+func (s *Server) calculatePermissions(chatType string, permissions int64, role string) *chatpb.ChatPermissions {
+	var isAdmin bool = role == "owner" || role == "admin"
+	if chatType == "private" {
+		return &chatpb.ChatPermissions{CanSendMessage: true, CanInviteUsers: false, CanDeleteMessages: true}
+	}
+	return &chatpb.ChatPermissions{
+		CanSendMessage:    isAdmin || (permissions&PermSendMessages) == 0,
+		CanInviteUsers:    isAdmin || (permissions&PermAddMembers) == 0,
+		CanEditMetadata:   isAdmin,
+		CanDeleteMessages: isAdmin,
+		CanAssignAdmins:   role == "owner",
+		CanSendMedia:      isAdmin || (permissions&PermSendMedia) == 0,
+		CanPinMessages:    isAdmin || (permissions&PermPinMessages) == 0,
+	}
 }
 
 func (s *Server) mapProtoTypeToDB(t chatpb.ChatType) string {
@@ -408,28 +438,19 @@ func (s *Server) mapProtoTypeToDB(t chatpb.ChatType) string {
 	}
 }
 
-func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatpb.Chat {
-	if d.ID == uuid.Nil {
-		return &chatpb.Chat{}
-	}
-
-	res := &chatpb.Chat{
-		Id:           d.ID.String(),
-		MembersCount: int32(d.MembersCount),
-		IsVerified:   d.IsVerified,
-	}
-
+func (s *Server) mapDBDialogToProto(d dbgen.Dialog, perms int64, role string) *chatpb.Chat {
+	res := &chatpb.Chat{Id: d.ID.String(), MembersCount: int32(d.MembersCount), IsVerified: d.IsVerified, MyRole: role}
 	if d.Name.Valid {
 		res.Title = d.Name.String
 	}
 	if d.Username.Valid {
 		res.Slug = d.Username.String
 	}
-	if d.LastMessageID.Valid {
-		res.LastMessageId = d.LastMessageID.UUID.String()
-	}
 	if d.PhotoUrl.Valid {
 		res.PhotoUrl = d.PhotoUrl.String
+	}
+	if d.LastMessageID.Valid {
+		res.LastMessageId = d.LastMessageID.UUID.String()
 	}
 
 	switch d.Type {
@@ -440,43 +461,107 @@ func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatpb.Chat {
 	default:
 		res.Type = chatpb.ChatType_CHAT_TYPE_PRIVATE
 	}
-
 	return res
 }
 
 func (s *Server) mapGetUserDialogsRowToProto(row dbgen.GetUserDialogsRow) *chatpb.Chat {
 	res := s.mapDBDialogToProto(dbgen.Dialog{
-		ID:            row.ID,
-		Type:          row.Type,
-		Name:          row.Name,
-		Username:      row.Username,
-		MembersCount:  row.MembersCount,
-		LastMessageID: row.LastMessageID,
-		IsVerified:    row.IsVerified,
-		PhotoUrl:      row.PhotoUrl,
-	})
+		ID: row.ID, Type: row.Type, Name: row.Name, Username: row.Username,
+		MembersCount: row.MembersCount, IsVerified: row.IsVerified, PhotoUrl: row.PhotoUrl, LastMessageID: row.LastMessageID,
+	}, 0, row.Role)
 
 	res.IsPinned = row.IsPinned
 	res.UnreadCount = int32(row.UnreadCount)
 	res.LastReadSequence = row.LastReadSequence
 
 	if row.LastMessageID.Valid {
-		msgPb := &messagespb.Message{
+		res.LastMessage = &messagespb.Message{
 			Id:       row.LastMessageID.UUID.String(),
-			ChatId:   row.ID.String(),
 			Text:     row.MsgContent.String,
 			Sequence: row.MsgSequence.Int64,
 			SenderId: row.MsgAuthorID.UUID.String(),
 			SentAt:   row.MsgCreatedAt.Time.Format(time.RFC3339),
 		}
+	}
+	return res
+}
 
-		if row.MsgReplyToID.Valid {
-			rid := row.MsgReplyToID.UUID.String()
-			msgPb.ReplyToId = &rid
+func (s *Server) PinChat(ctx context.Context, req *chatpb.PinChatRequest) (*chatpb.PinChatResponse, error) {
+	userID := s.getUserID(ctx, req.UserId)
+	uUUID, _ := uuid.Parse(userID)
+	cUUID, _ := uuid.Parse(req.ChatId)
+	_ = s.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
+		IsPinned: req.Pinned, DialogID: cUUID, UserID: uUUID,
+	})
+	return &chatpb.PinChatResponse{Success: true}, nil
+}
+
+func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) (*chatpb.DeleteChatResponse, error) {
+	userID := s.getUserID(ctx, req.UserId)
+	uid, _ := uuid.Parse(userID)
+	did, _ := uuid.Parse(req.ChatId)
+
+	dialog, _ := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
+	member, _ := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: uid})
+
+	if req.ForEveryone {
+		if dialog.Type == "private" || member.Role == "owner" {
+			_ = s.db.Queries.DeleteDialog(ctx, did)
+			s.rdb.Publish(ctx, "chat_deleted:"+req.ChatId, "{}")
+			return &chatpb.DeleteChatResponse{Success: true}, nil
 		}
-
-		res.LastMessage = msgPb
+		return nil, status.Error(codes.PermissionDenied, "only owner can delete for everyone")
 	}
 
-	return res
+	_ = s.db.Queries.HideDialogMember(ctx, dbgen.HideDialogMemberParams{DialogID: did, UserID: uid})
+	return &chatpb.DeleteChatResponse{Success: true}, nil
+}
+
+func (s *Server) UpdateMemberRole(ctx context.Context, req *chatpb.UpdateMemberRoleRequest) (*chatpb.UpdateMemberRoleResponse, error) {
+	authID := s.getUserID(ctx, "")
+	auid, _ := uuid.Parse(authID)
+	did, _ := uuid.Parse(req.ChatId)
+	tuid, _ := uuid.Parse(req.TargetUserId)
+
+	admin, _ := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: auid})
+	if admin.Role != "owner" {
+		return nil, status.Error(codes.PermissionDenied, "only owner can change roles")
+	}
+
+	_ = s.db.Queries.UpdateDialogMemberRole(ctx, dbgen.UpdateDialogMemberRoleParams{
+		DialogID: did, UserID: tuid, Role: req.NewRole,
+	})
+
+	return &chatpb.UpdateMemberRoleResponse{Success: true}, nil
+}
+
+func (s *Server) UpdateChatPermissions(ctx context.Context, req *chatpb.UpdateChatPermissionsRequest) (*chatpb.UpdateChatPermissionsResponse, error) {
+	authID := s.getUserID(ctx, "")
+	auid, _ := uuid.Parse(authID)
+	did, _ := uuid.Parse(req.ChatId)
+
+	admin, _ := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: auid})
+	if admin.Role != "owner" && admin.Role != "admin" {
+		return nil, status.Error(codes.PermissionDenied, "insufficient permissions")
+	}
+
+	var bitmask int64 = 0
+	if !req.Permissions.CanSendMessage {
+		bitmask |= PermSendMessages
+	}
+	if !req.Permissions.CanInviteUsers {
+		bitmask |= PermAddMembers
+	}
+	if !req.Permissions.CanPinMessages {
+		bitmask |= PermPinMessages
+	}
+	if !req.Permissions.CanSendMedia {
+		bitmask |= PermSendMedia
+	}
+
+	_ = s.db.Queries.UpdateDialogSettings(ctx, dbgen.UpdateDialogSettingsParams{
+		DialogID: did, Permissions: bitmask,
+	})
+
+	return &chatpb.UpdateChatPermissionsResponse{Success: true}, nil
 }
