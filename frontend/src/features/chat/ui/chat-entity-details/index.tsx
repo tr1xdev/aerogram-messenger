@@ -16,6 +16,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { UserContent } from "./user-content";
 import { GroupContent } from "./group-content";
+import { ChannelContent } from "./channel-content";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChatEntityDetailsProps {
@@ -48,6 +49,14 @@ export function ChatEntityDetails({
     }
   };
 
+  const renderContent = (isPreview: boolean = false) => {
+    if (type === "PRIVATE")
+      return <UserContent userId={id} isPreview={isPreview} />;
+    if (type === "CHANNEL")
+      return <ChannelContent id={id} isPreview={isPreview} />;
+    return <GroupContent id={id} isPreview={isPreview} />;
+  };
+
   if (isMobile) return <div onClick={handleTriggerClick}>{children}</div>;
 
   return (
@@ -64,11 +73,7 @@ export function ChatEntityDetails({
           className="w-80 p-0 overflow-hidden border-border/50 shadow-2xl"
         >
           <Suspense fallback={<EntitySkeleton />}>
-            {type === "PRIVATE" ? (
-              <UserContent userId={id} isPreview />
-            ) : (
-              <GroupContent id={id} isPreview />
-            )}
+            {renderContent(true)}
           </Suspense>
         </PopoverContent>
       </Popover>
@@ -76,18 +81,18 @@ export function ChatEntityDetails({
       <DialogContent className="max-w-[480px] p-0 overflow-hidden border-none shadow-2xl bg-background">
         <VisuallyHidden>
           <DialogTitle>
-            {type === "PRIVATE" ? "User Profile" : "Group Details"}
+            {type === "PRIVATE"
+              ? "User Profile"
+              : type === "CHANNEL"
+                ? "Channel Details"
+                : "Group Details"}
           </DialogTitle>
           <DialogDescription>
             Detailed information about the selected entity
           </DialogDescription>
         </VisuallyHidden>
         <Suspense fallback={<EntitySkeleton />}>
-          {type === "PRIVATE" ? (
-            <UserContent userId={id} />
-          ) : (
-            <GroupContent id={id} />
-          )}
+          {renderContent(false)}
         </Suspense>
       </DialogContent>
     </Dialog>

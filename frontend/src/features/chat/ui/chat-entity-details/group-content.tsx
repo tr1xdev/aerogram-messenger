@@ -1,18 +1,26 @@
 import { type ReactNode, useState } from "react";
-import { graphql, useLazyLoadQuery } from "react-relay";
-import { Plus } from "lucide-react";
+import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
+import {
+  Plus,
+  Shield,
+  UserMinus,
+  Image as ImageIcon,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { ParticipantSelector } from "../new-chat-dialog/participant-selector";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useChatActions } from "../../lib/chat/use-chat-management";
 import type { groupContentQuery } from "./__generated__/groupContentQuery.graphql";
 
@@ -25,8 +33,10 @@ const GroupQuery = graphql`
         title
         photoUrl
         membersCount
+        myRole
         permissions {
           canInviteUsers
+          canAssignAdmins
         }
         members {
           user {
@@ -42,6 +52,30 @@ const GroupQuery = graphql`
   }
 `;
 
+const UpdateRoleMutation = graphql`
+  mutation groupContentUpdateRoleMutation(
+    $chatID: ID!
+    $userID: ID!
+    $role: String!
+  ) {
+    updateMemberRole(chatID: $chatID, userID: $userID, role: $role) {
+      ... on SuccessResult {
+        success
+      }
+    }
+  }
+`;
+
+const RemoveMemberMutation = graphql`
+  mutation groupContentRemoveMemberMutation($chatID: ID!, $userID: ID!) {
+    removeChatMember(chatID: $chatID, userID: $userID) {
+      ... on SuccessResult {
+        success
+      }
+    }
+  }
+`;
+
 export function GroupContent({
   id,
   isPreview,
@@ -49,90 +83,149 @@ export function GroupContent({
   id: string;
   isPreview?: boolean;
 }): ReactNode {
-  const data: groupContentQuery["response"] =
-    useLazyLoadQuery<groupContentQuery>(GroupQuery, { id });
-  const [isInviteOpen, setIsInviteOpen] = useState<boolean>(false);
+  const data = useLazyLoadQuery<groupContentQuery>(GroupQuery, { id });
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const { inviteUsers } = useChatActions(id);
+
+  const [commitUpdateRole] = useMutation(UpdateRoleMutation);
+  const [commitRemove] = useMutation(RemoveMemberMutation);
 
   const chat = data.chat;
   if (!chat || chat.__typename !== "Chat") return null;
 
-  const handleInvite = (userIds: string[]): void => {
-    inviteUsers(userIds);
-    setIsInviteOpen(false);
+  const isSelfAdmin = chat.myRole === "owner" || chat.myRole === "admin";
+
+  const handleUpdateRole = (userID: string, currentRole: string) => {
+    const newRole = currentRole === "admin" ? "member" : "admin";
+    commitUpdateRole({ variables: { chatID: id, userID, role: newRole } });
   };
 
-  const currentMemberIds: string[] = chat.members?.map((m) => m.user.id) ?? [];
+  const handleRemoveMember = (userID: string) => {
+    commitRemove({ variables: { chatID: id, userID } });
+  };
 
   return (
-    <div className="flex flex-col">
-      <div className="h-24 bg-gradient-to-br from-indigo-500/20 to-purple-500/30" />
-      <div className="px-6 pb-6">
-        <div className="flex justify-between items-end mb-4">
-          <Avatar className="h-24 w-24 border-4 border-background shadow-xl -mt-12">
+    <div className="flex flex-col h-full bg-background select-none">
+      {/* Header Banner */}
+      <div className="relative h-32 bg-gradient-to-b from-primary/10 to-background">
+        <div className="absolute inset-0 bg-grid-white/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
+      </div>
+
+      <div className="px-8 pb-8 -mt-12 relative z-10">
+        <div className="flex justify-between items-end">
+          <Avatar className="h-28 w-28 border-[6px] border-background shadow-2xl rounded-[32px]">
             <AvatarImage src={chat.photoUrl ?? ""} className="object-cover" />
-            <AvatarFallback className="text-2xl font-bold">
-              {(chat.title?.[0] ?? "?").toUpperCase()}
+            <AvatarFallback className="text-3xl font-bold bg-secondary text-secondary-foreground">
+              {chat.title?.[0]?.toUpperCase()}
             </AvatarFallback>
           </Avatar>
+
           {!isPreview && chat.permissions?.canInviteUsers && (
             <Button
-              size="sm"
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase h-8 px-4"
-              onClick={(): void => setIsInviteOpen(true)}
+              onClick={() => setIsInviteOpen(true)}
+              className="rounded-2xl font-bold px-6 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
             >
-              <Plus className="w-3.5 h-3.5 mr-1.5" />
-              Invite
+              <Plus className="w-4 h-4 mr-2 stroke-[3]" />
+              Add Member
             </Button>
           )}
         </div>
 
-        <h3 className="text-2xl font-black leading-none">{chat.title}</h3>
-        <p className="text-sm text-muted-foreground font-medium mt-1">
-          {chat.membersCount} members
-        </p>
+        <div className="mt-6">
+          <h3 className="text-3xl font-bold tracking-tight text-foreground/90">
+            {chat.title}
+          </h3>
+          <div className="flex items-center gap-2 mt-1.5">
+            <Badge
+              variant="secondary"
+              className="rounded-md font-bold text-[10px] uppercase tracking-wider px-2 py-0.5"
+            >
+              Group
+            </Badge>
+            <span className="text-sm font-medium text-muted-foreground">
+              {chat.membersCount} participants
+            </span>
+          </div>
+        </div>
 
         {!isPreview && (
-          <Tabs defaultValue="members" className="mt-6">
-            <TabsList className="w-full grid grid-cols-2 bg-muted/50 p-1">
+          <Tabs defaultValue="members" className="mt-10">
+            <TabsList className="w-full justify-start bg-transparent border-b rounded-none h-auto p-0 gap-8">
               <TabsTrigger
                 value="members"
-                className="text-[10px] font-black uppercase"
+                className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-1 pb-3 bg-transparent font-bold text-sm transition-none"
               >
+                <Users className="w-4 h-4 mr-2" />
                 Members
               </TabsTrigger>
               <TabsTrigger
                 value="media"
-                className="text-[10px] font-black uppercase"
+                className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-1 pb-3 bg-transparent font-bold text-sm transition-none"
               >
+                <ImageIcon className="w-4 h-4 mr-2" />
                 Media
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="members" className="mt-4">
-              <ScrollArea className="h-[240px] pr-4">
-                <div className="space-y-3">
-                  {chat.members?.map((m, i: number) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9 text-xs">
-                        <AvatarImage src={m.user.photoUrl ?? ""} />
-                        <AvatarFallback>
-                          {(
-                            m.user.displayName?.[0] ||
-                            m.user.firstName?.[0] ||
-                            "?"
-                          ).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold truncate">
-                          {m.user.displayName || m.user.firstName}
-                        </p>
-                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">
-                          {m.role}
-                        </p>
-                      </div>
-                    </div>
+
+            <TabsContent
+              value="members"
+              className="mt-6 focus-visible:outline-none"
+            >
+              <ScrollArea className="h-[320px]">
+                <div className="grid gap-1">
+                  {chat.members?.map((m) => (
+                    <ContextMenu key={m.user.id}>
+                      <ContextMenuTrigger>
+                        <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-secondary/50 transition-all cursor-pointer group active:bg-secondary/80">
+                          <Avatar className="h-11 w-11 rounded-2xl shadow-sm">
+                            <AvatarImage src={m.user.photoUrl ?? ""} />
+                            <AvatarFallback className="font-bold text-xs">
+                              {m.user.firstName?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-semibold text-foreground/90">
+                                {m.user.displayName || m.user.firstName}
+                              </span>
+                              {m.role !== "member" && (
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                  {m.role}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                              online
+                            </p>
+                          </div>
+                        </div>
+                      </ContextMenuTrigger>
+
+                      {isSelfAdmin && m.role !== "owner" && (
+                        <ContextMenuContent className="w-64 rounded-xl p-1.5 shadow-xl border-muted/40">
+                          <ContextMenuItem
+                            className="rounded-lg font-semibold text-sm py-2 px-3 gap-3"
+                            onClick={() => handleUpdateRole(m.user.id, m.role)}
+                          >
+                            <Shield className="w-4 h-4 text-muted-foreground" />
+                            {m.role === "admin"
+                              ? "Dismiss as Admin"
+                              : "Make Group Admin"}
+                          </ContextMenuItem>
+
+                          <ContextMenuSeparator className="my-1" />
+
+                          <ContextMenuItem
+                            className="rounded-lg font-semibold text-sm py-2 px-3 gap-3 text-destructive focus:text-destructive focus:bg-destructive/10"
+                            onClick={() => handleRemoveMember(m.user.id)}
+                          >
+                            <UserMinus className="w-4 h-4" />
+                            Remove from Group
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      )}
+                    </ContextMenu>
                   ))}
                 </div>
               </ScrollArea>
@@ -142,26 +235,20 @@ export function GroupContent({
       </div>
 
       <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-        <DialogContent className="max-w-[400px] p-0 overflow-hidden border-none shadow-2xl bg-background">
-          <VisuallyHidden>
-            <DialogTitle>Invite Members</DialogTitle>
-            <DialogDescription>
-              Select participants to add to the group
-            </DialogDescription>
-          </VisuallyHidden>
-          <div className="p-6 pb-0">
-            <h2 className="text-xl font-black uppercase tracking-tighter">
-              Invite Members
+        <DialogContent className="max-w-md p-0 overflow-hidden rounded-[32px] border-none shadow-2xl">
+          <div className="p-8 pb-4">
+            <h2 className="text-2xl font-bold tracking-tight">
+              Add Participants
             </h2>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase mt-1">
-              Select users to add
-            </p>
           </div>
-          <div className="px-6 pb-2">
+          <div className="px-8 pb-8">
             <ParticipantSelector
               isMulti
-              onSelect={handleInvite}
-              excludeIds={currentMemberIds}
+              onSelect={(uids) => {
+                inviteUsers(uids);
+                setIsInviteOpen(false);
+              }}
+              excludeIds={chat.members?.map((m) => m.user.id) ?? []}
             />
           </div>
         </DialogContent>

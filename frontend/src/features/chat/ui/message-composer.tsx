@@ -180,10 +180,10 @@ export const MessageComposer = memo(function MessageComposer({
         </AnimatePresence>
 
         {!canWrite ? (
-          <div className="flex items-center justify-center w-full px-1 h-10 bg-muted/20 rounded-xl border border-dashed border-border/60">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" />
-              <span className="text-sm font-medium">
+          <div className="flex items-center justify-center w-full px-4 h-11 bg-muted/30 rounded-xl border border-border/50 select-none cursor-not-allowed">
+            <div className="flex items-center gap-2.5 text-muted-foreground/70">
+              <Lock className="h-4 w-4" />
+              <span className="text-[13.5px] font-medium tracking-wide">
                 Writing messages is restricted
               </span>
             </div>
