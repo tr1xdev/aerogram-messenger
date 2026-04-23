@@ -11,6 +11,10 @@ import (
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 )
 
+type ChatMembersResult interface {
+	IsChatMembersResult()
+}
+
 type ChatResult interface {
 	IsChatResult()
 }
@@ -53,6 +57,10 @@ type PinChatResult interface {
 	IsPinChatResult()
 }
 
+type RemoveMemberResult interface {
+	IsRemoveMemberResult()
+}
+
 type SendMessageResult interface {
 	IsSendMessageResult()
 }
@@ -88,6 +96,7 @@ type Chat struct {
 	Permissions      *ChatPermissions `json:"permissions"`
 	LastMessage      *Message         `json:"lastMessage,omitempty"`
 	Members          []*ChatMember    `json:"members,omitempty"`
+	MyRole           string           `json:"myRole"`
 	CreatedAt        string           `json:"createdAt"`
 }
 
@@ -105,10 +114,18 @@ type ChatList struct {
 func (ChatList) IsMyChatsResult() {}
 
 type ChatMember struct {
-	User             *dbgen.User `json:"user"`
-	Role             string      `json:"role"`
-	LastReadSequence int64       `json:"lastReadSequence"`
+	User             *dbgen.User      `json:"user"`
+	Role             string           `json:"role"`
+	LastReadSequence int64            `json:"lastReadSequence"`
+	Permissions      *ChatPermissions `json:"permissions"`
 }
+
+type ChatMembersList struct {
+	Members    []*ChatMember `json:"members"`
+	TotalCount int           `json:"totalCount"`
+}
+
+func (ChatMembersList) IsChatMembersResult() {}
 
 type ChatPermissions struct {
 	CanSendMessage    bool `json:"canSendMessage"`
@@ -116,6 +133,18 @@ type ChatPermissions struct {
 	CanEditMetadata   bool `json:"canEditMetadata"`
 	CanDeleteMessages bool `json:"canDeleteMessages"`
 	CanAssignAdmins   bool `json:"canAssignAdmins"`
+	CanSendMedia      bool `json:"canSendMedia"`
+	CanPinMessages    bool `json:"canPinMessages"`
+}
+
+type ChatPermissionsInput struct {
+	CanSendMessage    *bool `json:"canSendMessage,omitempty"`
+	CanInviteUsers    *bool `json:"canInviteUsers,omitempty"`
+	CanEditMetadata   *bool `json:"canEditMetadata,omitempty"`
+	CanDeleteMessages *bool `json:"canDeleteMessages,omitempty"`
+	CanAssignAdmins   *bool `json:"canAssignAdmins,omitempty"`
+	CanSendMedia      *bool `json:"canSendMedia,omitempty"`
+	CanPinMessages    *bool `json:"canPinMessages,omitempty"`
 }
 
 type CreateBotPayload struct {
@@ -133,6 +162,8 @@ func (ForbiddenError) IsChatResult() {}
 
 func (ForbiddenError) IsMyChatsResult() {}
 
+func (ForbiddenError) IsChatMembersResult() {}
+
 func (ForbiddenError) IsCreateChatResult() {}
 
 func (ForbiddenError) IsPinChatResult() {}
@@ -140,6 +171,8 @@ func (ForbiddenError) IsPinChatResult() {}
 func (ForbiddenError) IsDeleteChatResult() {}
 
 func (ForbiddenError) IsInviteResult() {}
+
+func (ForbiddenError) IsRemoveMemberResult() {}
 
 func (ForbiddenError) IsError()                {}
 func (this ForbiddenError) GetMessage() string { return this.Message }
@@ -154,6 +187,8 @@ func (InternalError) IsChatResult() {}
 
 func (InternalError) IsMyChatsResult() {}
 
+func (InternalError) IsChatMembersResult() {}
+
 func (InternalError) IsCreateChatResult() {}
 
 func (InternalError) IsPinChatResult() {}
@@ -161,6 +196,8 @@ func (InternalError) IsPinChatResult() {}
 func (InternalError) IsDeleteChatResult() {}
 
 func (InternalError) IsInviteResult() {}
+
+func (InternalError) IsRemoveMemberResult() {}
 
 func (InternalError) IsError()                {}
 func (this InternalError) GetMessage() string { return this.Message }
@@ -206,6 +243,18 @@ type NotFoundError struct {
 
 func (NotFoundError) IsChatResult() {}
 
+func (NotFoundError) IsChatMembersResult() {}
+
+func (NotFoundError) IsCreateChatResult() {}
+
+func (NotFoundError) IsPinChatResult() {}
+
+func (NotFoundError) IsDeleteChatResult() {}
+
+func (NotFoundError) IsInviteResult() {}
+
+func (NotFoundError) IsRemoveMemberResult() {}
+
 func (NotFoundError) IsError()                {}
 func (this NotFoundError) GetMessage() string { return this.Message }
 
@@ -240,6 +289,8 @@ func (SuccessResult) IsPinChatResult() {}
 func (SuccessResult) IsDeleteChatResult() {}
 
 func (SuccessResult) IsInviteResult() {}
+
+func (SuccessResult) IsRemoveMemberResult() {}
 
 type TypingPayload struct {
 	UserID   string `json:"userId"`

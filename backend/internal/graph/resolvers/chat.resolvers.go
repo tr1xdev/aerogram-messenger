@@ -17,8 +17,6 @@ import (
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // ID is the resolver for the id field.
@@ -28,7 +26,7 @@ func (r *chatResolver) ID(ctx context.Context, obj *model.Chat) (string, error) 
 
 // CanWrite is the resolver for the canWrite field.
 func (r *chatResolver) CanWrite(ctx context.Context, obj *model.Chat) (bool, error) {
-	return true, nil
+	return obj.CanWrite, nil
 }
 
 // CreateChat is the resolver for the createChat field.
@@ -54,15 +52,10 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 
 	resp, err := r.ChatClient.CreateChat(ctx, req)
 	if err != nil {
-		return &model.InternalError{Message: err.Error()}, nil
+		return r.mapToCreateChatError(err), nil
 	}
 
-	result, err := r.Enricher.EnrichChat(ctx, authID, resp.Chat)
-	if err != nil {
-		return &model.InternalError{Message: "failed to enrich chat"}, nil
-	}
-
-	return result, nil
+	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
 // CreateDirectChat is the resolver for the createDirectChat field.
@@ -83,15 +76,10 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 		CreatorId:      authID,
 	})
 	if err != nil {
-		return &model.InternalError{Message: err.Error()}, nil
+		return r.mapToCreateChatError(err), nil
 	}
 
-	result, err := r.Enricher.EnrichChat(ctx, authID, resp.Chat)
-	if err != nil {
-		return &model.InternalError{Message: "failed to enrich chat"}, nil
-	}
-
-	return result, nil
+	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
 // PinChat is the resolver for the pinChat field.
@@ -107,7 +95,7 @@ func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) 
 		Pinned: pinned,
 	})
 	if err != nil {
-		return &model.InternalError{Message: err.Error()}, nil
+		return r.mapToPinChatError(err), nil
 	}
 
 	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
@@ -131,7 +119,7 @@ func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryon
 		ForEveryone: everyone,
 	})
 	if err != nil {
-		return &model.InternalError{Message: err.Error()}, nil
+		return r.mapToDeleteChatError(err), nil
 	}
 
 	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
@@ -144,9 +132,16 @@ func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, user
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
-	rawUserIds := make([]string, len(userIds))
-	for i, id := range userIds {
-		rawUserIds[i] = helpers.ToRawID(id)
+	rawUserIds := make([]string, 0, len(userIds))
+	for _, id := range userIds {
+		rid := helpers.ToRawID(id)
+		if rid != authID {
+			rawUserIds = append(rawUserIds, rid)
+		}
+	}
+
+	if len(rawUserIds) == 0 {
+		return &model.ValidationError{Message: "no valid users to invite"}, nil
 	}
 
 	resp, err := r.ChatClient.InviteToChat(ctx, &chatv1.InviteToChatRequest{
@@ -154,7 +149,72 @@ func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, user
 		UserIds: rawUserIds,
 	})
 	if err != nil {
-		return &model.InternalError{Message: err.Error()}, nil
+		return r.mapToInviteError(err), nil
+	}
+
+	return &model.SuccessResult{Success: resp.Success}, nil
+}
+
+// RemoveChatMember is the resolver for the removeChatMember field.
+func (r *mutationResolver) RemoveChatMember(ctx context.Context, chatID string, userID string) (model.RemoveMemberResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+
+	resp, err := r.ChatClient.RemoveChatMember(ctx, &chatv1.RemoveChatMemberRequest{
+		ChatId: helpers.ToRawID(chatID),
+		UserId: helpers.ToRawID(userID),
+	})
+	if err != nil {
+		return r.mapToRemoveMemberError(err), nil
+	}
+
+	return &model.SuccessResult{Success: resp.Success}, nil
+}
+
+// UpdateMemberRole is the resolver for the updateMemberRole field.
+func (r *mutationResolver) UpdateMemberRole(ctx context.Context, chatID string, userID string, role string) (*model.SuccessResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	resp, err := r.ChatClient.UpdateMemberRole(ctx, &chatv1.UpdateMemberRoleRequest{
+		ChatId:       helpers.ToRawID(chatID),
+		TargetUserId: helpers.ToRawID(userID),
+		NewRole:      role,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.SuccessResult{Success: resp.Success}, nil
+}
+
+// UpdateChatPermissions is the resolver for the updateChatPermissions field.
+func (r *mutationResolver) UpdateChatPermissions(ctx context.Context, chatID string, permissions model.ChatPermissionsInput) (*model.SuccessResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return nil, errors.New("unauthorized")
+	}
+
+	req := &chatv1.UpdateChatPermissionsRequest{
+		ChatId: helpers.ToRawID(chatID),
+		Permissions: &chatv1.ChatPermissions{
+			CanSendMessage:    *permissions.CanSendMessage,
+			CanInviteUsers:    *permissions.CanInviteUsers,
+			CanEditMetadata:   *permissions.CanEditMetadata,
+			CanDeleteMessages: *permissions.CanDeleteMessages,
+			CanAssignAdmins:   *permissions.CanAssignAdmins,
+			CanSendMedia:      *permissions.CanSendMedia,
+			CanPinMessages:    *permissions.CanPinMessages,
+		},
+	}
+
+	resp, err := r.ChatClient.UpdateChatPermissions(ctx, req)
+	if err != nil {
+		return nil, err
 	}
 
 	return &model.SuccessResult{Success: resp.Success}, nil
@@ -168,7 +228,7 @@ func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string, t
 	}
 
 	if err := r.PresenceSvc.PublishTyping(ctx, authID, helpers.ToRawID(chatID), typing); err != nil {
-		return false, err
+		return false, nil
 	}
 
 	return true, nil
@@ -216,19 +276,75 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 	})
 
 	if err != nil {
-		st, ok := status.FromError(err)
-		if ok {
-			switch st.Code() {
-			case codes.NotFound:
-				return &model.NotFoundError{Message: "chat not found"}, nil
-			case codes.PermissionDenied:
-				return &model.ForbiddenError{Message: "access denied"}, nil
-			}
-		}
-		return &model.InternalError{Message: "internal error"}, nil
+		return r.mapToChatError(err), nil
 	}
 
 	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
+}
+
+// ChatMembers is the resolver for the chatMembers field.
+func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *int, offset *int) (model.ChatMembersResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+
+	l, o := 50, 0
+	if limit != nil {
+		l = *limit
+	}
+	if offset != nil {
+		o = *offset
+	}
+
+	resp, err := r.ChatClient.GetChatMembers(ctx, &chatv1.GetChatMembersRequest{
+		ChatId: helpers.ToRawID(chatID),
+		Limit:  int32(l),
+		Offset: int32(o),
+	})
+	if err != nil {
+		return r.mapToChatMembersError(err), nil
+	}
+
+	members := make([]*model.ChatMember, 0, len(resp.Members))
+	for _, m := range resp.Members {
+		user, err := r.Enricher.EnrichUser(ctx, m.UserId)
+		if err != nil {
+			continue
+		}
+
+		permissions := &model.ChatPermissions{
+			CanSendMessage:    true,
+			CanInviteUsers:    true,
+			CanEditMetadata:   false,
+			CanDeleteMessages: false,
+			CanAssignAdmins:   false,
+			CanSendMedia:      true,
+			CanPinMessages:    false,
+		}
+
+		if m.Permissions != nil {
+			permissions.CanSendMessage = m.Permissions.CanSendMessage
+			permissions.CanInviteUsers = m.Permissions.CanInviteUsers
+			permissions.CanEditMetadata = m.Permissions.CanEditMetadata
+			permissions.CanDeleteMessages = m.Permissions.CanDeleteMessages
+			permissions.CanAssignAdmins = m.Permissions.CanAssignAdmins
+			permissions.CanSendMedia = m.Permissions.CanSendMedia
+			permissions.CanPinMessages = m.Permissions.CanPinMessages
+		}
+
+		members = append(members, &model.ChatMember{
+			User:             user,
+			Role:             m.Role,
+			LastReadSequence: 0,
+			Permissions:      permissions,
+		})
+	}
+
+	return &model.ChatMembersList{
+		Members:    members,
+		TotalCount: int(resp.TotalCount),
+	}, nil
 }
 
 // ChatCreated is the resolver for the chatCreated field.

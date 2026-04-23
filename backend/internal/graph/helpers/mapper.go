@@ -24,8 +24,10 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 	}
 
 	if m.SenderId != "" {
-		msg.Sender = &dbgen.User{
-			ID: uuid.MustParse(ToRawID(m.SenderId)),
+		if uid, err := uuid.Parse(ToRawID(m.SenderId)); err == nil {
+			msg.Sender = &dbgen.User{
+				ID: uid,
+			}
 		}
 	}
 

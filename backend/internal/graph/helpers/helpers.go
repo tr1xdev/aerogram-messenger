@@ -60,8 +60,6 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 		if m.UserID == parsedAuthID {
 			isPinned = m.IsPinned
 			myReadSeq = m.LastReadSequence
-		} else if chatType == model.ChatTypePrivate {
-			pReadSeq = m.LastReadSequence
 		} else {
 			if m.LastReadSequence > pReadSeq {
 				pReadSeq = m.LastReadSequence
@@ -99,11 +97,31 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 	}
 
 	var gqlMembers []*model.ChatMember
+	canSeeAllMembers := true
+	if chatType == model.ChatTypeChannel {
+		if pbChat.MyRole != "owner" && pbChat.MyRole != "admin" {
+			canSeeAllMembers = false
+		}
+	}
+
 	for _, m := range dbMembers {
+		if !canSeeAllMembers && m.UserID != parsedAuthID {
+			continue
+		}
 		if u, ok := userMap[m.UserID]; ok {
 			gqlMembers = append(gqlMembers, &model.ChatMember{
 				User:             u,
+				Role:             m.Role,
 				LastReadSequence: m.LastReadSequence,
+				Permissions: &model.ChatPermissions{
+					CanSendMessage:    true,
+					CanInviteUsers:    true,
+					CanEditMetadata:   false,
+					CanDeleteMessages: false,
+					CanAssignAdmins:   false,
+					CanSendMedia:      true,
+					CanPinMessages:    false,
+				},
 			})
 		}
 	}
@@ -159,6 +177,8 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 		CanEditMetadata:   true,
 		CanDeleteMessages: true,
 		CanAssignAdmins:   true,
+		CanSendMedia:      true,
+		CanPinMessages:    true,
 	}
 
 	if pbChat.Permissions != nil {
@@ -167,6 +187,8 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 		permissions.CanEditMetadata = pbChat.Permissions.CanEditMetadata
 		permissions.CanDeleteMessages = pbChat.Permissions.CanDeleteMessages
 		permissions.CanAssignAdmins = pbChat.Permissions.CanAssignAdmins
+		permissions.CanSendMedia = pbChat.Permissions.CanSendMedia
+		permissions.CanPinMessages = pbChat.Permissions.CanPinMessages
 	}
 
 	return &model.Chat{
@@ -184,8 +206,26 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 		LastReadSequence: pReadSeq,
 		CanWrite:         pbChat.CanWrite,
 		Permissions:      permissions,
+		MyRole:           pbChat.MyRole,
 		CreatedAt:        time.Now().Format(time.RFC3339),
 	}, nil
+}
+
+func (e *ChatEnricher) EnrichUser(ctx context.Context, userID string) (*dbgen.User, error) {
+	uid, err := uuid.Parse(ToRawID(userID))
+	if err != nil {
+		return nil, err
+	}
+	user, err := e.store.GetUserByID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	if user.PhotoUrl.Valid && user.PhotoUrl.String != "" {
+		if signed, err := e.s3.GetPresignedURL(ctx, user.PhotoUrl.String, time.Hour*24); err == nil {
+			user.PhotoUrl.String = signed
+		}
+	}
+	return &user, nil
 }
 
 func NullStringToStringPtr(ns sql.NullString) *string {
