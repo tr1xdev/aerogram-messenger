@@ -3,7 +3,7 @@ import { graphql, useLazyLoadQuery } from "react-relay";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AtSign, Info } from "lucide-react";
+import { AtSign, Info, Bot } from "lucide-react";
 import type { userContentQuery } from "./__generated__/userContentQuery.graphql";
 
 const UserQuery = graphql`
@@ -17,6 +17,8 @@ const UserQuery = graphql`
       photoUrl
       bio
       status
+      isBot
+      botDescription
     }
   }
 `;
@@ -43,6 +45,9 @@ export function UserContent({
     user.displayName || `${user.firstName} ${user.lastName || ""}`.trim();
   const isOnline = user.status === "online";
 
+  const description = user.isBot ? user.botDescription : user.bio;
+  const label = user.isBot ? "Bot" : "User";
+
   return (
     <div className="flex flex-col h-full bg-background select-none">
       <div className="relative h-32 bg-gradient-to-br from-primary/10 via-accent/5 to-background">
@@ -57,29 +62,29 @@ export function UserContent({
               {initials}
             </AvatarFallback>
           </Avatar>
-          {isOnline && (
-            <span className="absolute bottom-1 right-1 flex h-6 w-6">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-6 w-6 bg-primary border-4 border-background"></span>
-            </span>
+          {isOnline && !user.isBot && (
+            <span className="absolute bottom-1 right-1 flex h-6 w-6 rounded-full bg-primary border-4 border-background" />
           )}
         </div>
 
         <div className="mt-6">
-          <h3 className="text-3xl font-bold tracking-tight text-foreground/90">
-            {fullName}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-3xl font-bold tracking-tight text-foreground/90">
+              {fullName}
+            </h3>
+            {user.isBot && <Bot className="w-6 h-6 text-primary" />}
+          </div>
           <div className="flex items-center gap-2 mt-1.5">
             <Badge
-              variant="secondary"
+              variant={user.isBot ? "default" : "secondary"}
               className="rounded-md font-bold text-[10px] uppercase tracking-wider px-2 py-0.5"
             >
-              User
+              {label}
             </Badge>
             <span
               className={`text-sm font-medium ${isOnline ? "text-primary" : "text-muted-foreground"}`}
             >
-              {user.status || "offline"}
+              {user.isBot ? "bot" : user.status || "offline"}
             </span>
           </div>
         </div>
@@ -108,7 +113,7 @@ export function UserContent({
                     About
                   </p>
                   <p className="text-sm leading-relaxed font-medium text-foreground/80 whitespace-pre-wrap">
-                    {user.bio || "No information provided"}
+                    {description || "No information provided"}
                   </p>
                 </div>
               </div>
