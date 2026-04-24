@@ -227,6 +227,10 @@ func (s *Server) JoinChatBySlug(ctx context.Context, req *chatpb.JoinChatBySlugR
 		return nil, status.Error(codes.NotFound, "chat not found")
 	}
 
+	if dialog.Type == "private" {
+		return nil, status.Error(codes.PermissionDenied, "cannot join private chat by slug")
+	}
+
 	_, checkErr := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
 		DialogID: dialog.ID,
 		UserID:   uID,
@@ -249,7 +253,10 @@ func (s *Server) JoinChatBySlug(ctx context.Context, req *chatpb.JoinChatBySlugR
 	}
 
 	_ = s.db.Queries.IncrementMembersCount(ctx, dialog.ID)
-	s.rdb.Publish(ctx, "user_chats:"+userIDStr, "{}")
+
+	chatProto := s.mapDBDialogToProto(dialog, 0, "member")
+	payload, _ := json.Marshal(chatProto)
+	s.rdb.Publish(ctx, "user_chats:"+userIDStr, payload)
 
 	return &chatpb.JoinChatBySlugResponse{
 		ChatId:  dialog.ID.String(),

@@ -155,6 +155,31 @@ func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, user
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
+// JoinChatBySlug is the resolver for the joinChatBySlug field.
+func (r *mutationResolver) JoinChatBySlug(ctx context.Context, slug string) (model.JoinChatResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+
+	resp, err := r.ChatClient.JoinChatBySlug(ctx, &chatv1.JoinChatBySlugRequest{
+		Slug: slug,
+	})
+	if err != nil {
+		return &model.InternalError{Message: "failed to join chat"}, nil
+	}
+
+	chatResp, err := r.ChatClient.GetChat(ctx, &chatv1.GetChatRequest{
+		ChatId: &resp.ChatId,
+		UserId: authID,
+	})
+	if err != nil {
+		return &model.NotFoundError{Message: "chat joined but not found"}, nil
+	}
+
+	return r.Enricher.EnrichChat(ctx, authID, chatResp.Chat)
+}
+
 // RemoveChatMember is the resolver for the removeChatMember field.
 func (r *mutationResolver) RemoveChatMember(ctx context.Context, chatID string, userID string) (model.RemoveMemberResult, error) {
 	authID := middleware.GetUserID(ctx)

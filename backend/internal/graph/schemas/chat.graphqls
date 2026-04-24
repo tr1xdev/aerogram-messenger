@@ -51,6 +51,7 @@ type ChatMembersList {
 
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 union MyChatsResult = ChatList | ForbiddenError | InternalError
+union JoinChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 union ChatMembersResult =
     | ChatMembersList
     | ForbiddenError
@@ -106,6 +107,7 @@ extend type Mutation {
     pinChat(id: ID!, pinned: Boolean!): PinChatResult!
     deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
     inviteToChat(chatID: ID!, userIds: [ID!]!): InviteResult!
+    joinChatBySlug(slug: String!): JoinChatResult!
     removeChatMember(chatID: ID!, userID: ID!): RemoveMemberResult!
     updateMemberRole(chatID: ID!, userID: ID!, role: String!): SuccessResult!
     updateChatPermissions(

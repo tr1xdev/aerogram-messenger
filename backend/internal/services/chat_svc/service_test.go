@@ -93,6 +93,59 @@ func TestChatServer(t *testing.T) {
 		assert.Equal(t, "Private Chat", res.Chat.Title)
 	})
 
+	t.Run("JoinChatBySlug_Success", func(t *testing.T) {
+		creatorID := uuid.New().String()
+		joinerID := uuid.New().String()
+		slug := "test_channel_" + uuid.New().String()[:4]
+
+		createUser(t, server, creatorID)
+		createUser(t, server, joinerID)
+
+		_, err := server.CreateChat(ctx, &chatpb.CreateChatRequest{
+			CreatorId: creatorID,
+			Type:      chatpb.ChatType_CHAT_TYPE_CHANNEL,
+			Title:     ptr("Public Channel"),
+			Slug:      ptr(slug),
+		})
+		require.NoError(t, err)
+
+		md := metadata.Pairs("user-id", joinerID)
+		authCtx := metadata.NewIncomingContext(ctx, md)
+
+		res, err := server.JoinChatBySlug(authCtx, &chatpb.JoinChatBySlugRequest{
+			Slug: slug,
+		})
+
+		assert.NoError(t, err)
+		assert.True(t, res.Success)
+		assert.NotEmpty(t, res.ChatId)
+
+		uUUID := uuid.MustParse(joinerID)
+		chatID := uuid.MustParse(res.ChatId)
+		member, err := server.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+			DialogID: chatID,
+			UserID:   uUUID,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "member", member.Role)
+	})
+
+	t.Run("JoinChatBySlug_NotFound", func(t *testing.T) {
+		uID := uuid.New().String()
+		createUser(t, server, uID)
+
+		md := metadata.Pairs("user-id", uID)
+		authCtx := metadata.NewIncomingContext(ctx, md)
+
+		_, err := server.JoinChatBySlug(authCtx, &chatpb.JoinChatBySlugRequest{
+			Slug: "non_existent_slug",
+		})
+
+		assert.Error(t, err)
+		st, _ := status.FromError(err)
+		assert.Equal(t, codes.NotFound, st.Code())
+	})
+
 	t.Run("CreateChat_RateLimitExceeded", func(t *testing.T) {
 		server.cfg.Create.Limit = 1
 		uID := uuid.New().String()

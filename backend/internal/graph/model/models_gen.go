@@ -40,6 +40,10 @@ type InviteResult interface {
 	IsInviteResult()
 }
 
+type JoinChatResult interface {
+	IsJoinChatResult()
+}
+
 type MessageHistoryResult interface {
 	IsMessageHistoryResult()
 }
@@ -105,6 +109,8 @@ func (this Chat) GetID() string { return this.ID }
 
 func (Chat) IsChatResult() {}
 
+func (Chat) IsJoinChatResult() {}
+
 func (Chat) IsCreateChatResult() {}
 
 type ChatList struct {
@@ -162,6 +168,8 @@ func (ForbiddenError) IsChatResult() {}
 
 func (ForbiddenError) IsMyChatsResult() {}
 
+func (ForbiddenError) IsJoinChatResult() {}
+
 func (ForbiddenError) IsChatMembersResult() {}
 
 func (ForbiddenError) IsCreateChatResult() {}
@@ -186,6 +194,8 @@ type InternalError struct {
 func (InternalError) IsChatResult() {}
 
 func (InternalError) IsMyChatsResult() {}
+
+func (InternalError) IsJoinChatResult() {}
 
 func (InternalError) IsChatMembersResult() {}
 
@@ -242,6 +252,8 @@ type NotFoundError struct {
 }
 
 func (NotFoundError) IsChatResult() {}
+
+func (NotFoundError) IsJoinChatResult() {}
 
 func (NotFoundError) IsChatMembersResult() {}
 
