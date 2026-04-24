@@ -15,6 +15,7 @@ type Querier interface {
 	AddDialogMember(ctx context.Context, arg AddDialogMemberParams) error
 	CheckUserExists(ctx context.Context, id uuid.UUID) (bool, error)
 	CountBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) (int64, error)
+	CountDialogAdmins(ctx context.Context, dialogID uuid.UUID) (int64, error)
 	CountPinnedDialogs(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUnreadMessages(ctx context.Context, arg CountUnreadMessagesParams) (int64, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (MessageAttachment, error)
@@ -29,6 +30,7 @@ type Querier interface {
 	DecrementMembersCount(ctx context.Context, id uuid.UUID) error
 	DeleteBot(ctx context.Context, arg DeleteBotParams) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
+	FindNewDialogOwner(ctx context.Context, arg FindNewDialogOwnerParams) (uuid.UUID, error)
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
 	GetAttachmentsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]MessageAttachment, error)
 	GetBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) ([]User, error)
@@ -65,6 +67,7 @@ type Querier interface {
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error
 	UpdateBot(ctx context.Context, arg UpdateBotParams) (User, error)
+	UpdateDialogCreator(ctx context.Context, arg UpdateDialogCreatorParams) error
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
 	UpdateDialogMemberRole(ctx context.Context, arg UpdateDialogMemberRoleParams) error
 	UpdateDialogSettings(ctx context.Context, arg UpdateDialogSettingsParams) error

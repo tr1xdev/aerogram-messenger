@@ -87,3 +87,17 @@ func (r *Resolver) mapToChatMembersError(err error) model.ChatMembersResult {
 		return &model.InternalError{Message: st.Message()}
 	}
 }
+
+func (r *Resolver) mapToLeaveChatError(err error) model.LeaveChatResult {
+	st, _ := status.FromError(err)
+	switch st.Code() {
+	case codes.NotFound:
+		return &model.NotFoundError{Message: st.Message()}
+	case codes.PermissionDenied:
+		return &model.ForbiddenError{Message: st.Message()}
+	case codes.FailedPrecondition:
+		return &model.ForbiddenError{Message: st.Message()}
+	default:
+		return &model.InternalError{Message: "internal error"}
+	}
+}

@@ -73,6 +73,11 @@ union DeleteChatResult =
     | ForbiddenError
     | InternalError
     | NotFoundError
+union LeaveChatResult =
+    | SuccessResult
+    | ForbiddenError
+    | InternalError
+    | NotFoundError
 union InviteResult =
     | SuccessResult
     | ValidationError
@@ -106,6 +111,7 @@ extend type Mutation {
     createDirectChat(userID: ID!): CreateChatResult!
     pinChat(id: ID!, pinned: Boolean!): PinChatResult!
     deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
+    leaveChat(chatID: ID!): LeaveChatResult!
     inviteToChat(chatID: ID!, userIds: [ID!]!): InviteResult!
     joinChatBySlug(slug: String!): JoinChatResult!
     removeChatMember(chatID: ID!, userID: ID!): RemoveMemberResult!

@@ -47,6 +47,18 @@ func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams
 	return err
 }
 
+const countDialogAdmins = `-- name: CountDialogAdmins :one
+SELECT COUNT(*) FROM dialog_members
+WHERE dialog_id = $1 AND role = 'admin'
+`
+
+func (q *Queries) CountDialogAdmins(ctx context.Context, dialogID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countDialogAdmins, dialogID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countPinnedDialogs = `-- name: CountPinnedDialogs :one
 SELECT COUNT(*)
 FROM dialog_members dm
@@ -176,6 +188,27 @@ WHERE id = $1
 func (q *Queries) DeleteDialog(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, deleteDialog, id)
 	return err
+}
+
+const findNewDialogOwner = `-- name: FindNewDialogOwner :one
+SELECT user_id FROM dialog_members
+WHERE dialog_id = $1 AND user_id != $2
+ORDER BY
+    CASE WHEN role = 'admin' THEN 0 ELSE 1 END ASC,
+    joined_at ASC
+LIMIT 1
+`
+
+type FindNewDialogOwnerParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) FindNewDialogOwner(ctx context.Context, arg FindNewDialogOwnerParams) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, findNewDialogOwner, arg.DialogID, arg.UserID)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
 }
 
 const getDialogByID = `-- name: GetDialogByID :one
@@ -604,6 +637,22 @@ WHERE dialog_id = $1
 
 func (q *Queries) UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, unhideDialogForMembers, dialogID)
+	return err
+}
+
+const updateDialogCreator = `-- name: UpdateDialogCreator :exec
+UPDATE dialogs
+SET creator_id = $2, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateDialogCreatorParams struct {
+	ID        uuid.UUID     `json:"id"`
+	CreatorID uuid.NullUUID `json:"creator_id"`
+}
+
+func (q *Queries) UpdateDialogCreator(ctx context.Context, arg UpdateDialogCreatorParams) error {
+	_, err := q.db.ExecContext(ctx, updateDialogCreator, arg.ID, arg.CreatorID)
 	return err
 }
 

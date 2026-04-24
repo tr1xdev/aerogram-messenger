@@ -165,3 +165,20 @@ WHERE dialog_id = $1 AND user_id = $2;
 UPDATE dialog_settings
 SET permissions = $2, updated_at = NOW()
 WHERE dialog_id = $1;
+
+-- name: FindNewDialogOwner :one
+SELECT user_id FROM dialog_members
+WHERE dialog_id = $1 AND user_id != $2
+ORDER BY
+    CASE WHEN role = 'admin' THEN 0 ELSE 1 END ASC,
+    joined_at ASC
+LIMIT 1;
+
+-- name: UpdateDialogCreator :exec
+UPDATE dialogs
+SET creator_id = $2, updated_at = NOW()
+WHERE id = $1;
+
+-- name: CountDialogAdmins :one
+SELECT COUNT(*) FROM dialog_members
+WHERE dialog_id = $1 AND role = 'admin';

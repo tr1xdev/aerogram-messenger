@@ -44,6 +44,10 @@ type JoinChatResult interface {
 	IsJoinChatResult()
 }
 
+type LeaveChatResult interface {
+	IsLeaveChatResult()
+}
+
 type MessageHistoryResult interface {
 	IsMessageHistoryResult()
 }
@@ -178,6 +182,8 @@ func (ForbiddenError) IsPinChatResult() {}
 
 func (ForbiddenError) IsDeleteChatResult() {}
 
+func (ForbiddenError) IsLeaveChatResult() {}
+
 func (ForbiddenError) IsInviteResult() {}
 
 func (ForbiddenError) IsRemoveMemberResult() {}
@@ -204,6 +210,8 @@ func (InternalError) IsCreateChatResult() {}
 func (InternalError) IsPinChatResult() {}
 
 func (InternalError) IsDeleteChatResult() {}
+
+func (InternalError) IsLeaveChatResult() {}
 
 func (InternalError) IsInviteResult() {}
 
@@ -263,6 +271,8 @@ func (NotFoundError) IsPinChatResult() {}
 
 func (NotFoundError) IsDeleteChatResult() {}
 
+func (NotFoundError) IsLeaveChatResult() {}
+
 func (NotFoundError) IsInviteResult() {}
 
 func (NotFoundError) IsRemoveMemberResult() {}
@@ -299,6 +309,8 @@ type SuccessResult struct {
 func (SuccessResult) IsPinChatResult() {}
 
 func (SuccessResult) IsDeleteChatResult() {}
+
+func (SuccessResult) IsLeaveChatResult() {}
 
 func (SuccessResult) IsInviteResult() {}
 

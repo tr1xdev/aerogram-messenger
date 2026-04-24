@@ -125,6 +125,23 @@ func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryon
 	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
 }
 
+// LeaveChat is the resolver for the leaveChat field.
+func (r *mutationResolver) LeaveChat(ctx context.Context, chatID string) (model.LeaveChatResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+
+	resp, err := r.ChatClient.LeaveChat(ctx, &chatv1.LeaveChatRequest{
+		ChatId: helpers.ToRawID(chatID),
+	})
+	if err != nil {
+		return r.mapToLeaveChatError(err), nil
+	}
+
+	return &model.SuccessResult{Success: resp.Success}, nil
+}
+
 // InviteToChat is the resolver for the inviteToChat field.
 func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, userIds []string) (model.InviteResult, error) {
 	authID := middleware.GetUserID(ctx)
@@ -394,13 +411,19 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 				if !ok {
 					return
 				}
-				var c model.Chat
-				if err := json.Unmarshal([]byte(msg.Payload), &c); err != nil {
+
+				var chatProto chatv1.Chat
+				if err := json.Unmarshal([]byte(msg.Payload), &chatProto); err != nil {
 					continue
 				}
-				c.ID = helpers.EncodeGlobalID("Chat", helpers.ToRawID(c.ID))
+
+				enriched, err := r.Enricher.EnrichChat(ctx, authID, &chatProto)
+				if err != nil {
+					continue
+				}
+
 				select {
-				case chatChan <- &c:
+				case chatChan <- enriched:
 				case <-ctx.Done():
 					return
 				}
@@ -419,7 +442,7 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 	}
 
 	deleteChan := make(chan string, 10)
-	pubsub := r.RedisClient.Subscribe(ctx, "user_chats_deleted:"+rawUserID)
+	pubsub := r.RedisClient.Subscribe(ctx, "user_chats_deleted:"+rawUserID, "chat_deleted:*")
 
 	go func() {
 		defer pubsub.Close()
@@ -432,8 +455,16 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 				if !ok {
 					return
 				}
+
+				var id string
+				if strings.HasPrefix(msg.Channel, "chat_deleted:") {
+					id = strings.TrimPrefix(msg.Channel, "chat_deleted:")
+				} else {
+					id = msg.Payload
+				}
+
 				select {
-				case deleteChan <- helpers.EncodeGlobalID("Chat", msg.Payload):
+				case deleteChan <- helpers.EncodeGlobalID("Chat", id):
 				case <-ctx.Done():
 					return
 				}

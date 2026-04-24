@@ -28,8 +28,9 @@ const (
 	ChatService_JoinChatBySlug_FullMethodName        = "/chat.v1.ChatService/JoinChatBySlug"
 	ChatService_UpdateMemberRole_FullMethodName      = "/chat.v1.ChatService/UpdateMemberRole"
 	ChatService_UpdateChatPermissions_FullMethodName = "/chat.v1.ChatService/UpdateChatPermissions"
-	ChatService_RemoveChatMember_FullMethodName      = "/chat.v1.ChatService/RemoveChatMember"
 	ChatService_GetChatMembers_FullMethodName        = "/chat.v1.ChatService/GetChatMembers"
+	ChatService_LeaveChat_FullMethodName             = "/chat.v1.ChatService/LeaveChat"
+	ChatService_RemoveChatMember_FullMethodName      = "/chat.v1.ChatService/RemoveChatMember"
 )
 
 // ChatServiceClient is the client API for ChatService service.
@@ -45,8 +46,9 @@ type ChatServiceClient interface {
 	JoinChatBySlug(ctx context.Context, in *JoinChatBySlugRequest, opts ...grpc.CallOption) (*JoinChatBySlugResponse, error)
 	UpdateMemberRole(ctx context.Context, in *UpdateMemberRoleRequest, opts ...grpc.CallOption) (*UpdateMemberRoleResponse, error)
 	UpdateChatPermissions(ctx context.Context, in *UpdateChatPermissionsRequest, opts ...grpc.CallOption) (*UpdateChatPermissionsResponse, error)
-	RemoveChatMember(ctx context.Context, in *RemoveChatMemberRequest, opts ...grpc.CallOption) (*RemoveChatMemberResponse, error)
 	GetChatMembers(ctx context.Context, in *GetChatMembersRequest, opts ...grpc.CallOption) (*GetChatMembersResponse, error)
+	LeaveChat(ctx context.Context, in *LeaveChatRequest, opts ...grpc.CallOption) (*LeaveChatResponse, error)
+	RemoveChatMember(ctx context.Context, in *RemoveChatMemberRequest, opts ...grpc.CallOption) (*RemoveChatMemberResponse, error)
 }
 
 type chatServiceClient struct {
@@ -147,20 +149,30 @@ func (c *chatServiceClient) UpdateChatPermissions(ctx context.Context, in *Updat
 	return out, nil
 }
 
-func (c *chatServiceClient) RemoveChatMember(ctx context.Context, in *RemoveChatMemberRequest, opts ...grpc.CallOption) (*RemoveChatMemberResponse, error) {
+func (c *chatServiceClient) GetChatMembers(ctx context.Context, in *GetChatMembersRequest, opts ...grpc.CallOption) (*GetChatMembersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RemoveChatMemberResponse)
-	err := c.cc.Invoke(ctx, ChatService_RemoveChatMember_FullMethodName, in, out, cOpts...)
+	out := new(GetChatMembersResponse)
+	err := c.cc.Invoke(ctx, ChatService_GetChatMembers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *chatServiceClient) GetChatMembers(ctx context.Context, in *GetChatMembersRequest, opts ...grpc.CallOption) (*GetChatMembersResponse, error) {
+func (c *chatServiceClient) LeaveChat(ctx context.Context, in *LeaveChatRequest, opts ...grpc.CallOption) (*LeaveChatResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetChatMembersResponse)
-	err := c.cc.Invoke(ctx, ChatService_GetChatMembers_FullMethodName, in, out, cOpts...)
+	out := new(LeaveChatResponse)
+	err := c.cc.Invoke(ctx, ChatService_LeaveChat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) RemoveChatMember(ctx context.Context, in *RemoveChatMemberRequest, opts ...grpc.CallOption) (*RemoveChatMemberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveChatMemberResponse)
+	err := c.cc.Invoke(ctx, ChatService_RemoveChatMember_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -180,8 +192,9 @@ type ChatServiceServer interface {
 	JoinChatBySlug(context.Context, *JoinChatBySlugRequest) (*JoinChatBySlugResponse, error)
 	UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error)
 	UpdateChatPermissions(context.Context, *UpdateChatPermissionsRequest) (*UpdateChatPermissionsResponse, error)
-	RemoveChatMember(context.Context, *RemoveChatMemberRequest) (*RemoveChatMemberResponse, error)
 	GetChatMembers(context.Context, *GetChatMembersRequest) (*GetChatMembersResponse, error)
+	LeaveChat(context.Context, *LeaveChatRequest) (*LeaveChatResponse, error)
+	RemoveChatMember(context.Context, *RemoveChatMemberRequest) (*RemoveChatMemberResponse, error)
 	mustEmbedUnimplementedChatServiceServer()
 }
 
@@ -219,11 +232,14 @@ func (UnimplementedChatServiceServer) UpdateMemberRole(context.Context, *UpdateM
 func (UnimplementedChatServiceServer) UpdateChatPermissions(context.Context, *UpdateChatPermissionsRequest) (*UpdateChatPermissionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateChatPermissions not implemented")
 }
-func (UnimplementedChatServiceServer) RemoveChatMember(context.Context, *RemoveChatMemberRequest) (*RemoveChatMemberResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RemoveChatMember not implemented")
-}
 func (UnimplementedChatServiceServer) GetChatMembers(context.Context, *GetChatMembersRequest) (*GetChatMembersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetChatMembers not implemented")
+}
+func (UnimplementedChatServiceServer) LeaveChat(context.Context, *LeaveChatRequest) (*LeaveChatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LeaveChat not implemented")
+}
+func (UnimplementedChatServiceServer) RemoveChatMember(context.Context, *RemoveChatMemberRequest) (*RemoveChatMemberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveChatMember not implemented")
 }
 func (UnimplementedChatServiceServer) mustEmbedUnimplementedChatServiceServer() {}
 func (UnimplementedChatServiceServer) testEmbeddedByValue()                     {}
@@ -408,24 +424,6 @@ func _ChatService_UpdateChatPermissions_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ChatService_RemoveChatMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveChatMemberRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ChatServiceServer).RemoveChatMember(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ChatService_RemoveChatMember_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChatServiceServer).RemoveChatMember(ctx, req.(*RemoveChatMemberRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _ChatService_GetChatMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetChatMembersRequest)
 	if err := dec(in); err != nil {
@@ -440,6 +438,42 @@ func _ChatService_GetChatMembers_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ChatServiceServer).GetChatMembers(ctx, req.(*GetChatMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_LeaveChat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LeaveChatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).LeaveChat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_LeaveChat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).LeaveChat(ctx, req.(*LeaveChatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_RemoveChatMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveChatMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).RemoveChatMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_RemoveChatMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).RemoveChatMember(ctx, req.(*RemoveChatMemberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -488,12 +522,16 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ChatService_UpdateChatPermissions_Handler,
 		},
 		{
-			MethodName: "RemoveChatMember",
-			Handler:    _ChatService_RemoveChatMember_Handler,
-		},
-		{
 			MethodName: "GetChatMembers",
 			Handler:    _ChatService_GetChatMembers_Handler,
+		},
+		{
+			MethodName: "LeaveChat",
+			Handler:    _ChatService_LeaveChat_Handler,
+		},
+		{
+			MethodName: "RemoveChatMember",
+			Handler:    _ChatService_RemoveChatMember_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

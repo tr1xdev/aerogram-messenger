@@ -155,6 +155,7 @@ type ComplexityRoot struct {
 		DeleteMessage             func(childComplexity int, id string) int
 		InviteToChat              func(childComplexity int, chatID string, userIds []string) int
 		JoinChatBySlug            func(childComplexity int, slug string) int
+		LeaveChat                 func(childComplexity int, chatID string) int
 		Login                     func(childComplexity int, input model.LoginInput) int
 		Logout                    func(childComplexity int) int
 		MarkDialogAsRead          func(childComplexity int, chatID string) int
@@ -292,6 +293,7 @@ type MutationResolver interface {
 	CreateDirectChat(ctx context.Context, userID string) (model.CreateChatResult, error)
 	PinChat(ctx context.Context, id string, pinned bool) (model.PinChatResult, error)
 	DeleteChat(ctx context.Context, id string, forEveryone *bool) (model.DeleteChatResult, error)
+	LeaveChat(ctx context.Context, chatID string) (model.LeaveChatResult, error)
 	InviteToChat(ctx context.Context, chatID string, userIds []string) (model.InviteResult, error)
 	JoinChatBySlug(ctx context.Context, slug string) (model.JoinChatResult, error)
 	RemoveChatMember(ctx context.Context, chatID string, userID string) (model.RemoveMemberResult, error)
@@ -818,6 +820,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.JoinChatBySlug(childComplexity, args["slug"].(string)), true
+	case "Mutation.leaveChat":
+		if e.complexity.Mutation.LeaveChat == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_leaveChat_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.LeaveChat(childComplexity, args["chatID"].(string)), true
 	case "Mutation.login":
 		if e.complexity.Mutation.Login == nil {
 			break
@@ -1735,6 +1748,17 @@ func (ec *executionContext) field_Mutation_joinChatBySlug_args(ctx context.Conte
 		return nil, err
 	}
 	args["slug"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_leaveChat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "chatID", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["chatID"] = arg0
 	return args, nil
 }
 
@@ -4630,6 +4654,47 @@ func (ec *executionContext) fieldContext_Mutation_deleteChat(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_deleteChat_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_leaveChat(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_leaveChat,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().LeaveChat(ctx, fc.Args["chatID"].(string))
+		},
+		nil,
+		ec.marshalNLeaveChatResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐLeaveChatResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_leaveChat(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type LeaveChatResult does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_leaveChat_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9644,6 +9709,47 @@ func (ec *executionContext) _JoinChatResult(ctx context.Context, sel ast.Selecti
 	}
 }
 
+func (ec *executionContext) _LeaveChatResult(ctx context.Context, sel ast.SelectionSet, obj model.LeaveChatResult) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.NotFoundError:
+		return ec._NotFoundError(ctx, sel, &obj)
+	case *model.NotFoundError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NotFoundError(ctx, sel, obj)
+	case model.InternalError:
+		return ec._InternalError(ctx, sel, &obj)
+	case *model.InternalError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._InternalError(ctx, sel, obj)
+	case model.ForbiddenError:
+		return ec._ForbiddenError(ctx, sel, &obj)
+	case *model.ForbiddenError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ForbiddenError(ctx, sel, obj)
+	case model.SuccessResult:
+		return ec._SuccessResult(ctx, sel, &obj)
+	case *model.SuccessResult:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SuccessResult(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of LeaveChatResult must implement graphql.Marshaler", obj))
+		}
+	}
+}
+
 func (ec *executionContext) _MessageHistoryResult(ctx context.Context, sel ast.SelectionSet, obj model.MessageHistoryResult) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -10416,7 +10522,7 @@ func (ec *executionContext) _CreateBotPayload(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var forbiddenErrorImplementors = []string{"ForbiddenError", "ChatResult", "MyChatsResult", "JoinChatResult", "ChatMembersResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "InviteResult", "RemoveMemberResult", "Error", "CreateBotResult"}
+var forbiddenErrorImplementors = []string{"ForbiddenError", "ChatResult", "MyChatsResult", "JoinChatResult", "ChatMembersResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "LeaveChatResult", "InviteResult", "RemoveMemberResult", "Error", "CreateBotResult"}
 
 func (ec *executionContext) _ForbiddenError(ctx context.Context, sel ast.SelectionSet, obj *model.ForbiddenError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, forbiddenErrorImplementors)
@@ -10455,7 +10561,7 @@ func (ec *executionContext) _ForbiddenError(ctx context.Context, sel ast.Selecti
 	return out
 }
 
-var internalErrorImplementors = []string{"InternalError", "ChatResult", "MyChatsResult", "JoinChatResult", "ChatMembersResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "InviteResult", "RemoveMemberResult", "Error", "CreateBotResult"}
+var internalErrorImplementors = []string{"InternalError", "ChatResult", "MyChatsResult", "JoinChatResult", "ChatMembersResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "LeaveChatResult", "InviteResult", "RemoveMemberResult", "Error", "CreateBotResult"}
 
 func (ec *executionContext) _InternalError(ctx context.Context, sel ast.SelectionSet, obj *model.InternalError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, internalErrorImplementors)
@@ -10861,6 +10967,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "leaveChat":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_leaveChat(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "inviteToChat":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_inviteToChat(ctx, field)
@@ -10996,7 +11109,7 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 	return out
 }
 
-var notFoundErrorImplementors = []string{"NotFoundError", "ChatResult", "JoinChatResult", "ChatMembersResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "InviteResult", "RemoveMemberResult", "Error", "MessageHistoryResult"}
+var notFoundErrorImplementors = []string{"NotFoundError", "ChatResult", "JoinChatResult", "ChatMembersResult", "CreateChatResult", "PinChatResult", "DeleteChatResult", "LeaveChatResult", "InviteResult", "RemoveMemberResult", "Error", "MessageHistoryResult"}
 
 func (ec *executionContext) _NotFoundError(ctx context.Context, sel ast.SelectionSet, obj *model.NotFoundError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, notFoundErrorImplementors)
@@ -11610,7 +11723,7 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	}
 }
 
-var successResultImplementors = []string{"SuccessResult", "PinChatResult", "DeleteChatResult", "InviteResult", "RemoveMemberResult"}
+var successResultImplementors = []string{"SuccessResult", "PinChatResult", "DeleteChatResult", "LeaveChatResult", "InviteResult", "RemoveMemberResult"}
 
 func (ec *executionContext) _SuccessResult(ctx context.Context, sel ast.SelectionSet, obj *model.SuccessResult) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, successResultImplementors)
@@ -12915,6 +13028,16 @@ func (ec *executionContext) marshalNJoinChatResult2githubᚗcomᚋtr1xdevᚋaero
 		return graphql.Null
 	}
 	return ec._JoinChatResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNLeaveChatResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐLeaveChatResult(ctx context.Context, sel ast.SelectionSet, v model.LeaveChatResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._LeaveChatResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐLoginInput(ctx context.Context, v any) (model.LoginInput, error) {

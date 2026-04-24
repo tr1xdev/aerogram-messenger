@@ -29,6 +29,8 @@ const (
 	PermChangeInfo   = 16
 )
 
+const MaxAdminsLimit = 50
+
 type Server struct {
 	chatpb.UnimplementedChatServiceServer
 	db         *database.DB
@@ -524,20 +526,131 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 	return &chatpb.DeleteChatResponse{Success: true}, nil
 }
 
+func (s *Server) LeaveChat(ctx context.Context, req *chatpb.LeaveChatRequest) (*chatpb.LeaveChatResponse, error) {
+	userID := s.getUserID(ctx, "")
+	uid, _ := uuid.Parse(userID)
+	did, _ := uuid.Parse(req.ChatId)
+
+	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "chat not found")
+	}
+
+	member, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: uid})
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "not a member")
+	}
+
+	if member.Role == "owner" && dialog.MembersCount > 1 {
+		heirID, err := s.db.Queries.FindNewDialogOwner(ctx, dbgen.FindNewDialogOwnerParams{
+			DialogID: did,
+			UserID:   uid,
+		})
+
+		if err == nil {
+			_ = s.db.Queries.UpdateDialogMemberRole(ctx, dbgen.UpdateDialogMemberRoleParams{
+				DialogID: did,
+				UserID:   heirID,
+				Role:     "owner",
+			})
+			_ = s.db.Queries.UpdateDialogCreator(ctx, dbgen.UpdateDialogCreatorParams{
+				ID:        did,
+				CreatorID: uuid.NullUUID{UUID: heirID, Valid: true},
+			})
+		}
+	}
+
+	_ = s.db.Queries.RemoveDialogMember(ctx, dbgen.RemoveDialogMemberParams{DialogID: did, UserID: uid})
+	_ = s.db.Queries.DecrementMembersCount(ctx, did)
+
+	if dialog.MembersCount <= 1 {
+		_ = s.db.Queries.DeleteDialog(ctx, did)
+	}
+
+	s.rdb.Publish(ctx, "user_chats_leave:"+userID, req.ChatId)
+	return &chatpb.LeaveChatResponse{Success: true}, nil
+}
+
+func (s *Server) RemoveChatMember(ctx context.Context, req *chatpb.RemoveChatMemberRequest) (*chatpb.RemoveChatMemberResponse, error) {
+	authID := s.getUserID(ctx, "")
+	if authID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
+
+	did, _ := uuid.Parse(req.ChatId)
+	auid, _ := uuid.Parse(authID)
+	tuid, _ := uuid.Parse(req.UserId)
+
+	if auid == tuid {
+		return nil, status.Error(codes.InvalidArgument, "use LeaveChat to leave")
+	}
+
+	requester, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: auid})
+	if err != nil || (requester.Role != "owner" && requester.Role != "admin") {
+		return nil, status.Error(codes.PermissionDenied, "insufficient permissions")
+	}
+
+	target, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: tuid})
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "target user not found in chat")
+	}
+
+	if (target.Role == "owner") || (target.Role == "admin" && requester.Role != "owner") {
+		return nil, status.Error(codes.PermissionDenied, "cannot remove user with higher or equal role")
+	}
+
+	err = s.db.Queries.RemoveDialogMember(ctx, dbgen.RemoveDialogMemberParams{
+		DialogID: did,
+		UserID:   tuid,
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to remove member")
+	}
+
+	_ = s.db.Queries.DecrementMembersCount(ctx, did)
+
+	s.rdb.Publish(ctx, "user_chats_kicked:"+req.UserId, req.ChatId)
+
+	return &chatpb.RemoveChatMemberResponse{Success: true}, nil
+}
+
 func (s *Server) UpdateMemberRole(ctx context.Context, req *chatpb.UpdateMemberRoleRequest) (*chatpb.UpdateMemberRoleResponse, error) {
 	authID := s.getUserID(ctx, "")
 	auid, _ := uuid.Parse(authID)
 	did, _ := uuid.Parse(req.ChatId)
 	tuid, _ := uuid.Parse(req.TargetUserId)
 
-	admin, _ := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: auid})
-	if admin.Role != "owner" {
+	admin, err := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: did, UserID: auid})
+	if err != nil || admin.Role != "owner" {
 		return nil, status.Error(codes.PermissionDenied, "only owner can change roles")
 	}
 
-	_ = s.db.Queries.UpdateDialogMemberRole(ctx, dbgen.UpdateDialogMemberRoleParams{
-		DialogID: did, UserID: tuid, Role: req.NewRole,
-	})
+	if req.NewRole == "admin" {
+		currentAdmins, err := s.db.Queries.CountDialogAdmins(ctx, did)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to count admins")
+		}
+		if currentAdmins >= MaxAdminsLimit {
+			return nil, status.Error(codes.ResourceExhausted, "too many admins in this chat")
+		}
+	}
+
+	if req.NewRole == "owner" {
+		_ = s.db.Queries.UpdateDialogMemberRole(ctx, dbgen.UpdateDialogMemberRoleParams{
+			DialogID: did, UserID: tuid, Role: "owner",
+		})
+		_ = s.db.Queries.UpdateDialogMemberRole(ctx, dbgen.UpdateDialogMemberRoleParams{
+			DialogID: did, UserID: auid, Role: "admin",
+		})
+		_ = s.db.Queries.UpdateDialogCreator(ctx, dbgen.UpdateDialogCreatorParams{
+			ID:        did,
+			CreatorID: uuid.NullUUID{UUID: tuid, Valid: true},
+		})
+	} else {
+		_ = s.db.Queries.UpdateDialogMemberRole(ctx, dbgen.UpdateDialogMemberRoleParams{
+			DialogID: did, UserID: tuid, Role: req.NewRole,
+		})
+	}
 
 	return &chatpb.UpdateMemberRoleResponse{Success: true}, nil
 }
