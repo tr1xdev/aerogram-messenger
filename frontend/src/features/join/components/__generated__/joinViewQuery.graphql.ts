@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<644d97ff2dc376413343f7a096278265>>
+ * @generated SignedSource<<535a93a25fb70c82cf67310209202ff5>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,14 +15,24 @@ export type joinViewQuery$variables = {
 };
 export type joinViewQuery$data = {
   readonly chat: {
-    readonly id?: string;
-    readonly membersCount?: number;
-    readonly message?: string;
-    readonly myRole?: string;
-    readonly photoUrl?: string | null | undefined;
-    readonly slug?: string | null | undefined;
-    readonly title?: string;
-    readonly type?: ChatType;
+    readonly __typename: "Chat";
+    readonly id: string;
+    readonly membersCount: number;
+    readonly myRole: string;
+    readonly photoUrl: string | null | undefined;
+    readonly slug: string | null | undefined;
+    readonly title: string;
+    readonly type: ChatType;
+  } | {
+    readonly __typename: "ForbiddenError";
+    readonly message: string;
+  } | {
+    readonly __typename: "NotFoundError";
+    readonly message: string;
+  } | {
+    // This will never be '%other', but we need some
+    // value in case none of the concrete values match.
+    readonly __typename: "%other";
   };
 };
 export type joinViewQuery = {
@@ -49,13 +59,20 @@ v2 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "id",
+  "name": "__typename",
   "storageKey": null
 },
 v3 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "id",
+  "storageKey": null
+},
+v4 = {
   "kind": "InlineFragment",
   "selections": [
-    (v2/*: any*/),
+    (v3/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -102,7 +119,7 @@ v3 = {
   "type": "Chat",
   "abstractKey": null
 },
-v4 = [
+v5 = [
   {
     "alias": null,
     "args": null,
@@ -111,15 +128,15 @@ v4 = [
     "storageKey": null
   }
 ],
-v5 = {
+v6 = {
   "kind": "InlineFragment",
-  "selections": (v4/*: any*/),
+  "selections": (v5/*: any*/),
   "type": "ForbiddenError",
   "abstractKey": null
 },
-v6 = {
+v7 = {
   "kind": "InlineFragment",
-  "selections": (v4/*: any*/),
+  "selections": (v5/*: any*/),
   "type": "NotFoundError",
   "abstractKey": null
 };
@@ -138,9 +155,10 @@ return {
         "name": "chat",
         "plural": false,
         "selections": [
-          (v3/*: any*/),
-          (v5/*: any*/),
-          (v6/*: any*/)
+          (v2/*: any*/),
+          (v4/*: any*/),
+          (v6/*: any*/),
+          (v7/*: any*/)
         ],
         "storageKey": null
       }
@@ -162,20 +180,14 @@ return {
         "name": "chat",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "__typename",
-            "storageKey": null
-          },
-          (v3/*: any*/),
-          (v5/*: any*/),
+          (v2/*: any*/),
+          (v4/*: any*/),
           (v6/*: any*/),
+          (v7/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/)
+              (v3/*: any*/)
             ],
             "type": "Node",
             "abstractKey": "__isNode"
@@ -196,6 +208,6 @@ return {
 };
 })();
 
-(node as any).hash = "0c5afc06afc456dc36972f06a7086279";
+(node as any).hash = "4a07023c5a67f8354a679ac84c47e11a";
 
 export default node;

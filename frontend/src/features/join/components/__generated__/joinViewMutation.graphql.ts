@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<3fefc6458329d8f9b2325195faa2955e>>
+ * @generated SignedSource<<f7323274816f8fa7879ce84680b071a9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -14,9 +14,19 @@ export type joinViewMutation$variables = {
 };
 export type joinViewMutation$data = {
   readonly joinChatBySlug: {
-    readonly id?: string;
-    readonly message?: string;
-    readonly title?: string;
+    readonly __typename: "Chat";
+    readonly id: string;
+    readonly title: string;
+  } | {
+    readonly __typename: "ForbiddenError";
+    readonly message: string;
+  } | {
+    readonly __typename: "InternalError";
+    readonly message: string;
+  } | {
+    // This will never be '%other', but we need some
+    // value in case none of the concrete values match.
+    readonly __typename: "%other";
   };
 };
 export type joinViewMutation = {
@@ -43,13 +53,20 @@ v2 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "id",
+  "name": "__typename",
   "storageKey": null
 },
 v3 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "id",
+  "storageKey": null
+},
+v4 = {
   "kind": "InlineFragment",
   "selections": [
-    (v2/*: any*/),
+    (v3/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -61,7 +78,7 @@ v3 = {
   "type": "Chat",
   "abstractKey": null
 },
-v4 = [
+v5 = [
   {
     "alias": null,
     "args": null,
@@ -70,15 +87,15 @@ v4 = [
     "storageKey": null
   }
 ],
-v5 = {
+v6 = {
   "kind": "InlineFragment",
-  "selections": (v4/*: any*/),
+  "selections": (v5/*: any*/),
   "type": "ForbiddenError",
   "abstractKey": null
 },
-v6 = {
+v7 = {
   "kind": "InlineFragment",
-  "selections": (v4/*: any*/),
+  "selections": (v5/*: any*/),
   "type": "InternalError",
   "abstractKey": null
 };
@@ -97,9 +114,10 @@ return {
         "name": "joinChatBySlug",
         "plural": false,
         "selections": [
-          (v3/*: any*/),
-          (v5/*: any*/),
-          (v6/*: any*/)
+          (v2/*: any*/),
+          (v4/*: any*/),
+          (v6/*: any*/),
+          (v7/*: any*/)
         ],
         "storageKey": null
       }
@@ -121,20 +139,14 @@ return {
         "name": "joinChatBySlug",
         "plural": false,
         "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "__typename",
-            "storageKey": null
-          },
-          (v3/*: any*/),
-          (v5/*: any*/),
+          (v2/*: any*/),
+          (v4/*: any*/),
           (v6/*: any*/),
+          (v7/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v2/*: any*/)
+              (v3/*: any*/)
             ],
             "type": "Node",
             "abstractKey": "__isNode"
@@ -155,6 +167,6 @@ return {
 };
 })();
 
-(node as any).hash = "58877937654dc4a6d1713a0b8e29e4b3";
+(node as any).hash = "275162b8ff5a6c75d26731a8a8345d12";
 
 export default node;

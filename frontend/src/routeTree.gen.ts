@@ -27,6 +27,7 @@ import { Route as authForgotPasswordRouteImport } from './app/routes/(auth)/forg
 import { Route as AuthenticatedSettingsIndexRouteImport } from './app/routes/_authenticated/settings/index'
 import { Route as AuthenticatedBotsIndexRouteImport } from './app/routes/_authenticated/bots/index'
 import { Route as AuthenticatedUsersUserIdRouteImport } from './app/routes/_authenticated/users/$userId'
+import { Route as AuthenticatedJoinSlugRouteImport } from './app/routes/_authenticated/join/$slug'
 import { Route as AuthenticatedChatChatIdRouteImport } from './app/routes/_authenticated/chat/$chatId'
 import { Route as AuthenticatedBotsCreateRouteImport } from './app/routes/_authenticated/bots/create'
 import { Route as AuthenticatedBotsBotIdRouteImport } from './app/routes/_authenticated/bots/$botId'
@@ -121,6 +122,11 @@ const AuthenticatedUsersUserIdRoute =
     path: '/users/$userId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedJoinSlugRoute = AuthenticatedJoinSlugRouteImport.update({
+  id: '/join/$slug',
+  path: '/join/$slug',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedChatChatIdRoute = AuthenticatedChatChatIdRouteImport.update({
   id: '/chat/$chatId',
   path: '/chat/$chatId',
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/bots/$botId': typeof AuthenticatedBotsBotIdRoute
   '/bots/create': typeof AuthenticatedBotsCreateRoute
   '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
+  '/join/$slug': typeof AuthenticatedJoinSlugRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/bots/': typeof AuthenticatedBotsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/bots/$botId': typeof AuthenticatedBotsBotIdRoute
   '/bots/create': typeof AuthenticatedBotsCreateRoute
   '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
+  '/join/$slug': typeof AuthenticatedJoinSlugRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/bots': typeof AuthenticatedBotsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
@@ -199,6 +207,7 @@ export interface FileRoutesById {
   '/_authenticated/bots/$botId': typeof AuthenticatedBotsBotIdRoute
   '/_authenticated/bots/create': typeof AuthenticatedBotsCreateRoute
   '/_authenticated/chat/$chatId': typeof AuthenticatedChatChatIdRoute
+  '/_authenticated/join/$slug': typeof AuthenticatedJoinSlugRoute
   '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/_authenticated/bots/': typeof AuthenticatedBotsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/bots/$botId'
     | '/bots/create'
     | '/chat/$chatId'
+    | '/join/$slug'
     | '/users/$userId'
     | '/bots/'
     | '/settings/'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/bots/$botId'
     | '/bots/create'
     | '/chat/$chatId'
+    | '/join/$slug'
     | '/users/$userId'
     | '/bots'
     | '/settings'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/_authenticated/bots/$botId'
     | '/_authenticated/bots/create'
     | '/_authenticated/chat/$chatId'
+    | '/_authenticated/join/$slug'
     | '/_authenticated/users/$userId'
     | '/_authenticated/bots/'
     | '/_authenticated/settings/'
@@ -412,6 +424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUsersUserIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/join/$slug': {
+      id: '/_authenticated/join/$slug'
+      path: '/join/$slug'
+      fullPath: '/join/$slug'
+      preLoaderRoute: typeof AuthenticatedJoinSlugRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/chat/$chatId': {
       id: '/_authenticated/chat/$chatId'
       path: '/chat/$chatId'
@@ -459,6 +478,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBotsBotIdRoute: typeof AuthenticatedBotsBotIdRoute
   AuthenticatedBotsCreateRoute: typeof AuthenticatedBotsCreateRoute
   AuthenticatedChatChatIdRoute: typeof AuthenticatedChatChatIdRoute
+  AuthenticatedJoinSlugRoute: typeof AuthenticatedJoinSlugRoute
   AuthenticatedUsersUserIdRoute: typeof AuthenticatedUsersUserIdRoute
   AuthenticatedBotsIndexRoute: typeof AuthenticatedBotsIndexRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
@@ -469,6 +489,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBotsBotIdRoute: AuthenticatedBotsBotIdRoute,
   AuthenticatedBotsCreateRoute: AuthenticatedBotsCreateRoute,
   AuthenticatedChatChatIdRoute: AuthenticatedChatChatIdRoute,
+  AuthenticatedJoinSlugRoute: AuthenticatedJoinSlugRoute,
   AuthenticatedUsersUserIdRoute: AuthenticatedUsersUserIdRoute,
   AuthenticatedBotsIndexRoute: AuthenticatedBotsIndexRoute,
   AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
