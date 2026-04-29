@@ -83,6 +83,11 @@ export function useMessageActions(chatId: string) {
       config?: Partial<UseMutationConfig<useMessageActionsSendMutation>>,
     ): Promise<void> => {
       return new Promise((resolve, reject): void => {
+        if (!chatId) {
+          reject(new Error("No chatId provided"));
+          return;
+        }
+
         send({
           ...config,
           variables: {
@@ -154,6 +159,11 @@ export function useMessageActions(chatId: string) {
   const editMessage = useCallback(
     (id: string, text: string): Promise<void> => {
       return new Promise((resolve, reject): void => {
+        if (!id) {
+          reject(new Error("No message id provided"));
+          return;
+        }
+
         edit({
           variables: { id, text },
           onCompleted: (
@@ -171,6 +181,8 @@ export function useMessageActions(chatId: string) {
   );
 
   const markAsRead = useCallback((): void => {
+    if (!chatId) return;
+
     read({
       variables: { chatId },
       optimisticUpdater: (store: RecordSourceSelectorProxy): void => {

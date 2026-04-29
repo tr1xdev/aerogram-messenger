@@ -42,6 +42,7 @@ const chatDetailsQuery = graphql`
         unreadCount
         isPinned
         lastReadSequence
+        myReadSequence
         canWrite
         permissions {
           canSendMessage
@@ -89,6 +90,9 @@ export function useChatDetails(chatId: string): ChatDetailsResponse {
   return useLazyLoadQuery<useChatsDetailsQuery>(
     chatDetailsQuery,
     { id: chatId },
-    { fetchPolicy: "store-or-network" },
+    {
+      fetchPolicy: "store-or-network",
+      fetchKey: chatId,
+    },
   );
 }

@@ -1,6 +1,7 @@
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import { toast } from "sonner";
 import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
+import { logger } from "@/shared/lib/logger";
 import type { useChatManagementSearchQuery } from "./__generated__/useChatManagementSearchQuery.graphql";
 import type { useChatManagementCreateMutation } from "./__generated__/useChatManagementCreateMutation.graphql";
 import type { useChatManagementPinMutation } from "./__generated__/useChatManagementPinMutation.graphql";
@@ -44,6 +45,9 @@ const createComplexChatMutation = graphql`
         photoUrl
         unreadCount
         isPinned
+        myRole
+        lastReadSequence
+        myReadSequence
       }
       ... on ForbiddenError {
         message
@@ -69,6 +73,9 @@ const createDirectChatMutation = graphql`
         photoUrl
         unreadCount
         isPinned
+        myRole
+        lastReadSequence
+        myReadSequence
       }
       ... on ForbiddenError {
         message
@@ -167,16 +174,16 @@ export function useChatActions(chatId?: string) {
     payload: RecordProxy | null,
   ): void => {
     if (!payload || payload.getType() !== "Chat") return;
+
     const root: RecordProxy = store.getRoot();
     const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
     if (myChats && myChats.getType() === "ChatList") {
       const chats: readonly RecordProxy[] =
         myChats.getLinkedRecords("chats") ?? [];
+      const newId: string = payload.getValue("id") as string;
+
       if (
-        !chats.some(
-          (c: RecordProxy): boolean =>
-            c.getValue("id") === payload.getValue("id"),
-        )
+        !chats.some((c: RecordProxy): boolean => c.getValue("id") === newId)
       ) {
         myChats.setLinkedRecords([payload, ...chats], "chats");
       }
@@ -196,8 +203,15 @@ export function useChatActions(chatId?: string) {
         response: useChatManagementCreateMutation["response"],
       ): void => {
         const res = response.createDirectChat;
-        if (res.__typename === "Chat") options?.onCompleted?.(res.id);
-        else if ("message" in res) toast.error(res.message);
+        if (res.__typename === "Chat") {
+          options?.onCompleted?.(res.id);
+        } else if ("message" in res) {
+          toast.error(res.message);
+        }
+      },
+      onError: (err: Error): void => {
+        logger.error("CHAT", "createDirectChat failed", err);
+        toast.error("Failed to create chat");
       },
     });
   };
@@ -220,8 +234,15 @@ export function useChatActions(chatId?: string) {
         response: useChatManagementCreateComplexMutation["response"],
       ): void => {
         const res = response.createChat;
-        if (res.__typename === "Chat") options?.onCompleted?.(res.id);
-        else if ("message" in res) toast.error(res.message);
+        if (res.__typename === "Chat") {
+          options?.onCompleted?.(res.id);
+        } else if ("message" in res) {
+          toast.error(res.message);
+        }
+      },
+      onError: (err: Error): void => {
+        logger.error("CHAT", "createChat failed", err);
+        toast.error("Failed to create chat");
       },
     });
   };
@@ -234,8 +255,12 @@ export function useChatActions(chatId?: string) {
         response: useChatManagementPinMutation["response"],
       ): void => {
         const res = response.pinChat;
-        if (res.__typename !== "SuccessResult" && "message" in res)
+        if (res.__typename !== "SuccessResult" && "message" in res) {
           toast.error(res.message);
+        }
+      },
+      onError: (err: Error): void => {
+        logger.error("CHAT", "pinChat failed", err);
       },
     });
   };
@@ -263,8 +288,13 @@ export function useChatActions(chatId?: string) {
         response: useChatManagementDeleteMutation["response"],
       ): void => {
         const res = response.deleteChat;
-        if (res.__typename !== "SuccessResult" && "message" in res)
+        if (res.__typename !== "SuccessResult" && "message" in res) {
           toast.error(res.message);
+        }
+      },
+      onError: (err: Error): void => {
+        logger.error("CHAT", "deleteChat failed", err);
+        toast.error("Failed to delete chat");
       },
     });
   };
@@ -273,10 +303,18 @@ export function useChatActions(chatId?: string) {
     if (!chatId) return;
     invite({
       variables: { chatID: chatId, userIds },
-      onCompleted: (response): void => {
+      onCompleted: (
+        response: useChatManagementInviteMutation["response"],
+      ): void => {
         const res = response.inviteToChat;
-        if (res.__typename === "SuccessResult") toast.success("Users invited");
-        else if ("message" in res) toast.error(res.message);
+        if (res.__typename === "SuccessResult") {
+          toast.success("Users invited");
+        } else if ("message" in res) {
+          toast.error(res.message);
+        }
+      },
+      onError: (err: Error): void => {
+        logger.error("CHAT", "inviteToChat failed", err);
       },
     });
   };

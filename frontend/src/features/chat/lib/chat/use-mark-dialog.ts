@@ -25,7 +25,7 @@ const chatReadFragment = graphql`
 `;
 
 export function useMarkDialog(
-  chatKey: useMarkDialog_chat$key,
+  chatKey: useMarkDialog_chat$key | null,
   lastSequence: number,
   meId: string | undefined,
 ): { checkAndMarkRead: () => void } {
@@ -33,15 +33,15 @@ export function useMarkDialog(
   const [commit] = useMutation<useMarkDialogMutation>(markDialogMutation);
   const isPendingRef = useRef<boolean>(false);
 
-  const chatId: string = chat.id;
-  const myReadSequence: number = chat.myReadSequence ?? 0;
-  const unreadCount: number = chat.unreadCount ?? 0;
+  const chatId: string | undefined = chat?.id;
+  const myReadSequence: number = chat?.myReadSequence ?? 0;
+  const unreadCount: number = chat?.unreadCount ?? 0;
 
   const checkAndMarkRead = useCallback((): void => {
     if (
+      !chatId ||
       document.visibilityState !== "visible" ||
       !meId ||
-      !chatId ||
       isPendingRef.current ||
       lastSequence <= myReadSequence ||
       unreadCount === 0
@@ -65,7 +65,7 @@ export function useMarkDialog(
         "myReadSequence",
       );
 
-      const members: RecordProxy[] | null | undefined =
+      const members: readonly RecordProxy[] | null | undefined =
         chatRecord.getLinkedRecords("members");
 
       if (members) {

@@ -64,8 +64,8 @@ export function useAppTitle(chatsRef: useAppTitle_chats$key | null): void {
   const totalUnread = useMemo((): number => {
     if (!data?.chats) return 0;
     return data.chats.reduce(
-      (acc: number, chat: { readonly unreadCount: number | null }) =>
-        acc + (chat.unreadCount || 0),
+      (acc: number, chat: { readonly unreadCount: number | null } | null) =>
+        acc + (chat?.unreadCount ?? 0),
       0,
     );
   }, [data]);
