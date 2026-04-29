@@ -11,7 +11,7 @@ import type {
   ReactElement,
   ChangeEvent,
   KeyboardEvent,
-  MouseEvent,
+  RefObject,
 } from "react";
 import { useRouterState, useNavigate, useParams } from "@tanstack/react-router";
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
@@ -176,19 +176,19 @@ function AppSidebarInner(): ReactElement {
     },
   );
 
-  const foldersRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const foldersRef: RefObject<HTMLDivElement | null> =
+    useRef<HTMLDivElement | null>(null);
+  const inputRef: RefObject<HTMLInputElement | null> =
+    useRef<HTMLInputElement | null>(null);
 
   const navigate = useNavigate();
-  const { chatId }: { chatId?: string } = useParams({ strict: false });
+  const { chatId }: { readonly chatId?: string } = useParams({ strict: false });
   const pathname: string = useRouterState().location.pathname;
 
   const isWsConnected: boolean = useConnectionStore(
-    (s: { readonly isWsConnected: boolean }): boolean => s.isWsConnected,
+    (s): boolean => s.isWsConnected,
   );
-  const isUpdating: boolean = useConnectionStore(
-    (s: { readonly isUpdating: boolean }): boolean => s.isUpdating,
-  );
+  const isUpdating: boolean = useConnectionStore((s): boolean => s.isUpdating);
   const isMobile: boolean = useIsMobile();
 
   const data: appSidebarQuery$data = useLazyLoadQuery<AppSidebarQueryType>(
@@ -197,10 +197,9 @@ function AppSidebarInner(): ReactElement {
     { fetchPolicy: "store-and-network" },
   );
 
-  const globalSearchData: { readonly searchUsers?: readonly User[] | null } =
-    useSearchUsers(debouncedQuery) as {
-      readonly searchUsers?: readonly User[] | null;
-    };
+  const globalSearchData = useSearchUsers(debouncedQuery) as {
+    readonly searchUsers?: readonly User[] | null;
+  };
 
   const [commitCreate] =
     useMutation<AppSidebarCreateMutationType>(createChatMutation);
@@ -217,12 +216,18 @@ function AppSidebarInner(): ReactElement {
 
   const pinnedChats: readonly SidebarChat[] =
     useMemo((): readonly SidebarChat[] => {
-      return chats.filter((c: SidebarChat): boolean => c.isPinned);
+      return chats.filter((c: SidebarChat | null): boolean => {
+        if (!c) return false;
+        return c.isPinned;
+      });
     }, [chats]);
 
   const otherChats: readonly SidebarChat[] =
     useMemo((): readonly SidebarChat[] => {
-      return chats.filter((c: SidebarChat): boolean => !c.isPinned);
+      return chats.filter((c: SidebarChat | null): boolean => {
+        if (!c) return false;
+        return !c.isPinned;
+      });
     }, [chats]);
 
   const fullName: string = useMemo((): string => {
@@ -235,7 +240,11 @@ function AppSidebarInner(): ReactElement {
 
   const folders: readonly Folder[] = useMemo((): readonly Folder[] => {
     const totalUnread: number = chats.reduce(
-      (acc: number, chat: SidebarChat): number => acc + (chat.unreadCount || 0),
+      (acc: number, chat: SidebarChat | null | undefined): number => {
+        if (!chat) return acc;
+        const unread: number = chat.unreadCount ?? 0;
+        return acc + unread;
+      },
       0,
     );
     return [{ id: "all", label: "All chats", unread: totalUnread }];
@@ -301,7 +310,7 @@ function AppSidebarInner(): ReactElement {
   }, []);
 
   const removeFromRecent = useCallback(
-    (e: MouseEvent, query: string): void => {
+    (e: React.MouseEvent, query: string): void => {
       e.stopPropagation();
       const updated: string[] = recentSearches.filter(
         (s: string): boolean => s !== query,
@@ -312,7 +321,7 @@ function AppSidebarInner(): ReactElement {
     [recentSearches],
   );
 
-  const handleClearAll = useCallback((e: MouseEvent): void => {
+  const handleClearAll = useCallback((e: React.MouseEvent): void => {
     e.preventDefault();
     e.stopPropagation();
     setRecentSearches([]);
@@ -509,8 +518,10 @@ function AppSidebarInner(): ReactElement {
                   {searchQuery && (
                     <button
                       type="button"
-                      onMouseDown={(e: MouseEvent): void => e.preventDefault()}
-                      onClick={(e: MouseEvent): void => {
+                      onMouseDown={(e: React.MouseEvent): void =>
+                        e.preventDefault()
+                      }
+                      onClick={(e: React.MouseEvent): void => {
                         e.preventDefault();
                         setSearchQuery("");
                         inputRef.current?.focus();
@@ -611,7 +622,7 @@ function AppSidebarInner(): ReactElement {
                               RECENT SEARCHES
                             </span>
                             <button
-                              onMouseDown={(e: MouseEvent): void =>
+                              onMouseDown={(e: React.MouseEvent): void =>
                                 e.preventDefault()
                               }
                               onClick={handleClearAll}
@@ -635,10 +646,10 @@ function AppSidebarInner(): ReactElement {
                                     </span>
                                   </div>
                                   <button
-                                    onMouseDown={(e: MouseEvent): void =>
+                                    onMouseDown={(e: React.MouseEvent): void =>
                                       e.preventDefault()
                                     }
-                                    onClick={(e: MouseEvent): void =>
+                                    onClick={(e: React.MouseEvent): void =>
                                       removeFromRecent(e, s)
                                     }
                                     className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded-full transition-all"
@@ -702,16 +713,18 @@ function AppSidebarInner(): ReactElement {
                         <BsFillPinFill className="h-3 w-3" /> PINNED CHATS
                       </div>
                       <SidebarMenu>
-                        {pinnedChats.map(
-                          (chat: SidebarChat): ReactElement => (
-                            <ChatMenuItem
-                              key={chat.id}
-                              chat={chat as unknown as chatMenuItem_chat$key}
-                              isActive={chatId === chat.id}
-                              myId={user?.id}
-                            />
-                          ),
-                        )}
+                        {pinnedChats
+                          .filter((chat) => chat !== null)
+                          .map(
+                            (chat: SidebarChat): ReactElement => (
+                              <ChatMenuItem
+                                key={chat.id}
+                                chat={chat as unknown as chatMenuItem_chat$key}
+                                isActive={chatId === chat.id}
+                                myId={user?.id}
+                              />
+                            ),
+                          )}
                       </SidebarMenu>
                     </div>
                   )}
@@ -721,16 +734,18 @@ function AppSidebarInner(): ReactElement {
                         ALL CHATS
                       </div>
                       <SidebarMenu>
-                        {otherChats.map(
-                          (chat: SidebarChat): ReactElement => (
-                            <ChatMenuItem
-                              key={chat.id}
-                              chat={chat as unknown as chatMenuItem_chat$key}
-                              isActive={chatId === chat.id}
-                              myId={user?.id}
-                            />
-                          ),
-                        )}
+                        {otherChats
+                          .filter((chat) => chat !== null)
+                          .map(
+                            (chat: SidebarChat): ReactElement => (
+                              <ChatMenuItem
+                                key={chat.id}
+                                chat={chat as unknown as chatMenuItem_chat$key}
+                                isActive={chatId === chat.id}
+                                myId={user?.id}
+                              />
+                            ),
+                          )}
                       </SidebarMenu>
                     </div>
                   )}
@@ -761,7 +776,6 @@ function AppSidebarInner(): ReactElement {
                   size={36}
                   className="border border-border/10"
                 />
-
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1 min-w-0">
                     <span className="text-[13px] font-semibold truncate text-foreground leading-none">
@@ -779,7 +793,6 @@ function AppSidebarInner(): ReactElement {
                   </span>
                 </div>
               </div>
-
               <SettingsIcon className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
           )}

@@ -37,6 +37,8 @@ type ChatNode = Extract<
   { readonly __typename: "Chat" }
 >;
 
+type RelayMember = NonNullable<ChatNode["members"]>[number];
+
 interface ExtendedUser extends Omit<User, "lastName"> {
   lastName?: string | null;
   displayName?: string | null;
@@ -83,7 +85,10 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   const partnerUser = useMemo((): chatHeader_user$key | null => {
     if (!chatNode?.members || !me) return null;
-    const partner = chatNode.members.find((m): boolean => m.user?.id !== me.id);
+    const partner = chatNode.members.find(
+      (m: RelayMember): boolean =>
+        m.user?.id !== undefined && m.user.id !== me.id,
+    );
     return (partner?.user as unknown as chatHeader_user$key) ?? null;
   }, [chatNode, me]);
 
@@ -162,32 +167,42 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   const totalUnread: number = useMemo((): number => {
     const myChatsResult = chatsData.myChats;
-    if (myChatsResult?.__typename === "ChatList") {
+
+    if (
+      myChatsResult?.__typename === "ChatList" &&
+      Array.isArray(myChatsResult.chats)
+    ) {
       return myChatsResult.chats.reduce((acc: number, c): number => {
-        const unread: number = c.unreadCount;
-        return c.id === chatId ? acc : acc + unread;
+        const unread: number = c?.unreadCount ?? 0;
+        const isCurrentChat: boolean = c?.id === chatId;
+
+        return isCurrentChat ? acc : acc + unread;
       }, 0);
     }
+
     return 0;
   }, [chatsData.myChats, chatId]);
 
   const isBotChat: boolean = useMemo((): boolean => {
     if (!chatNode?.members || !me) return false;
     const otherMember = chatNode.members.find(
-      (m): boolean => m.user.id !== me.id,
+      (m: RelayMember): boolean =>
+        m?.user?.id !== undefined && m.user.id !== me.id,
     );
-    return otherMember?.user.isBot ?? false;
+    return otherMember?.user?.isBot ?? false;
   }, [chatNode, me]);
 
   const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
     const rawMessages: Message[] = (messagesFromHistory ??
       []) as unknown as Message[];
-    return [...rawMessages].sort((a: Message, b: Message): number => {
-      const timeA: number = new Date(a.sentAt).getTime();
-      const timeB: number = new Date(b.sentAt).getTime();
-      if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
-      return (Number(a.sequence) || 0) - (Number(b.sequence) || 0);
-    });
+    return [...rawMessages]
+      .filter((m: Message | null): boolean => m !== null && m !== undefined)
+      .sort((a: Message, b: Message): number => {
+        const timeA: number = new Date(a.sentAt).getTime();
+        const timeB: number = new Date(b.sentAt).getTime();
+        if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
+        return (Number(a.sequence) || 0) - (Number(b.sequence) || 0);
+      });
   }, [messagesFromHistory]);
 
   useEffect((): void | (() => void) => {
