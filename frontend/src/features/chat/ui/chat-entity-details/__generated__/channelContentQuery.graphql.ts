@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<245c9bb8bfc440c59c52692457b0ecc3>>
+ * @generated SignedSource<<15572c72dfa28711389e9761de7594d4>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -28,6 +28,7 @@ export type channelContentQuery$data = {
     readonly membersCount: number;
     readonly myRole: string;
     readonly photoUrl: string | null | undefined;
+    readonly slug: string | null | undefined;
     readonly title: string;
   } | {
     // This will never be '%other', but we need some
@@ -85,6 +86,13 @@ v5 = {
       "args": null,
       "kind": "ScalarField",
       "name": "title",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "slug",
       "storageKey": null
     },
     (v4/*: any*/),
@@ -205,16 +213,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "8d183b3e35828d4cdbfdef733c323f31",
+    "cacheID": "5a168e465a643675d84c3d3b362ada4a",
     "id": null,
     "metadata": {},
     "name": "channelContentQuery",
     "operationKind": "query",
-    "text": "query channelContentQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      id\n      title\n      photoUrl\n      membersCount\n      myRole\n      members {\n        user {\n          id\n          displayName\n          firstName\n          photoUrl\n        }\n        role\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "query channelContentQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      id\n      title\n      slug\n      photoUrl\n      membersCount\n      myRole\n      members {\n        user {\n          id\n          displayName\n          firstName\n          photoUrl\n        }\n        role\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "0116ff33755f1c2b63417a2680e8c850";
+(node as any).hash = "e091077ff183a9530dc20b6bc8d386db";
 
 export default node;

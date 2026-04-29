@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<400732b143d09063b86d09067ab4165b>>
+ * @generated SignedSource<<ddb37052efdfc9806c0ba2dd7d309389>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -217,6 +217,13 @@ return {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
+                    "name": "myRole",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
                     "name": "lastReadSequence",
                     "storageKey": null
                   },
@@ -331,12 +338,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "da5a22c9b1c5a5cd6d26ac9ebd4c7ad1",
+    "cacheID": "165f5aa72ef4a0db99e0821ff3cd5893",
     "id": null,
     "metadata": {},
     "name": "useChatsMyChatsQuery",
     "operationKind": "query",
-    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      ...useAppTitle_chats\n      chats {\n        id\n        unreadCount\n        ...chatMenuItem_chat\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useAppTitle_chats on ChatList {\n  chats {\n    unreadCount\n    id\n  }\n}\n"
+    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      ...useAppTitle_chats\n      chats {\n        id\n        unreadCount\n        ...chatMenuItem_chat\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useAppTitle_chats on ChatList {\n  chats {\n    unreadCount\n    id\n  }\n}\n"
   }
 };
 })();

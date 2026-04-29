@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e02645ff18492c657a1ca82d0b377e29>>
+ * @generated SignedSource<<f38dde23052c4cf1d8d35ebd11918650>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -304,6 +304,13 @@ return {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
+                    "name": "myRole",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
                     "name": "lastReadSequence",
                     "storageKey": null
                   },
@@ -405,12 +412,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "dc5dc92acba16818cf3f06b28f39098b",
+    "cacheID": "f1c959c46f8688a688ebbf407f464808",
     "id": null,
     "metadata": {},
     "name": "appSidebarQuery",
     "operationKind": "query",
-    "text": "query appSidebarQuery {\n  me {\n    id\n    username\n    firstName\n    lastName\n    photoUrl\n    isVerified\n    ...settingsDialog_user\n  }\n  myChats {\n    __typename\n    ... on ChatList {\n      chats {\n        id\n        title\n        type\n        photoUrl\n        unreadCount\n        isPinned\n        ...chatMenuItem_chat\n      }\n    }\n    ... on Error {\n      __isError: __typename\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment profileContent_user on User {\n  id\n  firstName\n  lastName\n  username\n  displayName\n  photoUrl\n  bio\n  isBot\n  isVerified\n  botDescription\n  botCommands\n  createdAt\n}\n\nfragment settingsDialog_user on User {\n  id\n  ...profileContent_user\n}\n"
+    "text": "query appSidebarQuery {\n  me {\n    id\n    username\n    firstName\n    lastName\n    photoUrl\n    isVerified\n    ...settingsDialog_user\n  }\n  myChats {\n    __typename\n    ... on ChatList {\n      chats {\n        id\n        title\n        type\n        photoUrl\n        unreadCount\n        isPinned\n        ...chatMenuItem_chat\n      }\n    }\n    ... on Error {\n      __isError: __typename\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment profileContent_user on User {\n  id\n  firstName\n  lastName\n  username\n  displayName\n  photoUrl\n  bio\n  isBot\n  isVerified\n  botDescription\n  botCommands\n  createdAt\n}\n\nfragment settingsDialog_user on User {\n  id\n  ...profileContent_user\n}\n"
   }
 };
 })();

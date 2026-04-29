@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<23295cc0bf9e96360c1b0b2c4d269526>>
+ * @generated SignedSource<<6ca8928f0e7cbc099a87b8521592aedb>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -432,6 +432,13 @@ return {
               (v5/*: any*/),
               (v6/*: any*/),
               (v9/*: any*/),
+              {
+                "alias": null,
+                "args": null,
+                "kind": "ScalarField",
+                "name": "myRole",
+                "storageKey": null
+              },
               (v10/*: any*/),
               {
                 "alias": null,
@@ -506,12 +513,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "224e569d44d317cbb468e7815ae18bf3",
+    "cacheID": "66e8915b8f22e0a3a96116a77c203774",
     "id": null,
     "metadata": {},
     "name": "useChatsDetailsQuery",
     "operationKind": "query",
-    "text": "query useChatsDetailsQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      ...useMarkDialog_chat\n      ...chatMenuItem_chat\n      id\n      title\n      type\n      photoUrl\n      membersCount\n      unreadCount\n      isPinned\n      lastReadSequence\n      canWrite\n      permissions {\n        canSendMessage\n        canInviteUsers\n        canEditMetadata\n        canDeleteMessages\n        canAssignAdmins\n      }\n      members {\n        user {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n          isBot\n          status\n          isVerified\n          ...chatHeader_user\n        }\n      }\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment chatHeader_user on User {\n  id\n  status\n  photoUrl\n  firstName\n  lastName\n  displayName\n  isTyping\n  isVerified\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useMarkDialog_chat on Chat {\n  id\n  unreadCount\n  myReadSequence\n  members {\n    user {\n      id\n    }\n    lastReadSequence\n  }\n}\n"
+    "text": "query useChatsDetailsQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      ...useMarkDialog_chat\n      ...chatMenuItem_chat\n      id\n      title\n      type\n      photoUrl\n      membersCount\n      unreadCount\n      isPinned\n      lastReadSequence\n      canWrite\n      permissions {\n        canSendMessage\n        canInviteUsers\n        canEditMetadata\n        canDeleteMessages\n        canAssignAdmins\n      }\n      members {\n        user {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n          isBot\n          status\n          isVerified\n          ...chatHeader_user\n        }\n      }\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment chatHeader_user on User {\n  id\n  status\n  photoUrl\n  firstName\n  lastName\n  displayName\n  isTyping\n  isVerified\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useMarkDialog_chat on Chat {\n  id\n  unreadCount\n  myReadSequence\n  members {\n    user {\n      id\n    }\n    lastReadSequence\n  }\n}\n"
   }
 };
 })();

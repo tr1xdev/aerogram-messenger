@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<24d0d905b5ea1a26754c03e50340ec54>>
+ * @generated SignedSource<<2192ad597ce2a7d300a810a688072e47>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -21,6 +21,9 @@ export type useChatManagementCreateComplexMutation$data = {
     readonly __typename: "Chat";
     readonly id: string;
     readonly isPinned: boolean;
+    readonly lastReadSequence: any;
+    readonly myReadSequence: any;
+    readonly myRole: string;
     readonly photoUrl: string | null | undefined;
     readonly title: string;
     readonly type: ChatType;
@@ -140,6 +143,27 @@ v7 = {
       "kind": "ScalarField",
       "name": "isPinned",
       "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "myRole",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "lastReadSequence",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "myReadSequence",
+      "storageKey": null
     }
   ],
   "type": "Chat",
@@ -242,16 +266,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "53c08ac1620d0ae1324fb4098a769ec6",
+    "cacheID": "c80a23ef5d46b49d3e344862fb4c5b98",
     "id": null,
     "metadata": {},
     "name": "useChatManagementCreateComplexMutation",
     "operationKind": "mutation",
-    "text": "mutation useChatManagementCreateComplexMutation(\n  $type: ChatType!\n  $participantIds: [ID!]\n  $title: String\n  $slug: String\n) {\n  createChat(type: $type, participantIds: $participantIds, title: $title, slug: $slug) {\n    __typename\n    ... on Chat {\n      id\n      type\n      title\n      photoUrl\n      unreadCount\n      isPinned\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on ValidationError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "mutation useChatManagementCreateComplexMutation(\n  $type: ChatType!\n  $participantIds: [ID!]\n  $title: String\n  $slug: String\n) {\n  createChat(type: $type, participantIds: $participantIds, title: $title, slug: $slug) {\n    __typename\n    ... on Chat {\n      id\n      type\n      title\n      photoUrl\n      unreadCount\n      isPinned\n      myRole\n      lastReadSequence\n      myReadSequence\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on ValidationError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "f32c4a5a2eb406f700ae8479c79029dc";
+(node as any).hash = "9c7aaab445ce78a7349d4c553eca495e";
 
 export default node;
