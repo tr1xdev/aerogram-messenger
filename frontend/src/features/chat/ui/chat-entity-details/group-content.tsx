@@ -32,6 +32,7 @@ const GroupQuery = graphql`
       ... on Chat {
         id
         title
+        slug
         photoUrl
         membersCount
         myRole
@@ -77,6 +78,12 @@ const RemoveMemberMutation = graphql`
   }
 `;
 
+type GroupChat = Extract<
+  groupContentQuery["response"]["chat"],
+  { __typename: "Chat" }
+>;
+type GroupMember = NonNullable<GroupChat["members"]>[number];
+
 export function GroupContent({
   id,
   isPreview,
@@ -92,7 +99,7 @@ export function GroupContent({
 
   const chat = data.chat;
 
-  const sortedMembers = useMemo(() => {
+  const sortedMembers = useMemo((): readonly GroupMember[] => {
     if (!chat || chat.__typename !== "Chat" || !chat.members) return [];
 
     const getWeight = (role: string): number => {
@@ -162,7 +169,7 @@ export function GroupContent({
           );
           chatRecord.setLinkedRecords(nextMembers, "members");
 
-          const currentCount = chatRecord.getValue("membersCount");
+          const currentCount: unknown = chatRecord.getValue("membersCount");
           if (typeof currentCount === "number") {
             chatRecord.setValue(Math.max(0, currentCount - 1), "membersCount");
           }
@@ -201,6 +208,9 @@ export function GroupContent({
           <h3 className="text-3xl font-bold tracking-tight text-foreground/90">
             {chat.title}
           </h3>
+          {chat.slug && (
+            <p className="text-sm font-medium text-primary">@{chat.slug}</p>
+          )}
           <div className="flex items-center gap-2 mt-1.5">
             <Badge
               variant="secondary"
@@ -244,7 +254,7 @@ export function GroupContent({
                 <ScrollArea className="h-full">
                   <div className="grid gap-1 pr-4">
                     {sortedMembers.map(
-                      (m): ReactNode => (
+                      (m: GroupMember): ReactNode => (
                         <ContextMenu key={m.user.id}>
                           <ContextMenuTrigger>
                             <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-secondary/50 transition-all cursor-pointer group active:bg-secondary/80">
@@ -338,7 +348,9 @@ export function GroupContent({
                 inviteUsers(uids);
                 setIsInviteOpen(false);
               }}
-              excludeIds={chat.members?.map((m): string => m.user.id) ?? []}
+              excludeIds={
+                chat.members?.map((m: GroupMember): string => m.user.id) ?? []
+              }
             />
           </div>
         </DialogContent>

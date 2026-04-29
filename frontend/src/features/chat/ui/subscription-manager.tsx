@@ -4,7 +4,7 @@ import {
   useAppTitle,
   useGlobalSubscriptions,
 } from "@/features/chat/lib";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import type { Chat } from "@/entities/chat/model/types";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 import type { useAppTitle_chats$key } from "@/features/chat/lib/common/__generated__/useAppTitle_chats.graphql";
@@ -21,10 +21,19 @@ export function SubscriptionManager(): ReactNode {
 
   useAppTitle(chatsKey);
 
-  const chats: readonly Chat[] =
-    chatsData?.myChats?.__typename === "ChatList"
-      ? (chatsData.myChats.chats as unknown as readonly Chat[])
-      : [];
+  const chats: readonly Chat[] = useMemo((): readonly Chat[] => {
+    const result = chatsData?.myChats;
+
+    if (result?.__typename !== "ChatList") {
+      return [];
+    }
+
+    const chatsList = result.chats;
+
+    return (chatsList || []).filter(
+      (c: unknown): c is Chat => c !== null && c !== undefined,
+    ) as unknown as readonly Chat[];
+  }, [chatsData?.myChats]);
 
   useEffect((): void => {
     if (chats.length > 0) {

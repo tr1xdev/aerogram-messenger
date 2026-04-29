@@ -7,6 +7,7 @@ import {
   Shield,
   ShieldOff,
   Crown,
+  UserMinus,
 } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,9 +17,10 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
+import type { RecordSourceSelectorProxy } from "relay-runtime";
 import type { channelContentQuery } from "./__generated__/channelContentQuery.graphql";
 
 const ChannelQuery = graphql`
@@ -28,6 +30,7 @@ const ChannelQuery = graphql`
       ... on Chat {
         id
         title
+        slug
         photoUrl
         membersCount
         myRole
@@ -59,6 +62,16 @@ const UpdateRoleMutation = graphql`
   }
 `;
 
+const RemoveMemberMutation = graphql`
+  mutation channelContentRemoveMemberMutation($chatID: ID!, $userID: ID!) {
+    removeChatMember(chatID: $chatID, userID: $userID) {
+      ... on SuccessResult {
+        success
+      }
+    }
+  }
+`;
+
 export function ChannelContent({
   id,
   isPreview,
@@ -68,6 +81,7 @@ export function ChannelContent({
 }): ReactNode {
   const data = useLazyLoadQuery<channelContentQuery>(ChannelQuery, { id });
   const [commitUpdateRole] = useMutation(UpdateRoleMutation);
+  const [commitRemoveMember] = useMutation(RemoveMemberMutation);
 
   const chat = data.chat;
 
@@ -103,16 +117,14 @@ export function ChannelContent({
     userID: string,
     newRole: string,
   ): void => {
-    const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
+    const chatRecord = store.get(chatId);
     if (!chatRecord) return;
 
-    const members: readonly RecordProxy[] | null =
-      chatRecord.getLinkedRecords("members") ?? null;
+    const members = chatRecord.getLinkedRecords("members");
     if (!members) return;
 
-    members.forEach((memberProxy: RecordProxy): void => {
-      const userProxy: RecordProxy | null =
-        memberProxy.getLinkedRecord("user") ?? null;
+    members.forEach((memberProxy) => {
+      const userProxy = memberProxy.getLinkedRecord("user");
       if (userProxy?.getDataID() === userID) {
         memberProxy.setValue(newRole, "role");
       }
@@ -120,7 +132,7 @@ export function ChannelContent({
   };
 
   const handleToggleAdmin = (userID: string, currentRole: string): void => {
-    const newRole: string = currentRole === "admin" ? "member" : "admin";
+    const newRole = currentRole === "admin" ? "member" : "admin";
 
     commitUpdateRole({
       variables: { chatID: chatId, userID, role: newRole },
@@ -130,10 +142,27 @@ export function ChannelContent({
           success: true,
         },
       },
-      optimisticUpdater: (store: RecordSourceSelectorProxy): void =>
-        applyRoleUpdate(store, userID, newRole),
-      updater: (store: RecordSourceSelectorProxy): void =>
-        applyRoleUpdate(store, userID, newRole),
+      optimisticUpdater: (store) => applyRoleUpdate(store, userID, newRole),
+      updater: (store) => applyRoleUpdate(store, userID, newRole),
+    });
+  };
+
+  const handleKickMember = (userID: string): void => {
+    commitRemoveMember({
+      variables: { chatID: chatId, userID },
+      optimisticUpdater: (store) => {
+        const chatRecord = store.get(chatId);
+        if (!chatRecord) return;
+        const members = chatRecord.getLinkedRecords("members");
+        if (members) {
+          const nextMembers = members.filter(
+            (m) => m.getLinkedRecord("user")?.getDataID() !== userID,
+          );
+          chatRecord.setLinkedRecords(nextMembers, "members");
+        }
+        const count = chatRecord.getValue("membersCount") as number;
+        chatRecord.setValue(Math.max(0, count - 1), "membersCount");
+      },
     });
   };
 
@@ -155,6 +184,9 @@ export function ChannelContent({
             <h3 className="text-2xl font-bold tracking-tight text-foreground truncate">
               {chat.title}
             </h3>
+            {chat.slug && (
+              <p className="text-sm font-medium text-primary">@{chat.slug}</p>
+            )}
             <div className="flex items-center gap-2 mt-0.5">
               <Badge
                 variant="secondary"
@@ -199,8 +231,8 @@ export function ChannelContent({
                 <ScrollArea className="h-full">
                   <div className="grid gap-0.5 pb-6 pr-4">
                     {sortedMembers.map((m): ReactNode => {
-                      const isOwner: boolean = m.role === "owner";
-                      const isAdmin: boolean = m.role === "admin";
+                      const isOwner = m.role === "owner";
+                      const isAdmin = m.role === "admin";
 
                       return (
                         <ContextMenu key={m.user.id}>
@@ -250,7 +282,7 @@ export function ChannelContent({
                             <ContextMenuContent className="w-52 rounded-xl shadow-xl border-muted/40">
                               <ContextMenuItem
                                 className="gap-3 font-semibold py-2.5 cursor-pointer"
-                                onClick={(): void =>
+                                onClick={() =>
                                   handleToggleAdmin(m.user.id, m.role)
                                 }
                               >
@@ -265,6 +297,14 @@ export function ChannelContent({
                                     Promote to admin
                                   </>
                                 )}
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem
+                                className="gap-3 font-semibold py-2.5 cursor-pointer text-destructive focus:text-destructive"
+                                onClick={() => handleKickMember(m.user.id)}
+                              >
+                                <UserMinus className="w-4 h-4" />
+                                Kick from channel
                               </ContextMenuItem>
                             </ContextMenuContent>
                           )}
