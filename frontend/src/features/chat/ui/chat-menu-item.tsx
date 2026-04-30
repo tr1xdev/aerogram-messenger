@@ -120,7 +120,7 @@ export function ChatMenuItem({
 
   const displayName: string = useMemo((): string => {
     if (isPrivate && otherUser) {
-      const full =
+      const full: string =
         `${otherUser.firstName ?? ""} ${otherUser.lastName ?? ""}`.trim();
       return full || otherUser.username || chat.title || "Chat";
     }
@@ -254,7 +254,7 @@ export function ChatMenuItem({
                     )}
 
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-[13px] text-muted-foreground truncate flex-1 opacity-85">
+                      <div className="text-[13px] font-normal text-muted-foreground min-w-0 flex-1 opacity-85">
                         {lastMessage ? (
                           <LastMessageContent
                             message={lastMessage as ChatMessage}
@@ -265,7 +265,7 @@ export function ChatMenuItem({
                           "No messages yet"
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {chat.isPinned && (chat.unreadCount ?? 0) === 0 && (
                           <BsFillPinFill className="h-3.5 w-3.5 text-muted-foreground/40" />
                         )}
@@ -332,7 +332,7 @@ export function ChatMenuItem({
         <DeleteChatDialog
           open={isDeleteOpen}
           onOpenChange={setIsDeleteOpen}
-          onConfirm={(everyone) => deleteChat(everyone)}
+          onConfirm={(everyone: boolean) => deleteChat(everyone)}
           displayName={displayName}
           isPrivate={isPrivate}
         />

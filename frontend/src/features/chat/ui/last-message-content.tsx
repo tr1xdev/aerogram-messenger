@@ -21,7 +21,6 @@ interface LastMessageContentProps {
 
 const previewComponents: Components = {
   p: ({ children }) => <span className="inline">{children}</span>,
-  a: ({ children }) => <span className="text-blue-400">{children}</span>,
   strong: ({ children }) => <>{children}</>,
   em: ({ children }) => <>{children}</>,
   code: ({ className, children }) => {
@@ -94,14 +93,7 @@ export function LastMessageContent({
   }
 
   return (
-    <div
-      className="line-clamp-2 break-all [word-break:break-word] overflow-hidden text-ellipsis leading-[1.3]"
-      style={{
-        display: "-webkit-box",
-        WebkitBoxOrient: "vertical",
-        WebkitLineClamp: 2,
-      }}
-    >
+    <div className="truncate w-full">
       <span className="inline">{content}</span>
     </div>
   );
