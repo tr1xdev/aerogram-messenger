@@ -6,7 +6,6 @@ RUN sed -i 's/https/http/g' /etc/apk/repositories && \
 WORKDIR /app
 
 COPY backend/go.mod backend/go.sum ./
-
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
@@ -21,7 +20,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM alpine:3.19
 
 RUN sed -i 's/https/http/g' /etc/apk/repositories && \
-    apk --no-cache add ca-certificates tzdata && \
+    apk --no-cache add ca-certificates tzdata openssl && \
     addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
@@ -31,10 +30,19 @@ COPY --from=builder /app/config.yaml .
 COPY --from=builder /app/internal/templates ./internal/templates
 COPY --from=builder /app/assets ./assets
 
-RUN chown -R appuser:appgroup /app
+RUN mkdir -p /app/certs && chown -R appuser:appgroup /app
+
+RUN echo '#!/bin/sh\n\
+if [ ! -f "$TLS_CERT_PATH" ]; then\n\
+  openssl req -x509 -newkey rsa:4096 -keyout "$TLS_KEY_PATH" -out "$TLS_CERT_PATH" -sha256 -days 365 -nodes -subj "/CN=localhost"\n\
+fi\n\
+exec ./server' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 USER appuser
 
+ENV TLS_CERT_PATH=/app/certs/localhost+2.pem
+ENV TLS_KEY_PATH=/app/certs/localhost+2-key.pem
+
 EXPOSE 8080 50051
 
-ENTRYPOINT ["./server"]
+ENTRYPOINT ["/app/entrypoint.sh"]

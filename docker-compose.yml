@@ -7,6 +7,7 @@ services:
         restart: always
         ports:
             - "${HTTP_PORT:-8080}:8080/tcp"
+            - "${HTTP_PORT:-8080}:8080/udp"
             - "${GRPC_PORT:-50051}:50051/tcp"
         env_file: .env
         environment:
@@ -14,7 +15,7 @@ services:
             - REDIS_HOST=redis
             - S3_ENDPOINT=http://minio:9000
         volumes:
-            - ./certs:/app/certs:ro
+            - ./certs:/app/certs:rw
             - ./assets:/app/assets:ro
         depends_on:
             postgres:
