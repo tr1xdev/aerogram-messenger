@@ -138,7 +138,8 @@ export const MessageComposer = memo(function MessageComposer({
     fileInputRef.current?.click();
   }, []);
 
-  const showStartButton: boolean = isBot && isEmpty && chatType === "PRIVATE";
+  const showStartButton: boolean =
+    isBot && chatType === "PRIVATE" && isEmpty && !activeAction;
 
   return (
     <footer className="p-2 md:p-3 bg-background shrink-0 border-t border-border/40">

@@ -83,6 +83,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const isChatType: boolean = chatRaw?.__typename === "Chat";
   const chatNode: ChatNode | null = isChatType ? (chatRaw as ChatNode) : null;
 
+  const normalizedChatType = useMemo((): "PRIVATE" | "GROUP" | "CHANNEL" => {
+    const type: string | undefined = chatNode?.type;
+    if (type === "DIRECT" || type === "PRIVATE") return "PRIVATE";
+    if (type === "GROUP") return "GROUP";
+    return "CHANNEL";
+  }, [chatNode?.type]);
+
   const partnerUser = useMemo((): chatHeader_user$key | null => {
     if (!chatNode?.members || !me) return null;
     const partner = chatNode.members.find(
@@ -184,13 +191,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }, [chatsData.myChats, chatId]);
 
   const isBotChat: boolean = useMemo((): boolean => {
-    if (!chatNode?.members || !me) return false;
+    if (!chatNode?.members || !me || normalizedChatType !== "PRIVATE")
+      return false;
     const otherMember = chatNode.members.find(
       (m: RelayMember): boolean =>
         m?.user?.id !== undefined && m.user.id !== me.id,
     );
     return otherMember?.user?.isBot ?? false;
-  }, [chatNode, me]);
+  }, [chatNode, me, normalizedChatType]);
 
   const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
     const rawMessages: Message[] = (messagesFromHistory ??
@@ -337,19 +345,10 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         id={chatId}
         title={chatNode?.title}
         photoUrl={chatNode?.photoUrl ?? undefined}
-        userRef={
-          (chatNode?.type as string) === "PRIVATE" ||
-          (chatNode?.type as string) === "DIRECT"
-            ? partnerUser
-            : null
-        }
+        userRef={normalizedChatType === "PRIVATE" ? partnerUser : null}
         totalUnread={totalUnread}
         isLoading={isInitialLoading}
-        type={
-          ((chatNode?.type as string) === "DIRECT"
-            ? "PRIVATE"
-            : chatNode?.type) as "PRIVATE" | "GROUP" | "CHANNEL"
-        }
+        type={normalizedChatType}
         membersCount={chatNode?.membersCount ?? 0}
       />
 
@@ -358,6 +357,12 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           <div className="absolute inset-0 p-4 flex flex-col gap-6">
             <Skeleton className="h-10 w-[60%] self-end rounded-2xl" />
             <Skeleton className="h-10 w-[50%] self-start rounded-2xl" />
+          </div>
+        ) : allMessages.length === 0 ? (
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <div className="bg-muted/50 text-muted-foreground text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm">
+              {isBotChat ? "What can this bot do?" : "No messages yet"}
+            </div>
           </div>
         ) : (
           <MessageList
@@ -387,6 +392,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           editingMessage={editingMessage}
           onCancelAction={cancelAction}
           canWrite={canWrite}
+          chatType={normalizedChatType}
         />
       )}
     </div>
