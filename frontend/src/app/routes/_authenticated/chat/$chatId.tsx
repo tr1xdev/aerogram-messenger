@@ -3,7 +3,6 @@ import {
   useState,
   useEffect,
   useCallback,
-  type MutableRefObject,
   useRef,
   type ReactNode,
 } from "react";
@@ -65,10 +64,11 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
+  const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
 
   const { input, setInput, resetInput, setActiveChatId } =
     useChatStore() as ChatStoreState;
-  const inputRef: MutableRefObject<string> = useRef<string>(input);
+  const inputRef = useRef<string>(input);
 
   useEffect((): void => {
     inputRef.current = input;
@@ -208,8 +208,12 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   useEffect((): void | (() => void) => {
     let timeoutId: ReturnType<typeof setTimeout>;
 
-    const handleVisibilityChange = (): void => {
-      if (document.visibilityState === "visible") {
+    const handleMarkRead = (): void => {
+      if (
+        document.visibilityState === "visible" &&
+        lastSequence > 0 &&
+        isAtBottom
+      ) {
         clearTimeout(timeoutId);
         timeoutId = setTimeout((): void => {
           checkAndMarkRead();
@@ -218,15 +222,17 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       }
     };
 
-    window.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleVisibilityChange);
+    handleMarkRead();
+
+    window.addEventListener("visibilitychange", handleMarkRead);
+    window.addEventListener("focus", handleMarkRead);
 
     return (): void => {
       clearTimeout(timeoutId);
-      window.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleVisibilityChange);
+      window.removeEventListener("visibilitychange", handleMarkRead);
+      window.removeEventListener("focus", handleMarkRead);
     };
-  }, [checkAndMarkRead, markAsRead]);
+  }, [checkAndMarkRead, markAsRead, lastSequence, isAtBottom]);
 
   const handleSend = useCallback(
     (text?: string): void => {
@@ -363,6 +369,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
             onMarkRead={markAsRead}
             onReply={handleReplyInitiate}
             onEdit={handleEditInitiate}
+            onScrollAtBottomChange={setIsAtBottom}
           />
         )}
       </main>

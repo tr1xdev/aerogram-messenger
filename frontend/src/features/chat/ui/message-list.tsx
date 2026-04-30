@@ -1,4 +1,4 @@
-import { useMemo, memo, type ReactNode } from "react";
+import { useMemo, memo, useEffect, type ReactNode } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
@@ -17,6 +17,7 @@ interface MessageListProps {
   onMarkRead: () => void;
   onReply: (message: Message) => void;
   onEdit: (message: Message) => void;
+  onScrollAtBottomChange: (atBottom: boolean) => void;
 }
 
 export const MessageList = memo(function MessageList({
@@ -26,6 +27,7 @@ export const MessageList = memo(function MessageList({
   onMarkRead,
   onReply,
   onEdit,
+  onScrollAtBottomChange,
 }: MessageListProps): ReactNode {
   const groupedMessages = useMemo(() => {
     const groups: { date: string; items: Message[] }[] = [];
@@ -44,12 +46,16 @@ export const MessageList = memo(function MessageList({
     return groups;
   }, [messages]);
 
-  const { scrollRef, showScrollBtn, unreadCount, scrollToBottom } =
+  const { scrollRef, showScrollBtn, unreadCount, isAtBottom, scrollToBottom } =
     useChatScroll({
       messages,
       myId,
       onMarkRead,
     });
+
+  useEffect((): void => {
+    onScrollAtBottomChange(isAtBottom);
+  }, [isAtBottom, onScrollAtBottomChange]);
 
   return (
     <div className="h-full w-full relative bg-transparent overflow-hidden">
