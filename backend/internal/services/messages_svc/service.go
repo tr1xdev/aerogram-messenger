@@ -150,7 +150,9 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		log.Printf("[SEND-MESSAGE] DB Transaction error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to begin transaction")
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	qtx := s.db.Queries.WithTx(tx)
 
