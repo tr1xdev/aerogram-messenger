@@ -27,16 +27,18 @@ function IndexComponent(): React.ReactNode {
           <h1 className="text-2xl font-bold tracking-tight">Chats</h1>
         </header>
         <div className="flex-1 overflow-y-auto px-2 pb-20">
-          {chats.map(
-            (chat: Chat): React.ReactNode => (
-              <ChatMenuItem
-                key={chat.id}
-                chat={chat as unknown as chatMenuItem_chat$key}
-                isActive={false}
-                myId={userData?.me?.id}
-              />
-            ),
-          )}
+          {chats
+            .filter((chat: Chat | null): chat is Chat => chat !== null)
+            .map(
+              (chat: Chat): React.ReactNode => (
+                <ChatMenuItem
+                  key={chat.id}
+                  chat={chat as unknown as chatMenuItem_chat$key}
+                  isActive={false}
+                  myId={userData?.me?.id}
+                />
+              ),
+            )}
         </div>
       </div>
 

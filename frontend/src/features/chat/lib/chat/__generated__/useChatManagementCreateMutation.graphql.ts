@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6a8a9886e37900500e029df3dbcd2754>>
+ * @generated SignedSource<<60eeff2d6c6979b6479a3d1e0a289c19>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -18,6 +18,9 @@ export type useChatManagementCreateMutation$data = {
     readonly __typename: "Chat";
     readonly id: string;
     readonly isPinned: boolean;
+    readonly lastReadSequence: any;
+    readonly myReadSequence: any;
+    readonly myRole: string;
     readonly photoUrl: string | null | undefined;
     readonly title: string;
     readonly type: ChatType;
@@ -108,6 +111,27 @@ v4 = {
       "args": null,
       "kind": "ScalarField",
       "name": "isPinned",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "myRole",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "lastReadSequence",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "myReadSequence",
       "storageKey": null
     }
   ],
@@ -201,16 +225,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "61efddb63eb2f43111cb5c98c1df7a27",
+    "cacheID": "1fbc522df16b2a763487b093c9d70d55",
     "id": null,
     "metadata": {},
     "name": "useChatManagementCreateMutation",
     "operationKind": "mutation",
-    "text": "mutation useChatManagementCreateMutation(\n  $userID: ID!\n) {\n  createDirectChat(userID: $userID) {\n    __typename\n    ... on Chat {\n      id\n      type\n      title\n      photoUrl\n      unreadCount\n      isPinned\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on ValidationError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "mutation useChatManagementCreateMutation(\n  $userID: ID!\n) {\n  createDirectChat(userID: $userID) {\n    __typename\n    ... on Chat {\n      id\n      type\n      title\n      photoUrl\n      unreadCount\n      isPinned\n      myRole\n      lastReadSequence\n      myReadSequence\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on ValidationError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "7f9f31304f1d58c59a926ba6a3b484c8";
+(node as any).hash = "ff806bb8cbbb76a6643d75a9c0ac7127";
 
 export default node;

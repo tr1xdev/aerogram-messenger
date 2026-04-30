@@ -153,11 +153,42 @@ func (r *mutationResolver) CreateBot(ctx context.Context, username string, first
 
 	botProto := resp.GetUser()
 	botID, _ := uuid.Parse(botProto.Id)
+	ownerUUID, _ := uuid.Parse(authID)
+
+	createdAt := time.Now()
+	if botProto.CreatedAt != nil {
+		createdAt = botProto.CreatedAt.AsTime()
+	}
 
 	botUser := dbgen.User{
-		ID:        botID,
-		FirstName: botProto.FirstName,
-		IsBot:     true,
+		ID:             botID,
+		FirstName:      botProto.FirstName,
+		IsBot:          true,
+		BotOwnerID:     uuid.NullUUID{UUID: ownerUUID, Valid: true},
+		Status:         "ONLINE",
+		IsPremium:      botProto.IsPremium,
+		IsVerified:     botProto.IsVerified,
+		CreatedAt:      createdAt,
+		UpdatedAt:      createdAt,
+		Email:          helpers.ToNullString(botProto.Email),
+		LastName:       helpers.ToNullString(botProto.LastName),
+		Bio:            helpers.ToNullString(botProto.Bio),
+		BotDescription: helpers.ToNullString(botProto.BotDescription),
+		PhotoUrl:       helpers.ToNullString(botProto.PhotoUrl),
+	}
+
+	if botProto.Username != nil {
+		botUser.Username = sql.NullString{
+			String: *botProto.Username,
+			Valid:  *botProto.Username != "",
+		}
+	}
+
+	if botProto.BotCommands != nil && *botProto.BotCommands != "" {
+		botUser.BotCommands = pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(*botProto.BotCommands),
+			Valid:      true,
+		}
 	}
 
 	tokenResp, err := r.AuthClient.CreateBotToken(ctx, &authv1.CreateBotTokenRequest{
@@ -545,7 +576,7 @@ func (r *userResolver) Bio(ctx context.Context, obj *dbgen.User) (*string, error
 		return &obj.Bio.String, nil
 	}
 	u, err := loaders.LoadUser(ctx, obj.ID.String())
-	if err != nil {
+	if err != nil || u == nil {
 		return nil, nil
 	}
 	return helpers.ToStringPtr(u.Bio), nil
@@ -571,7 +602,7 @@ func (r *userResolver) BotDescription(ctx context.Context, obj *dbgen.User) (*st
 		return &obj.BotDescription.String, nil
 	}
 	u, err := loaders.LoadUser(ctx, obj.ID.String())
-	if err != nil {
+	if err != nil || u == nil {
 		return nil, nil
 	}
 	return helpers.ToStringPtr(u.BotDescription), nil
@@ -579,16 +610,28 @@ func (r *userResolver) BotDescription(ctx context.Context, obj *dbgen.User) (*st
 
 // BotCommands is the resolver for the botCommands field.
 func (r *userResolver) BotCommands(ctx context.Context, obj *dbgen.User) (*string, error) {
-	if obj.BotCommands.Valid {
+	if obj.BotCommands.Valid && len(obj.BotCommands.RawMessage) > 0 {
 		str := string(obj.BotCommands.RawMessage)
 		return &str, nil
 	}
 	u, err := loaders.LoadUser(ctx, obj.ID.String())
-	if err != nil || !u.BotCommands.Valid {
+	if err != nil || u == nil || !u.BotCommands.Valid {
 		return nil, nil
 	}
 	str := string(u.BotCommands.RawMessage)
 	return &str, nil
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *userResolver) CreatedAt(ctx context.Context, obj *dbgen.User) (string, error) {
+	if !obj.CreatedAt.IsZero() {
+		return obj.CreatedAt.Format(time.RFC3339), nil
+	}
+	u, err := loaders.LoadUser(ctx, obj.ID.String())
+	if err != nil || u == nil {
+		return time.Now().Format(time.RFC3339), nil
+	}
+	return u.CreatedAt.Format(time.RFC3339), nil
 }
 
 // User returns graph.UserResolver implementation.

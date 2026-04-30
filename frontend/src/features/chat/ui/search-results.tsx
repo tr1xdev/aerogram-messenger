@@ -1,7 +1,7 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Chat, User, ChatMember } from "@/entities/chat/model/types";
 import { Globe, MessageSquare, Search } from "lucide-react";
+import { UserAvatar } from "@/components/user-avatar";
 
 interface SearchResultsProps {
   readonly query: string;
@@ -79,7 +79,7 @@ export function SearchResults({
         <div className="pb-10 animate-in fade-in duration-300">
           {hasLocal && (
             <div className="px-2 pt-2">
-              <div className="flex items-center gap-2 px-3 py-2.5 text-[11px] uppercase tracking-[0.1em] font-bold text-muted-foreground/50">
+              <div className="flex items-center gap-2 px-3 py-2.5 text-[11px] uppercase tracking-[0.1em] font-bold text-muted-foreground/70">
                 <MessageSquare className="h-3 w-3" />
                 <span>Chats and Contacts</span>
               </div>
@@ -91,11 +91,12 @@ export function SearchResults({
                       onClick={(): void => onSelectChat(chat.id)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
                     >
-                      <Avatar className="h-12 w-12 border border-border/40">
-                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                          {chat.title?.[0]?.toUpperCase() || "?"}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        src={chat.photoUrl}
+                        fallback={chat.title || "?"}
+                        size={48}
+                        className="border border-border/40"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-[14.5px] font-medium truncate text-foreground">
                           {chat.title}
@@ -113,26 +114,29 @@ export function SearchResults({
 
           {hasGlobal && (
             <div className="px-2 pt-4">
-              <div className="flex items-center gap-2 px-3 py-2.5 text-[11px] uppercase tracking-[0.1em] font-bold text-muted-foreground/50">
+              <div className="flex items-center gap-2 px-3 py-2.5 text-[11px] uppercase tracking-[0.1em] font-bold text-muted-foreground/70">
                 <Globe className="h-3 w-3" />
                 <span>Global Search</span>
               </div>
               <div className="space-y-0.5">
-                {uniqueGlobalUsers.map(
-                  (user: User): React.ReactNode => (
+                {uniqueGlobalUsers.map((user: User): React.ReactNode => {
+                  const fullName =
+                    `${user.firstName} ${user.lastName || ""}`.trim();
+                  return (
                     <button
                       key={user.id}
                       onClick={(): void => onSelectUser(user.id)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
                     >
-                      <Avatar className="h-12 w-12 border border-border/40">
-                        <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
-                          {user.firstName?.[0] || user.username?.[0] || "?"}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        src={user.photoUrl}
+                        fallback={fullName || user.username || "?"}
+                        size={48}
+                        className="border border-border/40"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-[14.5px] font-medium truncate text-foreground">
-                          {user.firstName} {user.lastName || ""}
+                          {fullName}
                         </p>
                         {user.username && (
                           <p className="text-[12px] text-muted-foreground/80">
@@ -141,8 +145,8 @@ export function SearchResults({
                         )}
                       </div>
                     </button>
-                  ),
-                )}
+                  );
+                })}
               </div>
             </div>
           )}

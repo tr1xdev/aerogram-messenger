@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
-import { ChatUserPopover } from "./chat-user-popover";
+import { ChatEntityDetails } from "./chat-entity-details";
 import type { chatHeader_user$key } from "./__generated__/chatHeader_user.graphql";
 
 const ChatHeaderUserFragment = graphql`
@@ -42,33 +42,36 @@ const ChatHeaderUserFragment = graphql`
 `;
 
 interface ChatHeaderProps {
+  id: string;
   title?: string;
   photoUrl?: string;
   totalUnread: number;
-  meId: string | undefined;
   isLoading: boolean;
   userRef: chatHeader_user$key | null;
+  type: "PRIVATE" | "GROUP" | "CHANNEL";
+  membersCount?: number;
 }
 
 export const ChatHeader = memo(function ChatHeader({
+  id,
   title,
   photoUrl,
   totalUnread,
   isLoading,
   userRef,
+  type,
+  membersCount = 0,
 }: ChatHeaderProps): ReactNode {
   const navigate = useNavigate();
   const [now, setNow] = useState<number>((): number => Date.now());
-
   const user = useFragment(ChatHeaderUserFragment, userRef);
 
+  const isTyping: boolean = user?.isTyping ?? false;
   const rawStatus: string = user?.status ?? "offline";
   const isOnline: boolean = useMemo(
     (): boolean => rawStatus.toLowerCase() === "online",
     [rawStatus],
   );
-
-  const isTyping: boolean = user?.isTyping ?? false;
 
   useEffect((): (() => void) | void => {
     const interval: ReturnType<typeof setInterval> = setInterval((): void => {
@@ -78,15 +81,56 @@ export const ChatHeader = memo(function ChatHeader({
   }, []);
 
   const statusText: string = useMemo((): string => {
-    if (isTyping) return "typing";
+    if (type === "CHANNEL" || type === "GROUP") {
+      return `${membersCount} ${membersCount === 1 ? "member" : "members"}`;
+    }
+    if (isTyping) return "typing...";
     return formatLastSeen(rawStatus, new Date(now));
-  }, [rawStatus, isTyping, now]);
+  }, [type, membersCount, isTyping, rawStatus, now]);
 
   const effectivePhotoUrl: string | undefined = useMemo(():
     | string
     | undefined => {
     return photoUrl || user?.photoUrl || undefined;
   }, [user?.photoUrl, photoUrl]);
+
+  const showVerifiedBadge: boolean = useMemo((): boolean => {
+    if (type === "PRIVATE") {
+      return user?.isVerified ?? false;
+    }
+    return false;
+  }, [type, user?.isVerified]);
+
+  const renderInfo = (): ReactNode => (
+    <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
+      <UserAvatar
+        src={effectivePhotoUrl}
+        fallback={title || "Chat"}
+        size={40}
+        className="border border-border/40"
+      />
+      <div className="flex flex-col min-w-0 py-0.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[15px] font-bold truncate leading-tight">
+            {title}
+          </span>
+          {showVerifiedBadge && (
+            <MdVerified className="text-[#2196f3] shrink-0 text-[16px] self-center" />
+          )}
+        </div>
+        <span
+          className={cn(
+            "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",
+            type === "PRIVATE" && (isTyping || isOnline)
+              ? "text-primary"
+              : "text-muted-foreground",
+          )}
+        >
+          {statusText}
+        </span>
+      </div>
+    </div>
+  );
 
   return (
     <header className="flex h-16 items-center justify-between px-4 border-b shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -96,14 +140,14 @@ export const ChatHeader = memo(function ChatHeader({
             variant="ghost"
             size="icon"
             onClick={(): void => {
-              navigate({ to: "/" }).catch((): void => {});
+              void navigate({ to: "/" });
             }}
             className="shrink-0"
           >
             <ChevronLeft className="h-6 w-6" />
           </Button>
           {totalUnread > 0 && (
-            <span className="absolute top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold border-2 border-background px-1 z-60">
+            <span className="absolute top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold border-2 border-background px-1">
               {totalUnread}
             </span>
           )}
@@ -117,38 +161,14 @@ export const ChatHeader = memo(function ChatHeader({
               <Skeleton className="h-3 w-16" />
             </div>
           </div>
-        ) : user ? (
-          <ChatUserPopover userId={user.id}>
-            <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
-              <UserAvatar
-                src={effectivePhotoUrl}
-                fallback={title || "Chat"}
-                size={40}
-                className="border border-border/40"
-              />
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-[15px] font-bold truncate leading-none">
-                    {title}
-                  </span>
-                  {user.isVerified && (
-                    <MdVerified className="text-[#2196f3] shrink-0 text-[16px]" />
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",
-                    isTyping || isOnline
-                      ? "text-primary"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {isTyping ? "typing..." : statusText}
-                </span>
-              </div>
-            </div>
-          </ChatUserPopover>
-        ) : null}
+        ) : (
+          <ChatEntityDetails
+            id={type === "PRIVATE" ? (user?.id ?? id) : id}
+            type={type}
+          >
+            {renderInfo()}
+          </ChatEntityDetails>
+        )}
       </div>
 
       <div className="flex items-center gap-1">
@@ -182,24 +202,32 @@ export const ChatHeader = memo(function ChatHeader({
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem>
               <Search className="mr-2 h-4 w-4" />
-              <span>Search messages</span>
+              <span className="text-xs font-bold uppercase">
+                Search messages
+              </span>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <BellOff className="mr-2 h-4 w-4" />
-              <span>Mute notifications</span>
+              <span className="text-xs font-bold uppercase">
+                Mute notifications
+              </span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Shield className="mr-2 h-4 w-4" />
-              <span>Start secret chat</span>
-            </DropdownMenuItem>
+            {type === "PRIVATE" && (
+              <DropdownMenuItem>
+                <Shield className="mr-2 h-4 w-4" />
+                <span className="text-xs font-bold uppercase">
+                  Start secret chat
+                </span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive">
               <Ban className="mr-2 h-4 w-4" />
-              <span>Block user</span>
+              <span className="text-xs font-bold uppercase">Block</span>
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete chat</span>
+              <span className="text-xs font-bold uppercase">Delete chat</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

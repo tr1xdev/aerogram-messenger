@@ -25,6 +25,7 @@ interface ChatScrollResult {
   scrollRef: RefObject<HTMLDivElement | null>;
   showScrollBtn: boolean;
   unreadCount: number;
+  isAtBottom: boolean;
   scrollToBottom: (behavior?: ScrollBehavior) => void;
 }
 
@@ -36,6 +37,7 @@ export function useChatScroll({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
 
   const isPinnedToBottom = useRef<boolean>(true);
   const prevMessagesLength = useRef<number>(0);
@@ -61,6 +63,7 @@ export function useChatScroll({
       if (!viewport) return;
 
       isPinnedToBottom.current = true;
+      setIsAtBottom(true);
 
       requestAnimationFrame((): void => {
         setShowScrollBtn(false);
@@ -89,8 +92,8 @@ export function useChatScroll({
 
     const isNearBottom: boolean = distanceToBottom <= 50;
     isPinnedToBottom.current = isNearBottom;
-
     setShowScrollBtn(!isNearBottom);
+    setIsAtBottom(isNearBottom);
 
     if (isNearBottom && unreadCount > 0) {
       requestAnimationFrame((): void => setUnreadCount(0));
@@ -115,6 +118,9 @@ export function useChatScroll({
       isInitialRender.current = true;
       prevMessagesLength.current = 0;
       isPinnedToBottom.current = true;
+      requestAnimationFrame((): void => {
+        setIsAtBottom(true);
+      });
     }
 
     const isNewMessage: boolean = messages.length > prevMessagesLength.current;
@@ -170,5 +176,5 @@ export function useChatScroll({
     };
   }, [getViewport]);
 
-  return { scrollRef, showScrollBtn, unreadCount, scrollToBottom };
+  return { scrollRef, showScrollBtn, unreadCount, isAtBottom, scrollToBottom };
 }

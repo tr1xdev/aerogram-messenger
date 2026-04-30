@@ -39,6 +39,7 @@ type Query {
   mySessions: [Session!]!
   myChats: MyChatsResult!
   chat(id: ID, slug: String): ChatResult!
+  chatMembers(chatID: ID!, limit: Int, offset: Int): ChatMembersResult!
   messageHistory(chatId: ID!, limit: Int!, beforeSequence: Long): MessageHistoryResult!
   dialogRead(chatId: ID!): ReadPayload!
   node(id: ID!): Node
@@ -61,6 +62,12 @@ type Mutation {
   createDirectChat(userID: ID!): CreateChatResult!
   pinChat(id: ID!, pinned: Boolean!): PinChatResult!
   deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
+  leaveChat(chatID: ID!): LeaveChatResult!
+  inviteToChat(chatID: ID!, userIds: [ID!]!): InviteResult!
+  joinChatBySlug(slug: String!): JoinChatResult!
+  removeChatMember(chatID: ID!, userID: ID!): RemoveMemberResult!
+  updateMemberRole(chatID: ID!, userID: ID!, role: String!): SuccessResult!
+  updateChatPermissions(chatID: ID!, permissions: ChatPermissionsInput!): SuccessResult!
   sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
   sendMessage(chatId: ID!, text: String!, replyToId: ID): SendMessageResult!
   updateMessage(id: ID!, text: String!): SendMessageResult!
@@ -80,9 +87,21 @@ enum ChatType {
   CHANNEL
 }
 
+type ChatPermissions {
+  canSendMessage: Boolean!
+  canInviteUsers: Boolean!
+  canEditMetadata: Boolean!
+  canDeleteMessages: Boolean!
+  canAssignAdmins: Boolean!
+  canSendMedia: Boolean!
+  canPinMessages: Boolean!
+}
+
 type ChatMember {
   user: User!
+  role: String!
   lastReadSequence: Long!
+  permissions: ChatPermissions!
 }
 
 type Chat implements Node {
@@ -96,8 +115,11 @@ type Chat implements Node {
   myReadSequence: Long!
   lastReadSequence: Long!
   isPinned: Boolean!
+  canWrite: Boolean!
+  permissions: ChatPermissions!
   lastMessage: Message
-  members: [ChatMember!]
+  members(limit: Int, offset: Int): [ChatMember!]
+  myRole: String!
   createdAt: String!
 }
 
@@ -105,19 +127,44 @@ type ChatList {
   chats: [Chat!]!
 }
 
+type ChatMembersList {
+  members: [ChatMember!]!
+  totalCount: Int!
+}
+
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 
 union MyChatsResult = ChatList | ForbiddenError | InternalError
 
-union CreateChatResult = Chat | ValidationError | ForbiddenError | InternalError
+union JoinChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 
-union PinChatResult = SuccessResult | ForbiddenError | InternalError
+union ChatMembersResult = ChatMembersList | ForbiddenError | NotFoundError | InternalError
 
-union DeleteChatResult = SuccessResult | ForbiddenError | InternalError
+union CreateChatResult = Chat | ValidationError | ForbiddenError | InternalError | NotFoundError
+
+union PinChatResult = SuccessResult | ForbiddenError | InternalError | NotFoundError
+
+union DeleteChatResult = SuccessResult | ForbiddenError | InternalError | NotFoundError
+
+union LeaveChatResult = SuccessResult | ForbiddenError | InternalError | NotFoundError
+
+union InviteResult = SuccessResult | ValidationError | ForbiddenError | InternalError | NotFoundError
+
+union RemoveMemberResult = SuccessResult | ForbiddenError | NotFoundError | InternalError
 
 type TypingPayload {
   userId: ID!
   isTyping: Boolean!
+}
+
+input ChatPermissionsInput {
+  canSendMessage: Boolean
+  canInviteUsers: Boolean
+  canEditMetadata: Boolean
+  canDeleteMessages: Boolean
+  canAssignAdmins: Boolean
+  canSendMedia: Boolean
+  canPinMessages: Boolean
 }
 
 type Subscription {
@@ -217,6 +264,7 @@ type User implements Node {
   isTyping: Boolean!
   botDescription: String
   botCommands: String
+  createdAt: String!
 }
 
 input UpdateUserInput {

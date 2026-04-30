@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<1ca2889bdaae7c33b1458c4728f3b035>>
+ * @generated SignedSource<<ddb37052efdfc9806c0ba2dd7d309389>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,6 +16,7 @@ export type useChatsMyChatsQuery$data = {
     readonly __typename: "ChatList";
     readonly chats: ReadonlyArray<{
       readonly id: string;
+      readonly unreadCount: number;
       readonly " $fragmentSpreads": FragmentRefs<"chatMenuItem_chat">;
     }>;
     readonly " $fragmentSpreads": FragmentRefs<"useAppTitle_chats">;
@@ -51,7 +52,14 @@ v1 = {
   "name": "id",
   "storageKey": null
 },
-v2 = [
+v2 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "unreadCount",
+  "storageKey": null
+},
+v3 = [
   {
     "alias": null,
     "args": null,
@@ -60,40 +68,40 @@ v2 = [
     "storageKey": null
   }
 ],
-v3 = {
+v4 = {
   "kind": "InlineFragment",
-  "selections": (v2/*: any*/),
+  "selections": (v3/*: any*/),
   "type": "ForbiddenError",
   "abstractKey": null
 },
-v4 = {
+v5 = {
   "kind": "InlineFragment",
-  "selections": (v2/*: any*/),
+  "selections": (v3/*: any*/),
   "type": "InternalError",
   "abstractKey": null
 },
-v5 = {
+v6 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "photoUrl",
   "storageKey": null
 },
-v6 = {
+v7 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "firstName",
   "storageKey": null
 },
-v7 = {
+v8 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "lastName",
   "storageKey": null
 },
-v8 = {
+v9 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -133,6 +141,7 @@ return {
                 "plural": true,
                 "selections": [
                   (v1/*: any*/),
+                  (v2/*: any*/),
                   {
                     "args": null,
                     "kind": "FragmentSpread",
@@ -145,8 +154,8 @@ return {
             "type": "ChatList",
             "abstractKey": null
           },
-          (v3/*: any*/),
-          (v4/*: any*/)
+          (v4/*: any*/),
+          (v5/*: any*/)
         ],
         "storageKey": null
       }
@@ -180,13 +189,7 @@ return {
                 "name": "chats",
                 "plural": true,
                 "selections": [
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "unreadCount",
-                    "storageKey": null
-                  },
+                  (v2/*: any*/),
                   (v1/*: any*/),
                   {
                     "alias": null,
@@ -202,12 +205,19 @@ return {
                     "name": "type",
                     "storageKey": null
                   },
-                  (v5/*: any*/),
+                  (v6/*: any*/),
                   {
                     "alias": null,
                     "args": null,
                     "kind": "ScalarField",
                     "name": "isPinned",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "kind": "ScalarField",
+                    "name": "myRole",
                     "storageKey": null
                   },
                   {
@@ -256,9 +266,9 @@ return {
                         "plural": false,
                         "selections": [
                           (v1/*: any*/),
-                          (v6/*: any*/),
                           (v7/*: any*/),
                           (v8/*: any*/),
+                          (v9/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -289,10 +299,10 @@ return {
                         "plural": false,
                         "selections": [
                           (v1/*: any*/),
-                          (v6/*: any*/),
                           (v7/*: any*/),
                           (v8/*: any*/),
-                          (v5/*: any*/),
+                          (v9/*: any*/),
+                          (v6/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -320,24 +330,24 @@ return {
             "type": "ChatList",
             "abstractKey": null
           },
-          (v3/*: any*/),
-          (v4/*: any*/)
+          (v4/*: any*/),
+          (v5/*: any*/)
         ],
         "storageKey": null
       }
     ]
   },
   "params": {
-    "cacheID": "4df55dba7c2dba6f6b18c42712ba9803",
+    "cacheID": "165f5aa72ef4a0db99e0821ff3cd5893",
     "id": null,
     "metadata": {},
     "name": "useChatsMyChatsQuery",
     "operationKind": "query",
-    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      ...useAppTitle_chats\n      chats {\n        id\n        ...chatMenuItem_chat\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useAppTitle_chats on ChatList {\n  chats {\n    unreadCount\n    id\n  }\n}\n"
+    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      ...useAppTitle_chats\n      chats {\n        id\n        unreadCount\n        ...chatMenuItem_chat\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useAppTitle_chats on ChatList {\n  chats {\n    unreadCount\n    id\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "2f6677c8a166ff8d8b55092182484224";
+(node as any).hash = "542d590ac5128efb48852012119fd51a";
 
 export default node;

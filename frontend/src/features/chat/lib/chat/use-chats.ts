@@ -13,6 +13,7 @@ const myChatsQuery = graphql`
         ...useAppTitle_chats
         chats {
           id
+          unreadCount
           ...chatMenuItem_chat
         }
       }
@@ -41,6 +42,15 @@ const chatDetailsQuery = graphql`
         unreadCount
         isPinned
         lastReadSequence
+        myReadSequence
+        canWrite
+        permissions {
+          canSendMessage
+          canInviteUsers
+          canEditMetadata
+          canDeleteMessages
+          canAssignAdmins
+        }
         members {
           user {
             id
@@ -72,7 +82,7 @@ export function useMyChats(): MyChatsResponse {
   return useLazyLoadQuery<useChatsMyChatsQuery>(
     myChatsQuery,
     {},
-    { fetchPolicy: "store-and-network" },
+    { fetchPolicy: "store-or-network" },
   );
 }
 
@@ -80,6 +90,9 @@ export function useChatDetails(chatId: string): ChatDetailsResponse {
   return useLazyLoadQuery<useChatsDetailsQuery>(
     chatDetailsQuery,
     { id: chatId },
-    { fetchPolicy: "store-and-network" },
+    {
+      fetchPolicy: "store-or-network",
+      fetchKey: chatId,
+    },
   );
 }

@@ -12,6 +12,13 @@ service ChatService {
   rpc PinChat(PinChatRequest) returns (PinChatResponse);
   rpc GetChat(GetChatRequest) returns (GetChatResponse);
   rpc DeleteChat(DeleteChatRequest) returns (DeleteChatResponse);
+  rpc InviteToChat(InviteToChatRequest) returns (InviteToChatResponse);
+  rpc JoinChatBySlug(JoinChatBySlugRequest) returns (JoinChatBySlugResponse);
+  rpc UpdateMemberRole(UpdateMemberRoleRequest) returns (UpdateMemberRoleResponse);
+  rpc UpdateChatPermissions(UpdateChatPermissionsRequest) returns (UpdateChatPermissionsResponse);
+  rpc GetChatMembers(GetChatMembersRequest) returns (GetChatMembersResponse);
+  rpc LeaveChat(LeaveChatRequest) returns (LeaveChatResponse);
+  rpc RemoveChatMember(RemoveChatMemberRequest) returns (RemoveChatMemberResponse);
 }
 
 enum ChatType {
@@ -19,6 +26,22 @@ enum ChatType {
   CHAT_TYPE_PRIVATE = 1;
   CHAT_TYPE_GROUP = 2;
   CHAT_TYPE_CHANNEL = 3;
+}
+
+message ChatPermissions {
+  bool can_send_message = 1;
+  bool can_invite_users = 2;
+  bool can_edit_metadata = 3;
+  bool can_delete_messages = 4;
+  bool can_assign_admins = 5;
+  bool can_send_media = 6;
+  bool can_pin_messages = 7;
+}
+
+message ChatMember {
+  string user_id = 1;
+  string role = 2;
+  ChatPermissions permissions = 3;
 }
 
 message Chat {
@@ -37,6 +60,74 @@ message Chat {
   bool is_pinned = 13;
   int32 unread_count = 14;
   messages.v1.Message last_message = 15;
+  bool can_write = 16;
+  ChatPermissions permissions = 17;
+  string my_role = 18;
+}
+
+message JoinChatBySlugRequest {
+  string slug = 1;
+}
+
+message JoinChatBySlugResponse {
+  string chat_id = 1;
+  bool success = 2;
+}
+
+message UpdateMemberRoleRequest {
+  string chat_id = 1;
+  string target_user_id = 2;
+  string new_role = 3;
+}
+
+message UpdateMemberRoleResponse {
+  bool success = 1;
+}
+
+message UpdateChatPermissionsRequest {
+  string chat_id = 1;
+  ChatPermissions permissions = 2;
+}
+
+message UpdateChatPermissionsResponse {
+  bool success = 1;
+}
+
+message InviteToChatRequest {
+  string chat_id = 1;
+  repeated string user_ids = 2;
+}
+
+message InviteToChatResponse {
+  bool success = 1;
+}
+
+message RemoveChatMemberRequest {
+  string chat_id = 1;
+  string user_id = 2;
+}
+
+message LeaveChatResponse {
+  bool success = 1;
+}
+
+message LeaveChatRequest {
+  string chat_id = 1;
+}
+
+message RemoveChatMemberResponse {
+  bool success = 1;
+}
+
+message GetChatMembersRequest {
+  string chat_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetChatMembersResponse {
+  repeated ChatMember members = 1;
+  int32 total_count = 2;
 }
 
 message DeleteChatRequest {

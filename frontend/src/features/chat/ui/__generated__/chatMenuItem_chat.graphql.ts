@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<11ae8ddb3f95c50bdf8a4d330a8051a4>>
+ * @generated SignedSource<<aa7aba1e2b6e16ab283f31a72f02b0e3>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -39,6 +39,7 @@ export type chatMenuItem_chat$data = {
       readonly username: string | null | undefined;
     };
   }> | null | undefined;
+  readonly myRole: string;
   readonly photoUrl: string | null | undefined;
   readonly title: string;
   readonly type: ChatType;
@@ -120,6 +121,13 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "isPinned",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "myRole",
       "storageKey": null
     },
     {
@@ -231,6 +239,6 @@ return {
 };
 })();
 
-(node as any).hash = "1a2bdfb3ef6fc964703c852fa64c84b4";
+(node as any).hash = "aa4ae83ad5ad706f1ad35bccb8d721fb";
 
 export default node;

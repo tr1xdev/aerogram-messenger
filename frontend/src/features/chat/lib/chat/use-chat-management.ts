@@ -1,10 +1,16 @@
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import { toast } from "sonner";
 import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
+import { logger } from "@/shared/lib/logger";
 import type { useChatManagementSearchQuery } from "./__generated__/useChatManagementSearchQuery.graphql";
 import type { useChatManagementCreateMutation } from "./__generated__/useChatManagementCreateMutation.graphql";
 import type { useChatManagementPinMutation } from "./__generated__/useChatManagementPinMutation.graphql";
 import type { useChatManagementDeleteMutation } from "./__generated__/useChatManagementDeleteMutation.graphql";
+import type { useChatManagementInviteMutation } from "./__generated__/useChatManagementInviteMutation.graphql";
+import type {
+  useChatManagementCreateComplexMutation,
+  ChatType,
+} from "./__generated__/useChatManagementCreateComplexMutation.graphql";
 
 const searchUsersQuery = graphql`
   query useChatManagementSearchQuery($username: String!) {
@@ -18,7 +24,45 @@ const searchUsersQuery = graphql`
   }
 `;
 
-const createChatMutation = graphql`
+const createComplexChatMutation = graphql`
+  mutation useChatManagementCreateComplexMutation(
+    $type: ChatType!
+    $participantIds: [ID!]
+    $title: String
+    $slug: String
+  ) {
+    createChat(
+      type: $type
+      participantIds: $participantIds
+      title: $title
+      slug: $slug
+    ) {
+      __typename
+      ... on Chat {
+        id
+        type
+        title
+        photoUrl
+        unreadCount
+        isPinned
+        myRole
+        lastReadSequence
+        myReadSequence
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on ValidationError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
+
+const createDirectChatMutation = graphql`
   mutation useChatManagementCreateMutation($userID: ID!) {
     createDirectChat(userID: $userID) {
       __typename
@@ -29,6 +73,9 @@ const createChatMutation = graphql`
         photoUrl
         unreadCount
         isPinned
+        myRole
+        lastReadSequence
+        myReadSequence
       }
       ... on ForbiddenError {
         message
@@ -77,11 +124,27 @@ const deleteChatMutation = graphql`
   }
 `;
 
+const inviteToChatMutation = graphql`
+  mutation useChatManagementInviteMutation($chatID: ID!, $userIds: [ID!]!) {
+    inviteToChat(chatID: $chatID, userIds: $userIds) {
+      __typename
+      ... on SuccessResult {
+        success
+      }
+      ... on ForbiddenError {
+        message
+      }
+      ... on InternalError {
+        message
+      }
+    }
+  }
+`;
+
 export function useSearchUsers(
   username: string,
 ): useChatManagementSearchQuery["response"] | null {
   const isEnabled: boolean = username.trim().length > 0;
-
   const data = useLazyLoadQuery<useChatManagementSearchQuery>(
     searchUsersQuery,
     { username: isEnabled ? username : "" },
@@ -90,75 +153,96 @@ export function useSearchUsers(
       fetchKey: isEnabled ? username : "disabled",
     },
   );
-
   return isEnabled ? data : null;
 }
 
-export function useChatActions(chatId?: string): {
-  createChat: (
-    userID: string,
-    options?: {
-      onCompleted?: (
-        response: useChatManagementCreateMutation["response"],
-      ) => void;
-      onError?: (error: Error) => void;
-    },
-  ) => void;
-  togglePin: (pinned: boolean) => void;
-  deleteChat: (forEveryone?: boolean) => void;
-} {
-  const [createDirect] =
-    useMutation<useChatManagementCreateMutation>(createChatMutation);
+export function useChatActions(chatId?: string) {
+  const [createDirect] = useMutation<useChatManagementCreateMutation>(
+    createDirectChatMutation,
+  );
+  const [createComplex] = useMutation<useChatManagementCreateComplexMutation>(
+    createComplexChatMutation,
+  );
   const [pin] = useMutation<useChatManagementPinMutation>(pinChatMutation);
   const [remove] =
     useMutation<useChatManagementDeleteMutation>(deleteChatMutation);
+  const [invite] =
+    useMutation<useChatManagementInviteMutation>(inviteToChatMutation);
+
+  const updateStoreAfterCreate = (
+    store: RecordSourceSelectorProxy,
+    payload: RecordProxy | null,
+  ): void => {
+    if (!payload || payload.getType() !== "Chat") return;
+
+    const root: RecordProxy = store.getRoot();
+    const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
+    if (myChats && myChats.getType() === "ChatList") {
+      const chats: readonly RecordProxy[] =
+        myChats.getLinkedRecords("chats") ?? [];
+      const newId: string = payload.getValue("id") as string;
+
+      if (
+        !chats.some((c: RecordProxy): boolean => c.getValue("id") === newId)
+      ) {
+        myChats.setLinkedRecords([payload, ...chats], "chats");
+      }
+    }
+  };
 
   const createChat = (
     userID: string,
-    options?: {
-      onCompleted?: (
-        response: useChatManagementCreateMutation["response"],
-      ) => void;
-      onError?: (error: Error) => void;
-    },
+    options?: { onCompleted?: (id: string) => void },
   ): void => {
     createDirect({
       variables: { userID },
       updater: (store: RecordSourceSelectorProxy): void => {
-        const payload: RecordProxy | null =
-          store.getRootField("createDirectChat") ?? null;
-        if (!payload || payload.getType() !== "Chat") return;
-
-        const root: RecordProxy = store.getRoot();
-        const myChats: RecordProxy | null =
-          root.getLinkedRecord("myChats") ?? null;
-
-        if (myChats && myChats.getType() === "ChatList") {
-          const chats: ReadonlyArray<RecordProxy> =
-            myChats.getLinkedRecords("chats") ?? [];
-          const alreadyExists: boolean = chats.some(
-            (c: RecordProxy): boolean =>
-              c.getValue("id") === payload.getValue("id"),
-          );
-
-          if (!alreadyExists) {
-            myChats.setLinkedRecords([payload, ...chats], "chats");
-          }
-        }
+        updateStoreAfterCreate(store, store.getRootField("createDirectChat"));
       },
       onCompleted: (
         response: useChatManagementCreateMutation["response"],
       ): void => {
         const res = response.createDirectChat;
-        if (res.__typename !== "Chat" && "message" in res) {
-          toast.error(res.message as string);
-        } else {
-          options?.onCompleted?.(response);
+        if (res.__typename === "Chat") {
+          options?.onCompleted?.(res.id);
+        } else if ("message" in res) {
+          toast.error(res.message);
         }
       },
       onError: (err: Error): void => {
+        logger.error("CHAT", "createDirectChat failed", err);
         toast.error("Failed to create chat");
-        options?.onError?.(err);
+      },
+    });
+  };
+
+  const createGroupOrChannel = (
+    input: {
+      type: ChatType;
+      title: string;
+      participantIds: string[];
+      slug?: string;
+    },
+    options?: { onCompleted?: (id: string) => void },
+  ): void => {
+    createComplex({
+      variables: input,
+      updater: (store: RecordSourceSelectorProxy): void => {
+        updateStoreAfterCreate(store, store.getRootField("createChat"));
+      },
+      onCompleted: (
+        response: useChatManagementCreateComplexMutation["response"],
+      ): void => {
+        const res = response.createChat;
+        if (res.__typename === "Chat") {
+          options?.onCompleted?.(res.id);
+        } else if ("message" in res) {
+          toast.error(res.message);
+        }
+      },
+      onError: (err: Error): void => {
+        logger.error("CHAT", "createChat failed", err);
+        toast.error("Failed to create chat");
       },
     });
   };
@@ -167,27 +251,16 @@ export function useChatActions(chatId?: string): {
     if (!chatId) return;
     pin({
       variables: { id: chatId, pinned },
-      optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
-        const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
-        if (chatRecord) chatRecord.setValue(pinned, "isPinned");
-      },
-      updater: (store: RecordSourceSelectorProxy): void => {
-        const payload: RecordProxy | null = store.getRootField("pinChat");
-        if (payload && payload.getType() === "SuccessResult") {
-          const chatRecord: RecordProxy | null = store.get(chatId) ?? null;
-          if (chatRecord) chatRecord.setValue(pinned, "isPinned");
-        }
-      },
       onCompleted: (
         response: useChatManagementPinMutation["response"],
       ): void => {
         const res = response.pinChat;
         if (res.__typename !== "SuccessResult" && "message" in res) {
-          toast.error(res.message as string);
+          toast.error(res.message);
         }
       },
-      onError: (): void => {
-        toast.error("Action failed");
+      onError: (err: Error): void => {
+        logger.error("CHAT", "pinChat failed", err);
       },
     });
   };
@@ -198,15 +271,16 @@ export function useChatActions(chatId?: string): {
       variables: { id: chatId, forEveryone },
       updater: (store: RecordSourceSelectorProxy): void => {
         const root: RecordProxy = store.getRoot();
-        const myChats: RecordProxy | null =
-          root.getLinkedRecord("myChats") ?? null;
+        const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
         if (myChats && myChats.getType() === "ChatList") {
-          const chats: ReadonlyArray<RecordProxy> =
+          const chats: readonly RecordProxy[] =
             myChats.getLinkedRecords("chats") ?? [];
-          const nextChats: RecordProxy[] = chats.filter(
-            (c: RecordProxy): boolean => c.getValue("id") !== chatId,
+          myChats.setLinkedRecords(
+            chats.filter(
+              (c: RecordProxy): boolean => c.getValue("id") !== chatId,
+            ),
+            "chats",
           );
-          myChats.setLinkedRecords(nextChats, "chats");
         }
         store.delete(chatId);
       },
@@ -215,14 +289,41 @@ export function useChatActions(chatId?: string): {
       ): void => {
         const res = response.deleteChat;
         if (res.__typename !== "SuccessResult" && "message" in res) {
-          toast.error(res.message as string);
+          toast.error(res.message);
         }
       },
-      onError: (): void => {
+      onError: (err: Error): void => {
+        logger.error("CHAT", "deleteChat failed", err);
         toast.error("Failed to delete chat");
       },
     });
   };
 
-  return { createChat, togglePin, deleteChat };
+  const inviteUsers = (userIds: string[]): void => {
+    if (!chatId) return;
+    invite({
+      variables: { chatID: chatId, userIds },
+      onCompleted: (
+        response: useChatManagementInviteMutation["response"],
+      ): void => {
+        const res = response.inviteToChat;
+        if (res.__typename === "SuccessResult") {
+          toast.success("Users invited");
+        } else if ("message" in res) {
+          toast.error(res.message);
+        }
+      },
+      onError: (err: Error): void => {
+        logger.error("CHAT", "inviteToChat failed", err);
+      },
+    });
+  };
+
+  return {
+    createChat,
+    createGroupOrChannel,
+    togglePin,
+    deleteChat,
+    inviteUsers,
+  };
 }
