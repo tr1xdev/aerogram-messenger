@@ -52,7 +52,7 @@ The fastest way to launch the entire stack with automatic TLS:
 3. **Install SSL Trust:**
     To trust Caddy's local certificates in your browser and system:
     
-```bash
+    ```bash
     make setup-certs
     ```
 4. **Access the application:**
