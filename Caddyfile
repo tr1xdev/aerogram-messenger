@@ -1,0 +1,47 @@
+{
+}
+
+localhost:3443, :3443 {
+    root * /usr/share/caddy
+    encode zstd gzip
+
+    handle /query* {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    handle /media/* {
+        uri strip_prefix /media
+        reverse_proxy minio:9000
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+
+    handle_errors {
+        rewrite * /{err.status_code}.html
+        file_server
+    }
+
+    tls internal
+}
+
+:80 {
+    root * /usr/share/caddy
+
+    handle /query* {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}

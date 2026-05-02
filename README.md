@@ -39,36 +39,44 @@ cp .env.example .env
 
 ### Docker (Recommended)
 
-The fastest way to launch the entire stack with local certificates:
+The fastest way to launch the entire stack with automatic TLS:
 
-1.  **Clone this repository:**
+1. **Clone this repository:**
     ```bash
-    git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
+    git clone [https://github.com/tr1xdev/aerogram-messenger.git](https://github.com/tr1xdev/aerogram-messenger.git) && cd aerogram-messenger
     ```
-2.  **Build and start services:**
+2. **Build and start services:**
     ```bash
     docker compose up --build -d
     ```
-3.  **Access the application:**
-      * **Frontend:** [https://localhost:3443](https://www.google.com/search?q=https://localhost:3443)
-      * **Backend API:** [https://localhost:8080/query](https://www.google.com/search?q=https://localhost:8080/query)
+3. **Install SSL Trust:**
+    To trust Caddy's local certificates in your browser and system:
+    
+    ```bash
+    make setup-certs
+    ```
+4. **Access the application:**
+    * **Frontend:** [https://localhost:3443](https://localhost:3443)
+    * **Backend API:** [https://localhost:3443/query](https://localhost:3443/query)
 
 ### Local Development
 
-1.  **Setup Infrastructure & Deps:**
+1. **Setup Infrastructure & Deps:**
     ```bash
     make infra          # Starts Postgres & Redis containers
     make install-deps   # Installs Go/NPM modules & GeoIP data
     ```
-2.  **Code Generation:**
+2. **Generate TLS Certificates:**
+    Required for secure communication outside Docker:
+    ```bash
+    mkdir -p certs && mkcert -install && mkcert -destdir certs localhost
+    ```
+3. **Code Generation:**
     ```bash
     make proto gql      # Generates gRPC and GraphQL code
     ```
-3.  **Run Services (in separate terminals):**
+4. **Run Services (in separate terminals):**
     ```bash
     make dev-backend    # Starts Go server at https://localhost:8080
     make dev-frontend   # Starts Vite at http://localhost:5173
     ```
-
-> [\!IMPORTANT]
-> **Note on TLS:** The application requires SSL certificates in `certs/` (`localhost+2.pem` and `localhost+2-key.pem`). You can generate them using [mkcert](https://github.com/FiloSottile/mkcert) via `mkcert localhost`.

@@ -120,8 +120,16 @@ func main() {
 		PresenceClient: presencev1.NewPresenceServiceClient(conn),
 	})
 
-	tlsConfig := internal_tls.LoadServerConfig("certs/localhost+2.pem", "certs/localhost+2-key.pem")
+	certPath := os.Getenv("TLS_CERT_PATH")
+	if certPath == "" {
+		certPath = "certs/localhost+2.pem"
+	}
+	keyPath := os.Getenv("TLS_KEY_PATH")
+	if keyPath == "" {
+		keyPath = "certs/localhost+2-key.pem"
+	}
 
+	tlsConfig := internal_tls.LoadServerConfig(certPath, keyPath)
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 
 	httpServer := &http.Server{
