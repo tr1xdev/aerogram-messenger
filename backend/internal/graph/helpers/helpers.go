@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,189 +27,74 @@ func NewChatEnricher(store dbgen.Querier, s3 *storage.S3Storage) *ChatEnricher {
 	}
 }
 
-func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *chatv1.Chat) (*model.Chat, error) {
-	parsedAuthID, err := uuid.Parse(authID)
-	if err != nil {
-		return nil, err
-	}
-
+func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *chatv1.Chat) (*model.ChatExtended, error) {
 	chatID, err := uuid.Parse(pbChat.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	chatType := model.ChatTypePrivate
-	switch pbChat.Type {
-	case chatv1.ChatType_CHAT_TYPE_GROUP:
-		chatType = model.ChatTypeGroup
-	case chatv1.ChatType_CHAT_TYPE_CHANNEL:
-		chatType = model.ChatTypeChannel
-	}
-
-	dbMembers, err := e.store.GetDialogMembers(ctx, chatID)
-	if err != nil {
-		dbMembers = []dbgen.GetDialogMembersRow{}
-	}
-
-	idsMap := make(map[uuid.UUID]bool)
-	var isPinned bool
-	var myReadSeq int64
-	var pReadSeq int64
-
-	for _, m := range dbMembers {
-		idsMap[m.UserID] = true
-		if m.UserID == parsedAuthID {
-			isPinned = m.IsPinned
-			myReadSeq = m.LastReadSequence
-		} else {
-			if m.LastReadSequence > pReadSeq {
-				pReadSeq = m.LastReadSequence
-			}
+	var pinnedMsgID uuid.NullUUID
+	if pbChat.PinnedMessageId != nil && *pbChat.PinnedMessageId != "" {
+		if pID, err := uuid.Parse(*pbChat.PinnedMessageId); err == nil {
+			pinnedMsgID = uuid.NullUUID{UUID: pID, Valid: true}
 		}
 	}
 
-	var lastMsg *model.Message
+	var lastMsgID uuid.NullUUID
 	if pbChat.LastMessageId != "" {
-		if mID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
-			if m, err := e.store.GetMessageByID(ctx, mID); err == nil {
-				lastMsg = MapDBMessageToModel(&m)
-				if m.AuthorID != uuid.Nil {
-					idsMap[m.AuthorID] = true
-				}
-			}
+		if lID, err := uuid.Parse(pbChat.LastMessageId); err == nil {
+			lastMsgID = uuid.NullUUID{UUID: lID, Valid: true}
 		}
 	}
 
-	userIDs := make([]uuid.UUID, 0, len(idsMap))
-	for id := range idsMap {
-		userIDs = append(userIDs, id)
+	ext := &model.ChatExtended{
+		Dialog: dbgen.Dialog{
+			ID:              chatID,
+			Type:            strings.TrimPrefix(pbChat.Type.String(), "CHAT_TYPE_"),
+			Name:            sql.NullString{String: pbChat.Title, Valid: pbChat.Title != ""},
+			Username:        sql.NullString{String: pbChat.Slug, Valid: pbChat.Slug != ""},
+			PhotoUrl:        sql.NullString{String: pbChat.PhotoUrl, Valid: pbChat.PhotoUrl != ""},
+			Bio:             ToNullString(pbChat.Bio),
+			Description:     ToNullString(pbChat.Description),
+			PinnedMessageID: pinnedMsgID,
+			LastMessageID:   lastMsgID,
+			MembersCount:    pbChat.MembersCount,
+			IsVerified:      pbChat.IsVerified,
+			IsActive:        pbChat.CanWrite,
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		},
+		UnreadCount: int(pbChat.UnreadCount),
 	}
 
-	dbUsers, _ := e.store.GetUsersByIDs(ctx, userIDs)
-	userMap := make(map[uuid.UUID]*dbgen.User)
-	for i := range dbUsers {
-		u := dbUsers[i]
-		if u.PhotoUrl.Valid && u.PhotoUrl.String != "" {
-			if signed, err := e.s3.GetPresignedURL(ctx, u.PhotoUrl.String, time.Hour*24); err == nil {
-				u.PhotoUrl.String = signed
-			}
-		}
-		userMap[u.ID] = &u
-	}
-
-	var gqlMembers []*model.ChatMember
-	canSeeAllMembers := true
-	if chatType == model.ChatTypeChannel {
-		if pbChat.MyRole != "owner" && pbChat.MyRole != "admin" {
-			canSeeAllMembers = false
-		}
-	}
-
-	for _, m := range dbMembers {
-		if !canSeeAllMembers && m.UserID != parsedAuthID {
-			continue
-		}
-		if u, ok := userMap[m.UserID]; ok {
-			gqlMembers = append(gqlMembers, &model.ChatMember{
-				User:             u,
-				Role:             m.Role,
-				LastReadSequence: m.LastReadSequence,
-				Permissions: &model.ChatPermissions{
-					CanSendMessage:    true,
-					CanInviteUsers:    true,
-					CanEditMetadata:   false,
-					CanDeleteMessages: false,
-					CanAssignAdmins:   false,
-					CanSendMedia:      true,
-					CanPinMessages:    false,
-				},
-			})
+	if authID != "" {
+		uid, _ := uuid.Parse(authID)
+		member, err := e.store.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+			DialogID: chatID,
+			UserID:   uid,
+		})
+		if err == nil {
+			ext.Role = member.Role
+			ext.IsPinned = member.IsPinned
+			ext.MyReadSequence = member.LastReadSequence
 		}
 	}
 
-	displayTitle := pbChat.Title
-	var displayPhoto *string
+	return ext, nil
+}
 
-	if pbChat.PhotoUrl != "" {
-		if signed, err := e.s3.GetPresignedURL(ctx, pbChat.PhotoUrl, time.Hour*24); err == nil {
-			displayPhoto = &signed
-		}
+func (e *ChatEnricher) EnrichMessage(ctx context.Context, messageID string) (*model.Message, error) {
+	uid, err := uuid.Parse(messageID)
+	if err != nil {
+		return nil, err
 	}
 
-	if chatType == model.ChatTypePrivate {
-		foundPartner := false
-		for _, m := range dbMembers {
-			if m.UserID != parsedAuthID {
-				if u, ok := userMap[m.UserID]; ok {
-					displayTitle = FormatFullName(u.FirstName, u.LastName)
-					if (displayPhoto == nil || *displayPhoto == "") && u.PhotoUrl.Valid {
-						displayPhoto = &u.PhotoUrl.String
-					}
-					foundPartner = true
-					break
-				}
-			}
-		}
-		if !foundPartner {
-			if u, ok := userMap[parsedAuthID]; ok {
-				displayTitle = FormatFullName(u.FirstName, u.LastName)
-				if (displayPhoto == nil || *displayPhoto == "") && u.PhotoUrl.Valid {
-					displayPhoto = &u.PhotoUrl.String
-				}
-			} else if displayTitle == "" {
-				displayTitle = "Deleted Account"
-			}
-		}
+	msg, err := e.store.GetMessageByID(ctx, uid)
+	if err != nil {
+		return nil, err
 	}
 
-	if displayTitle == "" {
-		displayTitle = "Untitled Chat"
-	}
-
-	uCount, _ := e.store.CountUnreadMessages(ctx, dbgen.CountUnreadMessagesParams{
-		DialogID: chatID,
-		AuthorID: parsedAuthID,
-		Sequence: myReadSeq,
-	})
-
-	permissions := &model.ChatPermissions{
-		CanSendMessage:    true,
-		CanInviteUsers:    true,
-		CanEditMetadata:   true,
-		CanDeleteMessages: true,
-		CanAssignAdmins:   true,
-		CanSendMedia:      true,
-		CanPinMessages:    true,
-	}
-
-	if pbChat.Permissions != nil {
-		permissions.CanSendMessage = pbChat.Permissions.CanSendMessage
-		permissions.CanInviteUsers = pbChat.Permissions.CanInviteUsers
-		permissions.CanEditMetadata = pbChat.Permissions.CanEditMetadata
-		permissions.CanDeleteMessages = pbChat.Permissions.CanDeleteMessages
-		permissions.CanAssignAdmins = pbChat.Permissions.CanAssignAdmins
-		permissions.CanSendMedia = pbChat.Permissions.CanSendMedia
-		permissions.CanPinMessages = pbChat.Permissions.CanPinMessages
-	}
-
-	return &model.Chat{
-		ID:               pbChat.Id,
-		Type:             chatType,
-		Title:            displayTitle,
-		PhotoURL:         displayPhoto,
-		Slug:             &pbChat.Slug,
-		MembersCount:     int(pbChat.MembersCount),
-		Members:          gqlMembers,
-		LastMessage:      lastMsg,
-		UnreadCount:      int(uCount),
-		IsPinned:         isPinned,
-		MyReadSequence:   myReadSeq,
-		LastReadSequence: pReadSeq,
-		CanWrite:         pbChat.CanWrite,
-		Permissions:      permissions,
-		MyRole:           pbChat.MyRole,
-		CreatedAt:        time.Now().Format(time.RFC3339),
-	}, nil
+	return MapDBMessageToModel(&msg), nil
 }
 
 func (e *ChatEnricher) EnrichUser(ctx context.Context, userID string) (*dbgen.User, error) {
