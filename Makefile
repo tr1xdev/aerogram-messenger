@@ -1,6 +1,6 @@
 .PHONY: all proto gql generate build-backend build-frontend install-deps \
         dev-backend dev-frontend test test-coverage clean download-geoip \
-        infra stop-infra help
+        infra stop-infra help setup-certs
 
 GREEN  := \033[0;32m
 YELLOW := \033[0;33m
@@ -19,30 +19,40 @@ help:
 	@echo "$(YELLOW)Aerogram Messenger - Development Toolkit$(RESET)"
 	@echo ""
 	@echo "$(CYAN)Infrastructure:$(RESET)"
-	@echo "  make infra           - Start Postgres and Redis (Docker)"
-	@echo "  make stop-infra      - Stop infrastructure containers"
+	@echo "  make infra            - Start Postgres and Redis (Docker)"
+	@echo "  make stop-infra       - Stop infrastructure containers"
+	@echo "  make setup-certs      - Install Caddy CA to Windows & WSL2"
 	@echo ""
 	@echo "$(CYAN)Development:$(RESET)"
-	@echo "  make dev-backend     - Run Go API with local env and TLS"
-	@echo "  make dev-frontend    - Run Vite frontend (Hot Reload)"
+	@echo "  make dev-backend      - Run Go API with local env and TLS"
+	@echo "  make dev-frontend     - Run Vite frontend (Hot Reload)"
 	@echo ""
 	@echo "$(CYAN)Code Generation:$(RESET)"
-	@echo "  make proto           - Generate gRPC code using Buf"
-	@echo "  make gql             - Generate GraphQL resolvers & models"
-	@echo "  make generate        - Run standard go generate"
+	@echo "  make proto            - Generate gRPC code using Buf"
+	@echo "  make gql              - Generate GraphQL resolvers & models"
+	@echo "  make generate         - Run standard go generate"
 	@echo ""
 	@echo "$(CYAN)Testing & Quality:$(RESET)"
-	@echo "  make test            - Run all backend tests"
-	@echo "  make test-coverage   - Generate and view test coverage"
-	@echo "  make lint            - Run golangci-lint (if installed)"
+	@echo "  make test             - Run all backend tests"
+	@echo "  make test-coverage    - Generate and view test coverage"
+	@echo "  make lint             - Run golangci-lint (if installed)"
 	@echo ""
 	@echo "$(CYAN)Build & Cleanup:$(RESET)"
-	@echo "  make install-deps    - Install Go & NPM dependencies + GeoIP"
-	@echo "  make build-backend   - Compile optimized Go binary"
-	@echo "  make build-frontend  - Build production-ready frontend"
-	@echo "  make clean           - Remove binaries, gen-code and coverage"
+	@echo "  make install-deps     - Install Go & NPM dependencies + GeoIP"
+	@echo "  make build-backend    - Compile optimized Go binary"
+	@echo "  make build-frontend   - Build production-ready frontend"
+	@echo "  make clean            - Remove binaries, gen-code and coverage"
 
 # --- Infrastructure ---
+
+setup-certs:
+	@echo "$(GREEN)▶ Extracting and installing CA certificate...$(RESET)"
+	@docker cp aerogram-ui:/data/caddy/pki/authorities/local/root.crt ./caddy_temp.crt
+	@powershell.exe -Command "Start-Process powershell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command Import-Certificate -FilePath \"./caddy_temp.crt\" -CertStoreLocation \"Cert:\LocalMachine\Root\"' -Verb RunAs"
+	@sudo cp ./caddy_temp.crt /usr/local/share/ca-certificates/caddy_docker_root.crt
+	@sudo update-ca-certificates
+	@rm ./caddy_temp.crt
+	@echo "$(GREEN)▶ Success! Restart Chrome (chrome://restart) to apply changes.$(RESET)"
 
 infra:
 	@echo "$(GREEN)▶ Starting infrastructure...$(RESET)"

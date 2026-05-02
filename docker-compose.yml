@@ -15,7 +15,6 @@ services:
             - REDIS_HOST=redis
             - S3_ENDPOINT=http://minio:9000
         volumes:
-            - ./certs:/app/certs:rw
             - ./assets:/app/assets:ro
         depends_on:
             postgres:
@@ -35,11 +34,15 @@ services:
                 - VITE_API_URL=${VITE_API_URL}
                 - VITE_WS_URL=${VITE_WS_URL}
         container_name: aerogram-ui
+        restart: always
         ports:
-            - "3000:8080"
-            - "3443:8443"
+            - "3000:80"
+            - "3443:3443"
+            - "3443:3443/udp"
         volumes:
-            - ./certs:/etc/nginx/certs:ro
+            - ./Caddyfile:/etc/caddy/Caddyfile
+            - caddy_data:/data
+            - caddy_config:/config
         networks:
             - aerogram-net
         depends_on:
@@ -104,3 +107,5 @@ networks:
 volumes:
     pgdata:
     s3data:
+    caddy_data:
+    caddy_config:
