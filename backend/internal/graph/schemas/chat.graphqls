@@ -49,9 +49,14 @@ type ChatMembersList {
     totalCount: Int!
 }
 
+type GlobalSearchList {
+    results: [SearchResult!]!
+}
+
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 union MyChatsResult = ChatList | ForbiddenError | InternalError
 union JoinChatResult = Chat | NotFoundError | ForbiddenError | InternalError
+union SearchResult = User | Chat
 union ChatMembersResult =
     | ChatMembersList
     | ForbiddenError
@@ -99,6 +104,7 @@ extend type Query {
     myChats: MyChatsResult!
     chat(id: ID, slug: String): ChatResult!
     chatMembers(chatID: ID!, limit: Int, offset: Int): ChatMembersResult!
+    searchGlobal(query: String!): GlobalSearchList!
 }
 
 extend type Mutation {
