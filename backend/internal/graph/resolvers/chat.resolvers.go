@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/tr1xdev/aerogram-messenger/internal/graph"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
@@ -20,13 +21,119 @@ import (
 )
 
 // ID is the resolver for the id field.
-func (r *chatResolver) ID(ctx context.Context, obj *model.Chat) (string, error) {
-	return helpers.EncodeGlobalID("Chat", helpers.ToRawID(obj.ID)), nil
+func (r *chatResolver) ID(ctx context.Context, obj *model.ChatExtended) (string, error) {
+	return helpers.EncodeGlobalID("Chat", obj.ID.String()), nil
+}
+
+// Type is the resolver for the type field.
+func (r *chatResolver) Type(ctx context.Context, obj *model.ChatExtended) (model.ChatType, error) {
+	switch strings.ToUpper(obj.Type) {
+	case "GROUP":
+		return model.ChatTypeGroup, nil
+	case "CHANNEL":
+		return model.ChatTypeChannel, nil
+	default:
+		return model.ChatTypePrivate, nil
+	}
+}
+
+// Slug is the resolver for the slug field.
+func (r *chatResolver) Slug(ctx context.Context, obj *model.ChatExtended) (*string, error) {
+	if !obj.Username.Valid || obj.Username.String == "" {
+		return nil, nil
+	}
+	return &obj.Username.String, nil
+}
+
+// Title is the resolver for the title field.
+func (r *chatResolver) Title(ctx context.Context, obj *model.ChatExtended) (string, error) {
+	if obj.Name.Valid && obj.Name.String != "" {
+		return obj.Name.String, nil
+	}
+	if strings.ToUpper(obj.Type) == "PRIVATE" {
+		return "Saved Messages", nil
+	}
+	return "Untitled Chat", nil
+}
+
+// PhotoURL is the resolver for the photoUrl field.
+func (r *chatResolver) PhotoURL(ctx context.Context, obj *model.ChatExtended) (*string, error) {
+	if !obj.PhotoUrl.Valid || obj.PhotoUrl.String == "" {
+		return nil, nil
+	}
+	return &obj.PhotoUrl.String, nil
+}
+
+// UnreadCount is the resolver for the unreadCount field.
+func (r *chatResolver) UnreadCount(ctx context.Context, obj *model.ChatExtended) (int, error) {
+	return obj.UnreadCount, nil
+}
+
+// MyReadSequence is the resolver for the myReadSequence field.
+func (r *chatResolver) MyReadSequence(ctx context.Context, obj *model.ChatExtended) (int64, error) {
+	return obj.MyReadSequence, nil
+}
+
+// LastReadSequence is the resolver for the lastReadSequence field.
+func (r *chatResolver) LastReadSequence(ctx context.Context, obj *model.ChatExtended) (int64, error) {
+	return obj.ReadInboxMaxId, nil
+}
+
+// IsPinned is the resolver for the isPinned field.
+func (r *chatResolver) IsPinned(ctx context.Context, obj *model.ChatExtended) (bool, error) {
+	return obj.IsPinned, nil
 }
 
 // CanWrite is the resolver for the canWrite field.
-func (r *chatResolver) CanWrite(ctx context.Context, obj *model.Chat) (bool, error) {
-	return obj.CanWrite, nil
+func (r *chatResolver) CanWrite(ctx context.Context, obj *model.ChatExtended) (bool, error) {
+	return obj.IsActive, nil
+}
+
+// Permissions is the resolver for the permissions field.
+func (r *chatResolver) Permissions(ctx context.Context, obj *model.ChatExtended) (*model.ChatPermissions, error) {
+	isPrivate := strings.ToUpper(obj.Type) == "PRIVATE"
+	return &model.ChatPermissions{
+		CanSendMessage:    obj.IsActive,
+		CanInviteUsers:    !isPrivate,
+		CanEditMetadata:   obj.Role == "OWNER" || obj.Role == "ADMIN",
+		CanDeleteMessages: true,
+		CanAssignAdmins:   obj.Role == "OWNER",
+		CanSendMedia:      obj.IsActive,
+		CanPinMessages:    !isPrivate,
+	}, nil
+}
+
+// LastMessage is the resolver for the lastMessage field.
+func (r *chatResolver) LastMessage(ctx context.Context, obj *model.ChatExtended) (*model.Message, error) {
+	if !obj.LastMessageID.Valid {
+		return nil, nil
+	}
+	return r.Enricher.EnrichMessage(ctx, obj.LastMessageID.UUID.String())
+}
+
+// Members is the resolver for the members field.
+func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, limit *int, offset *int) ([]*model.ChatMember, error) {
+	res, err := r.Query().ChatMembers(ctx, helpers.EncodeGlobalID("Chat", obj.ID.String()), limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	if list, ok := res.(*model.ChatMembersList); ok {
+		return list.Members, nil
+	}
+	return []*model.ChatMember{}, nil
+}
+
+// MyRole is the resolver for the myRole field.
+func (r *chatResolver) MyRole(ctx context.Context, obj *model.ChatExtended) (string, error) {
+	if obj.Role == "" {
+		return "MEMBER", nil
+	}
+	return obj.Role, nil
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *chatResolver) CreatedAt(ctx context.Context, obj *model.ChatExtended) (string, error) {
+	return obj.CreatedAt.Format(time.RFC3339), nil
 }
 
 // CreateChat is the resolver for the createChat field.
@@ -42,15 +149,13 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 	}
 
 	enumKey := "CHAT_TYPE_" + strings.ToUpper(string(typeArg))
-	req := &chatv1.CreateChatRequest{
+	resp, err := r.ChatClient.CreateChat(ctx, &chatv1.CreateChatRequest{
 		Type:           chatv1.ChatType(chatv1.ChatType_value[enumKey]),
 		ParticipantIds: rawParticipantIds,
 		CreatorId:      authID,
 		Title:          title,
 		Slug:           slug,
-	}
-
-	resp, err := r.ChatClient.CreateChat(ctx, req)
+	})
 	if err != nil {
 		return r.mapToCreateChatError(err), nil
 	}
@@ -66,10 +171,6 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 	}
 
 	rawUserID := helpers.ToRawID(userID)
-	if authID == rawUserID {
-		return &model.InternalError{Message: "you cannot create a chat with yourself"}, nil
-	}
-
 	resp, err := r.ChatClient.CreateChat(ctx, &chatv1.CreateChatRequest{
 		Type:           chatv1.ChatType_CHAT_TYPE_PRIVATE,
 		ParticipantIds: []string{authID, rawUserID},
@@ -155,10 +256,6 @@ func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, user
 		if rid != authID {
 			rawUserIds = append(rawUserIds, rid)
 		}
-	}
-
-	if len(rawUserIds) == 0 {
-		return &model.ValidationError{Message: "no valid users to invite"}, nil
 	}
 
 	resp, err := r.ChatClient.InviteToChat(ctx, &chatv1.InviteToChatRequest{
@@ -288,7 +385,7 @@ func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error
 		return &model.InternalError{Message: "failed to load chats"}, nil
 	}
 
-	chats := make([]*model.Chat, 0, len(resp.Chats))
+	chats := make([]*model.ChatExtended, 0, len(resp.Chats))
 	for _, c := range resp.Chats {
 		if enriched, err := r.Enricher.EnrichChat(ctx, authID, c); err == nil && enriched != nil {
 			chats = append(chats, enriched)
@@ -355,7 +452,7 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 			continue
 		}
 
-		permissions := &model.ChatPermissions{
+		p := &model.ChatPermissions{
 			CanSendMessage:    true,
 			CanInviteUsers:    true,
 			CanEditMetadata:   false,
@@ -366,20 +463,20 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 		}
 
 		if m.Permissions != nil {
-			permissions.CanSendMessage = m.Permissions.CanSendMessage
-			permissions.CanInviteUsers = m.Permissions.CanInviteUsers
-			permissions.CanEditMetadata = m.Permissions.CanEditMetadata
-			permissions.CanDeleteMessages = m.Permissions.CanDeleteMessages
-			permissions.CanAssignAdmins = m.Permissions.CanAssignAdmins
-			permissions.CanSendMedia = m.Permissions.CanSendMedia
-			permissions.CanPinMessages = m.Permissions.CanPinMessages
+			p.CanSendMessage = m.Permissions.CanSendMessage
+			p.CanInviteUsers = m.Permissions.CanInviteUsers
+			p.CanEditMetadata = m.Permissions.CanEditMetadata
+			p.CanDeleteMessages = m.Permissions.CanDeleteMessages
+			p.CanAssignAdmins = m.Permissions.CanAssignAdmins
+			p.CanSendMedia = m.Permissions.CanSendMedia
+			p.CanPinMessages = m.Permissions.CanPinMessages
 		}
 
 		members = append(members, &model.ChatMember{
 			User:             user,
 			Role:             m.Role,
 			LastReadSequence: 0,
-			Permissions:      permissions,
+			Permissions:      p,
 		})
 	}
 
@@ -389,15 +486,20 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 	}, nil
 }
 
+// SearchGlobal is the resolver for the searchGlobal field.
+func (r *queryResolver) SearchGlobal(ctx context.Context, query string) (*model.GlobalSearchList, error) {
+	panic(errors.New("not implemented"))
+}
+
 // ChatCreated is the resolver for the chatCreated field.
-func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (<-chan *model.Chat, error) {
+func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (<-chan *model.ChatExtended, error) {
 	authID := middleware.GetUserID(ctx)
 	rawUserID := helpers.ToRawID(userID)
 	if authID == "" || authID != rawUserID {
 		return nil, errors.New("forbidden")
 	}
 
-	chatChan := make(chan *model.Chat, 10)
+	chatChan := make(chan *model.ChatExtended, 10)
 	pubsub := r.RedisClient.Subscribe(ctx, "user_chats:"+rawUserID)
 
 	go func() {

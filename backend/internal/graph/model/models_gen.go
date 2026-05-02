@@ -69,6 +69,10 @@ type RemoveMemberResult interface {
 	IsRemoveMemberResult()
 }
 
+type SearchResult interface {
+	IsSearchResult()
+}
+
 type SendMessageResult interface {
 	IsSendMessageResult()
 }
@@ -89,36 +93,8 @@ type AuthPayload struct {
 	RequiresVerification bool    `json:"requiresVerification"`
 }
 
-type Chat struct {
-	ID               string           `json:"id"`
-	Type             ChatType         `json:"type"`
-	Slug             *string          `json:"slug,omitempty"`
-	Title            string           `json:"title"`
-	PhotoURL         *string          `json:"photoUrl,omitempty"`
-	MembersCount     int              `json:"membersCount"`
-	UnreadCount      int              `json:"unreadCount"`
-	MyReadSequence   int64            `json:"myReadSequence"`
-	LastReadSequence int64            `json:"lastReadSequence"`
-	IsPinned         bool             `json:"isPinned"`
-	CanWrite         bool             `json:"canWrite"`
-	Permissions      *ChatPermissions `json:"permissions"`
-	LastMessage      *Message         `json:"lastMessage,omitempty"`
-	Members          []*ChatMember    `json:"members,omitempty"`
-	MyRole           string           `json:"myRole"`
-	CreatedAt        string           `json:"createdAt"`
-}
-
-func (Chat) IsNode()            {}
-func (this Chat) GetID() string { return this.ID }
-
-func (Chat) IsChatResult() {}
-
-func (Chat) IsJoinChatResult() {}
-
-func (Chat) IsCreateChatResult() {}
-
 type ChatList struct {
-	Chats []*Chat `json:"chats"`
+	Chats []*ChatExtended `json:"chats"`
 }
 
 func (ChatList) IsMyChatsResult() {}
@@ -192,6 +168,10 @@ func (ForbiddenError) IsError()                {}
 func (this ForbiddenError) GetMessage() string { return this.Message }
 
 func (ForbiddenError) IsCreateBotResult() {}
+
+type GlobalSearchList struct {
+	Results []SearchResult `json:"results"`
+}
 
 type InternalError struct {
 	Message string `json:"message"`
