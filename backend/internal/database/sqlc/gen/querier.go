@@ -61,6 +61,7 @@ type Querier interface {
 	MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error
 	PinDialog(ctx context.Context, arg PinDialogParams) error
 	RemoveDialogMember(ctx context.Context, arg RemoveDialogMemberParams) error
+	SearchPublicDialogs(ctx context.Context, dollar_1 sql.NullString) ([]Dialog, error)
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
 	SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString) ([]User, error)
 	SoftDeleteMessage(ctx context.Context, arg SoftDeleteMessageParams) error

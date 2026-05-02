@@ -629,6 +629,57 @@ func (q *Queries) RemoveDialogMember(ctx context.Context, arg RemoveDialogMember
 	return err
 }
 
+const searchPublicDialogs = `-- name: SearchPublicDialogs :many
+SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_active, created_at, updated_at, deleted_at FROM dialogs
+WHERE (name ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%')
+AND type IN ('group', 'channel')
+AND is_active = true
+AND deleted_at IS NULL
+LIMIT 20
+`
+
+func (q *Queries) SearchPublicDialogs(ctx context.Context, dollar_1 sql.NullString) ([]Dialog, error) {
+	rows, err := q.db.QueryContext(ctx, searchPublicDialogs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Dialog
+	for rows.Next() {
+		var i Dialog
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Name,
+			&i.Username,
+			&i.PhotoUrl,
+			&i.Bio,
+			&i.Description,
+			&i.InviteLink,
+			&i.PinnedMessageID,
+			&i.CreatorID,
+			&i.LastMessageID,
+			&i.LastMessageAt,
+			&i.MembersCount,
+			&i.IsVerified,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const unhideDialogForMembers = `-- name: UnhideDialogForMembers :exec
 UPDATE dialog_members
 SET is_hidden = false, updated_at = NOW()

@@ -182,3 +182,11 @@ WHERE id = $1;
 -- name: CountDialogAdmins :one
 SELECT COUNT(*) FROM dialog_members
 WHERE dialog_id = $1 AND role = 'admin';
+
+-- name: SearchPublicDialogs :many
+SELECT * FROM dialogs
+WHERE (name ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%')
+AND type IN ('group', 'channel')
+AND is_active = true
+AND deleted_at IS NULL
+LIMIT 20;
