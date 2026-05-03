@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,8 @@ func MapMessageToModel(m *messagesv1.Message) *model.Message {
 	if m == nil {
 		return nil
 	}
+
+	log.Printf("[Mapper] Mapping gRPC Message: %s, Seq: %d", m.Id, m.Sequence)
 
 	msg := &model.Message{
 		ID:       m.Id,
@@ -44,6 +47,8 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 	if m == nil {
 		return nil
 	}
+
+	log.Printf("[Mapper] Mapping DB Message: %s, Seq: %d", m.ID, m.Sequence)
 
 	msg := &model.Message{
 		ID:       EncodeGlobalID("Message", m.ID.String()),

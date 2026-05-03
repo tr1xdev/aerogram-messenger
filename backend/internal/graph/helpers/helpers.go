@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -28,6 +29,8 @@ func NewChatEnricher(store dbgen.Querier, s3 *storage.S3Storage) *ChatEnricher {
 }
 
 func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *chatv1.Chat) (*model.ChatExtended, error) {
+	log.Printf("[EnrichChat] Processing chat ID: %s", pbChat.Id)
+
 	chatID, err := uuid.Parse(pbChat.Id)
 	if err != nil {
 		return nil, err
@@ -47,10 +50,11 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 		}
 	}
 
+	chatType := strings.TrimPrefix(pbChat.Type.String(), "CHAT_TYPE_")
 	ext := &model.ChatExtended{
 		Dialog: dbgen.Dialog{
 			ID:              chatID,
-			Type:            strings.TrimPrefix(pbChat.Type.String(), "CHAT_TYPE_"),
+			Type:            chatType,
 			Name:            sql.NullString{String: pbChat.Title, Valid: pbChat.Title != ""},
 			Username:        sql.NullString{String: pbChat.Slug, Valid: pbChat.Slug != ""},
 			PhotoUrl:        sql.NullString{String: pbChat.PhotoUrl, Valid: pbChat.PhotoUrl != ""},
@@ -77,6 +81,28 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 			ext.Role = member.Role
 			ext.IsPinned = member.IsPinned
 			ext.MyReadSequence = member.LastReadSequence
+		}
+
+		if chatType == "PRIVATE" {
+			opponent, err := e.store.GetDialogOpponent(ctx, dbgen.GetDialogOpponentParams{
+				DialogID: chatID,
+				UserID:   uid,
+			})
+			if err == nil {
+				ext.OpponentReadSequence = opponent.LastReadSequence
+
+				if !ext.Name.Valid || ext.Name.String == "" {
+					user, err := e.store.GetUserByID(ctx, opponent.UserID)
+					if err == nil {
+						ext.Name = sql.NullString{
+							String: FormatFullName(user.FirstName, user.LastName),
+							Valid:  true,
+						}
+					}
+				}
+			} else if errors.Is(err, sql.ErrNoRows) {
+				ext.Name = sql.NullString{String: "Saved Messages", Valid: true}
+			}
 		}
 	}
 
