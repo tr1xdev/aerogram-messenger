@@ -190,3 +190,8 @@ AND type IN ('group', 'channel')
 AND is_active = true
 AND deleted_at IS NULL
 LIMIT 20;
+
+-- name: GetDialogOpponent :one
+SELECT * FROM dialog_members
+WHERE dialog_id = $1 AND user_id != $2
+LIMIT 1;
