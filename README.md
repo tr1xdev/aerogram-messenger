@@ -43,7 +43,7 @@ The fastest way to launch the entire stack with automatic TLS:
 
 1. **Clone this repository:**
     ```bash
-    git clone [https://github.com/tr1xdev/aerogram-messenger.git](https://github.com/tr1xdev/aerogram-messenger.git) && cd aerogram-messenger
+    git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
     ```
 2. **Build and start services:**
     ```bash
