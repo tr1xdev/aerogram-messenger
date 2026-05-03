@@ -39,6 +39,7 @@ type Querier interface {
 	GetDialogByUsername(ctx context.Context, username sql.NullString) (Dialog, error)
 	GetDialogMember(ctx context.Context, arg GetDialogMemberParams) (DialogMember, error)
 	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]GetDialogMembersRow, error)
+	GetDialogOpponent(ctx context.Context, arg GetDialogOpponentParams) (DialogMember, error)
 	GetDialogSettings(ctx context.Context, dialogID uuid.UUID) (DialogSetting, error)
 	GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (Message, error)
 	GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int64, error)

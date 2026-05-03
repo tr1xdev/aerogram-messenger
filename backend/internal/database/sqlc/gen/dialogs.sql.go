@@ -368,6 +368,38 @@ func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]G
 	return items, nil
 }
 
+const getDialogOpponent = `-- name: GetDialogOpponent :one
+SELECT dialog_id, user_id, role, joined_at, last_read_message_id, last_read_sequence, muted_until, is_pinned, is_hidden, custom_title, notifications_on, created_at, updated_at FROM dialog_members
+WHERE dialog_id = $1 AND user_id != $2
+LIMIT 1
+`
+
+type GetDialogOpponentParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetDialogOpponent(ctx context.Context, arg GetDialogOpponentParams) (DialogMember, error) {
+	row := q.db.QueryRowContext(ctx, getDialogOpponent, arg.DialogID, arg.UserID)
+	var i DialogMember
+	err := row.Scan(
+		&i.DialogID,
+		&i.UserID,
+		&i.Role,
+		&i.JoinedAt,
+		&i.LastReadMessageID,
+		&i.LastReadSequence,
+		&i.MutedUntil,
+		&i.IsPinned,
+		&i.IsHidden,
+		&i.CustomTitle,
+		&i.NotificationsOn,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getDialogSettings = `-- name: GetDialogSettings :one
 SELECT dialog_id, permissions, slow_mode_delay, is_history_hidden, is_signatures_enabled, created_at, updated_at FROM dialog_settings
 WHERE dialog_id = $1 LIMIT 1

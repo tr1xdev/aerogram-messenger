@@ -6,12 +6,13 @@ import (
 
 type ChatExtended struct {
 	dbgen.Dialog
-	Role            string
-	UnreadCount     int
-	IsPinned        bool
-	MyReadSequence  int64
-	ReadOutboxMaxId int64
-	ReadInboxMaxId  int64
+	Role                 string
+	UnreadCount          int
+	IsPinned             bool
+	MyReadSequence       int64
+	OpponentReadSequence int64
+	ReadOutboxMaxId      int64
+	ReadInboxMaxId       int64
 }
 
 func (ChatExtended) IsChatResult()    {}
