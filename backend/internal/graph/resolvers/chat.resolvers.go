@@ -7,8 +7,10 @@ package resolvers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -488,7 +490,43 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 
 // SearchGlobal is the resolver for the searchGlobal field.
 func (r *queryResolver) SearchGlobal(ctx context.Context, query string) (*model.GlobalSearchList, error) {
-	panic(errors.New("not implemented"))
+	cleanQuery := strings.TrimSpace(query)
+	if len(cleanQuery) < 2 {
+		return &model.GlobalSearchList{
+			Results: []model.SearchResult{},
+		}, nil
+	}
+
+	users, err := r.Store.SearchUsersByUsername(ctx, cleanQuery)
+	if err != nil {
+		log.Printf("SearchGlobal: error fetching users: %v", err)
+		return nil, err
+	}
+
+	dialogs, err := r.Store.SearchPublicDialogs(ctx, sql.NullString{
+		String: cleanQuery,
+		Valid:  true,
+	})
+	if err != nil {
+		log.Printf("SearchGlobal: error fetching dialogs: %v", err)
+		return nil, err
+	}
+
+	results := make([]model.SearchResult, 0, len(users)+len(dialogs))
+
+	for i := range users {
+		results = append(results, &users[i])
+	}
+
+	for i := range dialogs {
+		results = append(results, &model.ChatExtended{
+			Dialog: dialogs[i],
+		})
+	}
+
+	return &model.GlobalSearchList{
+		Results: results,
+	}, nil
 }
 
 // ChatCreated is the resolver for the chatCreated field.

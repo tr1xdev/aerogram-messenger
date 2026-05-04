@@ -40,6 +40,7 @@ type Query {
   myChats: MyChatsResult!
   chat(id: ID, slug: String): ChatResult!
   chatMembers(chatID: ID!, limit: Int, offset: Int): ChatMembersResult!
+  searchGlobal(query: String!): GlobalSearchList!
   messageHistory(chatId: ID!, limit: Int!, beforeSequence: Long): MessageHistoryResult!
   dialogRead(chatId: ID!): ReadPayload!
   node(id: ID!): Node
@@ -132,11 +133,17 @@ type ChatMembersList {
   totalCount: Int!
 }
 
+type GlobalSearchList {
+  results: [SearchResult!]!
+}
+
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 
 union MyChatsResult = ChatList | ForbiddenError | InternalError
 
 union JoinChatResult = Chat | NotFoundError | ForbiddenError | InternalError
+
+union SearchResult = User | Chat
 
 union ChatMembersResult = ChatMembersList | ForbiddenError | NotFoundError | InternalError
 
