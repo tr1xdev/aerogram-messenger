@@ -1,39 +1,33 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Chat, User, ChatMember } from "@/entities/chat/model/types";
-import { Globe, MessageSquare, Search } from "lucide-react";
+import type { Chat, User } from "@/entities/chat/model/types";
+import { Globe, MessageSquare, Search, Users, Radio } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
+
+type GlobalResult = (User | Chat) & { __typename: "User" | "Chat" };
 
 interface SearchResultsProps {
   readonly query: string;
   readonly localChats: readonly Chat[];
-  readonly globalUsers: readonly User[];
+  readonly globalResults: readonly GlobalResult[];
   readonly isLoading: boolean;
   readonly onSelectChat: (chatId: string) => void;
   readonly onSelectUser: (userId: string) => void;
+  readonly onJoinChat: (slug: string) => void;
 }
 
 export function SearchResults({
   query,
   localChats,
-  globalUsers,
+  globalResults,
   isLoading,
   onSelectChat,
   onSelectUser,
+  onJoinChat,
 }: SearchResultsProps): React.ReactNode {
   if (!query && !isLoading) return null;
 
-  const localUserIds: Set<string> = new Set(
-    localChats.flatMap((c: Chat): string[] =>
-      (c.members ?? []).map((m: ChatMember): string => m.user.id),
-    ),
-  );
-
-  const uniqueGlobalUsers: readonly User[] = globalUsers.filter(
-    (u: User): boolean => !localUserIds.has(u.id),
-  );
-
   const hasLocal: boolean = localChats.length > 0;
-  const hasGlobal: boolean = uniqueGlobalUsers.length > 0;
+  const hasGlobal: boolean = globalResults.length > 0;
 
   const displayQuery: string =
     query.length > 128 ? `${query.substring(0, 128)}...` : query;
@@ -65,7 +59,10 @@ export function SearchResults({
         <div className="px-2 space-y-0.5 pt-2 animate-in fade-in duration-200">
           {[...Array(8)].map(
             (_: unknown, i: number): React.ReactNode => (
-              <div key={i} className="flex items-center gap-3 px-3 py-3.5">
+              <div
+                key={`skeleton-${i}`}
+                className="flex items-center gap-3 px-3 py-3.5"
+              >
                 <Skeleton className="h-12 w-12 rounded-full shrink-0" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-3.5 w-[35%]" />
@@ -119,18 +116,60 @@ export function SearchResults({
                 <span>Global Search</span>
               </div>
               <div className="space-y-0.5">
-                {uniqueGlobalUsers.map((user: User): React.ReactNode => {
-                  const fullName =
-                    `${user.firstName} ${user.lastName || ""}`.trim();
+                {globalResults.map((result: GlobalResult): React.ReactNode => {
+                  if (result.__typename === "Chat") {
+                    const chat = result as Chat;
+                    return (
+                      <button
+                        key={`global-chat-${chat.id}`}
+                        onClick={(): void => {
+                          if (chat.slug) onJoinChat(chat.slug);
+                          else onSelectChat(chat.id);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
+                      >
+                        <UserAvatar
+                          src={chat.photoUrl}
+                          fallback={chat.title || "?"}
+                          size={48}
+                          className="border border-border/40"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-[14.5px] font-medium truncate text-foreground">
+                              {chat.title}
+                            </p>
+                            {chat.type === "CHANNEL" ? (
+                              <Radio className="h-3 w-3 text-sky-500" />
+                            ) : (
+                              <Users className="h-3 w-3 text-muted-foreground" />
+                            )}
+                          </div>
+                          <p className="text-[12px] text-muted-foreground/80">
+                            {chat.slug
+                              ? `@${chat.slug}`
+                              : `${chat.membersCount} members`}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  }
+
+                  const user = result as User;
+                  const fullName: string =
+                    `${user.firstName} ${user.lastName || ""}`.trim() ||
+                    user.username ||
+                    "Unknown";
+
                   return (
                     <button
-                      key={user.id}
+                      key={`global-user-${user.id}`}
                       onClick={(): void => onSelectUser(user.id)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 active:scale-[0.98] transition-all text-left"
                     >
                       <UserAvatar
                         src={user.photoUrl}
-                        fallback={fullName || user.username || "?"}
+                        fallback={fullName}
                         size={48}
                         className="border border-border/40"
                       />

@@ -145,6 +145,23 @@ type IndicatorStyle = {
   readonly width: number;
 };
 
+interface SearchResponse {
+  readonly searchUsers?: readonly User[] | null;
+}
+
+interface GlobalSearchResult {
+  readonly id: string;
+  readonly __typename: "User" | "Chat";
+  readonly title?: string | null;
+  readonly username?: string | null;
+  readonly firstName?: string | null;
+  readonly lastName?: string | null;
+  readonly photoUrl?: string | null;
+  readonly slug?: string | null;
+  readonly type?: "CHANNEL" | "GROUP" | "DIRECT" | null;
+  readonly membersCount?: number | null;
+}
+
 const SEARCH_DEBOUNCE_MS: number = 250;
 const RECENT_SEARCHES_KEY: string = "recent_searches";
 const MAX_RECENT_SEARCHES: number = 10;
@@ -197,9 +214,34 @@ function AppSidebarInner(): ReactElement {
     { fetchPolicy: "store-and-network" },
   );
 
-  const globalSearchData = useSearchUsers(debouncedQuery) as {
-    readonly searchUsers?: readonly User[] | null;
-  };
+  const globalSearchData = useSearchUsers(debouncedQuery) as SearchResponse;
+
+  const globalResults = useMemo((): readonly GlobalSearchResult[] => {
+    const data = globalSearchData as {
+      searchGlobal?: {
+        results?: Array<Record<string, unknown>>;
+      };
+    };
+
+    const results = data?.searchGlobal?.results ?? [];
+
+    return results.map((item: Record<string, unknown>): GlobalSearchResult => {
+      const isUser = !!(item.username || item.firstName);
+
+      return {
+        id: String(item.id ?? ""),
+        __typename: isUser ? "User" : "Chat",
+        title: item.title as string | null,
+        username: item.username as string | null,
+        firstName: item.firstName as string | null,
+        lastName: item.lastName as string | null,
+        photoUrl: item.photoUrl as string | null,
+        slug: item.slug as string | null,
+        type: item.type as "CHANNEL" | "GROUP" | "DIRECT" | null,
+        membersCount: item.membersCount as number | null,
+      };
+    });
+  }, [globalSearchData]);
 
   const [commitCreate] =
     useMutation<AppSidebarCreateMutationType>(createChatMutation);
@@ -354,12 +396,11 @@ function AppSidebarInner(): ReactElement {
           if (myChatsRec?.getType() === "ChatList") {
             const chatList: readonly RecordProxy[] =
               myChatsRec.getLinkedRecords("chats") ?? [];
-            const payloadId: string | null = payload.getValue("id") as
-              | string
-              | null;
+            const payloadId = payload.getValue("id") as string;
 
-            const alreadyExists: boolean = chatList.some(
-              (c: RecordProxy): boolean => c.getValue("id") === payloadId,
+            const alreadyExists = chatList.some(
+              (c: RecordProxy): boolean =>
+                (c.getValue("id") as string) === payloadId,
             );
 
             if (!alreadyExists) {
@@ -594,8 +635,10 @@ function AppSidebarInner(): ReactElement {
                       localChats={
                         filteredLocalChats as unknown as readonly Chat[]
                       }
-                      globalUsers={
-                        (globalSearchData?.searchUsers as User[]) ?? []
+                      globalResults={
+                        globalResults as unknown as readonly ((User | Chat) & {
+                          __typename: "User" | "Chat";
+                        })[]
                       }
                       isLoading={
                         searchQuery !== debouncedQuery ||
@@ -611,7 +654,12 @@ function AppSidebarInner(): ReactElement {
                           params: { chatId: id },
                         });
                       }}
-                      onSelectUser={handleSelectUser}
+                      onSelectUser={(id: string): void => {
+                        handleSelectUser(id);
+                      }}
+                      onJoinChat={(slug: string): void => {
+                        navigate({ to: "/join/$slug", params: { slug } });
+                      }}
                     />
                   ) : (
                     <div className="flex flex-col">
@@ -677,77 +725,94 @@ function AppSidebarInner(): ReactElement {
                     </div>
                   )}
                 </div>
-              ) : chats.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300">
-                  <div className="relative mb-6 select-none pointer-events-none">
-                    <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full" />
-                    <div className="relative w-20 h-20 bg-muted/30 rounded-[2rem] flex items-center justify-center rotate-3 border border-border/50 shadow-inner">
-                      <Search className="h-10 w-10 text-primary/30 -rotate-3" />
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-center max-w-60">
-                    <h3 className="text-[16px] font-bold tracking-tight text-foreground">
-                      No conversations yet
-                    </h3>
-                    <p className="text-[13px] text-muted-foreground leading-relaxed">
-                      Search for your friends or colleagues to start messaging.
-                    </p>
-                  </div>
-                  <div className="mt-8">
-                    <button
-                      onClick={(): void => {
-                        inputRef.current?.focus();
-                        setIsFocused(true);
-                      }}
-                      className="rounded-full px-6 h-10 font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-none transition-all"
-                    >
-                      Start searching
-                    </button>
-                  </div>
-                </div>
               ) : (
                 <div className="flex flex-col animate-in fade-in duration-300">
-                  {pinnedChats.length > 0 && (
-                    <div className="flex flex-col">
-                      <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/65 flex items-center gap-1">
-                        <BsFillPinFill className="h-3 w-3" /> PINNED CHATS
+                  {chats.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300">
+                      <div className="relative mb-6 select-none pointer-events-none">
+                        <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full" />
+                        <div className="relative w-20 h-20 bg-muted/30 rounded-[2rem] flex items-center justify-center rotate-3 border border-border/50 shadow-inner">
+                          <Search className="h-10 w-10 text-primary/30 -rotate-3" />
+                        </div>
                       </div>
-                      <SidebarMenu>
-                        {pinnedChats
-                          .filter((chat) => chat !== null)
-                          .map(
-                            (chat: SidebarChat): ReactElement => (
-                              <ChatMenuItem
-                                key={chat.id}
-                                chat={chat as unknown as chatMenuItem_chat$key}
-                                isActive={chatId === chat.id}
-                                myId={user?.id}
-                              />
-                            ),
-                          )}
-                      </SidebarMenu>
-                    </div>
-                  )}
-                  {otherChats.length > 0 && (
-                    <div className="flex flex-col">
-                      <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/65">
-                        ALL CHATS
+                      <div className="space-y-2 text-center max-w-60">
+                        <h3 className="text-[16px] font-bold tracking-tight text-foreground">
+                          No conversations yet
+                        </h3>
+                        <p className="text-[13px] text-muted-foreground leading-relaxed">
+                          Search for your friends or colleagues to start
+                          messaging.
+                        </p>
                       </div>
-                      <SidebarMenu>
-                        {otherChats
-                          .filter((chat) => chat !== null)
-                          .map(
-                            (chat: SidebarChat): ReactElement => (
-                              <ChatMenuItem
-                                key={chat.id}
-                                chat={chat as unknown as chatMenuItem_chat$key}
-                                isActive={chatId === chat.id}
-                                myId={user?.id}
-                              />
-                            ),
-                          )}
-                      </SidebarMenu>
+                      <div className="mt-8">
+                        <button
+                          onClick={(): void => {
+                            inputRef.current?.focus();
+                            setIsFocused(true);
+                          }}
+                          className="rounded-full px-6 h-10 font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-none transition-all"
+                        >
+                          Start searching
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      {pinnedChats.length > 0 && (
+                        <div className="flex flex-col">
+                          <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/65 flex items-center gap-1">
+                            <BsFillPinFill className="h-3 w-3" /> PINNED CHATS
+                          </div>
+                          <SidebarMenu>
+                            {pinnedChats
+                              .filter(
+                                (
+                                  chat: SidebarChat | null,
+                                ): chat is SidebarChat => chat !== null,
+                              )
+                              .map(
+                                (chat: SidebarChat): ReactElement => (
+                                  <ChatMenuItem
+                                    key={chat.id}
+                                    chat={
+                                      chat as unknown as chatMenuItem_chat$key
+                                    }
+                                    isActive={chatId === chat.id}
+                                    myId={user?.id}
+                                  />
+                                ),
+                              )}
+                          </SidebarMenu>
+                        </div>
+                      )}
+                      {otherChats.length > 0 && (
+                        <div className="flex flex-col">
+                          <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-muted-foreground/65">
+                            ALL CHATS
+                          </div>
+                          <SidebarMenu>
+                            {otherChats
+                              .filter(
+                                (
+                                  chat: SidebarChat | null,
+                                ): chat is SidebarChat => chat !== null,
+                              )
+                              .map(
+                                (chat: SidebarChat): ReactElement => (
+                                  <ChatMenuItem
+                                    key={chat.id}
+                                    chat={
+                                      chat as unknown as chatMenuItem_chat$key
+                                    }
+                                    isActive={chatId === chat.id}
+                                    myId={user?.id}
+                                  />
+                                ),
+                              )}
+                          </SidebarMenu>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -816,30 +881,30 @@ function AppSidebarSkeleton(): ReactElement {
     >
       <SidebarHeader className="px-4 pt-3 shrink-0 bg-background border-none">
         <div className="flex items-center justify-between h-8">
-          <Skeleton className="h-5 w-16 mx-auto" />
+          <Skeleton className="h-5 w-20" />
+          <Skeleton className="h-8 w-8 rounded-full" />
         </div>
       </SidebarHeader>
-      <SidebarContent className="flex-1 overflow-y-auto scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="px-4 py-2 sticky top-0">
+
+      <SidebarContent className="flex-1 px-4">
+        <div className="py-2">
           <Skeleton className="h-10 w-full rounded-xl" />
         </div>
-        <div className="px-4 pt-4 pb-2">
-          <Skeleton className="h-3 w-20 mb-4" />
-          <div className="space-y-4">
-            {Array.from({ length: 6 }).map(
-              (_: unknown, i: number): ReactElement => (
-                <div key={i} className="flex items-center gap-3">
-                  <Skeleton className="h-12 w-12 rounded-full shrink-0" />
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
+        <div className="mt-4 space-y-4">
+          {Array.from({ length: 8 }).map(
+            (_, i: number): ReactElement => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-12 w-12 rounded-full shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-full" />
                 </div>
-              ),
-            )}
-          </div>
+              </div>
+            ),
+          )}
         </div>
       </SidebarContent>
+
       <SidebarFooter className="p-4 border-t border-border/5">
         <div className="flex items-center gap-3">
           <Skeleton className="h-9 w-9 rounded-full" />
@@ -853,14 +918,7 @@ function AppSidebarSkeleton(): ReactElement {
   );
 }
 
-export function AppSidebar(): ReactElement | null {
-  const { chatId }: { chatId?: string } = useParams({ strict: false });
-  const isMobile: boolean = useIsMobile();
-
-  if (isMobile && chatId) {
-    return null;
-  }
-
+export function AppSidebar(): ReactElement {
   return (
     <Suspense fallback={<AppSidebarSkeleton />}>
       <AppSidebarInner />

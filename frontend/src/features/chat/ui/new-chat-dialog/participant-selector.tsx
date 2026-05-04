@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { ReactElement, ChangeEvent } from "react";
 import { Search, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useSearchUsers } from "../../lib/chat/use-chat-management";
 
-type SearchData = NonNullable<ReturnType<typeof useSearchUsers>>;
-type SearchedUser = NonNullable<SearchData["searchUsers"]>[number];
+interface SearchedUser {
+  readonly id: string;
+  readonly username: string | null;
+  readonly firstName: string | null;
+  readonly lastName: string | null;
+  readonly photoUrl: string | null;
+}
+
+interface SearchResponse {
+  readonly searchUsers?: readonly SearchedUser[] | null;
+}
 
 interface ParticipantSelectorProps {
   isMulti?: boolean;
@@ -34,7 +43,7 @@ export function ParticipantSelector({
     return (): void => window.clearTimeout(handler);
   }, [searchTerm]);
 
-  const data: SearchData | null = useSearchUsers(debouncedQuery);
+  const data = useSearchUsers(debouncedQuery) as SearchResponse | null;
 
   const toggleUser = (id: string): void => {
     if (!isMulti) {
@@ -48,9 +57,13 @@ export function ParticipantSelector({
     );
   };
 
-  const users: readonly SearchedUser[] = (data?.searchUsers ?? []).filter(
-    (u: SearchedUser): boolean => !excludeIds.includes(u.id),
-  );
+  const users: readonly SearchedUser[] =
+    useMemo((): readonly SearchedUser[] => {
+      const rawUsers: readonly SearchedUser[] = data?.searchUsers ?? [];
+      return rawUsers.filter(
+        (u: SearchedUser): boolean => !excludeIds.includes(u.id),
+      );
+    }, [data?.searchUsers, excludeIds]);
 
   return (
     <div className="space-y-4 py-4">

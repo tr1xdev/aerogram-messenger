@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<6ca8928f0e7cbc099a87b8521592aedb>>
+ * @generated SignedSource<<6ca3197b7519efacc6a53d4ab85a33ca>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -35,6 +35,7 @@ export type useChatsDetailsQuery$data = {
       };
     }> | null | undefined;
     readonly membersCount: number;
+    readonly myReadSequence: any;
     readonly permissions: {
       readonly canAssignAdmins: boolean;
       readonly canDeleteMessages: boolean;
@@ -149,10 +150,17 @@ v11 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "canWrite",
+  "name": "myReadSequence",
   "storageKey": null
 },
 v12 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "canWrite",
+  "storageKey": null
+},
+v13 = {
   "alias": null,
   "args": null,
   "concreteType": "ChatPermissions",
@@ -198,49 +206,49 @@ v12 = {
   ],
   "storageKey": null
 },
-v13 = {
+v14 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "firstName",
   "storageKey": null
 },
-v14 = {
+v15 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "lastName",
   "storageKey": null
 },
-v15 = {
+v16 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "displayName",
   "storageKey": null
 },
-v16 = {
+v17 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "isBot",
   "storageKey": null
 },
-v17 = {
+v18 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "status",
   "storageKey": null
 },
-v18 = {
+v19 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "isVerified",
   "storageKey": null
 },
-v19 = [
+v20 = [
   {
     "alias": null,
     "args": null,
@@ -249,25 +257,25 @@ v19 = [
     "storageKey": null
   }
 ],
-v20 = {
-  "kind": "InlineFragment",
-  "selections": (v19/*: any*/),
-  "type": "NotFoundError",
-  "abstractKey": null
-},
 v21 = {
   "kind": "InlineFragment",
-  "selections": (v19/*: any*/),
-  "type": "ForbiddenError",
+  "selections": (v20/*: any*/),
+  "type": "NotFoundError",
   "abstractKey": null
 },
 v22 = {
   "kind": "InlineFragment",
-  "selections": (v19/*: any*/),
-  "type": "InternalError",
+  "selections": (v20/*: any*/),
+  "type": "ForbiddenError",
   "abstractKey": null
 },
 v23 = {
+  "kind": "InlineFragment",
+  "selections": (v20/*: any*/),
+  "type": "InternalError",
+  "abstractKey": null
+},
+v24 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -313,6 +321,7 @@ return {
               (v10/*: any*/),
               (v11/*: any*/),
               (v12/*: any*/),
+              (v13/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -330,13 +339,13 @@ return {
                     "plural": false,
                     "selections": [
                       (v3/*: any*/),
-                      (v13/*: any*/),
                       (v14/*: any*/),
-                      (v6/*: any*/),
                       (v15/*: any*/),
+                      (v6/*: any*/),
                       (v16/*: any*/),
                       (v17/*: any*/),
                       (v18/*: any*/),
+                      (v19/*: any*/),
                       {
                         "args": null,
                         "kind": "FragmentSpread",
@@ -352,9 +361,9 @@ return {
             "type": "Chat",
             "abstractKey": null
           },
-          (v20/*: any*/),
           (v21/*: any*/),
-          (v22/*: any*/)
+          (v22/*: any*/),
+          (v23/*: any*/)
         ],
         "storageKey": null
       }
@@ -382,13 +391,7 @@ return {
             "selections": [
               (v3/*: any*/),
               (v8/*: any*/),
-              {
-                "alias": null,
-                "args": null,
-                "kind": "ScalarField",
-                "name": "myReadSequence",
-                "storageKey": null
-              },
+              (v11/*: any*/),
               {
                 "alias": null,
                 "args": null,
@@ -406,14 +409,14 @@ return {
                     "plural": false,
                     "selections": [
                       (v3/*: any*/),
-                      (v13/*: any*/),
                       (v14/*: any*/),
-                      (v23/*: any*/),
-                      (v6/*: any*/),
-                      (v18/*: any*/),
-                      (v17/*: any*/),
                       (v15/*: any*/),
+                      (v24/*: any*/),
+                      (v6/*: any*/),
+                      (v19/*: any*/),
+                      (v18/*: any*/),
                       (v16/*: any*/),
+                      (v17/*: any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -479,10 +482,10 @@ return {
                     "plural": false,
                     "selections": [
                       (v3/*: any*/),
-                      (v13/*: any*/),
                       (v14/*: any*/),
-                      (v23/*: any*/),
-                      (v15/*: any*/)
+                      (v15/*: any*/),
+                      (v24/*: any*/),
+                      (v16/*: any*/)
                     ],
                     "storageKey": null
                   }
@@ -490,15 +493,15 @@ return {
                 "storageKey": null
               },
               (v7/*: any*/),
-              (v11/*: any*/),
-              (v12/*: any*/)
+              (v12/*: any*/),
+              (v13/*: any*/)
             ],
             "type": "Chat",
             "abstractKey": null
           },
-          (v20/*: any*/),
           (v21/*: any*/),
           (v22/*: any*/),
+          (v23/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
@@ -513,16 +516,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "66e8915b8f22e0a3a96116a77c203774",
+    "cacheID": "9f139f94f2d8a5e61e4f996d50dd4399",
     "id": null,
     "metadata": {},
     "name": "useChatsDetailsQuery",
     "operationKind": "query",
-    "text": "query useChatsDetailsQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      ...useMarkDialog_chat\n      ...chatMenuItem_chat\n      id\n      title\n      type\n      photoUrl\n      membersCount\n      unreadCount\n      isPinned\n      lastReadSequence\n      canWrite\n      permissions {\n        canSendMessage\n        canInviteUsers\n        canEditMetadata\n        canDeleteMessages\n        canAssignAdmins\n      }\n      members {\n        user {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n          isBot\n          status\n          isVerified\n          ...chatHeader_user\n        }\n      }\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment chatHeader_user on User {\n  id\n  status\n  photoUrl\n  firstName\n  lastName\n  displayName\n  isTyping\n  isVerified\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useMarkDialog_chat on Chat {\n  id\n  unreadCount\n  myReadSequence\n  members {\n    user {\n      id\n    }\n    lastReadSequence\n  }\n}\n"
+    "text": "query useChatsDetailsQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      ...useMarkDialog_chat\n      ...chatMenuItem_chat\n      id\n      title\n      type\n      photoUrl\n      membersCount\n      unreadCount\n      isPinned\n      lastReadSequence\n      myReadSequence\n      canWrite\n      permissions {\n        canSendMessage\n        canInviteUsers\n        canEditMetadata\n        canDeleteMessages\n        canAssignAdmins\n      }\n      members {\n        user {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n          isBot\n          status\n          isVerified\n          ...chatHeader_user\n        }\n      }\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment chatHeader_user on User {\n  id\n  status\n  photoUrl\n  firstName\n  lastName\n  displayName\n  isTyping\n  isVerified\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useMarkDialog_chat on Chat {\n  id\n  unreadCount\n  myReadSequence\n  members {\n    user {\n      id\n    }\n    lastReadSequence\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "053d4032e787ccfea70179f09e4a3e13";
+(node as any).hash = "d11ac1ff1cf752b1143b274a3d1d9ad9";
 
 export default node;
