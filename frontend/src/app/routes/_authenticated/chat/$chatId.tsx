@@ -8,6 +8,7 @@ import {
 } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import { useChatStore } from "@/store/chat";
 import {
   useChatHistory,
@@ -34,7 +35,7 @@ import type { useChatsDetailsQuery$data } from "@/features/chat/lib/chat/__gener
 type ChatNode = Extract<
   useChatsDetailsQuery$data["chat"],
   { readonly __typename: "Chat" }
->;
+> & { myRole?: string | null };
 
 type RelayMember = NonNullable<ChatNode["members"]>[number];
 
@@ -65,6 +66,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
   const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
+  const [isOptimisticJoined, setIsOptimisticJoined] = useState<boolean>(false);
 
   const { input, setInput, resetInput, setActiveChatId } =
     useChatStore() as ChatStoreState;
@@ -81,7 +83,24 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const me: User | undefined = meData?.me as unknown as User | undefined;
   const chatRaw = chatData.chat;
   const isChatType: boolean = chatRaw?.__typename === "Chat";
-  const chatNode: ChatNode | null = isChatType ? (chatRaw as ChatNode) : null;
+
+  const chatNode = useMemo((): (ChatNode & { slug?: string }) | null => {
+    if (!isChatType || !chatRaw) return null;
+    return chatRaw as unknown as ChatNode & { slug?: string };
+  }, [isChatType, chatRaw]);
+
+  const isMember: boolean = useMemo((): boolean => {
+    if (isOptimisticJoined) return true;
+    if (!chatNode) return false;
+    const role: string | null | undefined = chatNode.myRole?.toLowerCase();
+    if (role && role !== "none" && role !== "") return true;
+    if (Array.isArray(chatNode.members) && chatNode.members.length > 0 && me) {
+      return chatNode.members.some(
+        (m: RelayMember): boolean => m.user?.id === me.id,
+      );
+    }
+    return false;
+  }, [chatNode, me, isOptimisticJoined]);
 
   const normalizedChatType = useMemo((): "PRIVATE" | "GROUP" | "CHANNEL" => {
     const type: string | undefined = chatNode?.type;
@@ -102,8 +121,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const { messages: messagesFromHistory, isLoading: historyLoading } =
     useChatHistory(chatId);
 
-  const { sendMessage, editMessage, markAsRead } = useMessageActions(chatId);
-  const { handleKeyPress, stopTyping } = useSendTyping(chatId);
+  const { sendMessage, editMessage, markAsRead, joinChat } =
+    useMessageActions(chatId);
+  const { handleKeyPress, stopTyping: stopTypingHook } = useSendTyping(chatId);
 
   const canWrite: boolean = chatNode ? chatNode.canWrite : true;
   const isInitialLoading: boolean = isFirstLoad && historyLoading;
@@ -123,6 +143,16 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     lastSequence,
     me?.id,
   );
+
+  useEffect(() => {
+    console.log("--- CHAT DEBUG ---", {
+      chatId,
+      isMember,
+      canWrite,
+      lastSequence,
+      msgCount: messagesFromHistory?.length,
+    });
+  }, [chatId, isMember, canWrite, lastSequence, messagesFromHistory]);
 
   useEffect((): void | (() => void) => {
     if (!historyLoading && chatNode) {
@@ -144,8 +174,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     setReplyingTo(null);
     setEditingMessage(null);
     resetInput();
-    stopTyping();
-  }, [resetInput, stopTyping]);
+    stopTypingHook();
+  }, [resetInput, stopTypingHook]);
 
   const handleEditInitiate = useCallback(
     (msg: Message): void => {
@@ -166,15 +196,31 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       if (isTyping) {
         handleKeyPress();
       } else {
-        stopTyping();
+        stopTypingHook();
       }
     },
-    [handleKeyPress, stopTyping],
+    [handleKeyPress, stopTypingHook],
   );
+
+  const handleJoin = useCallback((): void => {
+    const slug: string | undefined =
+      chatNode && "slug" in chatNode ? (chatNode.slug as string) : undefined;
+    if (joinChat && slug) {
+      console.log("[JOIN] Attempting to join:", slug);
+      setIsOptimisticJoined(true);
+      joinChat(slug)
+        .then((): void => {
+          toast.success("Successfully joined the chat");
+        })
+        .catch((): void => {
+          setIsOptimisticJoined(false);
+          toast.error("Failed to join the chat");
+        });
+    }
+  }, [joinChat, chatNode]);
 
   const totalUnread: number = useMemo((): number => {
     const myChatsResult = chatsData.myChats;
-
     if (
       myChatsResult?.__typename === "ChatList" &&
       Array.isArray(myChatsResult.chats)
@@ -182,11 +228,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       return myChatsResult.chats.reduce((acc: number, c): number => {
         const unread: number = c?.unreadCount ?? 0;
         const isCurrentChat: boolean = c?.id === chatId;
-
         return isCurrentChat ? acc : acc + unread;
       }, 0);
     }
-
     return 0;
   }, [chatsData.myChats, chatId]);
 
@@ -206,8 +250,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     return [...rawMessages]
       .filter((m: Message | null): boolean => m !== null && m !== undefined)
       .sort((a: Message, b: Message): number => {
-        const timeA: number = new Date(a.sentAt).getTime();
-        const timeB: number = new Date(b.sentAt).getTime();
+        const timeA: number = new Date(a.sentAt || 0).getTime();
+        const timeB: number = new Date(b.sentAt || 0).getTime();
         if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
         return (Number(a.sequence) || 0) - (Number(b.sequence) || 0);
       });
@@ -215,13 +259,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   useEffect((): void | (() => void) => {
     let timeoutId: ReturnType<typeof setTimeout>;
-
     const handleMarkRead = (): void => {
       if (
         document.visibilityState === "visible" &&
         lastSequence > 0 &&
         isAtBottom
       ) {
+        console.log("[READ] Triggering markAsRead", { lastSequence });
         clearTimeout(timeoutId);
         timeoutId = setTimeout((): void => {
           checkAndMarkRead();
@@ -229,12 +273,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         }, 100);
       }
     };
-
     handleMarkRead();
-
     window.addEventListener("visibilitychange", handleMarkRead);
     window.addEventListener("focus", handleMarkRead);
-
     return (): void => {
       clearTimeout(timeoutId);
       window.removeEventListener("visibilitychange", handleMarkRead);
@@ -245,21 +286,20 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const handleSend = useCallback(
     (text?: string): void => {
       const val: string = (text ?? inputRef.current).trim();
+      console.log("[SEND] Initialized", { val, isEditing: !!editingMessage });
       if (!val || !me) return;
-
       if (editingMessage) {
         editMessage(editingMessage.id, val)
           .then((): void => cancelAction())
-          .catch((err: Error): void => console.error(err));
+          .catch((): void => {
+            toast.error("Failed to edit message");
+          });
         return;
       }
-
       const originalReply: Message | null = replyingTo;
       const tempId: string = `temp-${Date.now()}`;
       const extendedMe: ExtendedUser = me as unknown as ExtendedUser;
-
       cancelAction();
-
       sendMessage(val, {
         variables: {
           chatId,
@@ -303,6 +343,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       }).catch((): void => {
         setInput(val);
         if (originalReply) setReplyingTo(originalReply);
+        toast.error("Message not sent");
       });
     },
     [
@@ -326,7 +367,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         </div>
         <h2 className="text-xl font-bold mb-2">Chat not found</h2>
         <p className="text-muted-foreground text-sm max-w-70 mb-8">
-          The chat doesn't exist or you don't have permission to view it.
+          The chat doesn't exist or you don't have access.
         </p>
         <button
           className="gap-2 rounded-xl flex items-center px-4 py-2 border hover:bg-muted"
@@ -351,7 +392,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         type={normalizedChatType}
         membersCount={chatNode?.membersCount ?? 0}
       />
-
       <main className="flex-1 relative min-h-0 bg-background overflow-hidden">
         {isInitialLoading ? (
           <div className="absolute inset-0 p-4 flex flex-col gap-6">
@@ -378,7 +418,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           />
         )}
       </main>
-
       {!isInitialLoading && (
         <MessageComposer
           isBot={isBotChat}
@@ -386,12 +425,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           input={input}
           setInput={setInput}
           onSend={handleSend}
+          onJoin={handleJoin}
           onTyping={handleTyping}
           disabled={false}
           replyingTo={replyingTo}
           editingMessage={editingMessage}
           onCancelAction={cancelAction}
           canWrite={canWrite}
+          isMember={isMember}
           chatType={normalizedChatType}
         />
       )}
