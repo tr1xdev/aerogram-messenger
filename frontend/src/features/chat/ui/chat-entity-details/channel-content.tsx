@@ -201,8 +201,28 @@ export function ChannelContent({
     userName: string,
   ): void => {
     const newRole: string = currentRole === "admin" ? "member" : "admin";
+
+    const updateRoleInStore = (store: RecordSourceSelectorProxy): void => {
+      const chatRecord = store.get(chatId);
+      if (!chatRecord) return;
+
+      const members: RecordProxy[] | null =
+        chatRecord.getLinkedRecords("members");
+      if (!members) return;
+
+      members.forEach((memberProxy: RecordProxy): void => {
+        const userProxy: RecordProxy | null =
+          memberProxy.getLinkedRecord("user");
+        if (userProxy?.getValue("id") === userID) {
+          memberProxy.setValue(newRole, "role");
+        }
+      });
+    };
+
     commitUpdateRole({
       variables: { chatID: chatId, userID, role: newRole },
+      optimisticUpdater: updateRoleInStore,
+      updater: updateRoleInStore,
       onCompleted: (response): void => {
         if (response.updateMemberRole?.success) {
           toast.success(`${userName} is now ${newRole}`);
@@ -211,7 +231,7 @@ export function ChannelContent({
     });
   };
 
-  const sharedUpdater = (
+  const sharedRemoveUpdater = (
     store: RecordSourceSelectorProxy,
     userID: string,
   ): void => {
@@ -246,10 +266,10 @@ export function ChannelContent({
     commitRemoveMember({
       variables: { chatID: chatId, userID },
       optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
-        sharedUpdater(store, userID);
+        sharedRemoveUpdater(store, userID);
       },
       updater: (store: RecordSourceSelectorProxy): void => {
-        sharedUpdater(store, userID);
+        sharedRemoveUpdater(store, userID);
       },
       onCompleted: (response): void => {
         const result = response.removeChatMember;
@@ -328,14 +348,13 @@ export function ChannelContent({
               >
                 <ImageIcon className="w-3.5 h-3.5" /> Media
               </TabsTrigger>
-              {isSelfAdmin && (
-                <TabsTrigger
-                  value="settings"
-                  className="gap-2 text-xs font-medium rounded-lg"
-                >
-                  <Settings className="w-3.5 h-3.5" /> Settings
-                </TabsTrigger>
-              )}
+              <TabsTrigger
+                value="settings"
+                disabled={!isSelfAdmin}
+                className="gap-2 text-xs font-medium rounded-lg"
+              >
+                <Settings className="w-3.5 h-3.5" /> Settings
+              </TabsTrigger>
             </TabsList>
 
             <div className="flex-1 min-h-0 mt-4">
