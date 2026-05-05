@@ -128,7 +128,7 @@ func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, lim
 // MyRole is the resolver for the myRole field.
 func (r *chatResolver) MyRole(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	if obj.Role == "" {
-		return "MEMBER", nil
+		return "NONE", nil
 	}
 	return obj.Role, nil
 }
