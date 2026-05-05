@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<a3feb4cf9cc82d9b59307f15e983d000>>
+ * @generated SignedSource<<3a2e38031e4dcaab212ae49ea223bcbe>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,7 +15,18 @@ export type channelContentRemoveMemberMutation$variables = {
 };
 export type channelContentRemoveMemberMutation$data = {
   readonly removeChatMember: {
-    readonly success?: boolean;
+    readonly __typename: "ForbiddenError";
+    readonly message: string;
+  } | {
+    readonly __typename: "NotFoundError";
+    readonly message: string;
+  } | {
+    readonly __typename: "SuccessResult";
+    readonly success: boolean;
+  } | {
+    // This will never be '%other', but we need some
+    // value in case none of the concrete values match.
+    readonly __typename: "%other";
   };
 };
 export type channelContentRemoveMemberMutation = {
@@ -38,50 +49,77 @@ var v0 = [
 ],
 v1 = [
   {
-    "kind": "Variable",
-    "name": "chatID",
-    "variableName": "chatID"
-  },
-  {
-    "kind": "Variable",
-    "name": "userID",
-    "variableName": "userID"
+    "alias": null,
+    "args": null,
+    "kind": "ScalarField",
+    "name": "message",
+    "storageKey": null
   }
 ],
-v2 = {
-  "kind": "InlineFragment",
-  "selections": [
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "success",
-      "storageKey": null
-    }
-  ],
-  "type": "SuccessResult",
-  "abstractKey": null
-};
+v2 = [
+  {
+    "alias": null,
+    "args": [
+      {
+        "kind": "Variable",
+        "name": "chatID",
+        "variableName": "chatID"
+      },
+      {
+        "kind": "Variable",
+        "name": "userID",
+        "variableName": "userID"
+      }
+    ],
+    "concreteType": null,
+    "kind": "LinkedField",
+    "name": "removeChatMember",
+    "plural": false,
+    "selections": [
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "__typename",
+        "storageKey": null
+      },
+      {
+        "kind": "InlineFragment",
+        "selections": [
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "success",
+            "storageKey": null
+          }
+        ],
+        "type": "SuccessResult",
+        "abstractKey": null
+      },
+      {
+        "kind": "InlineFragment",
+        "selections": (v1/*: any*/),
+        "type": "NotFoundError",
+        "abstractKey": null
+      },
+      {
+        "kind": "InlineFragment",
+        "selections": (v1/*: any*/),
+        "type": "ForbiddenError",
+        "abstractKey": null
+      }
+    ],
+    "storageKey": null
+  }
+];
 return {
   "fragment": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
     "name": "channelContentRemoveMemberMutation",
-    "selections": [
-      {
-        "alias": null,
-        "args": (v1/*: any*/),
-        "concreteType": null,
-        "kind": "LinkedField",
-        "name": "removeChatMember",
-        "plural": false,
-        "selections": [
-          (v2/*: any*/)
-        ],
-        "storageKey": null
-      }
-    ],
+    "selections": (v2/*: any*/),
     "type": "Mutation",
     "abstractKey": null
   },
@@ -90,39 +128,19 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
     "name": "channelContentRemoveMemberMutation",
-    "selections": [
-      {
-        "alias": null,
-        "args": (v1/*: any*/),
-        "concreteType": null,
-        "kind": "LinkedField",
-        "name": "removeChatMember",
-        "plural": false,
-        "selections": [
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "__typename",
-            "storageKey": null
-          },
-          (v2/*: any*/)
-        ],
-        "storageKey": null
-      }
-    ]
+    "selections": (v2/*: any*/)
   },
   "params": {
-    "cacheID": "16f68ea19a3b3078832a3955e0f76488",
+    "cacheID": "936bf76127c6034d21fb3b8218e70a1c",
     "id": null,
     "metadata": {},
     "name": "channelContentRemoveMemberMutation",
     "operationKind": "mutation",
-    "text": "mutation channelContentRemoveMemberMutation(\n  $chatID: ID!\n  $userID: ID!\n) {\n  removeChatMember(chatID: $chatID, userID: $userID) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n  }\n}\n"
+    "text": "mutation channelContentRemoveMemberMutation(\n  $chatID: ID!\n  $userID: ID!\n) {\n  removeChatMember(chatID: $chatID, userID: $userID) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "72b3e9e345a765369718056fe10f9059";
+(node as any).hash = "260b3b4cb572ee761f60b57b03759823";
 
 export default node;
