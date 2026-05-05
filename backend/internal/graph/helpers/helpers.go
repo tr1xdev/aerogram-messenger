@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
 	"strings"
 	"time"
 
@@ -29,8 +28,6 @@ func NewChatEnricher(store dbgen.Querier, s3 *storage.S3Storage) *ChatEnricher {
 }
 
 func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *chatv1.Chat) (*model.ChatExtended, error) {
-	log.Printf("[EnrichChat] Processing chat ID: %s", pbChat.Id)
-
 	chatID, err := uuid.Parse(pbChat.Id)
 	if err != nil {
 		return nil, err
@@ -68,7 +65,9 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 			CreatedAt:       time.Now(),
 			UpdatedAt:       time.Now(),
 		},
-		UnreadCount: int(pbChat.UnreadCount),
+		UnreadCount:     int(pbChat.UnreadCount),
+		ReadOutboxMaxId: pbChat.LastReadSequence,
+		ReadInboxMaxId:  pbChat.LastReadSequence,
 	}
 
 	if authID != "" {
