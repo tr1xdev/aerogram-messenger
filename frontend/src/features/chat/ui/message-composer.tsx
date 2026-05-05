@@ -3,6 +3,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   type ChangeEvent,
   type KeyboardEvent,
   type ReactNode,
@@ -17,6 +18,7 @@ interface MessageComposerProps {
   input: string;
   setInput: (val: string) => void;
   onSend: (text?: string) => void;
+  onJoin?: () => void;
   onTyping?: (isTyping: boolean) => void;
   disabled: boolean;
   replyingTo: Message | null;
@@ -25,6 +27,7 @@ interface MessageComposerProps {
   isBot: boolean;
   isEmpty: boolean;
   canWrite: boolean;
+  isMember: boolean;
   chatType?: "PRIVATE" | "GROUP" | "CHANNEL";
 }
 
@@ -32,6 +35,7 @@ export const MessageComposer = memo(function MessageComposer({
   input,
   setInput,
   onSend,
+  onJoin,
   onTyping,
   disabled,
   replyingTo,
@@ -40,6 +44,7 @@ export const MessageComposer = memo(function MessageComposer({
   isBot,
   isEmpty,
   canWrite,
+  isMember,
   chatType,
 }: MessageComposerProps): ReactNode {
   const activeAction: Message | null = editingMessage || replyingTo;
@@ -47,6 +52,36 @@ export const MessageComposer = memo(function MessageComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef<boolean>(false);
+
+  const showStartButton: boolean = useMemo(
+    () => isBot && chatType === "PRIVATE" && isEmpty && !activeAction,
+    [isBot, chatType, isEmpty, activeAction],
+  );
+
+  const showJoinButton: boolean = useMemo(
+    () => !isMember && (chatType === "CHANNEL" || chatType === "GROUP"),
+    [isMember, chatType],
+  );
+
+  useEffect(() => {
+    console.log("[MessageComposer State Check]", {
+      chatType,
+      isMember,
+      canWrite,
+      showJoinButton,
+      showStartButton,
+      activeAction: !!activeAction,
+      disabled,
+    });
+  }, [
+    chatType,
+    isMember,
+    canWrite,
+    showJoinButton,
+    showStartButton,
+    activeAction,
+    disabled,
+  ]);
 
   const stopTyping = useCallback((): void => {
     if (isTypingRef.current && onTyping) {
@@ -85,13 +120,29 @@ export const MessageComposer = memo(function MessageComposer({
   );
 
   const handleSendAndStopTyping = useCallback((): void => {
+    console.log("[MessageComposer Action] Attempting send", {
+      disabled,
+      canWrite,
+      inputLength: input.length,
+    });
+    if (disabled || !canWrite) return;
     stopTyping();
     onSend();
-  }, [onSend, stopTyping]);
+  }, [onSend, stopTyping, disabled, canWrite, input]);
 
   const handleStartBot = useCallback((): void => {
+    console.log("[MessageComposer Action] Start Bot clicked");
     onSend("/start");
   }, [onSend]);
+
+  const handleJoinClick = useCallback((): void => {
+    console.log("[MessageComposer Action] Join clicked", {
+      hasOnJoin: !!onJoin,
+      disabled,
+    });
+    if (!onJoin || disabled) return;
+    onJoin();
+  }, [onJoin, disabled]);
 
   const adjustHeight = useCallback((): void => {
     const textarea: HTMLTextAreaElement | null = textareaRef.current;
@@ -138,11 +189,8 @@ export const MessageComposer = memo(function MessageComposer({
     fileInputRef.current?.click();
   }, []);
 
-  const showStartButton: boolean =
-    isBot && chatType === "PRIVATE" && isEmpty && !activeAction;
-
   return (
-    <footer className="p-2 md:p-3 bg-background shrink-0 border-t border-border/40">
+    <footer className="p-2 md:p-3 bg-background shrink-0 border-t border-border/40 relative">
       <div className="max-w-5xl mx-auto flex flex-col min-w-0">
         <AnimatePresence mode="wait">
           {activeAction && (
@@ -182,14 +230,15 @@ export const MessageComposer = memo(function MessageComposer({
           )}
         </AnimatePresence>
 
-        {!canWrite ? (
-          <div className="flex items-center justify-center w-full px-4 h-11 bg-muted/30 rounded-xl border border-border/50 select-none cursor-not-allowed">
-            <div className="flex items-center gap-2.5 text-muted-foreground/70">
-              <Lock className="h-4 w-4" />
-              <span className="text-[13.5px] font-medium tracking-wide">
-                Writing messages is restricted
-              </span>
-            </div>
+        {showJoinButton ? (
+          <div className="flex justify-center w-full px-1">
+            <Button
+              onClick={handleJoinClick}
+              disabled={disabled}
+              className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-all shadow-sm"
+            >
+              Join {chatType === "CHANNEL" ? "Channel" : "Group"}
+            </Button>
           </div>
         ) : showStartButton ? (
           <div className="flex justify-center w-full px-1">
@@ -200,6 +249,15 @@ export const MessageComposer = memo(function MessageComposer({
             >
               Start
             </Button>
+          </div>
+        ) : !canWrite ? (
+          <div className="flex items-center justify-center w-full px-4 h-11 bg-muted/30 rounded-xl border border-border/50 select-none cursor-not-allowed">
+            <div className="flex items-center gap-2.5 text-muted-foreground/70">
+              <Lock className="h-4 w-4" />
+              <span className="text-[13.5px] font-medium tracking-wide">
+                Writing messages is restricted
+              </span>
+            </div>
           </div>
         ) : (
           <div className="flex items-end gap-2 relative">

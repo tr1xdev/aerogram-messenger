@@ -15,6 +15,10 @@ import type {
   useMessageActionsEditMutation$data,
 } from "./__generated__/useMessageActionsEditMutation.graphql";
 import type { useMessageActionsReadMutation } from "./__generated__/useMessageActionsReadMutation.graphql";
+import type {
+  useMessageActionsJoinMutation,
+  useMessageActionsJoinMutation$data,
+} from "./__generated__/useMessageActionsJoinMutation.graphql";
 
 const sendMessageMutation = graphql`
   mutation useMessageActionsSendMutation(
@@ -70,12 +74,29 @@ const markAsReadMutation = graphql`
   }
 `;
 
+const joinChatMutation = graphql`
+  mutation useMessageActionsJoinMutation($slug: String!) {
+    joinChatBySlug(slug: $slug) {
+      ... on Chat {
+        id
+        type
+        title
+        slug
+      }
+      ... on Error {
+        message
+      }
+    }
+  }
+`;
+
 export function useMessageActions(chatId: string) {
   const [send, isSending] =
     useMutation<useMessageActionsSendMutation>(sendMessageMutation);
   const [edit] =
     useMutation<useMessageActionsEditMutation>(editMessageMutation);
   const [read] = useMutation<useMessageActionsReadMutation>(markAsReadMutation);
+  const [join] = useMutation<useMessageActionsJoinMutation>(joinChatMutation);
 
   const sendMessage = useCallback(
     (
@@ -200,5 +221,41 @@ export function useMessageActions(chatId: string) {
     });
   }, [chatId, read]);
 
-  return { sendMessage, editMessage, markAsRead, isSending };
+  const joinChat = useCallback(
+    (slug: string): Promise<void> => {
+      return new Promise((resolve, reject): void => {
+        if (!slug) {
+          reject(new Error("No slug provided"));
+          return;
+        }
+
+        join({
+          variables: { slug },
+          onCompleted: (
+            response: useMessageActionsJoinMutation$data,
+            err: ReadonlyArray<PayloadError> | null,
+          ): void => {
+            if (err) {
+              reject(err);
+              return;
+            }
+
+            const result = response.joinChatBySlug;
+            if (result && "message" in result && result.message) {
+              reject(new Error(result.message as string));
+              return;
+            }
+
+            resolve();
+          },
+          onError: (err: Error): void => {
+            reject(err);
+          },
+        });
+      });
+    },
+    [join],
+  );
+
+  return { sendMessage, editMessage, markAsRead, joinChat, isSending };
 }
