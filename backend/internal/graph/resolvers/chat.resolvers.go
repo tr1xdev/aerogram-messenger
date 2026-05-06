@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -370,23 +371,46 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 
-	var rawID *string
-	if id != nil {
-		val := helpers.ToRawID(*id)
-		rawID = &val
+	var req chatv1.GetChatRequest
+	req.UserId = authID
+
+	if id != nil && *id != "" {
+		raw := helpers.ToRawID(*id)
+		req.ChatId = &raw
+		log.Printf("[Query.Chat] Searching by ID: %s (raw: %s)", *id, raw)
 	}
 
-	resp, err := r.ChatClient.GetChat(ctx, &chatv1.GetChatRequest{
-		ChatId: rawID,
-		Slug:   slug,
-		UserId: authID,
-	})
+	if slug != nil {
+		req.Slug = slug
+		log.Printf("[Query.Chat] Searching by Slug: %s", *slug)
+	}
 
+	resp, err := r.ChatClient.GetChat(ctx, &req)
 	if err != nil {
+		log.Printf("[Query.Chat] gRPC Error: %v", err)
 		return r.mapToChatError(err), nil
 	}
 
-	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
+	if resp.Chat == nil {
+		log.Printf("[Query.Chat] gRPC returned success but Chat is NIL")
+		return &model.NotFoundError{Message: "chat not found"}, nil
+	}
+
+	log.Printf("[Query.Chat] Found chat in gRPC: ID=%s, Title=%s. Starting enrichment...", resp.Chat.Id, resp.Chat.Title)
+
+	result, err := r.Enricher.EnrichChat(ctx, authID, resp.Chat)
+	if err != nil {
+		log.Printf("[Query.Chat] Enrichment failed with error: %v", err)
+		return nil, err
+	}
+
+	if result == nil {
+		log.Printf("[Query.Chat] Enrichment returned NIL result without error")
+		return &model.NotFoundError{Message: "chat not found"}, nil
+	}
+
+	log.Printf("[Query.Chat] Successfully enriched chat: %s", resp.Chat.Id)
+	return result, nil
 }
 
 func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *int, offset *int) (model.ChatMembersResult, error) {
