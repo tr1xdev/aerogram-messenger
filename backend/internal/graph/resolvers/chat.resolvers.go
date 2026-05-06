@@ -442,7 +442,7 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 		members = append(members, &model.ChatMember{
 			User:             user,
 			Role:             m.Role,
-			LastReadSequence: 0,
+			LastReadSequence: m.LastReadSequence,
 			Permissions:      p,
 		})
 	}

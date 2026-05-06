@@ -167,12 +167,13 @@ func (x *ChatPermissions) GetCanPinMessages() bool {
 }
 
 type ChatMember struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Role          string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
-	Permissions   *ChatPermissions       `protobuf:"bytes,3,opt,name=permissions,proto3" json:"permissions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	UserId           string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Role             string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
+	Permissions      *ChatPermissions       `protobuf:"bytes,3,opt,name=permissions,proto3" json:"permissions,omitempty"`
+	LastReadSequence int64                  `protobuf:"varint,4,opt,name=last_read_sequence,json=lastReadSequence,proto3" json:"last_read_sequence,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ChatMember) Reset() {
@@ -224,6 +225,13 @@ func (x *ChatMember) GetPermissions() *ChatPermissions {
 		return x.Permissions
 	}
 	return nil
+}
+
+func (x *ChatMember) GetLastReadSequence() int64 {
+	if x != nil {
+		return x.LastReadSequence
+	}
+	return 0
 }
 
 type Chat struct {
@@ -1626,12 +1634,13 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\x13can_delete_messages\x18\x04 \x01(\bR\x11canDeleteMessages\x12*\n" +
 	"\x11can_assign_admins\x18\x05 \x01(\bR\x0fcanAssignAdmins\x12$\n" +
 	"\x0ecan_send_media\x18\x06 \x01(\bR\fcanSendMedia\x12(\n" +
-	"\x10can_pin_messages\x18\a \x01(\bR\x0ecanPinMessages\"u\n" +
+	"\x10can_pin_messages\x18\a \x01(\bR\x0ecanPinMessages\"\xa3\x01\n" +
 	"\n" +
 	"ChatMember\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x12\n" +
 	"\x04role\x18\x02 \x01(\tR\x04role\x12:\n" +
-	"\vpermissions\x18\x03 \x01(\v2\x18.chat.v1.ChatPermissionsR\vpermissions\"\xa8\x05\n" +
+	"\vpermissions\x18\x03 \x01(\v2\x18.chat.v1.ChatPermissionsR\vpermissions\x12,\n" +
+	"\x12last_read_sequence\x18\x04 \x01(\x03R\x10lastReadSequence\"\xa8\x05\n" +
 	"\x04Chat\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x11.chat.v1.ChatTypeR\x04type\x12\x14\n" +

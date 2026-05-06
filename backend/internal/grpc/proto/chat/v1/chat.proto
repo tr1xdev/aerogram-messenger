@@ -42,6 +42,7 @@ message ChatMember {
   string user_id = 1;
   string role = 2;
   ChatPermissions permissions = 3;
+  int64 last_read_sequence = 4;
 }
 
 message Chat {

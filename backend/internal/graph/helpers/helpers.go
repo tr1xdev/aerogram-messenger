@@ -89,7 +89,9 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 			})
 			if err == nil {
 				ext.OpponentReadSequence = opponent.LastReadSequence
-				ext.ReadOutboxMaxId = opponent.LastReadSequence
+				if opponent.LastReadSequence > 0 {
+					ext.ReadOutboxMaxId = opponent.LastReadSequence
+				}
 
 				if !ext.Name.Valid || ext.Name.String == "" {
 					user, err := e.store.GetUserByID(ctx, opponent.UserID)

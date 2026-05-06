@@ -97,7 +97,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		}
 		existingDialog, err := s.dialogRepo.GetPrivateDialogByMembers(ctx, req.ParticipantIds[0], req.ParticipantIds[1])
 		if err == nil {
-			return &chatpb.CreateChatResponse{Chat: s.mapDBDialogToProto(existingDialog, 0, "member")}, nil
+			return &chatpb.CreateChatResponse{Chat: s.mapDBDialogToProto(existingDialog, 0, "member", 0)}, nil
 		}
 	}
 
@@ -153,7 +153,7 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	}
 
 	dialog, _ := s.dialogRepo.GetDialogByID(ctx, newID.String())
-	protoChat := s.mapDBDialogToProto(dialog, defaultPerms, "owner")
+	protoChat := s.mapDBDialogToProto(dialog, defaultPerms, "owner", 0)
 	protoChat.CanWrite = true
 	protoChat.Permissions = s.calculatePermissions(dialog.Type, defaultPerms, "owner")
 
@@ -256,7 +256,7 @@ func (s *Server) JoinChatBySlug(ctx context.Context, req *chatpb.JoinChatBySlugR
 
 	_ = s.db.Queries.IncrementMembersCount(ctx, dialog.ID)
 
-	chatProto := s.mapDBDialogToProto(dialog, 0, "member")
+	chatProto := s.mapDBDialogToProto(dialog, 0, "member", 0)
 	payload, _ := json.Marshal(chatProto)
 	s.rdb.Publish(ctx, "user_chats:"+userIDStr, payload)
 
@@ -318,9 +318,10 @@ func (s *Server) GetChatMembers(ctx context.Context, req *chatpb.GetChatMembersR
 	res := make([]*chatpb.ChatMember, 0, len(slice))
 	for _, m := range slice {
 		res = append(res, &chatpb.ChatMember{
-			UserId:      m.UserID.String(),
-			Role:        m.Role,
-			Permissions: s.calculatePermissions(dialog.Type, settings.Permissions, m.Role),
+			UserId:           m.UserID.String(),
+			Role:             m.Role,
+			Permissions:      s.calculatePermissions(dialog.Type, settings.Permissions, m.Role),
+			LastReadSequence: m.LastReadSequence,
 		})
 	}
 
@@ -388,11 +389,13 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 
 	var role string = "guest"
 	var perms int64 = 0
+	var lastRead int64 = 0
 	if userID != "" {
 		uUUID, _ := uuid.Parse(userID)
 		m, getErr := s.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{DialogID: dialog.ID, UserID: uUUID})
 		if getErr == nil {
 			role = m.Role
+			lastRead = m.LastReadSequence
 		}
 		settings, setErr := s.db.Queries.GetDialogSettings(ctx, dialog.ID)
 		if setErr == nil {
@@ -400,7 +403,7 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 		}
 	}
 
-	protoChat := s.mapDBDialogToProto(dialog, perms, role)
+	protoChat := s.mapDBDialogToProto(dialog, perms, role, lastRead)
 	protoChat.CanWrite = s.calculateCanWrite(dialog.Type, perms, role, dialog.IsActive)
 	protoChat.Permissions = s.calculatePermissions(dialog.Type, perms, role)
 
@@ -447,8 +450,14 @@ func (s *Server) mapProtoTypeToDB(t chatpb.ChatType) string {
 	}
 }
 
-func (s *Server) mapDBDialogToProto(d dbgen.Dialog, perms int64, role string) *chatpb.Chat {
-	res := &chatpb.Chat{Id: d.ID.String(), MembersCount: int32(d.MembersCount), IsVerified: d.IsVerified, MyRole: role}
+func (s *Server) mapDBDialogToProto(d dbgen.Dialog, perms int64, role string, lastRead int64) *chatpb.Chat {
+	res := &chatpb.Chat{
+		Id:               d.ID.String(),
+		MembersCount:     int32(d.MembersCount),
+		IsVerified:       d.IsVerified,
+		MyRole:           role,
+		LastReadSequence: lastRead,
+	}
 	if d.Name.Valid {
 		res.Title = d.Name.String
 	}
@@ -477,11 +486,10 @@ func (s *Server) mapGetUserDialogsRowToProto(row dbgen.GetUserDialogsRow) *chatp
 	res := s.mapDBDialogToProto(dbgen.Dialog{
 		ID: row.ID, Type: row.Type, Name: row.Name, Username: row.Username,
 		MembersCount: row.MembersCount, IsVerified: row.IsVerified, PhotoUrl: row.PhotoUrl, LastMessageID: row.LastMessageID,
-	}, 0, row.Role)
+	}, 0, row.Role, row.LastReadSequence)
 
 	res.IsPinned = row.IsPinned
 	res.UnreadCount = int32(row.UnreadCount)
-	res.LastReadSequence = row.LastReadSequence
 
 	if row.LastMessageID.Valid {
 		res.LastMessage = &messagespb.Message{
