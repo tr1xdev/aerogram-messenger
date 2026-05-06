@@ -672,9 +672,10 @@ func (q *Queries) RemoveDialogMember(ctx context.Context, arg RemoveDialogMember
 const searchPublicDialogs = `-- name: SearchPublicDialogs :many
 SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at FROM dialogs
 WHERE (name ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%')
-AND type IN ('group', 'channel')
-AND is_active = true
-AND deleted_at IS NULL
+  AND type IN ('group', 'channel')
+  AND username IS NOT NULL
+  AND is_active = true
+  AND deleted_at IS NULL
 LIMIT 20
 `
 
