@@ -195,3 +195,14 @@ LIMIT 20;
 SELECT * FROM dialog_members
 WHERE dialog_id = $1 AND user_id != $2
 LIMIT 1;
+
+-- name: UpdateChatMetadata :one
+UPDATE dialogs
+SET
+    name = COALESCE($2, name),
+    username = $3,
+    description = COALESCE($4, description),
+    photo_url = COALESCE($5, photo_url),
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;

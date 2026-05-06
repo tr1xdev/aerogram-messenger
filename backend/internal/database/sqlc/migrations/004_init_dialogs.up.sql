@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS dialogs (
     last_message_at   TIMESTAMPTZ,
     members_count     INT NOT NULL DEFAULT 1,
     is_verified       BOOLEAN NOT NULL DEFAULT FALSE,
+    is_private        BOOLEAN NOT NULL DEFAULT FALSE,
     is_active         BOOLEAN NOT NULL DEFAULT TRUE,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),

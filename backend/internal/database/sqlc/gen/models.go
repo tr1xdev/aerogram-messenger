@@ -27,10 +27,25 @@ type Dialog struct {
 	LastMessageAt   sql.NullTime   `json:"last_message_at"`
 	MembersCount    int32          `json:"members_count"`
 	IsVerified      bool           `json:"is_verified"`
+	IsPrivate       bool           `json:"is_private"`
 	IsActive        bool           `json:"is_active"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 	DeletedAt       sql.NullTime   `json:"deleted_at"`
+}
+
+type DialogInvite struct {
+	ID         uuid.UUID      `json:"id"`
+	DialogID   uuid.UUID      `json:"dialog_id"`
+	CreatorID  uuid.UUID      `json:"creator_id"`
+	InviteCode string         `json:"invite_code"`
+	Name       sql.NullString `json:"name"`
+	UsageLimit sql.NullInt32  `json:"usage_limit"`
+	UsageCount int32          `json:"usage_count"`
+	ExpireAt   sql.NullTime   `json:"expire_at"`
+	IsRevoked  bool           `json:"is_revoked"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
 type DialogMember struct {
@@ -47,6 +62,7 @@ type DialogMember struct {
 	NotificationsOn   bool           `json:"notifications_on"`
 	CreatedAt         time.Time      `json:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at"`
+	InviteID          uuid.NullUUID  `json:"invite_id"`
 }
 
 type DialogSetting struct {

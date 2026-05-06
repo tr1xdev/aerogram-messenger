@@ -21,6 +21,7 @@ type Querier interface {
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (MessageAttachment, error)
 	CreateBot(ctx context.Context, arg CreateBotParams) (User, error)
 	CreateDialog(ctx context.Context, arg CreateDialogParams) (Dialog, error)
+	CreateDialogInvite(ctx context.Context, arg CreateDialogInviteParams) (DialogInvite, error)
 	CreateDialogSettings(ctx context.Context, arg CreateDialogSettingsParams) error
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
@@ -37,10 +38,12 @@ type Querier interface {
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error)
 	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)
 	GetDialogByUsername(ctx context.Context, username sql.NullString) (Dialog, error)
+	GetDialogInvites(ctx context.Context, dialogID uuid.UUID) ([]DialogInvite, error)
 	GetDialogMember(ctx context.Context, arg GetDialogMemberParams) (DialogMember, error)
 	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]GetDialogMembersRow, error)
 	GetDialogOpponent(ctx context.Context, arg GetDialogOpponentParams) (DialogMember, error)
 	GetDialogSettings(ctx context.Context, dialogID uuid.UUID) (DialogSetting, error)
+	GetInviteByCode(ctx context.Context, inviteCode string) (DialogInvite, error)
 	GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (Message, error)
 	GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int64, error)
 	GetMessageByID(ctx context.Context, id uuid.UUID) (Message, error)
@@ -57,11 +60,14 @@ type Querier interface {
 	GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]User, error)
 	HardDeleteDialog(ctx context.Context, id uuid.UUID) error
 	HideDialogMember(ctx context.Context, arg HideDialogMemberParams) error
+	IncrementInviteUsage(ctx context.Context, id uuid.UUID) error
 	IncrementMembersCount(ctx context.Context, id uuid.UUID) error
 	IsDialogCreator(ctx context.Context, arg IsDialogCreatorParams) (bool, error)
+	JoinDialogByInvite(ctx context.Context, arg JoinDialogByInviteParams) error
 	MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error
 	PinDialog(ctx context.Context, arg PinDialogParams) error
 	RemoveDialogMember(ctx context.Context, arg RemoveDialogMemberParams) error
+	RevokeInvite(ctx context.Context, arg RevokeInviteParams) error
 	SearchPublicDialogs(ctx context.Context, dollar_1 sql.NullString) ([]Dialog, error)
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
 	SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString) ([]User, error)
@@ -69,6 +75,7 @@ type Querier interface {
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error
 	UpdateBot(ctx context.Context, arg UpdateBotParams) (User, error)
+	UpdateChatMetadata(ctx context.Context, arg UpdateChatMetadataParams) (Dialog, error)
 	UpdateDialogCreator(ctx context.Context, arg UpdateDialogCreatorParams) error
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
 	UpdateDialogMemberRole(ctx context.Context, arg UpdateDialogMemberRoleParams) error
