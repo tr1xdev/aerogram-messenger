@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log"
 	"strings"
 	"time"
 
@@ -57,7 +56,7 @@ func (r *chatResolver) PhotoURL(ctx context.Context, obj *model.ChatExtended) (*
 }
 
 func (r *chatResolver) UnreadCount(ctx context.Context, obj *model.ChatExtended) (int, error) {
-	return obj.UnreadCount, nil
+	return int(obj.UnreadCount), nil
 }
 
 func (r *chatResolver) MyReadSequence(ctx context.Context, obj *model.ChatExtended) (int64, error) {
@@ -73,19 +72,28 @@ func (r *chatResolver) IsPinned(ctx context.Context, obj *model.ChatExtended) (b
 }
 
 func (r *chatResolver) CanWrite(ctx context.Context, obj *model.ChatExtended) (bool, error) {
-	return obj.IsActive, nil
+	if !obj.IsActive {
+		return false, nil
+	}
+	isOwnerOrAdmin := obj.Role == "owner" || obj.Role == "admin"
+	if strings.ToUpper(obj.Type) == "CHANNEL" && !isOwnerOrAdmin {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (r *chatResolver) Permissions(ctx context.Context, obj *model.ChatExtended) (*model.ChatPermissions, error) {
 	isPrivate := strings.ToUpper(obj.Type) == "PRIVATE"
+	isAdmin := obj.Role == "owner" || obj.Role == "admin"
+
 	return &model.ChatPermissions{
-		CanSendMessage:    obj.IsActive,
+		CanSendMessage:    obj.IsActive && (isAdmin || strings.ToUpper(obj.Type) != "CHANNEL"),
 		CanInviteUsers:    !isPrivate,
-		CanEditMetadata:   obj.Role == "OWNER" || obj.Role == "ADMIN",
-		CanDeleteMessages: true,
-		CanAssignAdmins:   obj.Role == "OWNER",
-		CanSendMedia:      obj.IsActive,
-		CanPinMessages:    !isPrivate,
+		CanEditMetadata:   isAdmin,
+		CanDeleteMessages: isAdmin || isPrivate,
+		CanAssignAdmins:   obj.Role == "owner",
+		CanSendMedia:      obj.IsActive && (isAdmin || strings.ToUpper(obj.Type) != "CHANNEL"),
+		CanPinMessages:    isAdmin || isPrivate,
 	}, nil
 }
 
@@ -109,9 +117,9 @@ func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, lim
 
 func (r *chatResolver) MyRole(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	if obj.Role == "" {
-		return "NONE", nil
+		return "GUEST", nil
 	}
-	return obj.Role, nil
+	return strings.ToUpper(obj.Role), nil
 }
 
 func (r *chatResolver) CreatedAt(ctx context.Context, obj *model.ChatExtended) (string, error) {
@@ -377,39 +385,30 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 	if id != nil && *id != "" {
 		raw := helpers.ToRawID(*id)
 		req.ChatId = &raw
-		log.Printf("[Query.Chat] Searching by ID: %s (raw: %s)", *id, raw)
 	}
 
 	if slug != nil {
 		req.Slug = slug
-		log.Printf("[Query.Chat] Searching by Slug: %s", *slug)
 	}
 
 	resp, err := r.ChatClient.GetChat(ctx, &req)
 	if err != nil {
-		log.Printf("[Query.Chat] gRPC Error: %v", err)
 		return r.mapToChatError(err), nil
 	}
 
 	if resp.Chat == nil {
-		log.Printf("[Query.Chat] gRPC returned success but Chat is NIL")
 		return &model.NotFoundError{Message: "chat not found"}, nil
 	}
 
-	log.Printf("[Query.Chat] Found chat in gRPC: ID=%s, Title=%s. Starting enrichment...", resp.Chat.Id, resp.Chat.Title)
-
 	result, err := r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 	if err != nil {
-		log.Printf("[Query.Chat] Enrichment failed with error: %v", err)
 		return nil, err
 	}
 
 	if result == nil {
-		log.Printf("[Query.Chat] Enrichment returned NIL result without error")
 		return &model.NotFoundError{Message: "chat not found"}, nil
 	}
 
-	log.Printf("[Query.Chat] Successfully enriched chat: %s", resp.Chat.Id)
 	return result, nil
 }
 
@@ -443,16 +442,7 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 			continue
 		}
 
-		p := &model.ChatPermissions{
-			CanSendMessage:    true,
-			CanInviteUsers:    true,
-			CanEditMetadata:   false,
-			CanDeleteMessages: false,
-			CanAssignAdmins:   false,
-			CanSendMedia:      true,
-			CanPinMessages:    false,
-		}
-
+		p := &model.ChatPermissions{}
 		if m.Permissions != nil {
 			p.CanSendMessage = m.Permissions.CanSendMessage
 			p.CanInviteUsers = m.Permissions.CanInviteUsers
@@ -465,7 +455,7 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 
 		members = append(members, &model.ChatMember{
 			User:             user,
-			Role:             m.Role,
+			Role:             strings.ToUpper(m.Role),
 			LastReadSequence: m.LastReadSequence,
 			Permissions:      p,
 		})
@@ -480,23 +470,11 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 func (r *queryResolver) SearchGlobal(ctx context.Context, query string) (*model.GlobalSearchList, error) {
 	cleanQuery := strings.TrimSpace(query)
 	if len(cleanQuery) < 2 {
-		return &model.GlobalSearchList{
-			Results: []model.SearchResult{},
-		}, nil
+		return &model.GlobalSearchList{Results: []model.SearchResult{}}, nil
 	}
 
-	users, err := r.Store.SearchUsersByUsername(ctx, cleanQuery)
-	if err != nil {
-		return nil, err
-	}
-
-	dialogs, err := r.Store.SearchPublicDialogs(ctx, sql.NullString{
-		String: cleanQuery,
-		Valid:  true,
-	})
-	if err != nil {
-		return nil, err
-	}
+	users, _ := r.Store.SearchUsersByUsername(ctx, cleanQuery)
+	dialogs, _ := r.Store.SearchPublicDialogs(ctx, sql.NullString{String: cleanQuery, Valid: true})
 
 	results := make([]model.SearchResult, 0, len(users)+len(dialogs))
 
@@ -510,9 +488,7 @@ func (r *queryResolver) SearchGlobal(ctx context.Context, query string) (*model.
 		})
 	}
 
-	return &model.GlobalSearchList{
-		Results: results,
-	}, nil
+	return &model.GlobalSearchList{Results: results}, nil
 }
 
 func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (<-chan *model.ChatExtended, error) {
@@ -536,21 +512,13 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 				if !ok {
 					return
 				}
-
 				var chatProto chatv1.Chat
 				if err := json.Unmarshal([]byte(msg.Payload), &chatProto); err != nil {
 					continue
 				}
-
 				enriched, err := r.Enricher.EnrichChat(ctx, authID, &chatProto)
-				if err != nil {
-					continue
-				}
-
-				select {
-				case chatChan <- enriched:
-				case <-ctx.Done():
-					return
+				if err == nil {
+					chatChan <- enriched
 				}
 			}
 		}
@@ -579,19 +547,11 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 				if !ok {
 					return
 				}
-
-				var id string
+				id := msg.Payload
 				if strings.HasPrefix(msg.Channel, "chat_deleted:") {
 					id = strings.TrimPrefix(msg.Channel, "chat_deleted:")
-				} else {
-					id = msg.Payload
 				}
-
-				select {
-				case deleteChan <- helpers.EncodeGlobalID("Chat", id):
-				case <-ctx.Done():
-					return
-				}
+				deleteChan <- helpers.EncodeGlobalID("Chat", id)
 			}
 		}
 	}()
@@ -615,14 +575,9 @@ func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<
 				return
 			}
 			var payload model.TypingPayload
-			if err := json.Unmarshal([]byte(resp.Payload), &payload); err != nil {
-				continue
-			}
-			payload.UserID = helpers.EncodeGlobalID("User", helpers.ToRawID(payload.UserID))
-			select {
-			case out <- &payload:
-			case <-ctx.Done():
-				return
+			if err := json.Unmarshal([]byte(resp.Payload), &payload); err == nil {
+				payload.UserID = helpers.EncodeGlobalID("User", helpers.ToRawID(payload.UserID))
+				out <- &payload
 			}
 		}
 	}()

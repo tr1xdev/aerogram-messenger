@@ -14,6 +14,16 @@ type ChatPermissions {
     canPinMessages: Boolean!
 }
 
+input ChatPermissionsInput {
+    canSendMessage: Boolean
+    canInviteUsers: Boolean
+    canEditMetadata: Boolean
+    canDeleteMessages: Boolean
+    canAssignAdmins: Boolean
+    canSendMedia: Boolean
+    canPinMessages: Boolean
+}
+
 type ChatMember {
     user: User!
     role: String!
@@ -52,6 +62,8 @@ type ChatMembersList {
 type GlobalSearchList {
     results: [SearchResult!]!
 }
+
+# --- Results & Errors ---
 
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 union MyChatsResult = ChatList | ForbiddenError | InternalError
@@ -100,6 +112,8 @@ type TypingPayload {
     isTyping: Boolean!
 }
 
+# --- Root Types ---
+
 extend type Query {
     myChats: MyChatsResult!
     chat(id: ID, slug: String): ChatResult!
@@ -114,29 +128,29 @@ extend type Mutation {
         slug: String
         title: String
     ): CreateChatResult!
+
     createDirectChat(userID: ID!): CreateChatResult!
+
     pinChat(id: ID!, pinned: Boolean!): PinChatResult!
+
     deleteChat(id: ID!, forEveryone: Boolean): DeleteChatResult!
+
     leaveChat(chatID: ID!): LeaveChatResult!
+
     inviteToChat(chatID: ID!, userIds: [ID!]!): InviteResult!
+
     joinChatBySlug(slug: String!): JoinChatResult!
+
     removeChatMember(chatID: ID!, userID: ID!): RemoveMemberResult!
+
     updateMemberRole(chatID: ID!, userID: ID!, role: String!): SuccessResult!
+
     updateChatPermissions(
         chatID: ID!
         permissions: ChatPermissionsInput!
     ): SuccessResult!
-    sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
-}
 
-input ChatPermissionsInput {
-    canSendMessage: Boolean
-    canInviteUsers: Boolean
-    canEditMetadata: Boolean
-    canDeleteMessages: Boolean
-    canAssignAdmins: Boolean
-    canSendMedia: Boolean
-    canPinMessages: Boolean
+    sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
 }
 
 extend type Subscription {
