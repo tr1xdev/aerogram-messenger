@@ -4,6 +4,7 @@ import {
   RecordSource,
   Store,
   Observable,
+  type MutableRecordSource,
   type RequestParameters,
   type Variables,
   type GraphQLResponse,
@@ -18,13 +19,6 @@ import { useConnectionStore } from "@/store/connection";
 import { toast } from "sonner";
 import { logger } from "@/shared/lib/logger";
 
-interface ExtendedRecordSource extends RecordSource {
-  getLinkedRecordIDs(
-    dataID: string,
-    storageKey: string,
-  ): (string | null)[] | null | undefined;
-}
-
 interface RefreshTokenResponse {
   data?: {
     refreshToken?: {
@@ -34,13 +28,20 @@ interface RefreshTokenResponse {
   };
 }
 
+type RecordSourceWithLinkedIDs = MutableRecordSource & {
+  getLinkedRecordIDs?: (
+    dataID: string,
+    storageKey: string,
+  ) => (string | null)[] | null | undefined;
+};
+
 const HTTP_ENDPOINT: string =
   import.meta.env.VITE_API_URL || "https://localhost:8080/query";
 const WS_ENDPOINT: string =
   import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
 const THROTTLE_MS: number = 5000;
 
-const LOG_STYLES = {
+const LOG_STYLES: Record<string, string> = {
   query:
     "color: #00ff00; font-weight: bold; background: #002200; padding: 2px 5px; border-radius: 3px;",
   mutation:
@@ -138,8 +139,7 @@ async function performFetch(
 ): Promise<GraphQLResponse> {
   const startTime: number = performance.now();
   const type: string = params.operationKind;
-  const style: string =
-    LOG_STYLES[type as keyof typeof LOG_STYLES] || LOG_STYLES.info;
+  const style: string = LOG_STYLES[type] || LOG_STYLES.info;
 
   console.groupCollapsed(
     `%c ${type.toUpperCase()} %c ${params.name} `,
@@ -228,7 +228,7 @@ async function performFetch(
 
     console.groupEnd();
     return json;
-  } catch (error) {
+  } catch (error: unknown) {
     console.log(`%c CRASHED %c`, LOG_STYLES.error, LOG_STYLES.info);
     console.groupEnd();
     throw error;
@@ -407,24 +407,28 @@ const subscribe: SubscribeFunction = (
 function createStore(): Store {
   const source: RecordSource = new RecordSource();
   const store: Store = new Store(source, { gcReleaseBufferSize: 10 });
-  const recordSource: ExtendedRecordSource =
-    store.getSource() as unknown as ExtendedRecordSource;
+  const recordSource: RecordSourceWithLinkedIDs =
+    store.getSource() as RecordSourceWithLinkedIDs;
 
   if (typeof recordSource.getLinkedRecordIDs === "function") {
-    const originalGetLinkedRecordIDs =
+    const originalGetLinkedRecordIDs: (
+      dataID: string,
+      storageKey: string,
+    ) => (string | null)[] | null | undefined =
       recordSource.getLinkedRecordIDs.bind(recordSource);
 
     recordSource.getLinkedRecordIDs = (
       dataID: string,
       storageKey: string,
     ): (string | null)[] | null | undefined => {
-      const result = originalGetLinkedRecordIDs(dataID, storageKey);
+      const result: (string | null)[] | null | undefined =
+        originalGetLinkedRecordIDs(dataID, storageKey);
 
       if (!result || !Array.isArray(result)) return result;
 
       return result.filter((id: string | null): boolean => {
         if (id === null) return false;
-        const record = recordSource.get(id);
+        const record: unknown = recordSource.get(id);
         return record !== undefined && record !== null;
       });
     };
