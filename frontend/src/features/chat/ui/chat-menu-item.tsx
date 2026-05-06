@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useFragment, graphql, useMutation } from "react-relay";
 import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
 import { motion, AnimatePresence } from "framer-motion";
@@ -62,6 +62,7 @@ export function ChatMenuItem({
   isActive,
   myId,
 }: ChatMenuItemProps): ReactNode {
+  const navigate = useNavigate();
   const chat: chatMenuItem_chat$data = useFragment(
     graphql`
       fragment chatMenuItem_chat on Chat {
@@ -145,42 +146,61 @@ export function ChatMenuItem({
   }, [lastMessage, chat.type, isMe]);
 
   const handleTogglePin = (pinned: boolean): void => {
+    handleTogglePinInternal(pinned);
+  };
+
+  const handleTogglePinInternal = (pinned: boolean): void => {
+    const updatePin = (store: RecordSourceSelectorProxy): void => {
+      const record: RecordProxy | null | undefined = store.get(chatId);
+      if (record) {
+        record.setValue(pinned, "isPinned");
+      }
+    };
+
     commitPin({
       variables: { id: chatId, pinned },
-      optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
-        store.get(chatId)?.setValue(pinned, "isPinned");
-      },
-      updater: (store: RecordSourceSelectorProxy): void => {
-        store.get(chatId)?.setValue(pinned, "isPinned");
-      },
+      optimisticUpdater: updatePin,
+      updater: updatePin,
     });
   };
 
-  const handleLeave = (): void => {
+  const handleLeave = async (): Promise<void> => {
+    if (isActive) {
+      await navigate({ to: "/", replace: true });
+    }
+
+    const updateLeave = (store: RecordSourceSelectorProxy): void => {
+      const root: RecordProxy = store.getRoot();
+      const myChats: RecordProxy | null | undefined =
+        root.getLinkedRecord("myChats");
+      if (myChats) {
+        const chats: readonly (RecordProxy | null)[] =
+          myChats.getLinkedRecords("chats") ?? [];
+        myChats.setLinkedRecords(
+          chats.filter(
+            (c: RecordProxy | null): boolean => c?.getDataID() !== chatId,
+          ),
+          "chats",
+        );
+      }
+      store.delete(chatId);
+    };
+
     commitLeave({
       variables: { id: chatId },
-      optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
-        const root: RecordProxy = store.getRoot();
-        const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
-        if (myChats) {
-          const chats: readonly RecordProxy[] =
-            myChats.getLinkedRecords("chats") ?? [];
-          myChats.setLinkedRecords(
-            chats.filter(
-              (c: RecordProxy): boolean => c.getValue("id") !== chatId,
-            ),
-            "chats",
-          );
-        }
-        store.delete(chatId);
-      },
-      updater: (store: RecordSourceSelectorProxy): void => {
-        store.delete(chatId);
-      },
+      optimisticUpdater: updateLeave,
+      updater: updateLeave,
       onCompleted: (): void => {
         toast.success("Left chat");
       },
     });
+  };
+
+  const handleConfirmDelete = async (everyone: boolean): Promise<void> => {
+    if (isActive) {
+      await navigate({ to: "/", replace: true });
+    }
+    deleteChat(everyone);
   };
 
   return (
@@ -284,7 +304,7 @@ export function ChatMenuItem({
 
           <ContextMenuContent className="w-56 rounded-xl">
             <ContextMenuItem
-              onClick={() => handleTogglePin(!chat.isPinned)}
+              onClick={(): void => handleTogglePin(!chat.isPinned)}
               className="gap-2"
             >
               {chat.isPinned ? (
@@ -296,7 +316,10 @@ export function ChatMenuItem({
             </ContextMenuItem>
 
             {(chat.unreadCount ?? 0) > 0 && (
-              <ContextMenuItem onClick={() => markAsRead()} className="gap-2">
+              <ContextMenuItem
+                onClick={(): void => markAsRead()}
+                className="gap-2"
+              >
                 <CheckCircle2 className="h-4 w-4" />
                 <span>Mark as read</span>
               </ContextMenuItem>
@@ -311,7 +334,7 @@ export function ChatMenuItem({
 
             {!isPrivate && (
               <ContextMenuItem
-                onClick={handleLeave}
+                onClick={(): Promise<void> => handleLeave()}
                 className="gap-2 text-destructive"
               >
                 <LogOut className="h-4 w-4" />
@@ -320,7 +343,7 @@ export function ChatMenuItem({
             )}
 
             <ContextMenuItem
-              onClick={() => setIsDeleteOpen(true)}
+              onClick={(): void => setIsDeleteOpen(true)}
               className="gap-2 text-destructive"
             >
               <Trash2 className="h-4 w-4" />
@@ -332,7 +355,7 @@ export function ChatMenuItem({
         <DeleteChatDialog
           open={isDeleteOpen}
           onOpenChange={setIsDeleteOpen}
-          onConfirm={(everyone: boolean) => deleteChat(everyone)}
+          onConfirm={handleConfirmDelete}
           displayName={displayName}
           isPrivate={isPrivate}
         />
