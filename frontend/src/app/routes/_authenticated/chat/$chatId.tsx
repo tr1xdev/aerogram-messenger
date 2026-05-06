@@ -35,7 +35,7 @@ import type { useChatsDetailsQuery$data } from "@/features/chat/lib/chat/__gener
 type ChatNode = Extract<
   useChatsDetailsQuery$data["chat"],
   { readonly __typename: "Chat" }
-> & { myRole?: string | null };
+>;
 
 type RelayMember = NonNullable<ChatNode["members"]>[number];
 
@@ -80,21 +80,23 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const chatData: ChatDetailsResponse = useChatDetails(chatId);
   const chatsData: MyChatsResponse = useMyChats();
 
-  const me: User | undefined = meData?.me as unknown as User | undefined;
+  const me: User | undefined = meData?.me ? (meData.me as User) : undefined;
   const chatRaw = chatData.chat;
-  const isChatType: boolean = chatRaw?.__typename === "Chat";
 
   const chatNode = useMemo((): (ChatNode & { slug?: string }) | null => {
-    if (!isChatType || !chatRaw) return null;
-    return chatRaw as unknown as ChatNode & { slug?: string };
-  }, [isChatType, chatRaw]);
+    if (chatRaw?.__typename === "Chat") {
+      return chatRaw as ChatNode & { slug?: string };
+    }
+    return null;
+  }, [chatRaw]);
 
   const isMember: boolean = useMemo((): boolean => {
     if (isOptimisticJoined) return true;
     if (!chatNode) return false;
-    const role: string | null | undefined = chatNode.myRole?.toLowerCase();
-    if (role && role !== "none" && role !== "") return true;
-    if (Array.isArray(chatNode.members) && chatNode.members.length > 0 && me) {
+    const role: string = (chatNode.myRole ?? "").toLowerCase();
+    if (role && role !== "none") return true;
+
+    if (chatNode.members && me) {
       return chatNode.members.some(
         (m: RelayMember): boolean => m.user?.id === me.id,
       );
@@ -112,10 +114,11 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const partnerUser = useMemo((): chatHeader_user$key | null => {
     if (!chatNode?.members || !me) return null;
     const partner = chatNode.members.find(
-      (m: RelayMember): boolean =>
-        m.user?.id !== undefined && m.user.id !== me.id,
+      (m: RelayMember): boolean => m.user?.id !== me.id,
     );
-    return (partner?.user as unknown as chatHeader_user$key) ?? null;
+    return partner?.user
+      ? (partner.user as unknown as chatHeader_user$key)
+      : null;
   }, [chatNode, me]);
 
   const { messages: messagesFromHistory, isLoading: historyLoading } =
@@ -125,34 +128,24 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     useMessageActions(chatId);
   const { handleKeyPress, stopTyping: stopTypingHook } = useSendTyping(chatId);
 
-  const canWrite: boolean = chatNode ? chatNode.canWrite : true;
+  const canWrite: boolean = chatNode?.canWrite ?? true;
   const isInitialLoading: boolean = isFirstLoad && historyLoading;
   const isNotFound: boolean =
     !chatNode && !isInitialLoading && chatRaw?.__typename !== "InternalError";
 
   const lastSequence: number = useMemo((): number => {
     if (!messagesFromHistory || messagesFromHistory.length === 0) return 0;
-    const lastMsg: Message = messagesFromHistory[
+    const lastMsg = messagesFromHistory[
       messagesFromHistory.length - 1
-    ] as unknown as Message;
+    ] as Message;
     return Number(lastMsg.sequence) || 0;
   }, [messagesFromHistory]);
 
   const { checkAndMarkRead } = useMarkDialog(
-    (isChatType ? chatRaw : null) as unknown as useMarkDialog_chat$key,
+    (chatNode ? chatNode : null) as unknown as useMarkDialog_chat$key,
     lastSequence,
     me?.id,
   );
-
-  useEffect(() => {
-    console.log("--- CHAT DEBUG ---", {
-      chatId,
-      isMember,
-      canWrite,
-      lastSequence,
-      msgCount: messagesFromHistory?.length,
-    });
-  }, [chatId, isMember, canWrite, lastSequence, messagesFromHistory]);
 
   useEffect((): void | (() => void) => {
     if (!historyLoading && chatNode) {
@@ -203,10 +196,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   );
 
   const handleJoin = useCallback((): void => {
-    const slug: string | undefined =
-      chatNode && "slug" in chatNode ? (chatNode.slug as string) : undefined;
+    const slug: string | undefined = chatNode?.slug;
     if (joinChat && slug) {
-      console.log("[JOIN] Attempting to join:", slug);
       setIsOptimisticJoined(true);
       joinChat(slug)
         .then((): void => {
@@ -221,14 +212,10 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   const totalUnread: number = useMemo((): number => {
     const myChatsResult = chatsData.myChats;
-    if (
-      myChatsResult?.__typename === "ChatList" &&
-      Array.isArray(myChatsResult.chats)
-    ) {
+    if (myChatsResult?.__typename === "ChatList") {
       return myChatsResult.chats.reduce((acc: number, c): number => {
-        const unread: number = c?.unreadCount ?? 0;
-        const isCurrentChat: boolean = c?.id === chatId;
-        return isCurrentChat ? acc : acc + unread;
+        if (c?.id === chatId) return acc;
+        return acc + (c?.unreadCount ?? 0);
       }, 0);
     }
     return 0;
@@ -238,56 +225,61 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     if (!chatNode?.members || !me || normalizedChatType !== "PRIVATE")
       return false;
     const otherMember = chatNode.members.find(
-      (m: RelayMember): boolean =>
-        m?.user?.id !== undefined && m.user.id !== me.id,
+      (m: RelayMember): boolean => m?.user?.id !== me.id,
     );
     return otherMember?.user?.isBot ?? false;
   }, [chatNode, me, normalizedChatType]);
 
   const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
-    const rawMessages: Message[] = (messagesFromHistory ??
-      []) as unknown as Message[];
+    const rawMessages: Message[] = (messagesFromHistory ?? []) as Message[];
     return [...rawMessages]
-      .filter((m: Message | null): boolean => m !== null && m !== undefined)
+      .filter((m: Message): boolean => !!m)
       .sort((a: Message, b: Message): number => {
-        const timeA: number = new Date(a.sentAt || 0).getTime();
-        const timeB: number = new Date(b.sentAt || 0).getTime();
-        if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
-        return (Number(a.sequence) || 0) - (Number(b.sequence) || 0);
+        const seqA: number = Number(a.sequence) || 0;
+        const seqB: number = Number(b.sequence) || 0;
+
+        if (seqA !== seqB) {
+          return seqA - seqB;
+        }
+
+        return new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
       });
   }, [messagesFromHistory]);
 
   useEffect((): void | (() => void) => {
     let timeoutId: ReturnType<typeof setTimeout>;
-    const handleMarkRead = (): void => {
+
+    const triggerRead = (): void => {
       if (
         document.visibilityState === "visible" &&
         lastSequence > 0 &&
         isAtBottom
       ) {
-        console.log("[READ] Triggering markAsRead", { lastSequence });
         clearTimeout(timeoutId);
         timeoutId = setTimeout((): void => {
           checkAndMarkRead();
           markAsRead();
-        }, 100);
+        }, 300);
       }
     };
-    handleMarkRead();
-    window.addEventListener("visibilitychange", handleMarkRead);
-    window.addEventListener("focus", handleMarkRead);
+
+    triggerRead();
+
+    window.addEventListener("visibilitychange", triggerRead);
+    window.addEventListener("focus", triggerRead);
+
     return (): void => {
       clearTimeout(timeoutId);
-      window.removeEventListener("visibilitychange", handleMarkRead);
-      window.removeEventListener("focus", handleMarkRead);
+      window.removeEventListener("visibilitychange", triggerRead);
+      window.removeEventListener("focus", triggerRead);
     };
   }, [checkAndMarkRead, markAsRead, lastSequence, isAtBottom]);
 
   const handleSend = useCallback(
     (text?: string): void => {
       const val: string = (text ?? inputRef.current).trim();
-      console.log("[SEND] Initialized", { val, isEditing: !!editingMessage });
       if (!val || !me) return;
+
       if (editingMessage) {
         editMessage(editingMessage.id, val)
           .then((): void => cancelAction())
@@ -296,10 +288,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           });
         return;
       }
+
       const originalReply: Message | null = replyingTo;
       const tempId: string = `temp-${Date.now()}`;
-      const extendedMe: ExtendedUser = me as unknown as ExtendedUser;
+      const extendedMe: ExtendedUser = me as ExtendedUser;
+
       cancelAction();
+
       sendMessage(val, {
         variables: {
           chatId,

@@ -11,6 +11,7 @@ import type { useGlobalSubscriptionsDialogReadSubscription } from "./__generated
 import type { useGlobalSubscriptionsTypingSubscription } from "./__generated__/useGlobalSubscriptionsTypingSubscription.graphql";
 import type { useGlobalSubscriptionsChatDeletedSubscription } from "./__generated__/useGlobalSubscriptionsChatDeletedSubscription.graphql";
 import { logger } from "@/shared/lib/logger";
+import { deleteFromChatList } from "@/features/chat/lib/chat/use-chat-management";
 
 const messageSubscription = graphql`
   subscription useGlobalSubscriptionsMessageAddedSubscription($chatId: ID!) {
@@ -253,10 +254,14 @@ export function useGlobalSubscriptions(
         variables: { userId: myId ?? "" },
         skip: !myId,
         updater: (store: RecordSourceSelectorProxy): void => {
-          const deletedId: unknown = store.getRootField("chatDeleted");
-          if (typeof deletedId === "string") {
+          const deletedId: string | null | undefined = store.getRootField(
+            "chatDeleted",
+          ) as string | null | undefined;
+
+          if (deletedId) {
+            deleteFromChatList(store, deletedId);
             store.delete(deletedId);
-            logger.warn("APP", `Chat deleted: ${deletedId}`);
+            logger.warn("APP", `Chat removed from store: ${deletedId}`);
           }
         },
       }),

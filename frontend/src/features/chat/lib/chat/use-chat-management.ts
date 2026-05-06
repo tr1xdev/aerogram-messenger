@@ -13,6 +13,25 @@ import type {
   ChatType,
 } from "./__generated__/useChatManagementCreateComplexMutation.graphql";
 
+export const deleteFromChatList = (
+  store: RecordSourceSelectorProxy,
+  chatId: string,
+): void => {
+  const root: RecordProxy = store.getRoot();
+  const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
+
+  if (myChats && myChats.getType() === "ChatList") {
+    const chats: readonly RecordProxy[] =
+      myChats.getLinkedRecords("chats") ?? [];
+
+    const filteredChats: RecordProxy[] = chats.filter(
+      (c: RecordProxy): boolean => (c.getValue("id") as string) !== chatId,
+    );
+
+    myChats.setLinkedRecords(filteredChats, "chats");
+  }
+};
+
 const searchGlobalQuery = graphql`
   query useChatManagementSearchQuery($query: String!) {
     searchGlobal(query: $query) {
@@ -319,18 +338,7 @@ export function useChatActions(chatId?: string) {
     remove({
       variables: { id: chatId, forEveryone },
       updater: (store: RecordSourceSelectorProxy): void => {
-        const root: RecordProxy = store.getRoot();
-        const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
-        if (myChats && myChats.getType() === "ChatList") {
-          const chats: readonly RecordProxy[] =
-            myChats.getLinkedRecords("chats") ?? [];
-          myChats.setLinkedRecords(
-            chats.filter(
-              (c: RecordProxy): boolean => c.getValue("id") !== chatId,
-            ),
-            "chats",
-          );
-        }
+        deleteFromChatList(store, chatId);
         store.delete(chatId);
       },
       onCompleted: (
