@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useSearchUsers } from "../../lib/chat/use-chat-management";
 
 interface SearchedUser {
+  readonly __typename?: string;
   readonly id: string;
   readonly username: string | null;
   readonly firstName: string | null;
@@ -16,7 +17,9 @@ interface SearchedUser {
 }
 
 interface SearchResponse {
-  readonly searchUsers?: readonly SearchedUser[] | null;
+  readonly searchGlobal?: {
+    readonly results: readonly SearchedUser[];
+  } | null;
 }
 
 interface ParticipantSelectorProps {
@@ -59,11 +62,12 @@ export function ParticipantSelector({
 
   const users: readonly SearchedUser[] =
     useMemo((): readonly SearchedUser[] => {
-      const rawUsers: readonly SearchedUser[] = data?.searchUsers ?? [];
-      return rawUsers.filter(
-        (u: SearchedUser): boolean => !excludeIds.includes(u.id),
+      const rawResults = data?.searchGlobal?.results ?? [];
+      return rawResults.filter(
+        (u: SearchedUser): boolean =>
+          u.__typename === "User" && !excludeIds.includes(u.id),
       );
-    }, [data?.searchUsers, excludeIds]);
+    }, [data?.searchGlobal?.results, excludeIds]);
 
   return (
     <div className="space-y-4 py-4">

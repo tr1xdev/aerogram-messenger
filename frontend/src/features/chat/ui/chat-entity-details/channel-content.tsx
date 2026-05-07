@@ -14,8 +14,6 @@ import {
   Save,
   Globe,
   Lock,
-  Copy,
-  RotateCcw,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,9 +36,10 @@ import {
 } from "@/components/ui/context-menu";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
 import type { channelContentUpdateRoleMutation } from "./__generated__/channelContentUpdateRoleMutation.graphql";
 import type { channelContentRemoveMemberMutation } from "./__generated__/channelContentRemoveMemberMutation.graphql";
+import type { channelContentUpdateMetadataMutation } from "./__generated__/channelContentUpdateMetadataMutation.graphql";
+import type { channelContentDeleteChatMutation } from "./__generated__/channelContentDeleteChatMutation.graphql";
 import type {
   channelContentQuery,
   channelContentQuery$data,
@@ -52,7 +51,7 @@ const channelSettingsSchema = z.object({
     .string()
     .max(32)
     .regex(/^[a-zA-Z0-9_]*$/, "Only letters, numbers and underscores")
-    .optional(),
+    .or(z.literal("")),
   visibility: z.enum(["public", "private"]),
 });
 
@@ -88,6 +87,23 @@ const ChannelQuery = graphql`
   }
 `;
 
+const UpdateMetadataMutation = graphql`
+  mutation channelContentUpdateMetadataMutation(
+    $id: ID!
+    $title: String
+    $slug: String
+  ) {
+    updateChatMetadata(id: $id, title: $title, slug: $slug) {
+      __typename
+      ... on Chat {
+        id
+        title
+        slug
+      }
+    }
+  }
+`;
+
 const UpdateRoleMutation = graphql`
   mutation channelContentUpdateRoleMutation(
     $chatID: ID!
@@ -107,11 +123,16 @@ const RemoveMemberMutation = graphql`
       ... on SuccessResult {
         success
       }
-      ... on NotFoundError {
-        message
-      }
-      ... on ForbiddenError {
-        message
+    }
+  }
+`;
+
+const DeleteChatMutation = graphql`
+  mutation channelContentDeleteChatMutation($id: ID!, $forEveryone: Boolean) {
+    deleteChat(id: $id, forEveryone: $forEveryone) {
+      __typename
+      ... on SuccessResult {
+        success
       }
     }
   }
@@ -125,10 +146,14 @@ export function ChannelContent({
   isPreview?: boolean;
 }): ReactNode {
   const data = useLazyLoadQuery<channelContentQuery>(ChannelQuery, { id });
+  const [commitUpdateMetadata] =
+    useMutation<channelContentUpdateMetadataMutation>(UpdateMetadataMutation);
   const [commitUpdateRole] =
     useMutation<channelContentUpdateRoleMutation>(UpdateRoleMutation);
   const [commitRemoveMember] =
     useMutation<channelContentRemoveMemberMutation>(RemoveMemberMutation);
+  const [commitDeleteChat] =
+    useMutation<channelContentDeleteChatMutation>(DeleteChatMutation);
 
   const chat = data.chat;
 
@@ -138,7 +163,7 @@ export function ChannelContent({
     reset,
     watch,
     setValue,
-    formState: { isDirty, errors },
+    formState: { isDirty, errors, isSubmitting },
   } = useForm<ChannelSettingsValues>({
     resolver: zodResolver(channelSettingsSchema),
     defaultValues: {
@@ -163,36 +188,62 @@ export function ChannelContent({
 
   const sortedMembers = useMemo((): ChatMember[] => {
     if (!chat || chat.__typename !== "Chat" || !chat.members) return [];
-
-    const weights: Record<string, number> = {
-      owner: 3,
-      admin: 2,
-      member: 1,
-    };
-
-    const membersList: ChatMember[] = chat.members.filter(
-      (m: ChatMember | null): m is ChatMember => m !== null,
-    );
-
-    return [...membersList].sort(
-      (a: ChatMember, b: ChatMember): number =>
-        (weights[b.role ?? "member"] || 0) - (weights[a.role ?? "member"] || 0),
-    );
+    const weights: Record<string, number> = { owner: 3, admin: 2, member: 1 };
+    return [...chat.members]
+      .filter((m): m is ChatMember => m !== null)
+      .sort(
+        (a, b) =>
+          (weights[b.role.toLowerCase()] || 0) -
+          (weights[a.role.toLowerCase()] || 0),
+      );
   }, [chat]);
 
   if (!chat || chat.__typename !== "Chat") return null;
 
-  const chatId: string = chat.id;
   const isSelfAdmin: boolean =
-    chat.myRole === "owner" || chat.myRole === "admin";
+    chat.myRole.toLowerCase() === "owner" ||
+    chat.myRole.toLowerCase() === "admin";
 
-  const handleCopyLink = (): void => {
-    void navigator.clipboard.writeText("https://app.link/join/p/x7R2k9Lp8z2W");
-    toast.success("Invite link copied to clipboard");
+  const onSaveSettings = (values: ChannelSettingsValues): void => {
+    const finalSlug = values.visibility === "private" ? "" : values.slug;
+
+    commitUpdateMetadata({
+      variables: {
+        id: chat.id,
+        title: values.title,
+        slug: finalSlug,
+      },
+      onCompleted: (response) => {
+        if (response.updateChatMetadata?.__typename === "Chat") {
+          toast.success("Channel updated successfully");
+          reset(values);
+        } else {
+          toast.error("Failed to update channel");
+        }
+      },
+      onError: () => {
+        toast.error("An error occurred while saving");
+      },
+    });
   };
 
-  const handleRegenerateLink = (): void => {
-    toast.success("Invite link has been regenerated");
+  const handleDeleteChannel = (): void => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this channel? This action cannot be undone.",
+      )
+    )
+      return;
+
+    commitDeleteChat({
+      variables: { id: chat.id, forEveryone: true },
+      onCompleted: (response) => {
+        if (response.deleteChat?.__typename === "SuccessResult") {
+          toast.success("Channel deleted");
+          window.location.href = "/";
+        }
+      },
+    });
   };
 
   const handleToggleAdmin = (
@@ -200,96 +251,48 @@ export function ChannelContent({
     currentRole: string,
     userName: string,
   ): void => {
-    const newRole: string = currentRole === "admin" ? "member" : "admin";
-
-    const updateRoleInStore = (store: RecordSourceSelectorProxy): void => {
-      const chatRecord = store.get(chatId);
-      if (!chatRecord) return;
-
-      const members: RecordProxy[] | null =
-        chatRecord.getLinkedRecords("members");
-      if (!members) return;
-
-      members.forEach((memberProxy: RecordProxy): void => {
-        const userProxy: RecordProxy | null =
-          memberProxy.getLinkedRecord("user");
-        if (userProxy?.getValue("id") === userID) {
-          memberProxy.setValue(newRole, "role");
-        }
-      });
-    };
-
+    const newRole = currentRole.toLowerCase() === "admin" ? "member" : "admin";
     commitUpdateRole({
-      variables: { chatID: chatId, userID, role: newRole },
-      optimisticUpdater: updateRoleInStore,
-      updater: updateRoleInStore,
-      onCompleted: (response): void => {
-        if (response.updateMemberRole?.success) {
-          toast.success(`${userName} is now ${newRole}`);
+      variables: { chatID: chat.id, userID, role: newRole },
+      optimisticUpdater: (store) => {
+        const chatProxy = store.get(chat.id);
+        if (!chatProxy) return;
+        const members = chatProxy.getLinkedRecords("members");
+        if (!members) return;
+        const targetMember = members.find(
+          (m) => m.getLinkedRecord("user")?.getValue("id") === userID,
+        );
+        if (targetMember) {
+          targetMember.setValue(newRole.toUpperCase(), "role");
         }
+      },
+      onCompleted: (res) => {
+        if (res.updateMemberRole?.success)
+          toast.success(`${userName} is now ${newRole}`);
       },
     });
-  };
-
-  const sharedRemoveUpdater = (
-    store: RecordSourceSelectorProxy,
-    userID: string,
-  ): void => {
-    const chatRecord: RecordProxy | null | undefined = store.get(chatId);
-    if (!chatRecord) return;
-
-    const members: RecordProxy[] | null =
-      chatRecord.getLinkedRecords("members");
-    if (!members) return;
-
-    const nextMembers: RecordProxy[] = members.filter(
-      (m: RecordProxy): boolean => {
-        const userRecord: RecordProxy | null = m.getLinkedRecord("user");
-        const currentId: string | null | undefined = userRecord?.getValue(
-          "id",
-        ) as string | null | undefined;
-        return currentId !== userID;
-      },
-    );
-
-    chatRecord.setLinkedRecords(nextMembers, "members");
-
-    const currentCount: number | null | undefined = chatRecord.getValue(
-      "membersCount",
-    ) as number | null | undefined;
-    if (typeof currentCount === "number") {
-      chatRecord.setValue(Math.max(0, currentCount - 1), "membersCount");
-    }
   };
 
   const handleKickMember = (userID: string, userName: string): void => {
     commitRemoveMember({
-      variables: { chatID: chatId, userID },
-      optimisticUpdater: (store: RecordSourceSelectorProxy): void => {
-        sharedRemoveUpdater(store, userID);
-      },
-      updater: (store: RecordSourceSelectorProxy): void => {
-        sharedRemoveUpdater(store, userID);
-      },
-      onCompleted: (response): void => {
-        const result = response.removeChatMember;
-        if (result?.__typename === "SuccessResult") {
-          toast.success(`${userName} removed`);
+      variables: { chatID: chat.id, userID },
+      updater: (store) => {
+        const chatProxy = store.get(chat.id);
+        const members = chatProxy?.getLinkedRecords("members");
+        if (chatProxy && members) {
+          const nextMembers = members.filter(
+            (m) => m.getLinkedRecord("user")?.getValue("id") !== userID,
+          );
+          chatProxy.setLinkedRecords(nextMembers, "members");
+          const count = chatProxy.getValue("membersCount") as number;
+          chatProxy.setValue(Math.max(0, count - 1), "membersCount");
         }
       },
+      onCompleted: (res) => {
+        if (res.removeChatMember?.__typename === "SuccessResult")
+          toast.success(`${userName} removed`);
+      },
     });
-  };
-
-  const onSaveSettings = (values: ChannelSettingsValues): void => {
-    const savePromise: Promise<ChannelSettingsValues> = new Promise((resolve) =>
-      setTimeout(() => resolve(values), 800),
-    );
-    toast.promise(savePromise, {
-      loading: "Saving changes...",
-      success: "Channel updated",
-      error: "Could not save settings",
-    });
-    void savePromise.then(() => reset(values));
   };
 
   return (
@@ -310,7 +313,7 @@ export function ChannelContent({
             <h3 className="text-2xl font-bold tracking-tight text-foreground truncate w-full px-4">
               {chat.title}
             </h3>
-            {chat.slug && visibility === "public" && (
+            {chat.slug && (
               <div className="flex items-center justify-center gap-1.5 mt-1 text-primary/80">
                 <Link2 className="w-3.5 h-3.5" />
                 <p className="text-sm font-medium">@{chat.slug}</p>
@@ -364,14 +367,14 @@ export function ChannelContent({
               >
                 <ScrollArea className="h-full">
                   <div className="grid gap-1 pb-6 pr-4">
-                    {sortedMembers.map((m: ChatMember): ReactNode => {
-                      const name: string =
+                    {sortedMembers.map((m) => {
+                      const name =
                         m.user.displayName || m.user.firstName || "Unknown";
-                      const role: string = m.role ?? "member";
+                      const role = m.role.toLowerCase();
                       return (
                         <ContextMenu key={m.user.id}>
                           <ContextMenuTrigger>
-                            <div className="flex items-center gap-3 p-2 rounded-xl transition-all duration-200 hover:bg-secondary/40 cursor-default group">
+                            <div className="flex items-center gap-3 p-2 rounded-xl transition-all duration-200 hover:bg-secondary/40 cursor-default">
                               <UserAvatar
                                 src={m.user.photoUrl ?? null}
                                 fallback={name}
@@ -464,7 +467,7 @@ export function ChannelContent({
                             </Label>
                             <Input
                               {...register("title")}
-                              className={`bg-secondary/30 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-secondary/30 rounded-xl h-11 transition-all ${errors.title ? "border-destructive/50" : ""}`}
+                              className={`bg-secondary/30 border-transparent focus-visible:ring-1 focus-visible:ring-primary rounded-xl h-11 transition-all ${errors.title ? "border-destructive/50" : ""}`}
                             />
                           </div>
 
@@ -474,7 +477,7 @@ export function ChannelContent({
                             </Label>
                             <RadioGroup
                               value={visibility}
-                              onValueChange={(v: string): void =>
+                              onValueChange={(v) =>
                                 setValue(
                                   "visibility",
                                   v as "public" | "private",
@@ -524,7 +527,7 @@ export function ChannelContent({
                             </RadioGroup>
                           </div>
 
-                          {visibility === "public" ? (
+                          {visibility === "public" && (
                             <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
                               <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                                 Public Link
@@ -535,43 +538,10 @@ export function ChannelContent({
                                 </span>
                                 <input
                                   {...register("slug")}
-                                  className="flex-1 bg-transparent px-3 text-sm outline-none w-full h-full focus:bg-transparent"
+                                  className="flex-1 bg-transparent px-3 text-sm outline-none w-full h-full"
                                   placeholder="link"
                                 />
                               </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                              <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                                Private Invite Link
-                              </Label>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  readOnly
-                                  value="https://app.link/join/p/x7R2k9Lp8z2W"
-                                  className="bg-secondary/20 border-transparent rounded-xl h-11 text-muted-foreground font-mono text-[12px] cursor-default focus-visible:ring-0 shadow-inner"
-                                />
-                                <Button
-                                  onClick={handleCopyLink}
-                                  type="button"
-                                  size="icon"
-                                  className="h-11 w-11 shrink-0 rounded-xl bg-secondary/30 hover:bg-secondary/50 text-foreground border-transparent transition-colors"
-                                >
-                                  <Copy className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  onClick={handleRegenerateLink}
-                                  type="button"
-                                  size="icon"
-                                  className="h-11 w-11 shrink-0 rounded-xl bg-secondary/30 hover:bg-secondary/50 text-foreground border-transparent transition-colors"
-                                >
-                                  <RotateCcw className="w-4 h-4" />
-                                </Button>
-                              </div>
-                              <p className="px-1 text-[10px] text-muted-foreground opacity-70">
-                                This link is unique and cannot be manually
-                                changed.
-                              </p>
                             </div>
                           )}
                         </div>
@@ -580,6 +550,7 @@ export function ChannelContent({
                           <Button
                             variant="ghost"
                             type="button"
+                            onClick={handleDeleteChannel}
                             className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/5 font-medium px-4 rounded-xl"
                           >
                             <Trash2 className="w-4 h-4" /> Delete Channel
@@ -589,7 +560,7 @@ export function ChannelContent({
                     </ScrollArea>
                     <div className="pt-4 mt-auto">
                       <Button
-                        disabled={!isDirty}
+                        disabled={!isDirty || isSubmitting}
                         type="submit"
                         className="w-full h-11 gap-2 shadow-lg shadow-primary/20 rounded-xl transition-all active:scale-[0.98]"
                       >

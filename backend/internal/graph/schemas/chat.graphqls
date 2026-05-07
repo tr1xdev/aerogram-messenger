@@ -63,8 +63,6 @@ type GlobalSearchList {
     results: [SearchResult!]!
 }
 
-# --- Results & Errors ---
-
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 union MyChatsResult = ChatList | ForbiddenError | InternalError
 union JoinChatResult = Chat | NotFoundError | ForbiddenError | InternalError
@@ -112,8 +110,6 @@ type TypingPayload {
     isTyping: Boolean!
 }
 
-# --- Root Types ---
-
 extend type Query {
     myChats: MyChatsResult!
     chat(id: ID, slug: String): ChatResult!
@@ -149,6 +145,8 @@ extend type Mutation {
         chatID: ID!
         permissions: ChatPermissionsInput!
     ): SuccessResult!
+
+    updateChatMetadata(id: ID!, title: String, slug: String): ChatResult!
 
     sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
 }

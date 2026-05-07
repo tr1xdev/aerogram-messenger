@@ -103,7 +103,11 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		}
 	}
 
-	creatorUUID, _ := uuid.Parse(creatorIDStr)
+	creatorUUID, err := uuid.Parse(creatorIDStr)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid creator")
+	}
+
 	newID := uuid.New()
 	participantsMap := make(map[string]bool)
 	participantsMap[creatorIDStr] = true
@@ -123,7 +127,10 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 
 	mParams := make([]dbgen.AddDialogMemberParams, 0, len(participantsMap))
 	for pID := range participantsMap {
-		pUUID, _ := uuid.Parse(pID)
+		pUUID, err := uuid.Parse(pID)
+		if err != nil {
+			continue
+		}
 		role := "member"
 		if pID == creatorIDStr {
 			role = "owner"
@@ -171,20 +178,9 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 		if err != nil && userID != "" {
 			userRepo := repositories.NewUserRepository(s.db)
 			if target, uErr := userRepo.GetByUsername(ctx, slug); uErr == nil {
-				targetID := target.ID.String()
-				if existing, diagErr := s.dialogRepo.GetPrivateDialogByMembers(ctx, userID, targetID); diagErr == nil {
+				if existing, diagErr := s.dialogRepo.GetPrivateDialogByMembers(ctx, userID, target.ID.String()); diagErr == nil {
 					dialog = existing
 					err = nil
-				} else {
-					return &chatpb.GetChatResponse{Chat: &chatpb.Chat{
-						Id:           targetID,
-						Type:         chatpb.ChatType_CHAT_TYPE_PRIVATE,
-						Title:        target.FirstName,
-						Slug:         target.Username.String,
-						MembersCount: 2,
-						CanWrite:     true,
-						Permissions:  s.calculatePermissions("private", 0, "member"),
-					}}, nil
 				}
 			}
 		}
@@ -203,6 +199,10 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 		if set, sErr := s.db.Queries.GetDialogSettings(ctx, dialog.ID); sErr == nil {
 			perms = set.Permissions
 		}
+	}
+
+	if dialog.Type == "private" && role == "guest" {
+		return nil, status.Error(codes.NotFound, "chat not found")
 	}
 
 	proto := s.mapDBDialogToProto(dialog, perms, role, lastRead)
@@ -381,6 +381,9 @@ func (s *Server) mapProtoTypeToDB(t chatpb.ChatType) string {
 
 func (s *Server) JoinChatBySlug(ctx context.Context, req *chatpb.JoinChatBySlugRequest) (*chatpb.JoinChatBySlugResponse, error) {
 	userID := s.getUserID(ctx, "")
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
 	uUUID, _ := uuid.Parse(userID)
 	slug := strings.TrimPrefix(req.Slug, "@")
 
@@ -459,9 +462,16 @@ func (s *Server) UpdateChat(ctx context.Context, req *chatpb.UpdateChatRequest) 
 	}
 
 	var newSlug sql.NullString
-	if req.Slug != nil && *req.Slug != "" {
-		clean := strings.TrimPrefix(*req.Slug, "@")
-		newSlug = database.ToNullString(&clean)
+	shouldUpdateSlug := false
+
+	if req.Slug != nil {
+		shouldUpdateSlug = true
+		if *req.Slug != "" {
+			clean := strings.TrimPrefix(*req.Slug, "@")
+			newSlug = sql.NullString{String: clean, Valid: true}
+		} else {
+			newSlug = sql.NullString{Valid: false}
+		}
 	}
 
 	updated, err := s.db.Queries.UpdateChatMetadata(ctx, dbgen.UpdateChatMetadataParams{
@@ -470,6 +480,7 @@ func (s *Server) UpdateChat(ctx context.Context, req *chatpb.UpdateChatRequest) 
 		Username:    newSlug,
 		Description: database.ToNullString(req.Description),
 		PhotoUrl:    database.ToNullString(req.PhotoUrl),
+		UpdateSlug:  shouldUpdateSlug,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "unique constraint") {
@@ -579,6 +590,9 @@ func (s *Server) ExportChatInvite(ctx context.Context, req *chatpb.ExportChatInv
 
 func (s *Server) JoinChatByInvite(ctx context.Context, req *chatpb.JoinChatByInviteRequest) (*chatpb.JoinChatByInviteResponse, error) {
 	userID := s.getUserID(ctx, "")
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "unauthorized")
+	}
 	uUUID, _ := uuid.Parse(userID)
 
 	invite, err := s.db.Queries.GetInviteByCode(ctx, req.InviteCode)

@@ -13,6 +13,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/storage"
+	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 	"google.golang.org/grpc/status"
 )
 
@@ -85,12 +86,19 @@ func (e *ChatEnricher) EnrichChat(ctx context.Context, authID string, pbChat *ch
 				DialogID: chatID,
 				UserID:   uid,
 			})
+
 			if err == nil {
 				ext.Role = member.Role
 				ext.IsPinned = member.IsPinned
 				ext.MyReadSequence = member.LastReadSequence
 			} else {
-				ext.Role = "MEMBER"
+				ext.Role = "NONE"
+				ext.IsPinned = false
+				ext.MyReadSequence = 0
+
+				if pbChat.Slug == "" && chatType == "channel" {
+					return nil, errors.New("PRIVATE_CHAT_ACCESS_DENIED")
+				}
 			}
 
 			if chatType == "private" {
@@ -191,4 +199,11 @@ func ToNullString(s *string) sql.NullString {
 		return sql.NullString{String: "", Valid: false}
 	}
 	return sql.NullString{String: *s, Valid: true}
+}
+
+func GetUserIDFromContext(ctx context.Context) string {
+	if userID, ok := ctx.Value(middleware.AuthUserIDKey).(string); ok {
+		return userID
+	}
+	return ""
 }

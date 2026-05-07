@@ -68,7 +68,7 @@ type Querier interface {
 	PinDialog(ctx context.Context, arg PinDialogParams) error
 	RemoveDialogMember(ctx context.Context, arg RemoveDialogMemberParams) error
 	RevokeInvite(ctx context.Context, arg RevokeInviteParams) error
-	SearchPublicDialogs(ctx context.Context, dollar_1 sql.NullString) ([]Dialog, error)
+	SearchPublicDialogs(ctx context.Context, arg SearchPublicDialogsParams) ([]SearchPublicDialogsRow, error)
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
 	SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString) ([]User, error)
 	SoftDeleteMessage(ctx context.Context, arg SoftDeleteMessageParams) error

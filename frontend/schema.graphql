@@ -69,6 +69,7 @@ type Mutation {
   removeChatMember(chatID: ID!, userID: ID!): RemoveMemberResult!
   updateMemberRole(chatID: ID!, userID: ID!, role: String!): SuccessResult!
   updateChatPermissions(chatID: ID!, permissions: ChatPermissionsInput!): SuccessResult!
+  updateChatMetadata(id: ID!, title: String, slug: String): ChatResult!
   sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
   sendMessage(chatId: ID!, text: String!, replyToId: ID): SendMessageResult!
   updateMessage(id: ID!, text: String!): SendMessageResult!
@@ -96,6 +97,16 @@ type ChatPermissions {
   canAssignAdmins: Boolean!
   canSendMedia: Boolean!
   canPinMessages: Boolean!
+}
+
+input ChatPermissionsInput {
+  canSendMessage: Boolean
+  canInviteUsers: Boolean
+  canEditMetadata: Boolean
+  canDeleteMessages: Boolean
+  canAssignAdmins: Boolean
+  canSendMedia: Boolean
+  canPinMessages: Boolean
 }
 
 type ChatMember {
@@ -162,16 +173,6 @@ union RemoveMemberResult = SuccessResult | ForbiddenError | NotFoundError | Inte
 type TypingPayload {
   userId: ID!
   isTyping: Boolean!
-}
-
-input ChatPermissionsInput {
-  canSendMessage: Boolean
-  canInviteUsers: Boolean
-  canEditMetadata: Boolean
-  canDeleteMessages: Boolean
-  canAssignAdmins: Boolean
-  canSendMedia: Boolean
-  canPinMessages: Boolean
 }
 
 type Subscription {

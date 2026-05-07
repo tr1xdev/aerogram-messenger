@@ -14,7 +14,7 @@ INSERT INTO dialog_members (
 ) VALUES (
     $1, $2, $3, NOW(), $4, $5, $6, $7, NOW(), NOW()
 ) ON CONFLICT (dialog_id, user_id) DO UPDATE SET
-    is_hidden = EXCLUDED.is_hidden,
+    is_hidden = false,
     updated_at = NOW();
 
 -- name: PinDialog :exec
@@ -32,7 +32,7 @@ INSERT INTO dialog_settings (
     updated_at = NOW();
 
 -- name: GetDialogByID :one
-SELECT * FROM dialogs WHERE id = $1 LIMIT 1;
+SELECT * FROM dialogs WHERE id = $1 AND deleted_at IS NULL LIMIT 1;
 
 -- name: GetUserDialogs :many
 SELECT
@@ -71,6 +71,7 @@ LEFT JOIN messages m ON d.last_message_id = m.id
 LEFT JOIN users u ON m.author_id = u.id
 WHERE dm.user_id = $1
   AND d.is_active = true
+  AND d.deleted_at IS NULL
   AND dm.is_hidden = false
 ORDER BY dm.is_pinned DESC, COALESCE(d.last_message_at, d.created_at) DESC;
 
@@ -99,6 +100,7 @@ WHERE dialog_id = $1 AND user_id = $2 LIMIT 1;
 SELECT * FROM dialogs
 WHERE username = $1
   AND is_active = true
+  AND deleted_at IS NULL
 LIMIT 1;
 
 -- name: CountPinnedDialogs :one
@@ -138,7 +140,7 @@ WHERE id = $1;
 
 -- name: IsDialogCreator :one
 SELECT EXISTS (
-    SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2
+    SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2 AND deleted_at IS NULL
 );
 
 -- name: GetPrivateDialogByMembers :one
@@ -149,7 +151,9 @@ JOIN dialog_members dm2 ON d.id = dm2.dialog_id
 WHERE d.type = 'private'
   AND dm1.user_id = $1
   AND dm2.user_id = $2
+  AND dm1.user_id != dm2.user_id
   AND d.is_active = true
+  AND d.deleted_at IS NULL
 LIMIT 1;
 
 -- name: GetDialogSettings :one
@@ -184,12 +188,17 @@ SELECT COUNT(*) FROM dialog_members
 WHERE dialog_id = $1 AND role = 'admin';
 
 -- name: SearchPublicDialogs :many
-SELECT * FROM dialogs
-WHERE (name ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%')
-  AND type IN ('group', 'channel')
-  AND username IS NOT NULL
-  AND is_active = true
-  AND deleted_at IS NULL
+SELECT
+    d.id, d.type, d.name, d.username, d.photo_url, d.description,
+    d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at,
+    COALESCE(dm.role, 'NONE')::text as user_role
+FROM dialogs d
+LEFT JOIN dialog_members dm ON d.id = dm.dialog_id AND dm.user_id = $2
+WHERE (d.name ILIKE '%' || $1 || '%' OR d.username ILIKE '%' || $1 || '%')
+    AND d.type IN ('group', 'channel')
+    AND d.username IS NOT NULL
+    AND d.is_active = true
+    AND d.deleted_at IS NULL
 LIMIT 20;
 
 -- name: GetDialogOpponent :one
@@ -201,7 +210,7 @@ LIMIT 1;
 UPDATE dialogs
 SET
     name = COALESCE($2, name),
-    username = $3,
+    username = CASE WHEN @update_slug::boolean THEN $3 ELSE username END,
     description = COALESCE($4, description),
     photo_url = COALESCE($5, photo_url),
     updated_at = NOW()

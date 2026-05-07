@@ -20,7 +20,7 @@ INSERT INTO dialog_members (
 ) VALUES (
     $1, $2, $3, NOW(), $4, $5, $6, $7, NOW(), NOW()
 ) ON CONFLICT (dialog_id, user_id) DO UPDATE SET
-    is_hidden = EXCLUDED.is_hidden,
+    is_hidden = false,
     updated_at = NOW()
 `
 
@@ -213,7 +213,7 @@ func (q *Queries) FindNewDialogOwner(ctx context.Context, arg FindNewDialogOwner
 }
 
 const getDialogByID = `-- name: GetDialogByID :one
-SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at FROM dialogs WHERE id = $1 LIMIT 1
+SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at FROM dialogs WHERE id = $1 AND deleted_at IS NULL LIMIT 1
 `
 
 func (q *Queries) GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error) {
@@ -247,6 +247,7 @@ const getDialogByUsername = `-- name: GetDialogByUsername :one
 SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at FROM dialogs
 WHERE username = $1
   AND is_active = true
+  AND deleted_at IS NULL
 LIMIT 1
 `
 
@@ -435,7 +436,9 @@ JOIN dialog_members dm2 ON d.id = dm2.dialog_id
 WHERE d.type = 'private'
   AND dm1.user_id = $1
   AND dm2.user_id = $2
+  AND dm1.user_id != dm2.user_id
   AND d.is_active = true
+  AND d.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -508,6 +511,7 @@ LEFT JOIN messages m ON d.last_message_id = m.id
 LEFT JOIN users u ON m.author_id = u.id
 WHERE dm.user_id = $1
   AND d.is_active = true
+  AND d.deleted_at IS NULL
   AND dm.is_hidden = false
 ORDER BY dm.is_pinned DESC, COALESCE(d.last_message_at, d.created_at) DESC
 `
@@ -621,7 +625,7 @@ func (q *Queries) IncrementMembersCount(ctx context.Context, id uuid.UUID) error
 
 const isDialogCreator = `-- name: IsDialogCreator :one
 SELECT EXISTS (
-    SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2
+    SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2 AND deleted_at IS NULL
 )
 `
 
@@ -670,44 +674,62 @@ func (q *Queries) RemoveDialogMember(ctx context.Context, arg RemoveDialogMember
 }
 
 const searchPublicDialogs = `-- name: SearchPublicDialogs :many
-SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at FROM dialogs
-WHERE (name ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%')
-  AND type IN ('group', 'channel')
-  AND username IS NOT NULL
-  AND is_active = true
-  AND deleted_at IS NULL
+SELECT
+    d.id, d.type, d.name, d.username, d.photo_url, d.description,
+    d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at,
+    COALESCE(dm.role, 'NONE')::text as user_role
+FROM dialogs d
+LEFT JOIN dialog_members dm ON d.id = dm.dialog_id AND dm.user_id = $2
+WHERE (d.name ILIKE '%' || $1 || '%' OR d.username ILIKE '%' || $1 || '%')
+    AND d.type IN ('group', 'channel')
+    AND d.username IS NOT NULL
+    AND d.is_active = true
+    AND d.deleted_at IS NULL
 LIMIT 20
 `
 
-func (q *Queries) SearchPublicDialogs(ctx context.Context, dollar_1 sql.NullString) ([]Dialog, error) {
-	rows, err := q.db.QueryContext(ctx, searchPublicDialogs, dollar_1)
+type SearchPublicDialogsParams struct {
+	Column1 sql.NullString `json:"column_1"`
+	UserID  uuid.UUID      `json:"user_id"`
+}
+
+type SearchPublicDialogsRow struct {
+	ID           uuid.UUID      `json:"id"`
+	Type         string         `json:"type"`
+	Name         sql.NullString `json:"name"`
+	Username     sql.NullString `json:"username"`
+	PhotoUrl     sql.NullString `json:"photo_url"`
+	Description  sql.NullString `json:"description"`
+	MembersCount int32          `json:"members_count"`
+	IsVerified   bool           `json:"is_verified"`
+	IsActive     bool           `json:"is_active"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	UserRole     string         `json:"user_role"`
+}
+
+func (q *Queries) SearchPublicDialogs(ctx context.Context, arg SearchPublicDialogsParams) ([]SearchPublicDialogsRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchPublicDialogs, arg.Column1, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Dialog
+	var items []SearchPublicDialogsRow
 	for rows.Next() {
-		var i Dialog
+		var i SearchPublicDialogsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Type,
 			&i.Name,
 			&i.Username,
 			&i.PhotoUrl,
-			&i.Bio,
 			&i.Description,
-			&i.InviteLink,
-			&i.PinnedMessageID,
-			&i.CreatorID,
-			&i.LastMessageID,
-			&i.LastMessageAt,
 			&i.MembersCount,
 			&i.IsVerified,
-			&i.IsPrivate,
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.DeletedAt,
+			&i.UserRole,
 		); err != nil {
 			return nil, err
 		}
@@ -737,7 +759,7 @@ const updateChatMetadata = `-- name: UpdateChatMetadata :one
 UPDATE dialogs
 SET
     name = COALESCE($2, name),
-    username = $3,
+    username = CASE WHEN $6::boolean THEN $3 ELSE username END,
     description = COALESCE($4, description),
     photo_url = COALESCE($5, photo_url),
     updated_at = NOW()
@@ -751,6 +773,7 @@ type UpdateChatMetadataParams struct {
 	Username    sql.NullString `json:"username"`
 	Description sql.NullString `json:"description"`
 	PhotoUrl    sql.NullString `json:"photo_url"`
+	UpdateSlug  bool           `json:"update_slug"`
 }
 
 func (q *Queries) UpdateChatMetadata(ctx context.Context, arg UpdateChatMetadataParams) (Dialog, error) {
@@ -760,6 +783,7 @@ func (q *Queries) UpdateChatMetadata(ctx context.Context, arg UpdateChatMetadata
 		arg.Username,
 		arg.Description,
 		arg.PhotoUrl,
+		arg.UpdateSlug,
 	)
 	var i Dialog
 	err := row.Scan(
