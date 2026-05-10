@@ -753,13 +753,27 @@ func (s *Server) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) 
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
 
+	chat, err := s.db.Queries.GetDialogByIDInternal(ctx, did)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "chat not found")
+	}
+
 	if req.ForEveryone {
-		isCreator, err := s.db.Queries.IsDialogCreator(ctx, dbgen.IsDialogCreatorParams{
-			ID:        did,
-			CreatorID: uuid.NullUUID{UUID: authID, Valid: true},
-		})
-		if err != nil || !isCreator {
-			return nil, status.Error(codes.PermissionDenied, "only creator can delete for everyone")
+		var canDelete bool
+		if chat.Type == "private" {
+			canDelete, err = s.db.Queries.CanDeletePrivateDialog(ctx, dbgen.CanDeletePrivateDialogParams{
+				ID:     did,
+				UserID: authID,
+			})
+		} else {
+			canDelete, err = s.db.Queries.IsDialogCreator(ctx, dbgen.IsDialogCreatorParams{
+				ID:        did,
+				CreatorID: uuid.NullUUID{UUID: authID, Valid: true},
+			})
+		}
+
+		if err != nil || !canDelete {
+			return nil, status.Error(codes.PermissionDenied, "access denied")
 		}
 
 		err = s.db.Queries.DeleteDialog(ctx, did)

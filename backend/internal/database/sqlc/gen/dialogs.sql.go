@@ -49,6 +49,29 @@ func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams
 	return err
 }
 
+const canDeletePrivateDialog = `-- name: CanDeletePrivateDialog :one
+SELECT EXISTS (
+    SELECT 1 FROM dialogs d
+    JOIN dialog_members dm ON d.id = dm.dialog_id
+    WHERE d.id = $1
+      AND dm.user_id = $2
+      AND d.type = 'private'
+      AND d.deleted_at IS NULL
+)
+`
+
+type CanDeletePrivateDialogParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) CanDeletePrivateDialog(ctx context.Context, arg CanDeletePrivateDialogParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, canDeletePrivateDialog, arg.ID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const countDialogAdmins = `-- name: CountDialogAdmins :one
 SELECT COUNT(*) FROM dialog_members
 WHERE dialog_id = $1 AND role = 'admin'
@@ -174,12 +197,13 @@ func (q *Queries) CreateDialogSettings(ctx context.Context, arg CreateDialogSett
 
 const decrementMembersCount = `-- name: DecrementMembersCount :exec
 UPDATE dialogs
-SET members_count = members_count - 1, updated_at = NOW()
+SET members_count = (SELECT COUNT(*) FROM dialog_members WHERE dialog_id = $1),
+    updated_at = NOW()
 WHERE id = $1
 `
 
-func (q *Queries) DecrementMembersCount(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, decrementMembersCount, id)
+func (q *Queries) DecrementMembersCount(ctx context.Context, dialogID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, decrementMembersCount, dialogID)
 	return err
 }
 
@@ -658,12 +682,13 @@ func (q *Queries) HideDialogMember(ctx context.Context, arg HideDialogMemberPara
 
 const incrementMembersCount = `-- name: IncrementMembersCount :exec
 UPDATE dialogs
-SET members_count = members_count + 1, updated_at = NOW()
+SET members_count = (SELECT COUNT(*) FROM dialog_members WHERE dialog_id = $1),
+    updated_at = NOW()
 WHERE id = $1
 `
 
-func (q *Queries) IncrementMembersCount(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, incrementMembersCount, id)
+func (q *Queries) IncrementMembersCount(ctx context.Context, dialogID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, incrementMembersCount, dialogID)
 	return err
 }
 

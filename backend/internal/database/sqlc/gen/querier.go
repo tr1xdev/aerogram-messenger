@@ -13,6 +13,7 @@ import (
 
 type Querier interface {
 	AddDialogMember(ctx context.Context, arg AddDialogMemberParams) error
+	CanDeletePrivateDialog(ctx context.Context, arg CanDeletePrivateDialogParams) (bool, error)
 	CheckUserExists(ctx context.Context, id uuid.UUID) (bool, error)
 	CountBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) (int64, error)
 	CountDialogAdmins(ctx context.Context, dialogID uuid.UUID) (int64, error)
@@ -28,7 +29,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeactivateAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	DeactivateSession(ctx context.Context, id uuid.UUID) error
-	DecrementMembersCount(ctx context.Context, id uuid.UUID) error
+	DecrementMembersCount(ctx context.Context, dialogID uuid.UUID) error
 	DeleteBot(ctx context.Context, arg DeleteBotParams) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
 	FindNewDialogOwner(ctx context.Context, arg FindNewDialogOwnerParams) (uuid.UUID, error)
@@ -62,7 +63,7 @@ type Querier interface {
 	HardDeleteDialog(ctx context.Context, id uuid.UUID) error
 	HideDialogMember(ctx context.Context, arg HideDialogMemberParams) error
 	IncrementInviteUsage(ctx context.Context, id uuid.UUID) error
-	IncrementMembersCount(ctx context.Context, id uuid.UUID) error
+	IncrementMembersCount(ctx context.Context, dialogID uuid.UUID) error
 	IsDialogCreator(ctx context.Context, arg IsDialogCreatorParams) (bool, error)
 	JoinDialogByInvite(ctx context.Context, arg JoinDialogByInviteParams) error
 	MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error

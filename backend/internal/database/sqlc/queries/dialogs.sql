@@ -132,16 +132,6 @@ DELETE FROM dialogs WHERE id = $1;
 DELETE FROM dialog_members
 WHERE dialog_id = $1 AND user_id = $2;
 
--- name: IncrementMembersCount :exec
-UPDATE dialogs
-SET members_count = members_count + 1, updated_at = NOW()
-WHERE id = $1;
-
--- name: DecrementMembersCount :exec
-UPDATE dialogs
-SET members_count = members_count - 1, updated_at = NOW()
-WHERE id = $1;
-
 -- name: IsDialogCreator :one
 SELECT EXISTS (
     SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2 AND deleted_at IS NULL
@@ -246,3 +236,13 @@ UPDATE dialogs
 SET members_count = (SELECT COUNT(*) FROM dialog_members WHERE dialog_id = $1),
     updated_at = NOW()
 WHERE id = $1;
+
+-- name: CanDeletePrivateDialog :one
+SELECT EXISTS (
+    SELECT 1 FROM dialogs d
+    JOIN dialog_members dm ON d.id = dm.dialog_id
+    WHERE d.id = $1
+      AND dm.user_id = $2
+      AND d.type = 'private'
+      AND d.deleted_at IS NULL
+);
