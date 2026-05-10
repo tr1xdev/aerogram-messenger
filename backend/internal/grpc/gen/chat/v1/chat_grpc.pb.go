@@ -34,6 +34,7 @@ const (
 	ChatService_GetChatMembers_FullMethodName        = "/chat.v1.ChatService/GetChatMembers"
 	ChatService_LeaveChat_FullMethodName             = "/chat.v1.ChatService/LeaveChat"
 	ChatService_RemoveChatMember_FullMethodName      = "/chat.v1.ChatService/RemoveChatMember"
+	ChatService_RevokeChatInvite_FullMethodName      = "/chat.v1.ChatService/RevokeChatInvite"
 )
 
 // ChatServiceClient is the client API for ChatService service.
@@ -55,6 +56,7 @@ type ChatServiceClient interface {
 	GetChatMembers(ctx context.Context, in *GetChatMembersRequest, opts ...grpc.CallOption) (*GetChatMembersResponse, error)
 	LeaveChat(ctx context.Context, in *LeaveChatRequest, opts ...grpc.CallOption) (*LeaveChatResponse, error)
 	RemoveChatMember(ctx context.Context, in *RemoveChatMemberRequest, opts ...grpc.CallOption) (*RemoveChatMemberResponse, error)
+	RevokeChatInvite(ctx context.Context, in *RevokeChatInviteRequest, opts ...grpc.CallOption) (*RevokeChatInviteResponse, error)
 }
 
 type chatServiceClient struct {
@@ -215,6 +217,16 @@ func (c *chatServiceClient) RemoveChatMember(ctx context.Context, in *RemoveChat
 	return out, nil
 }
 
+func (c *chatServiceClient) RevokeChatInvite(ctx context.Context, in *RevokeChatInviteRequest, opts ...grpc.CallOption) (*RevokeChatInviteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeChatInviteResponse)
+	err := c.cc.Invoke(ctx, ChatService_RevokeChatInvite_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChatServiceServer is the server API for ChatService service.
 // All implementations must embed UnimplementedChatServiceServer
 // for forward compatibility.
@@ -234,6 +246,7 @@ type ChatServiceServer interface {
 	GetChatMembers(context.Context, *GetChatMembersRequest) (*GetChatMembersResponse, error)
 	LeaveChat(context.Context, *LeaveChatRequest) (*LeaveChatResponse, error)
 	RemoveChatMember(context.Context, *RemoveChatMemberRequest) (*RemoveChatMemberResponse, error)
+	RevokeChatInvite(context.Context, *RevokeChatInviteRequest) (*RevokeChatInviteResponse, error)
 	mustEmbedUnimplementedChatServiceServer()
 }
 
@@ -288,6 +301,9 @@ func (UnimplementedChatServiceServer) LeaveChat(context.Context, *LeaveChatReque
 }
 func (UnimplementedChatServiceServer) RemoveChatMember(context.Context, *RemoveChatMemberRequest) (*RemoveChatMemberResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveChatMember not implemented")
+}
+func (UnimplementedChatServiceServer) RevokeChatInvite(context.Context, *RevokeChatInviteRequest) (*RevokeChatInviteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeChatInvite not implemented")
 }
 func (UnimplementedChatServiceServer) mustEmbedUnimplementedChatServiceServer() {}
 func (UnimplementedChatServiceServer) testEmbeddedByValue()                     {}
@@ -580,6 +596,24 @@ func _ChatService_RemoveChatMember_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChatService_RevokeChatInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeChatInviteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).RevokeChatInvite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_RevokeChatInvite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).RevokeChatInvite(ctx, req.(*RevokeChatInviteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ChatService_ServiceDesc is the grpc.ServiceDesc for ChatService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -646,6 +680,10 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveChatMember",
 			Handler:    _ChatService_RemoveChatMember_Handler,
+		},
+		{
+			MethodName: "RevokeChatInvite",
+			Handler:    _ChatService_RevokeChatInvite_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

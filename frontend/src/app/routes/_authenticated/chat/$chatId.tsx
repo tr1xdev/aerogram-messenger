@@ -27,7 +27,6 @@ import { MessageComposer } from "@/features/chat/ui/message-composer";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 import type { Message, User, ChatMember } from "@/entities/chat/model/types";
 import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generated__/useMarkDialog_chat.graphql";
-import type { useMessageActionsSendMutation$data } from "@/features/chat/lib/messages/__generated__/useMessageActionsSendMutation.graphql";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 import type { chatHeader_user$key } from "@/features/chat/ui/__generated__/chatHeader_user.graphql";
 import type { useChatsDetailsQuery$data } from "@/features/chat/lib/chat/__generated__/useChatsDetailsQuery.graphql";
@@ -147,13 +146,16 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     me?.id,
   );
 
-  useEffect((): void | (() => void) => {
+  useEffect((): (() => void) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
     if (!historyLoading && chatNode) {
-      const timer: ReturnType<typeof setTimeout> = setTimeout((): void => {
+      timer = setTimeout((): void => {
         setIsFirstLoad(false);
       }, 100);
-      return (): void => clearTimeout(timer);
     }
+    return (): void => {
+      if (timer) clearTimeout(timer);
+    };
   }, [historyLoading, chatNode]);
 
   useEffect((): (() => void) => {
@@ -184,6 +186,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     setReplyingTo(msg);
   }, []);
 
+  const handleDeleteMessage = useCallback((id: string): void => {
+    console.log("Delete triggered for:", id);
+  }, []);
+
+  const handleForwardMessage = useCallback((msg: Message): void => {
+    console.log("Forward triggered for:", msg.id);
+  }, []);
+
   const handleTyping = useCallback(
     (isTyping: boolean): void => {
       if (isTyping) {
@@ -208,7 +218,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           toast.error("Failed to join the chat");
         });
     }
-  }, [joinChat, chatNode]);
+  }, [joinChat, chatNode?.slug]);
 
   const totalUnread: number = useMemo((): number => {
     const myChatsResult = chatsData.myChats;
@@ -233,43 +243,35 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
     const rawMessages: Message[] = (messagesFromHistory ?? []) as Message[];
     return [...rawMessages]
-      .filter((m: Message): boolean => !!m)
+      .filter((m: Message | null): m is Message => !!m)
       .sort((a: Message, b: Message): number => {
         const seqA: number = Number(a.sequence) || 0;
         const seqB: number = Number(b.sequence) || 0;
-
-        if (seqA !== seqB) {
-          return seqA - seqB;
-        }
-
+        if (seqA !== seqB) return seqA - seqB;
         return new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
       });
   }, [messagesFromHistory]);
 
-  useEffect((): void | (() => void) => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-
+  useEffect((): (() => void) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const triggerRead = (): void => {
       if (
         document.visibilityState === "visible" &&
         lastSequence > 0 &&
         isAtBottom
       ) {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout((): void => {
           checkAndMarkRead();
           markAsRead();
         }, 300);
       }
     };
-
     triggerRead();
-
     window.addEventListener("visibilitychange", triggerRead);
     window.addEventListener("focus", triggerRead);
-
     return (): void => {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       window.removeEventListener("visibilitychange", triggerRead);
       window.removeEventListener("focus", triggerRead);
     };
@@ -279,7 +281,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     (text?: string): void => {
       const val: string = (text ?? inputRef.current).trim();
       if (!val || !me) return;
-
       if (editingMessage) {
         editMessage(editingMessage.id, val)
           .then((): void => cancelAction())
@@ -288,13 +289,10 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           });
         return;
       }
-
       const originalReply: Message | null = replyingTo;
       const tempId: string = `temp-${Date.now()}`;
       const extendedMe: ExtendedUser = me as ExtendedUser;
-
       cancelAction();
-
       sendMessage(val, {
         variables: {
           chatId,
@@ -334,7 +332,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
                 }
               : null,
           },
-        } as useMessageActionsSendMutation$data,
+        },
       }).catch((): void => {
         setInput(val);
         if (originalReply) setReplyingTo(originalReply);
@@ -405,10 +403,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
             messages={allMessages}
             members={(chatNode?.members as unknown as ChatMember[]) ?? []}
             myId={me?.id}
+            chatType={normalizedChatType}
             lastReadSequence={Number(chatNode?.lastReadSequence) || 0}
+            canWrite={canWrite}
             onMarkRead={markAsRead}
             onReply={handleReplyInitiate}
             onEdit={handleEditInitiate}
+            onDelete={handleDeleteMessage}
+            onForward={handleForwardMessage}
             onScrollAtBottomChange={setIsAtBottom}
           />
         )}

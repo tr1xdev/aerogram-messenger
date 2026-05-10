@@ -41,6 +41,7 @@ type Query {
   chat(id: ID, slug: String): ChatResult!
   chatMembers(chatID: ID!, limit: Int, offset: Int): ChatMembersResult!
   searchGlobal(query: String!): GlobalSearchList!
+  chatInvites(chatID: ID!): ChatInvitesResult!
   messageHistory(chatId: ID!, limit: Int!, beforeSequence: Long): MessageHistoryResult!
   dialogRead(chatId: ID!): ReadPayload!
   node(id: ID!): Node
@@ -66,6 +67,9 @@ type Mutation {
   leaveChat(chatID: ID!): LeaveChatResult!
   inviteToChat(chatID: ID!, userIds: [ID!]!): InviteResult!
   joinChatBySlug(slug: String!): JoinChatResult!
+  joinChatByInvite(inviteCode: String!): JoinChatResult!
+  exportChatInvite(chatID: ID!, name: String, usageLimit: Int, expireAt: Int): ExportInviteResult!
+  revokeChatInvite(chatID: ID!, inviteCode: String!): RevokeInviteResult!
   removeChatMember(chatID: ID!, userID: ID!): RemoveMemberResult!
   updateMemberRole(chatID: ID!, userID: ID!, role: String!): SuccessResult!
   updateChatPermissions(chatID: ID!, permissions: ChatPermissionsInput!): SuccessResult!
@@ -99,16 +103,6 @@ type ChatPermissions {
   canPinMessages: Boolean!
 }
 
-input ChatPermissionsInput {
-  canSendMessage: Boolean
-  canInviteUsers: Boolean
-  canEditMetadata: Boolean
-  canDeleteMessages: Boolean
-  canAssignAdmins: Boolean
-  canSendMedia: Boolean
-  canPinMessages: Boolean
-}
-
 type ChatMember {
   user: User!
   role: String!
@@ -135,6 +129,17 @@ type Chat implements Node {
   createdAt: String!
 }
 
+type ChatInvite {
+  code: String!
+  inviteLink: String!
+  creator: User!
+  usageCount: Int!
+  usageLimit: Int
+  expireAt: String
+  isRevoked: Boolean!
+  createdAt: String!
+}
+
 type ChatList {
   chats: [Chat!]!
 }
@@ -144,8 +149,17 @@ type ChatMembersList {
   totalCount: Int!
 }
 
+type ChatInvitesList {
+  invites: [ChatInvite!]!
+}
+
 type GlobalSearchList {
   results: [SearchResult!]!
+}
+
+type TypingPayload {
+  userId: ID!
+  isTyping: Boolean!
 }
 
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
@@ -170,9 +184,20 @@ union InviteResult = SuccessResult | ValidationError | ForbiddenError | Internal
 
 union RemoveMemberResult = SuccessResult | ForbiddenError | NotFoundError | InternalError
 
-type TypingPayload {
-  userId: ID!
-  isTyping: Boolean!
+union ExportInviteResult = ChatInvite | ForbiddenError | InternalError | NotFoundError
+
+union RevokeInviteResult = SuccessResult | ForbiddenError | InternalError | NotFoundError
+
+union ChatInvitesResult = ChatInvitesList | ForbiddenError | InternalError | NotFoundError
+
+input ChatPermissionsInput {
+  canSendMessage: Boolean
+  canInviteUsers: Boolean
+  canEditMetadata: Boolean
+  canDeleteMessages: Boolean
+  canAssignAdmins: Boolean
+  canSendMedia: Boolean
+  canPinMessages: Boolean
 }
 
 type Subscription {

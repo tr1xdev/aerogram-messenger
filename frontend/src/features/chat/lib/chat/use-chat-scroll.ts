@@ -34,17 +34,19 @@ export function useChatScroll({
   myId,
   onMarkRead,
 }: UseChatScrollProps): ChatScrollResult {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef: RefObject<HTMLDivElement | null> =
+    useRef<HTMLDivElement | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
 
-  const isPinnedToBottom = useRef<boolean>(true);
-  const prevMessagesLength = useRef<number>(0);
-  const prevScrollHeight = useRef<number>(0);
-  const isInitialRender = useRef<boolean>(true);
-  const currentChatId = useRef<string | null>(null);
-  const onMarkReadRef = useRef<() => void>(onMarkRead);
+  const isPinnedToBottom: RefObject<boolean> = useRef<boolean>(true);
+  const prevMessagesLength: RefObject<number> = useRef<number>(0);
+  const prevScrollHeight: RefObject<number> = useRef<number>(0);
+  const isInitialRender: RefObject<boolean> = useRef<boolean>(true);
+  const currentChatId: RefObject<string | null> = useRef<string | null>(null);
+  const onMarkReadRef: RefObject<() => void> = useRef<() => void>(onMarkRead);
+  const lastScrollTime: RefObject<number> = useRef<number>(0);
 
   useLayoutEffect((): void => {
     onMarkReadRef.current = onMarkRead;
@@ -65,6 +67,11 @@ export function useChatScroll({
       isPinnedToBottom.current = true;
       setIsAtBottom(true);
 
+      const now: number = Date.now();
+      const finalBehavior: ScrollBehavior =
+        now - lastScrollTime.current < 150 ? "auto" : behavior;
+      lastScrollTime.current = now;
+
       requestAnimationFrame((): void => {
         setShowScrollBtn(false);
         if (unreadCount > 0) {
@@ -72,7 +79,7 @@ export function useChatScroll({
         }
         viewport.scrollTo({
           top: viewport.scrollHeight,
-          behavior,
+          behavior: finalBehavior,
         });
       });
 
@@ -87,16 +94,21 @@ export function useChatScroll({
     const viewport: HTMLElement | null = getViewport();
     if (!viewport) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = viewport;
+    const {
+      scrollTop,
+      scrollHeight,
+      clientHeight,
+    }: { scrollTop: number; scrollHeight: number; clientHeight: number } =
+      viewport;
     const distanceToBottom: number = scrollHeight - scrollTop - clientHeight;
 
-    const isNearBottom: boolean = distanceToBottom <= 50;
+    const isNearBottom: boolean = distanceToBottom <= 100;
     isPinnedToBottom.current = isNearBottom;
     setShowScrollBtn(!isNearBottom);
     setIsAtBottom(isNearBottom);
 
     if (isNearBottom && unreadCount > 0) {
-      requestAnimationFrame((): void => setUnreadCount(0));
+      setUnreadCount(0);
       onMarkReadRef.current();
     }
   }, [getViewport, unreadCount]);
@@ -118,12 +130,15 @@ export function useChatScroll({
       isInitialRender.current = true;
       prevMessagesLength.current = 0;
       isPinnedToBottom.current = true;
+
       requestAnimationFrame((): void => {
         setIsAtBottom(true);
+        setUnreadCount(0);
       });
     }
 
-    const isNewMessage: boolean = messages.length > prevMessagesLength.current;
+    const diff: number = messages.length - prevMessagesLength.current;
+    const isNewMessage: boolean = diff > 0;
     const lastMsg: ScrollMessage | undefined = messages[messages.length - 1];
     const isMe: boolean = lastMsg?.sender?.id === myId;
 
@@ -132,11 +147,10 @@ export function useChatScroll({
       isInitialRender.current = false;
     } else if (isNewMessage) {
       if (isMe || isPinnedToBottom.current) {
-        requestAnimationFrame((): void => scrollToBottom("smooth"));
+        const behavior: ScrollBehavior = diff > 1 ? "auto" : "smooth";
+        requestAnimationFrame((): void => scrollToBottom(behavior));
       } else {
-        requestAnimationFrame((): void => {
-          setUnreadCount((prev: number): number => prev + 1);
-        });
+        setUnreadCount((prev: number): number => prev + diff);
       }
     }
 
@@ -157,12 +171,10 @@ export function useChatScroll({
       const currentScrollHeight: number = viewport.scrollHeight;
       const heightDiff: number = currentScrollHeight - prevScrollHeight.current;
 
-      if (heightDiff !== 0 && isPinnedToBottom.current) {
-        requestAnimationFrame((): void => {
-          viewport.scrollTo({
-            top: currentScrollHeight,
-            behavior: "auto",
-          });
+      if (heightDiff > 0 && isPinnedToBottom.current) {
+        viewport.scrollTo({
+          top: currentScrollHeight,
+          behavior: "auto",
         });
       }
 
@@ -170,10 +182,7 @@ export function useChatScroll({
     });
 
     resizeObserver.observe(content);
-
-    return (): void => {
-      resizeObserver.disconnect();
-    };
+    return (): void => resizeObserver.disconnect();
   }, [getViewport]);
 
   return { scrollRef, showScrollBtn, unreadCount, isAtBottom, scrollToBottom };

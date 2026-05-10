@@ -61,12 +61,16 @@ func (r *DialogRepository) GetUserDialogs(ctx context.Context, userID string) ([
 	return r.db.Queries.GetUserDialogs(ctx, uid)
 }
 
-func (r *DialogRepository) GetDialogByID(ctx context.Context, id string) (dbgen.Dialog, error) {
+func (r *DialogRepository) GetDialogByID(ctx context.Context, id string, userID uuid.UUID) (dbgen.Dialog, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return dbgen.Dialog{}, fmt.Errorf("invalid dialog id: %w", err)
 	}
-	return r.db.Queries.GetDialogByID(ctx, uid)
+
+	return r.db.Queries.GetDialogByID(ctx, dbgen.GetDialogByIDParams{
+		ID:     uid,
+		UserID: userID,
+	})
 }
 
 func (r *DialogRepository) GetMember(ctx context.Context, dialogID, userID string) (dbgen.DialogMember, error) {
@@ -165,7 +169,7 @@ func (r *DialogRepository) GetPrivateDialogByMembers(ctx context.Context, user1,
 }
 
 func (r *DialogRepository) PinChat(ctx context.Context, dialogID, userID uuid.UUID, pinned bool) error {
-	return r.db.Queries.UpdateMemberPinStatus(ctx, dbgen.UpdateMemberPinStatusParams{
+	return r.db.Queries.PinDialog(ctx, dbgen.PinDialogParams{
 		DialogID: dialogID,
 		UserID:   userID,
 		IsPinned: pinned,

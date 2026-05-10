@@ -10,6 +10,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -23,12 +25,10 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 )
 
-// ID is the resolver for the id field.
 func (r *chatResolver) ID(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	return helpers.EncodeGlobalID("Chat", obj.ID.String()), nil
 }
 
-// Type is the resolver for the type field.
 func (r *chatResolver) Type(ctx context.Context, obj *model.ChatExtended) (model.ChatType, error) {
 	switch strings.ToUpper(obj.Type) {
 	case "GROUP":
@@ -40,7 +40,6 @@ func (r *chatResolver) Type(ctx context.Context, obj *model.ChatExtended) (model
 	}
 }
 
-// Slug is the resolver for the slug field.
 func (r *chatResolver) Slug(ctx context.Context, obj *model.ChatExtended) (*string, error) {
 	if !obj.Username.Valid || obj.Username.String == "" {
 		return nil, nil
@@ -48,7 +47,6 @@ func (r *chatResolver) Slug(ctx context.Context, obj *model.ChatExtended) (*stri
 	return &obj.Username.String, nil
 }
 
-// Title is the resolver for the title field.
 func (r *chatResolver) Title(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	if obj.Name.Valid && obj.Name.String != "" {
 		return obj.Name.String, nil
@@ -59,7 +57,6 @@ func (r *chatResolver) Title(ctx context.Context, obj *model.ChatExtended) (stri
 	return "Untitled Chat", nil
 }
 
-// PhotoURL is the resolver for the photoUrl field.
 func (r *chatResolver) PhotoURL(ctx context.Context, obj *model.ChatExtended) (*string, error) {
 	if !obj.PhotoUrl.Valid || obj.PhotoUrl.String == "" {
 		return nil, nil
@@ -67,32 +64,26 @@ func (r *chatResolver) PhotoURL(ctx context.Context, obj *model.ChatExtended) (*
 	return &obj.PhotoUrl.String, nil
 }
 
-// UnreadCount is the resolver for the unreadCount field.
 func (r *chatResolver) UnreadCount(ctx context.Context, obj *model.ChatExtended) (int, error) {
 	return obj.UnreadCount, nil
 }
 
-// MyReadSequence is the resolver for the myReadSequence field.
 func (r *chatResolver) MyReadSequence(ctx context.Context, obj *model.ChatExtended) (int64, error) {
 	return obj.MyReadSequence, nil
 }
 
-// LastReadSequence is the resolver for the lastReadSequence field.
 func (r *chatResolver) LastReadSequence(ctx context.Context, obj *model.ChatExtended) (int64, error) {
 	return obj.ReadOutboxMaxId, nil
 }
 
-// IsPinned is the resolver for the isPinned field.
 func (r *chatResolver) IsPinned(ctx context.Context, obj *model.ChatExtended) (bool, error) {
 	return obj.IsPinned, nil
 }
 
-// CanWrite is the resolver for the canWrite field.
 func (r *chatResolver) CanWrite(ctx context.Context, obj *model.ChatExtended) (bool, error) {
 	return obj.IsActive, nil
 }
 
-// Permissions is the resolver for the permissions field.
 func (r *chatResolver) Permissions(ctx context.Context, obj *model.ChatExtended) (*model.ChatPermissions, error) {
 	isPrivate := strings.ToUpper(obj.Type) == "PRIVATE"
 	return &model.ChatPermissions{
@@ -106,7 +97,6 @@ func (r *chatResolver) Permissions(ctx context.Context, obj *model.ChatExtended)
 	}, nil
 }
 
-// LastMessage is the resolver for the lastMessage field.
 func (r *chatResolver) LastMessage(ctx context.Context, obj *model.ChatExtended) (*model.Message, error) {
 	if !obj.LastMessageID.Valid {
 		return nil, nil
@@ -114,19 +104,31 @@ func (r *chatResolver) LastMessage(ctx context.Context, obj *model.ChatExtended)
 	return r.Enricher.EnrichMessage(ctx, obj.LastMessageID.UUID.String())
 }
 
-// Members is the resolver for the members field.
 func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, limit *int, offset *int) ([]*model.ChatMember, error) {
-	res, err := r.Query().ChatMembers(ctx, helpers.EncodeGlobalID("Chat", obj.ID.String()), limit, offset)
+	var globalID string
+	if strings.Contains(obj.ID.String(), ":") {
+		globalID = obj.ID.String()
+	} else {
+		globalID = helpers.EncodeGlobalID("Chat", obj.ID.String())
+	}
+
+	log.Printf("[ChatResolver.Members] Input ID: %s, Generated GlobalID: %s", obj.ID.String(), globalID)
+
+	res, err := r.Query().ChatMembers(ctx, globalID, limit, offset)
 	if err != nil {
+		log.Printf("[ChatResolver.Members] Query.ChatMembers error: %v", err)
 		return nil, err
 	}
+
 	if list, ok := res.(*model.ChatMembersList); ok {
+		log.Printf("[ChatResolver.Members] Successfully fetched %d members", len(list.Members))
 		return list.Members, nil
 	}
+
+	log.Printf("[ChatResolver.Members] No members list found in result, returning empty slice")
 	return []*model.ChatMember{}, nil
 }
 
-// MyRole is the resolver for the myRole field.
 func (r *chatResolver) MyRole(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	if obj.Role == "" || obj.Role == "NONE" {
 		return "NONE", nil
@@ -134,23 +136,19 @@ func (r *chatResolver) MyRole(ctx context.Context, obj *model.ChatExtended) (str
 	return obj.Role, nil
 }
 
-// CreatedAt is the resolver for the createdAt field.
 func (r *chatResolver) CreatedAt(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	return obj.CreatedAt.Format(time.RFC3339), nil
 }
 
-// CreateChat is the resolver for the createChat field.
 func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatType, participantIds []string, slug *string, title *string) (model.CreateChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	rawParticipantIds := make([]string, len(participantIds))
 	for i, id := range participantIds {
 		rawParticipantIds[i] = helpers.ToRawID(id)
 	}
-
 	enumKey := "CHAT_TYPE_" + strings.ToUpper(string(typeArg))
 	resp, err := r.ChatClient.CreateChat(ctx, &chatv1.CreateChatRequest{
 		Type:           chatv1.ChatType(chatv1.ChatType_value[enumKey]),
@@ -160,19 +158,17 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 		Slug:           slug,
 	})
 	if err != nil {
+		log.Printf("[CreateChat] gRPC Error: %v", err)
 		return r.mapToCreateChatError(err), nil
 	}
-
 	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
-// CreateDirectChat is the resolver for the createDirectChat field.
 func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) (model.CreateChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	rawUserID := helpers.ToRawID(userID)
 	resp, err := r.ChatClient.CreateChat(ctx, &chatv1.CreateChatRequest{
 		Type:           chatv1.ChatType_CHAT_TYPE_PRIVATE,
@@ -180,79 +176,70 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 		CreatorId:      authID,
 	})
 	if err != nil {
+		log.Printf("[CreateDirectChat] gRPC Error: %v", err)
 		return r.mapToCreateChatError(err), nil
 	}
-
 	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
-// PinChat is the resolver for the pinChat field.
 func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) (model.PinChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	resp, err := r.ChatClient.PinChat(ctx, &chatv1.PinChatRequest{
 		ChatId: helpers.ToRawID(id),
 		UserId: authID,
 		Pinned: pinned,
 	})
 	if err != nil {
+		log.Printf("[PinChat] gRPC Error: %v", err)
 		return r.mapToPinChatError(err), nil
 	}
-
 	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
 }
 
-// DeleteChat is the resolver for the deleteChat field.
 func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryone *bool) (model.DeleteChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	everyone := false
 	if forEveryone != nil {
 		everyone = *forEveryone
 	}
-
 	resp, err := r.ChatClient.DeleteChat(ctx, &chatv1.DeleteChatRequest{
 		ChatId:      helpers.ToRawID(id),
 		UserId:      authID,
 		ForEveryone: everyone,
 	})
 	if err != nil {
+		log.Printf("[DeleteChat] gRPC Error: %v", err)
 		return r.mapToDeleteChatError(err), nil
 	}
-
 	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
 }
 
-// LeaveChat is the resolver for the leaveChat field.
 func (r *mutationResolver) LeaveChat(ctx context.Context, chatID string) (model.LeaveChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	resp, err := r.ChatClient.LeaveChat(ctx, &chatv1.LeaveChatRequest{
 		ChatId: helpers.ToRawID(chatID),
 	})
 	if err != nil {
+		log.Printf("[LeaveChat] gRPC Error: %v", err)
 		return r.mapToLeaveChatError(err), nil
 	}
-
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
-// InviteToChat is the resolver for the inviteToChat field.
 func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, userIds []string) (model.InviteResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	rawUserIds := make([]string, 0, len(userIds))
 	for _, id := range userIds {
 		rid := helpers.ToRawID(id)
@@ -260,87 +247,164 @@ func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, user
 			rawUserIds = append(rawUserIds, rid)
 		}
 	}
-
 	resp, err := r.ChatClient.InviteToChat(ctx, &chatv1.InviteToChatRequest{
 		ChatId:  helpers.ToRawID(chatID),
 		UserIds: rawUserIds,
 	})
 	if err != nil {
+		log.Printf("[InviteToChat] gRPC Error: %v", err)
 		return r.mapToInviteError(err), nil
 	}
-
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
-// JoinChatBySlug is the resolver for the joinChatBySlug field.
 func (r *mutationResolver) JoinChatBySlug(ctx context.Context, slug string) (model.JoinChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
+	log.Printf("[JoinChatBySlug] Attempting join. Slug: %s, AuthID: %s", slug, authID)
 	resp, err := r.ChatClient.JoinChatBySlug(ctx, &chatv1.JoinChatBySlugRequest{
 		Slug: slug,
 	})
 	if err != nil {
+		log.Printf("[JoinChatBySlug] gRPC Join Error: %v", err)
 		return &model.InternalError{Message: "failed to join chat"}, nil
 	}
-
+	log.Printf("[JoinChatBySlug] Join successful. ChatID: %s. Fetching chat details...", resp.ChatId)
 	chatResp, err := r.ChatClient.GetChat(ctx, &chatv1.GetChatRequest{
 		ChatId: &resp.ChatId,
 		UserId: authID,
 	})
 	if err != nil {
+		log.Printf("[JoinChatBySlug] GetChat Error after join: %v", err)
 		return &model.NotFoundError{Message: "chat joined but not found"}, nil
 	}
-
 	return r.Enricher.EnrichChat(ctx, authID, chatResp.Chat)
 }
 
-// RemoveChatMember is the resolver for the removeChatMember field.
+func (r *mutationResolver) JoinChatByInvite(ctx context.Context, inviteCode string) (model.JoinChatResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+	log.Printf("[JoinChatByInvite] Attempting join. InviteCode: %s, AuthID: %s", inviteCode, authID)
+	resp, err := r.ChatClient.JoinChatByInvite(ctx, &chatv1.JoinChatByInviteRequest{
+		InviteCode: inviteCode,
+	})
+	if err != nil {
+		log.Printf("[JoinChatByInvite] gRPC Join Error: %v", err)
+		return &model.InternalError{Message: "failed to join by invite link"}, nil
+	}
+	log.Printf("[JoinChatByInvite] Join successful. ChatID: %s. Fetching chat details...", resp.ChatId)
+	chatResp, err := r.ChatClient.GetChat(ctx, &chatv1.GetChatRequest{
+		ChatId: &resp.ChatId,
+		UserId: authID,
+	})
+	if err != nil {
+		log.Printf("[JoinChatByInvite] GetChat Error after join: %v", err)
+		return &model.NotFoundError{Message: "chat joined but not found"}, nil
+	}
+	return r.Enricher.EnrichChat(ctx, authID, chatResp.Chat)
+}
+
+func (r *mutationResolver) ExportChatInvite(ctx context.Context, chatID string, name *string, usageLimit *int, expireAt *int) (model.ExportInviteResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+	rawChatID := helpers.ToRawID(chatID)
+	log.Printf("[ExportChatInvite] Creating invite. ChatID: %s (Raw: %s), AuthID: %s", chatID, rawChatID, authID)
+	var limit *int32
+	if usageLimit != nil {
+		l := int32(*usageLimit)
+		limit = &l
+	}
+	var expire *int64
+	if expireAt != nil {
+		e := int64(*expireAt)
+		expire = &e
+	}
+	resp, err := r.ChatClient.ExportChatInvite(ctx, &chatv1.ExportChatInviteRequest{
+		ChatId:     rawChatID,
+		Name:       name,
+		UsageLimit: limit,
+		ExpireAt:   expire,
+	})
+	if err != nil {
+		log.Printf("[ExportChatInvite] gRPC Error: %v", err)
+		return &model.InternalError{Message: "failed to export invite"}, nil
+	}
+	parts := strings.Split(resp.InviteLink, "/")
+	code := parts[len(parts)-1]
+	log.Printf("[ExportChatInvite] Successfully generated code: %s", code)
+	creator, _ := r.Enricher.EnrichUser(ctx, authID)
+	return &model.ChatInvite{
+		Code:       code,
+		InviteLink: resp.InviteLink,
+		Creator:    creator,
+		UsageCount: 0,
+		UsageLimit: usageLimit,
+		IsRevoked:  false,
+		CreatedAt:  time.Now().Format(time.RFC3339),
+	}, nil
+}
+
+func (r *mutationResolver) RevokeChatInvite(ctx context.Context, chatID string, inviteCode string) (model.RevokeInviteResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+	log.Printf("[RevokeChatInvite] Revoking code: %s for Chat: %s", inviteCode, chatID)
+	resp, err := r.ChatClient.RevokeChatInvite(ctx, &chatv1.RevokeChatInviteRequest{
+		ChatId:     helpers.ToRawID(chatID),
+		InviteCode: inviteCode,
+	})
+	if err != nil {
+		log.Printf("[RevokeChatInvite] gRPC Error: %v", err)
+		return &model.InternalError{Message: "failed to revoke invite"}, nil
+	}
+	return &model.SuccessResult{Success: resp.Success}, nil
+}
+
 func (r *mutationResolver) RemoveChatMember(ctx context.Context, chatID string, userID string) (model.RemoveMemberResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	resp, err := r.ChatClient.RemoveChatMember(ctx, &chatv1.RemoveChatMemberRequest{
 		ChatId: helpers.ToRawID(chatID),
 		UserId: helpers.ToRawID(userID),
 	})
 	if err != nil {
+		log.Printf("[RemoveChatMember] gRPC Error: %v", err)
 		return r.mapToRemoveMemberError(err), nil
 	}
-
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
-// UpdateMemberRole is the resolver for the updateMemberRole field.
 func (r *mutationResolver) UpdateMemberRole(ctx context.Context, chatID string, userID string, role string) (*model.SuccessResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return nil, errors.New("unauthorized")
 	}
-
 	resp, err := r.ChatClient.UpdateMemberRole(ctx, &chatv1.UpdateMemberRoleRequest{
 		ChatId:       helpers.ToRawID(chatID),
 		TargetUserId: helpers.ToRawID(userID),
 		NewRole:      role,
 	})
 	if err != nil {
+		log.Printf("[UpdateMemberRole] gRPC Error: %v", err)
 		return nil, err
 	}
-
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
-// UpdateChatPermissions is the resolver for the updateChatPermissions field.
 func (r *mutationResolver) UpdateChatPermissions(ctx context.Context, chatID string, permissions model.ChatPermissionsInput) (*model.SuccessResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return nil, errors.New("unauthorized")
 	}
-
 	req := &chatv1.UpdateChatPermissionsRequest{
 		ChatId: helpers.ToRawID(chatID),
 		Permissions: &chatv1.ChatPermissions{
@@ -353,71 +417,74 @@ func (r *mutationResolver) UpdateChatPermissions(ctx context.Context, chatID str
 			CanPinMessages:    *permissions.CanPinMessages,
 		},
 	}
-
 	resp, err := r.ChatClient.UpdateChatPermissions(ctx, req)
 	if err != nil {
+		log.Printf("[UpdateChatPermissions] gRPC Error: %v", err)
 		return nil, err
 	}
-
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
-// UpdateChatMetadata is the resolver for the updateChatMetadata field.
 func (r *mutationResolver) UpdateChatMetadata(ctx context.Context, id string, title *string, slug *string) (model.ChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
+	rawID := helpers.ToRawID(id)
+	valTitle := "nil"
+	if title != nil {
+		valTitle = *title
+	}
+	valSlug := "nil"
+	if slug != nil {
+		valSlug = fmt.Sprintf("'%s'", *slug)
+	}
+	log.Printf("[GQL-MUTATION] UpdateChatMetadata: ID=%s (Raw=%s), Title=%s, Slug=%s, Caller=%s", id, rawID, valTitle, valSlug, authID)
 	resp, err := r.ChatClient.UpdateChat(ctx, &chatv1.UpdateChatRequest{
-		ChatId: helpers.ToRawID(id),
+		ChatId: rawID,
 		Title:  title,
 		Slug:   slug,
 	})
 	if err != nil {
+		log.Printf("[GQL-MUTATION] ChatClient Error: %v", err)
 		return r.mapToChatError(err), nil
 	}
-
 	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
-// SendTypingEvent is the resolver for the sendTypingEvent field.
 func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string, typing bool) (bool, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return false, nil
 	}
-
 	if err := r.PresenceSvc.PublishTyping(ctx, authID, helpers.ToRawID(chatID), typing); err != nil {
+		log.Printf("[SendTypingEvent] Presence Publish Error: %v", err)
 		return false, nil
 	}
-
 	return true, nil
 }
 
-// MyChats is the resolver for the myChats field.
 func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	resp, err := r.ChatClient.GetMyChats(ctx, &chatv1.GetMyChatsRequest{UserId: authID})
 	if err != nil {
+		log.Printf("[MyChats] gRPC Error: %v", err)
 		return &model.InternalError{Message: "failed to load chats"}, nil
 	}
-
 	chats := make([]*model.ChatExtended, 0, len(resp.Chats))
 	for _, c := range resp.Chats {
 		if enriched, err := r.Enricher.EnrichChat(ctx, authID, c); err == nil && enriched != nil {
 			chats = append(chats, enriched)
+		} else if err != nil {
+			log.Printf("[MyChats] Enrichment failed for chat %s: %v", c.Id, err)
 		}
 	}
-
 	return &model.ChatList{Chats: chats}, nil
 }
 
-// Chat is the resolver for the chat field.
 func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (model.ChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -435,29 +502,29 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 		Slug:   slug,
 		UserId: authID,
 	})
-
 	if err != nil {
 		return r.mapToChatError(err), nil
 	}
 
 	chatExtended, err := r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 	if err != nil {
-		if err.Error() == "PRIVATE_CHAT_ACCESS_DENIED" {
-			return &model.ForbiddenError{Message: "This chat is private and you are not a member"}, nil
+		if err.Error() == "PRIVATE_CHAT_ACCESS_DENIED" && resp.Chat != nil {
+			return r.mapToChatModel(resp.Chat), nil
 		}
-		return nil, err
+
+		log.Printf("[Chat.Resolver] Enrichment Failed: %v", err)
+		return &model.ForbiddenError{Message: "access denied"}, nil
 	}
 
 	return chatExtended, nil
 }
 
-// ChatMembers is the resolver for the chatMembers field.
 func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *int, offset *int) (model.ChatMembersResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
+		log.Printf("[ChatMembers] Unauthorized access attempt")
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
-
 	l, o := 50, 0
 	if limit != nil {
 		l = *limit
@@ -465,23 +532,25 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 	if offset != nil {
 		o = *offset
 	}
-
+	rawID := helpers.ToRawID(chatID)
+	log.Printf("[ChatMembers] Fetching members. AuthID: %s, GlobalID: %s, RawID: %s", authID, chatID, rawID)
 	resp, err := r.ChatClient.GetChatMembers(ctx, &chatv1.GetChatMembersRequest{
-		ChatId: helpers.ToRawID(chatID),
+		ChatId: rawID,
 		Limit:  int32(l),
 		Offset: int32(o),
 	})
 	if err != nil {
+		log.Printf("[ChatMembers] gRPC error: %v", err)
 		return r.mapToChatMembersError(err), nil
 	}
-
+	log.Printf("[ChatMembers] gRPC returned %d members", len(resp.Members))
 	members := make([]*model.ChatMember, 0, len(resp.Members))
 	for _, m := range resp.Members {
 		user, err := r.Enricher.EnrichUser(ctx, m.UserId)
 		if err != nil {
+			log.Printf("[ChatMembers] Failed to enrich user %s: %v", m.UserId, err)
 			continue
 		}
-
 		p := &model.ChatPermissions{
 			CanSendMessage:    true,
 			CanInviteUsers:    true,
@@ -491,7 +560,6 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 			CanSendMedia:      true,
 			CanPinMessages:    false,
 		}
-
 		if m.Permissions != nil {
 			p.CanSendMessage = m.Permissions.CanSendMessage
 			p.CanInviteUsers = m.Permissions.CanInviteUsers
@@ -501,58 +569,48 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 			p.CanSendMedia = m.Permissions.CanSendMedia
 			p.CanPinMessages = m.Permissions.CanPinMessages
 		}
-
 		members = append(members, &model.ChatMember{
 			User:             user,
-			Role:             strings.ToUpper(m.Role),
+			Role:             strings.ToLower(m.Role),
 			LastReadSequence: m.LastReadSequence,
 			Permissions:      p,
 		})
 	}
-
+	log.Printf("[ChatMembers] Successfully processed %d members", len(members))
 	return &model.ChatMembersList{
 		Members:    members,
 		TotalCount: int(resp.TotalCount),
 	}, nil
 }
 
-// SearchGlobal is the resolver for the searchGlobal field.
 func (r *queryResolver) SearchGlobal(ctx context.Context, query string) (*model.GlobalSearchList, error) {
 	cleanQuery := strings.TrimSpace(query)
 	if len(cleanQuery) < 2 {
-		return &model.GlobalSearchList{
-			Results: []model.SearchResult{},
-		}, nil
+		return &model.GlobalSearchList{Results: []model.SearchResult{}}, nil
 	}
-
 	userID := helpers.GetUserIDFromContext(ctx)
 	var userUUID uuid.UUID
 	if userID != "" {
 		userUUID, _ = uuid.Parse(helpers.ToRawID(userID))
 	}
-
+	log.Printf("[SearchGlobal] Query: %s, User: %s", cleanQuery, userID)
 	users, err := r.Store.SearchUsersByUsername(ctx, cleanQuery)
 	if err != nil {
+		log.Printf("[SearchGlobal] User search error: %v", err)
 		return nil, err
 	}
-
 	dialogs, err := r.Store.SearchPublicDialogs(ctx, dbgen.SearchPublicDialogsParams{
-		Column1: sql.NullString{
-			String: cleanQuery,
-			Valid:  true,
-		},
-		UserID: userUUID,
+		Column1: sql.NullString{String: cleanQuery, Valid: true},
+		UserID:  userUUID,
 	})
 	if err != nil {
+		log.Printf("[SearchGlobal] Dialog search error: %v", err)
 		return nil, err
 	}
-
 	results := make([]model.SearchResult, 0, len(users)+len(dialogs))
-
 	for i := range users {
 		results = append(results, &users[i])
 	}
-
 	for i := range dialogs {
 		results = append(results, &model.ChatExtended{
 			Dialog: dbgen.Dialog{
@@ -571,23 +629,56 @@ func (r *queryResolver) SearchGlobal(ctx context.Context, query string) (*model.
 			Role: dialogs[i].UserRole,
 		})
 	}
-
-	return &model.GlobalSearchList{
-		Results: results,
-	}, nil
+	return &model.GlobalSearchList{Results: results}, nil
 }
 
-// ChatCreated is the resolver for the chatCreated field.
+func (r *queryResolver) ChatInvites(ctx context.Context, chatID string) (model.ChatInvitesResult, error) {
+	authID := middleware.GetUserID(ctx)
+	if authID == "" {
+		return &model.ForbiddenError{Message: "unauthorized"}, nil
+	}
+	did, _ := uuid.Parse(helpers.ToRawID(chatID))
+	log.Printf("[ChatInvites] Fetching invites for Chat: %s (UUID: %s)", chatID, did)
+	invites, err := r.Store.GetDialogInvites(ctx, did)
+	if err != nil {
+		log.Printf("[ChatInvites] DB Error: %v", err)
+		return &model.InternalError{Message: "failed to fetch invites"}, nil
+	}
+	results := make([]*model.ChatInvite, 0, len(invites))
+	for _, invite := range invites {
+		creator, _ := r.Enricher.EnrichUser(ctx, invite.CreatorID.String())
+		var exp *string
+		if invite.ExpireAt.Valid {
+			e := invite.ExpireAt.Time.Format(time.RFC3339)
+			exp = &e
+		}
+		var limit *int
+		if invite.UsageLimit.Valid {
+			l := int(invite.UsageLimit.Int32)
+			limit = &l
+		}
+		results = append(results, &model.ChatInvite{
+			Code:       invite.InviteCode,
+			InviteLink: "/join/" + invite.InviteCode,
+			Creator:    creator,
+			UsageCount: int(invite.UsageCount),
+			UsageLimit: limit,
+			ExpireAt:   exp,
+			IsRevoked:  invite.IsRevoked,
+			CreatedAt:  invite.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return &model.ChatInvitesList{Invites: results}, nil
+}
+
 func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (<-chan *model.ChatExtended, error) {
 	authID := middleware.GetUserID(ctx)
 	rawUserID := helpers.ToRawID(userID)
 	if authID == "" || authID != rawUserID {
 		return nil, errors.New("forbidden")
 	}
-
 	chatChan := make(chan *model.ChatExtended, 10)
 	pubsub := r.RedisClient.Subscribe(ctx, "user_chats:"+rawUserID)
-
 	go func() {
 		defer pubsub.Close()
 		defer close(chatChan)
@@ -599,17 +690,14 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 				if !ok {
 					return
 				}
-
 				var chatProto chatv1.Chat
 				if err := json.Unmarshal([]byte(msg.Payload), &chatProto); err != nil {
 					continue
 				}
-
 				enriched, err := r.Enricher.EnrichChat(ctx, authID, &chatProto)
 				if err != nil {
 					continue
 				}
-
 				select {
 				case chatChan <- enriched:
 				case <-ctx.Done():
@@ -621,17 +709,14 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 	return chatChan, nil
 }
 
-// ChatDeleted is the resolver for the chatDeleted field.
 func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (<-chan string, error) {
 	authID := middleware.GetUserID(ctx)
 	rawUserID := helpers.ToRawID(userID)
 	if authID == "" || authID != rawUserID {
 		return nil, errors.New("forbidden")
 	}
-
 	deleteChan := make(chan string, 10)
 	pubsub := r.RedisClient.Subscribe(ctx, "user_chats_deleted:"+rawUserID, "chat_deleted:*")
-
 	go func() {
 		defer pubsub.Close()
 		defer close(deleteChan)
@@ -643,14 +728,12 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 				if !ok {
 					return
 				}
-
 				var id string
 				if strings.HasPrefix(msg.Channel, "chat_deleted:") {
 					id = strings.TrimPrefix(msg.Channel, "chat_deleted:")
 				} else {
 					id = msg.Payload
 				}
-
 				select {
 				case deleteChan <- helpers.EncodeGlobalID("Chat", id):
 				case <-ctx.Done():
@@ -662,16 +745,14 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 	return deleteChan, nil
 }
 
-// UserTyping is the resolver for the userTyping field.
 func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<-chan *model.TypingPayload, error) {
 	rawChatID := helpers.ToRawID(chatID)
 	stream, err := r.PresenceClient.SubscribeTyping(ctx, &presencev1.SubscribeTypingRequest{ChatId: rawChatID})
 	if err != nil {
+		log.Printf("[UserTyping] Subscription Error: %v", err)
 		return nil, err
 	}
-
 	out := make(chan *model.TypingPayload, 10)
-
 	go func() {
 		defer close(out)
 		for {
@@ -694,7 +775,6 @@ func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<
 	return out, nil
 }
 
-// Chat returns graph.ChatResolver implementation.
 func (r *Resolver) Chat() graph.ChatResolver { return &chatResolver{r} }
 
 type chatResolver struct{ *Resolver }

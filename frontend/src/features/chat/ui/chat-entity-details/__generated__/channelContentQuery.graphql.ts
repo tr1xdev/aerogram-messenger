@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<15572c72dfa28711389e9761de7594d4>>
+ * @generated SignedSource<<9f95baf8da4a1f787262ead7b96a86cb>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -30,6 +30,16 @@ export type channelContentQuery$data = {
     readonly photoUrl: string | null | undefined;
     readonly slug: string | null | undefined;
     readonly title: string;
+  } | {
+    // This will never be '%other', but we need some
+    // value in case none of the concrete values match.
+    readonly __typename: "%other";
+  };
+  readonly chatInvites: {
+    readonly __typename: "ChatInvitesList";
+    readonly invites: ReadonlyArray<{
+      readonly inviteLink: string;
+    }>;
   } | {
     // This will never be '%other', but we need some
     // value in case none of the concrete values match.
@@ -158,6 +168,49 @@ v5 = {
   ],
   "type": "Chat",
   "abstractKey": null
+},
+v6 = {
+  "alias": null,
+  "args": [
+    {
+      "kind": "Variable",
+      "name": "chatID",
+      "variableName": "id"
+    }
+  ],
+  "concreteType": null,
+  "kind": "LinkedField",
+  "name": "chatInvites",
+  "plural": false,
+  "selections": [
+    (v2/*: any*/),
+    {
+      "kind": "InlineFragment",
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "ChatInvite",
+          "kind": "LinkedField",
+          "name": "invites",
+          "plural": true,
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "inviteLink",
+              "storageKey": null
+            }
+          ],
+          "storageKey": null
+        }
+      ],
+      "type": "ChatInvitesList",
+      "abstractKey": null
+    }
+  ],
+  "storageKey": null
 };
 return {
   "fragment": {
@@ -178,7 +231,8 @@ return {
           (v5/*: any*/)
         ],
         "storageKey": null
-      }
+      },
+      (v6/*: any*/)
     ],
     "type": "Query",
     "abstractKey": null
@@ -209,20 +263,21 @@ return {
           }
         ],
         "storageKey": null
-      }
+      },
+      (v6/*: any*/)
     ]
   },
   "params": {
-    "cacheID": "5a168e465a643675d84c3d3b362ada4a",
+    "cacheID": "198ce3da6102fdcb16393d6de5862e6a",
     "id": null,
     "metadata": {},
     "name": "channelContentQuery",
     "operationKind": "query",
-    "text": "query channelContentQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      id\n      title\n      slug\n      photoUrl\n      membersCount\n      myRole\n      members {\n        user {\n          id\n          displayName\n          firstName\n          photoUrl\n        }\n        role\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "query channelContentQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      id\n      title\n      slug\n      photoUrl\n      membersCount\n      myRole\n      members {\n        user {\n          id\n          displayName\n          firstName\n          photoUrl\n        }\n        role\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  chatInvites(chatID: $id) {\n    __typename\n    ... on ChatInvitesList {\n      invites {\n        inviteLink\n      }\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "e091077ff183a9530dc20b6bc8d386db";
+(node as any).hash = "1552af22b15576d12dea83f393e5865d";
 
 export default node;

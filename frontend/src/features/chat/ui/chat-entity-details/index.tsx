@@ -49,7 +49,7 @@ export function ChatEntityDetails({
     }
   };
 
-  const renderContent = (isPreview: boolean = false) => {
+  const renderContent = (isPreview: boolean = false): ReactNode => {
     if (type === "PRIVATE")
       return <UserContent userId={id} isPreview={isPreview} />;
     if (type === "CHANNEL")
@@ -57,28 +57,52 @@ export function ChatEntityDetails({
     return <GroupContent id={id} isPreview={isPreview} />;
   };
 
-  if (isMobile) return <div onClick={handleTriggerClick}>{children}</div>;
+  if (isMobile) {
+    return (
+      <div onClick={handleTriggerClick} className="cursor-pointer">
+        {children}
+      </div>
+    );
+  }
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+    <Dialog
+      open={isDialogOpen}
+      onOpenChange={(open: boolean): void => {
+        setIsDialogOpen(open);
+      }}
+    >
+      <Popover
+        open={isPopoverOpen}
+        onOpenChange={(open: boolean): void => {
+          setIsPopoverOpen(open);
+        }}
+      >
         <PopoverTrigger asChild>
           <DialogTrigger asChild onClick={handleTriggerClick}>
-            <div className="cursor-pointer outline-none">{children}</div>
+            <div
+              className="cursor-pointer outline-none"
+              onContextMenu={(e: React.MouseEvent): void => {
+                e.preventDefault();
+                setIsPopoverOpen(true);
+              }}
+            >
+              {children}
+            </div>
           </DialogTrigger>
         </PopoverTrigger>
         <PopoverContent
           side="bottom"
           align="start"
-          className="w-80 p-0 overflow-hidden border-border/50 shadow-2xl"
+          className="w-80 p-0 overflow-hidden border-border/50 shadow-2xl max-h-[500px] flex flex-col bg-background"
         >
           <Suspense fallback={<EntitySkeleton />}>
-            {renderContent(true)}
+            <div className="flex-1 overflow-hidden">{renderContent(true)}</div>
           </Suspense>
         </PopoverContent>
       </Popover>
 
-      <DialogContent className="max-w-[480px] p-0 overflow-hidden border-none shadow-2xl bg-background">
+      <DialogContent className="max-w-[480px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-fit max-h-[90vh]">
         <VisuallyHidden>
           <DialogTitle>
             {type === "PRIVATE"
@@ -91,8 +115,11 @@ export function ChatEntityDetails({
             Detailed information about the selected entity
           </DialogDescription>
         </VisuallyHidden>
+
         <Suspense fallback={<EntitySkeleton />}>
-          {renderContent(false)}
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            {renderContent(false)}
+          </div>
         </Suspense>
       </DialogContent>
     </Dialog>
@@ -104,9 +131,9 @@ function EntitySkeleton(): ReactNode {
     <div className="flex flex-col w-full">
       <Skeleton className="h-24 w-full rounded-none" />
       <div className="p-5 space-y-4">
-        <Skeleton className="h-20 w-20 rounded-full -mt-12 border-4 border-background" />
-        <Skeleton className="h-6 w-1/2" />
-        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-16 w-16 rounded-3xl -mt-12 border-4 border-background" />
+        <Skeleton className="h-5 w-1/2" />
+        <Skeleton className="h-16 w-full rounded-xl" />
       </div>
     </div>
   );

@@ -62,10 +62,13 @@ func (s *Server) getUserID(ctx context.Context, reqID string) string {
 }
 
 func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID uuid.UUID, bit int64) (bool, error) {
-	dialog, err := s.db.Queries.GetDialogByID(ctx, dialogID)
+	dialog, err := s.db.Queries.GetDialogByID(ctx, dbgen.GetDialogByIDParams{
+		ID:     dialogID,
+		UserID: userID,
+	})
 	if err != nil {
-		log.Printf("[CHECK-PERM] Dialog %s not found: %v", dialogID, err)
-		return false, status.Error(codes.NotFound, "chat not found")
+		log.Printf("[CHECK-PERM] Dialog %s not found or access denied: %v", dialogID, err)
+		return false, status.Error(codes.NotFound, "chat not found or access denied")
 	}
 
 	if dialog.Type == "private" {
@@ -209,7 +212,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	readData, _ := json.Marshal(readPayload)
 	s.rdb.Publish(context.Background(), "chat:"+req.ChatId+":read", readData)
 
-	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId)
+	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId, senderID)
 	if err == nil {
 		protoChat := s.mapDBDialogToProto(dialog)
 		chatType := strings.ToUpper(strings.TrimPrefix(protoChat.Type.String(), "CHAT_TYPE_"))

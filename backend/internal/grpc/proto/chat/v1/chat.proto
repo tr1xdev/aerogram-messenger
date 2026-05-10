@@ -22,6 +22,7 @@ service ChatService {
   rpc GetChatMembers(GetChatMembersRequest) returns (GetChatMembersResponse);
   rpc LeaveChat(LeaveChatRequest) returns (LeaveChatResponse);
   rpc RemoveChatMember(RemoveChatMemberRequest) returns (RemoveChatMemberResponse);
+  rpc RevokeChatInvite(RevokeChatInviteRequest) returns (RevokeChatInviteResponse);
 }
 
 enum ChatType {
@@ -67,6 +68,15 @@ message Chat {
   bool can_write = 16;
   ChatPermissions permissions = 17;
   string my_role = 18;
+}
+
+message RevokeChatInviteRequest {
+  string chat_id = 1;
+  string invite_code = 2;
+}
+
+message RevokeChatInviteResponse {
+  bool success = 1;
 }
 
 message UpdateChatRequest {

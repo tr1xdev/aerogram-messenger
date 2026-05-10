@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useEffect } from "react";
+import { type ReactNode, useMemo, useEffect, useState } from "react";
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
 import {
   Image as ImageIcon,
@@ -10,10 +10,13 @@ import {
   UserMinus,
   Settings,
   Link2,
-  Trash2,
   Save,
   Globe,
   Lock,
+  Copy,
+  Check,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,7 +29,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -39,28 +41,45 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { channelContentUpdateRoleMutation } from "./__generated__/channelContentUpdateRoleMutation.graphql";
 import type { channelContentRemoveMemberMutation } from "./__generated__/channelContentRemoveMemberMutation.graphql";
 import type { channelContentUpdateMetadataMutation } from "./__generated__/channelContentUpdateMetadataMutation.graphql";
-import type { channelContentDeleteChatMutation } from "./__generated__/channelContentDeleteChatMutation.graphql";
+import type { channelContentGenerateInviteLinkMutation } from "./__generated__/channelContentGenerateInviteLinkMutation.graphql";
 import type {
   channelContentQuery,
   channelContentQuery$data,
 } from "./__generated__/channelContentQuery.graphql";
 
-const channelSettingsSchema = z.object({
-  title: z.string().min(1, "Title is required").max(64),
-  slug: z
-    .string()
-    .max(32)
-    .regex(/^[a-zA-Z0-9_]*$/, "Only letters, numbers and underscores")
-    .or(z.literal("")),
-  visibility: z.enum(["public", "private"]),
-});
+const channelSettingsSchema = z
+  .object({
+    title: z.string().min(1, "Title is required").max(64),
+    slug: z
+      .string()
+      .max(32)
+      .regex(/^[a-zA-Z0-9_]*$/, "Only letters, numbers and underscores")
+      .or(z.literal("")),
+    visibility: z.enum(["public", "private"]),
+  })
+  .refine(
+    (data: { visibility: string; slug: string }): boolean => {
+      if (data.visibility === "public") {
+        return data.slug.trim().length > 0;
+      }
+      return true;
+    },
+    {
+      message: "Public link is required for public channels",
+      path: ["slug"],
+    },
+  );
 
 type ChannelSettingsValues = z.infer<typeof channelSettingsSchema>;
-type ChatData = Extract<
-  channelContentQuery$data["chat"],
-  { readonly __typename: "Chat" }
+
+type ChatMember = NonNullable<
+  NonNullable<
+    Extract<
+      channelContentQuery$data["chat"],
+      { readonly __typename: "Chat" }
+    >["members"]
+  >[number]
 >;
-type ChatMember = NonNullable<NonNullable<ChatData["members"]>[number]>;
 
 const ChannelQuery = graphql`
   query channelContentQuery($id: ID!) {
@@ -81,6 +100,14 @@ const ChannelQuery = graphql`
             photoUrl
           }
           role
+        }
+      }
+    }
+    chatInvites(chatID: $id) {
+      __typename
+      ... on ChatInvitesList {
+        invites {
+          inviteLink
         }
       }
     }
@@ -111,7 +138,10 @@ const UpdateRoleMutation = graphql`
     $role: String!
   ) {
     updateMemberRole(chatID: $chatID, userID: $userID, role: $role) {
-      success
+      __typename
+      ... on SuccessResult {
+        success
+      }
     }
   }
 `;
@@ -127,35 +157,80 @@ const RemoveMemberMutation = graphql`
   }
 `;
 
-const DeleteChatMutation = graphql`
-  mutation channelContentDeleteChatMutation($id: ID!, $forEveryone: Boolean) {
-    deleteChat(id: $id, forEveryone: $forEveryone) {
+const GenerateInviteLinkMutation = graphql`
+  mutation channelContentGenerateInviteLinkMutation($id: ID!) {
+    exportChatInvite(chatID: $id) {
       __typename
-      ... on SuccessResult {
-        success
+      ... on ChatInvite {
+        code
+        inviteLink
       }
     }
   }
 `;
 
+const formatInviteLink = (rawLink: string | null | undefined): string => {
+  if (!rawLink) return "";
+  if (rawLink.startsWith("http")) return rawLink;
+
+  const baseUrl: string =
+    typeof window !== "undefined" ? window.location.origin : "";
+  const cleanBase: string = baseUrl.replace(/\/+$/, "");
+  const cleanPath: string = rawLink
+    .replace(/^\/?join\//, "")
+    .replace(/^\/+/, "");
+
+  return `${cleanBase}/join/${cleanPath}`;
+};
+
+const generateSlug = (name: string): string => {
+  const slug: string = name
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s-]+/g, "_")
+    .replace(/^-+|-+$/g, "");
+  return slug || "channel";
+};
+
+interface ChannelContentProps {
+  id: string;
+  isPreview?: boolean;
+}
+
 export function ChannelContent({
   id,
   isPreview,
-}: {
-  id: string;
-  isPreview?: boolean;
-}): ReactNode {
-  const data = useLazyLoadQuery<channelContentQuery>(ChannelQuery, { id });
+}: ChannelContentProps): ReactNode {
+  const data: channelContentQuery$data = useLazyLoadQuery<channelContentQuery>(
+    ChannelQuery,
+    { id },
+  );
+
   const [commitUpdateMetadata] =
     useMutation<channelContentUpdateMetadataMutation>(UpdateMetadataMutation);
   const [commitUpdateRole] =
     useMutation<channelContentUpdateRoleMutation>(UpdateRoleMutation);
   const [commitRemoveMember] =
     useMutation<channelContentRemoveMemberMutation>(RemoveMemberMutation);
-  const [commitDeleteChat] =
-    useMutation<channelContentDeleteChatMutation>(DeleteChatMutation);
+  const [commitGenerateLink, isGeneratingLink] =
+    useMutation<channelContentGenerateInviteLinkMutation>(
+      GenerateInviteLinkMutation,
+    );
 
   const chat = data.chat;
+  const invitesData = data.chatInvites;
+
+  const [inviteLinkState, setInviteLinkState] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState<boolean>(false);
+
+  useEffect((): void => {
+    if (
+      invitesData?.__typename === "ChatInvitesList" &&
+      invitesData.invites.length > 0
+    ) {
+      setInviteLinkState(invitesData.invites[0].inviteLink);
+    }
+  }, [invitesData]);
 
   const {
     register,
@@ -163,9 +238,10 @@ export function ChannelContent({
     reset,
     watch,
     setValue,
-    formState: { isDirty, errors, isSubmitting },
+    formState: { isDirty, errors, isSubmitting, isValid },
   } = useForm<ChannelSettingsValues>({
     resolver: zodResolver(channelSettingsSchema),
+    mode: "onChange",
     defaultValues: {
       title: chat?.__typename === "Chat" ? chat.title : "",
       slug: (chat?.__typename === "Chat" ? chat.slug : "") ?? "",
@@ -175,8 +251,18 @@ export function ChannelContent({
   });
 
   const visibility: "public" | "private" = watch("visibility");
+  const channelTitle: string = watch("title");
 
-  useEffect(() => {
+  useEffect((): void => {
+    if (visibility === "public" && channelTitle) {
+      setValue("slug", generateSlug(channelTitle), {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  }, [channelTitle, visibility, setValue]);
+
+  useEffect((): void => {
     if (chat?.__typename === "Chat") {
       reset({
         title: chat.title,
@@ -186,13 +272,18 @@ export function ChannelContent({
     }
   }, [chat, reset]);
 
-  const sortedMembers = useMemo((): ChatMember[] => {
+  const fullInviteLink: string = useMemo(
+    (): string => formatInviteLink(inviteLinkState),
+    [inviteLinkState],
+  );
+
+  const sortedMembers: ChatMember[] = useMemo((): ChatMember[] => {
     if (!chat || chat.__typename !== "Chat" || !chat.members) return [];
     const weights: Record<string, number> = { owner: 3, admin: 2, member: 1 };
     return [...chat.members]
-      .filter((m): m is ChatMember => m !== null)
+      .filter((m: ChatMember | null): m is ChatMember => m !== null)
       .sort(
-        (a, b) =>
+        (a: ChatMember, b: ChatMember): number =>
           (weights[b.role.toLowerCase()] || 0) -
           (weights[a.role.toLowerCase()] || 0),
       );
@@ -205,42 +296,38 @@ export function ChannelContent({
     chat.myRole.toLowerCase() === "admin";
 
   const onSaveSettings = (values: ChannelSettingsValues): void => {
-    const finalSlug = values.visibility === "private" ? "" : values.slug;
-
+    const finalSlug: string =
+      values.visibility === "private" ? "" : values.slug;
     commitUpdateMetadata({
-      variables: {
-        id: chat.id,
-        title: values.title,
-        slug: finalSlug,
-      },
-      onCompleted: (response) => {
+      variables: { id: chat.id, title: values.title, slug: finalSlug },
+      onCompleted: (
+        response: channelContentUpdateMetadataMutation["response"],
+      ): void => {
         if (response.updateChatMetadata?.__typename === "Chat") {
           toast.success("Channel updated successfully");
           reset(values);
-        } else {
-          toast.error("Failed to update channel");
         }
-      },
-      onError: () => {
-        toast.error("An error occurred while saving");
       },
     });
   };
 
-  const handleDeleteChannel = (): void => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this channel? This action cannot be undone.",
-      )
-    )
-      return;
+  const handleCopyLink = (): void => {
+    if (!fullInviteLink) return;
+    navigator.clipboard.writeText(fullInviteLink);
+    setIsCopied(true);
+    setTimeout((): void => setIsCopied(false), 2000);
+    toast.success("Invite link copied");
+  };
 
-    commitDeleteChat({
-      variables: { id: chat.id, forEveryone: true },
-      onCompleted: (response) => {
-        if (response.deleteChat?.__typename === "SuccessResult") {
-          toast.success("Channel deleted");
-          window.location.href = "/";
+  const handleRegenerateLink = (): void => {
+    commitGenerateLink({
+      variables: { id: chat.id },
+      onCompleted: (
+        response: channelContentGenerateInviteLinkMutation["response"],
+      ): void => {
+        if (response.exportChatInvite?.__typename === "ChatInvite") {
+          setInviteLinkState(response.exportChatInvite.inviteLink);
+          toast.success("Link regenerated");
         }
       },
     });
@@ -251,24 +338,15 @@ export function ChannelContent({
     currentRole: string,
     userName: string,
   ): void => {
-    const newRole = currentRole.toLowerCase() === "admin" ? "member" : "admin";
+    const newRole: string =
+      currentRole.toLowerCase() === "admin" ? "member" : "admin";
     commitUpdateRole({
       variables: { chatID: chat.id, userID, role: newRole },
-      optimisticUpdater: (store) => {
-        const chatProxy = store.get(chat.id);
-        if (!chatProxy) return;
-        const members = chatProxy.getLinkedRecords("members");
-        if (!members) return;
-        const targetMember = members.find(
-          (m) => m.getLinkedRecord("user")?.getValue("id") === userID,
-        );
-        if (targetMember) {
-          targetMember.setValue(newRole.toUpperCase(), "role");
-        }
-      },
-      onCompleted: (res) => {
-        if (res.updateMemberRole?.success)
-          toast.success(`${userName} is now ${newRole}`);
+      onCompleted: (
+        res: channelContentUpdateRoleMutation["response"],
+      ): void => {
+        if (res.updateMemberRole?.__typename === "SuccessResult")
+          toast.success(`${userName} updated`);
       },
     });
   };
@@ -276,19 +354,9 @@ export function ChannelContent({
   const handleKickMember = (userID: string, userName: string): void => {
     commitRemoveMember({
       variables: { chatID: chat.id, userID },
-      updater: (store) => {
-        const chatProxy = store.get(chat.id);
-        const members = chatProxy?.getLinkedRecords("members");
-        if (chatProxy && members) {
-          const nextMembers = members.filter(
-            (m) => m.getLinkedRecord("user")?.getValue("id") !== userID,
-          );
-          chatProxy.setLinkedRecords(nextMembers, "members");
-          const count = chatProxy.getValue("membersCount") as number;
-          chatProxy.setValue(Math.max(0, count - 1), "membersCount");
-        }
-      },
-      onCompleted: (res) => {
+      onCompleted: (
+        res: channelContentRemoveMemberMutation["response"],
+      ): void => {
         if (res.removeChatMember?.__typename === "SuccessResult")
           toast.success(`${userName} removed`);
       },
@@ -296,284 +364,312 @@ export function ChannelContent({
   };
 
   return (
-    <div className="flex flex-col w-full h-full bg-background select-none shrink-0 overflow-hidden">
-      <div className="relative h-40 bg-gradient-to-b from-primary/10 via-primary/5 to-transparent shrink-0">
-        <div className="absolute inset-0 bg-grid-white/5 opacity-30" />
-      </div>
-
-      <div className="px-6 pb-6 -mt-16 relative z-10 flex-1 flex flex-col min-h-0">
-        <div className="flex flex-col items-center gap-4 shrink-0">
-          <UserAvatar
-            src={chat.photoUrl ?? null}
-            fallback={chat.title}
-            size={128}
-            className="h-32 w-32 border-[4px] border-background shadow-xl rounded-[40px] shrink-0 object-cover"
-          />
-          <div className="flex flex-col items-center text-center w-full">
-            <h3 className="text-2xl font-bold tracking-tight text-foreground truncate w-full px-4">
-              {chat.title}
-            </h3>
-            {chat.slug && (
-              <div className="flex items-center justify-center gap-1.5 mt-1 text-primary/80">
-                <Link2 className="w-3.5 h-3.5" />
-                <p className="text-sm font-medium">@{chat.slug}</p>
-              </div>
-            )}
-            <div className="flex items-center gap-2 mt-2">
-              <Badge
-                variant="secondary"
-                className="h-5 text-[10px] uppercase font-bold px-1.5 tracking-wide"
-              >
-                Channel
-              </Badge>
-              <p className="text-sm font-medium text-muted-foreground">
-                {chat.membersCount} subscribers
-              </p>
-            </div>
-          </div>
+    <div className="flex flex-col w-full h-full max-h-[85vh] bg-background select-none overflow-hidden">
+      <ScrollArea className="flex-1 w-full h-full">
+        <div className="relative h-28 bg-gradient-to-b from-primary/10 via-primary/5 to-transparent shrink-0">
+          <div className="absolute inset-0 bg-grid-white/5 opacity-30" />
         </div>
 
-        {!isPreview && (
-          <Tabs
-            defaultValue="members"
-            className="mt-8 flex-1 flex flex-col min-h-0"
-          >
-            <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 h-11 shrink-0 rounded-xl">
-              <TabsTrigger
-                value="members"
-                className="gap-2 text-xs font-medium rounded-lg"
-              >
-                <Users className="w-3.5 h-3.5" /> Subscribers
-              </TabsTrigger>
-              <TabsTrigger
-                value="media"
-                className="gap-2 text-xs font-medium rounded-lg"
-              >
-                <ImageIcon className="w-3.5 h-3.5" /> Media
-              </TabsTrigger>
-              <TabsTrigger
-                value="settings"
-                disabled={!isSelfAdmin}
-                className="gap-2 text-xs font-medium rounded-lg"
-              >
-                <Settings className="w-3.5 h-3.5" /> Settings
-              </TabsTrigger>
-            </TabsList>
+        <div className="px-6 pb-6 -mt-12 relative z-10 flex flex-col">
+          <div className="flex items-start gap-4 mb-6">
+            <UserAvatar
+              src={chat.photoUrl ?? null}
+              fallback={chat.title}
+              size={80}
+              className="h-20 w-20 border-4 border-background shadow-lg rounded-3xl shrink-0 object-cover"
+            />
+            <div className="flex flex-col min-w-0 pt-1">
+              <h3 className="text-xl font-bold tracking-tight text-foreground truncate leading-tight">
+                {chat.title}
+              </h3>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1.5">
+                {chat.slug && (
+                  <div className="flex items-center gap-1 text-primary/80">
+                    <Link2 className="w-3 h-3" />
+                    <span className="text-xs font-semibold">@{chat.slug}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <Badge
+                    variant="secondary"
+                    className="h-4 text-[9px] uppercase font-bold px-1.5 tracking-tighter"
+                  >
+                    Channel
+                  </Badge>
+                  <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                    {chat.membersCount} subscribers
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            <div className="flex-1 min-h-0 mt-4">
+          {!isPreview && (
+            <Tabs defaultValue="members" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 h-10 rounded-xl mb-4">
+                <TabsTrigger
+                  value="members"
+                  className="gap-2 text-[11px] font-semibold rounded-lg"
+                >
+                  <Users className="w-3 h-3" /> Subs
+                </TabsTrigger>
+                <TabsTrigger
+                  value="media"
+                  className="gap-2 text-[11px] font-semibold rounded-lg"
+                >
+                  <ImageIcon className="w-3 h-3" /> Media
+                </TabsTrigger>
+                <TabsTrigger
+                  value="settings"
+                  disabled={!isSelfAdmin}
+                  className="gap-2 text-[11px] font-semibold rounded-lg"
+                >
+                  <Settings className="w-3 h-3" /> Config
+                </TabsTrigger>
+              </TabsList>
+
               <TabsContent
                 value="members"
-                className="h-full m-0 focus-visible:outline-none"
+                className="mt-0 focus-visible:outline-none"
               >
-                <ScrollArea className="h-full">
-                  <div className="grid gap-1 pb-6 pr-4">
-                    {sortedMembers.map((m) => {
-                      const name =
-                        m.user.displayName || m.user.firstName || "Unknown";
-                      const role = m.role.toLowerCase();
-                      return (
-                        <ContextMenu key={m.user.id}>
-                          <ContextMenuTrigger>
-                            <div className="flex items-center gap-3 p-2 rounded-xl transition-all duration-200 hover:bg-secondary/40 cursor-default">
-                              <UserAvatar
-                                src={m.user.photoUrl ?? null}
-                                fallback={name}
-                                size={40}
-                                className="h-10 w-10 rounded-full shrink-0"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <span className="text-sm font-medium truncate block text-foreground">
-                                  {name}
-                                </span>
-                              </div>
-                              {role === "owner" && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] border-amber-500/20 text-amber-600 bg-amber-500/5 gap-1"
-                                >
-                                  <Crown className="w-2.5 h-2.5" /> Owner
-                                </Badge>
-                              )}
-                              {role === "admin" && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] border-primary/20 text-primary bg-primary/5 gap-1"
-                                >
-                                  <Shield className="w-2.5 h-2.5" /> Admin
-                                </Badge>
-                              )}
+                <div className="grid gap-1">
+                  {sortedMembers.map((m: ChatMember): ReactNode => {
+                    const name: string =
+                      m.user.displayName || m.user.firstName || "Unknown";
+                    const role: string = m.role.toLowerCase();
+                    return (
+                      <ContextMenu key={m.user.id}>
+                        <ContextMenuTrigger>
+                          <div className="flex items-center gap-3 p-2 rounded-xl transition-all hover:bg-secondary/40 cursor-default group">
+                            <UserAvatar
+                              src={m.user.photoUrl ?? null}
+                              fallback={name}
+                              size={36}
+                              className="h-9 w-9 rounded-full shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium truncate block text-foreground">
+                                {name}
+                              </span>
                             </div>
-                          </ContextMenuTrigger>
-                          {isSelfAdmin && role !== "owner" && (
-                            <ContextMenuContent className="w-52 rounded-xl shadow-xl border-muted/20">
-                              <ContextMenuItem
-                                className="gap-3 py-2.5"
-                                onClick={() =>
-                                  handleToggleAdmin(m.user.id, role, name)
-                                }
+                            {role === "owner" && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] border-amber-500/20 text-amber-600 bg-amber-500/5 px-1"
                               >
-                                {role === "admin" ? (
-                                  <ShieldOff className="w-4 h-4" />
-                                ) : (
-                                  <Shield className="w-4 h-4" />
-                                )}
-                                {role === "admin"
-                                  ? "Dismiss admin"
-                                  : "Promote to admin"}
-                              </ContextMenuItem>
-                              <ContextMenuSeparator />
-                              <ContextMenuItem
-                                className="gap-3 py-2.5 text-destructive focus:text-destructive focus:bg-destructive/5"
-                                onClick={() =>
-                                  handleKickMember(m.user.id, name)
-                                }
+                                <Crown className="w-2.5 h-2.5 mr-0.5" /> Owner
+                              </Badge>
+                            )}
+                            {role === "admin" && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] border-primary/20 text-primary bg-primary/5 px-1"
                               >
-                                <UserMinus className="w-4 h-4" /> Kick member
-                              </ContextMenuItem>
-                            </ContextMenuContent>
-                          )}
-                        </ContextMenu>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
+                                <Shield className="w-2.5 h-2.5 mr-0.5" /> Admin
+                              </Badge>
+                            )}
+                          </div>
+                        </ContextMenuTrigger>
+                        {isSelfAdmin && role !== "owner" && (
+                          <ContextMenuContent className="w-52 rounded-xl shadow-xl">
+                            <ContextMenuItem
+                              className="gap-3 py-2.5"
+                              onClick={(): void =>
+                                handleToggleAdmin(m.user.id, role, name)
+                              }
+                            >
+                              {role === "admin" ? (
+                                <ShieldOff className="w-4 h-4" />
+                              ) : (
+                                <Shield className="w-4 h-4" />
+                              )}
+                              {role === "admin"
+                                ? "Dismiss admin"
+                                : "Promote to admin"}
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                              className="gap-3 py-2.5 text-destructive focus:text-destructive focus:bg-destructive/5"
+                              onClick={(): void =>
+                                handleKickMember(m.user.id, name)
+                              }
+                            >
+                              <UserMinus className="w-4 h-4" /> Kick member
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        )}
+                      </ContextMenu>
+                    );
+                  })}
+                </div>
               </TabsContent>
 
               <TabsContent
                 value="media"
-                className="h-full m-0 focus-visible:outline-none"
+                className="mt-0 focus-visible:outline-none"
               >
-                <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 border-2 border-dashed border-muted/20 rounded-[32px]">
-                  <Megaphone className="w-12 h-12 mb-3 opacity-20" />
-                  <p className="text-sm font-semibold">No shared media</p>
+                <div className="h-32 flex flex-col items-center justify-center text-muted-foreground/30 border-2 border-dashed border-muted/20 rounded-2xl">
+                  <Megaphone className="w-8 h-8 mb-2 opacity-20" />
+                  <p className="text-xs font-semibold">No shared media</p>
                 </div>
               </TabsContent>
 
               {isSelfAdmin && (
                 <TabsContent
                   value="settings"
-                  className="h-full m-0 focus-visible:outline-none"
+                  className="mt-0 focus-visible:outline-none"
                 >
                   <form
                     onSubmit={handleSubmit(onSaveSettings)}
-                    className="h-full flex flex-col min-h-0"
+                    className="space-y-5"
                   >
-                    <ScrollArea className="flex-1">
-                      <div className="space-y-6 pb-6 pr-4">
-                        <div className="space-y-4 px-1">
-                          <div className="space-y-2">
-                            <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                              Channel Name
-                            </Label>
-                            <Input
-                              {...register("title")}
-                              className={`bg-secondary/30 border-transparent focus-visible:ring-1 focus-visible:ring-primary rounded-xl h-11 transition-all ${errors.title ? "border-destructive/50" : ""}`}
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+                          Channel Name
+                        </Label>
+                        <Input
+                          {...register("title")}
+                          className={`bg-secondary/20 border-secondary/40 rounded-xl h-10 ${errors.title ? "border-destructive/50" : ""}`}
+                        />
+                        {errors.title && (
+                          <div className="flex items-center gap-1 px-1 text-destructive">
+                            <AlertCircle className="w-3 h-3" />
+                            <p className="text-[10px] font-medium">
+                              {errors.title.message}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+                          Type
+                        </Label>
+                        <RadioGroup
+                          value={visibility}
+                          onValueChange={(v: string): void => {
+                            setValue("visibility", v as "public" | "private", {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                          }}
+                          className="grid grid-cols-2 gap-2"
+                        >
+                          <Label
+                            className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${visibility === "public" ? "border-primary bg-primary/5" : "border-secondary/20 bg-secondary/5"}`}
+                          >
+                            <RadioGroupItem
+                              value="public"
+                              className="sr-only"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Globe
+                                className={`w-3.5 h-3.5 ${visibility === "public" ? "text-primary" : "text-muted-foreground"}`}
+                              />
+                              <span className="text-xs font-bold">Public</span>
+                            </div>
+                            {visibility === "public" && (
+                              <Check className="w-3.5 h-3.5 text-primary" />
+                            )}
+                          </Label>
+                          <Label
+                            className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${visibility === "private" ? "border-primary bg-primary/5" : "border-secondary/20 bg-secondary/5"}`}
+                          >
+                            <RadioGroupItem
+                              value="private"
+                              className="sr-only"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Lock
+                                className={`w-3.5 h-3.5 ${visibility === "private" ? "text-primary" : "text-muted-foreground"}`}
+                              />
+                              <span className="text-xs font-bold">Private</span>
+                            </div>
+                            {visibility === "private" && (
+                              <Check className="w-3.5 h-3.5 text-primary" />
+                            )}
+                          </Label>
+                        </RadioGroup>
+                      </div>
+
+                      {visibility === "public" && (
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+                            Public Link
+                          </Label>
+                          <div
+                            className={`flex items-center rounded-xl bg-secondary/20 border h-10 overflow-hidden ${errors.slug ? "border-destructive/50" : "border-secondary/40"}`}
+                          >
+                            <span className="flex items-center justify-center w-8 h-full bg-secondary/20 text-muted-foreground text-xs font-bold border-r border-secondary/40">
+                              @
+                            </span>
+                            <input
+                              {...register("slug")}
+                              className="flex-1 bg-transparent px-3 text-xs outline-none w-full h-full"
+                              placeholder="link"
                             />
                           </div>
+                        </div>
+                      )}
 
-                          <div className="space-y-3">
-                            <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                              Channel Type
-                            </Label>
-                            <RadioGroup
-                              value={visibility}
-                              onValueChange={(v) =>
-                                setValue(
-                                  "visibility",
-                                  v as "public" | "private",
-                                  { shouldDirty: true },
-                                )
-                              }
-                              className="grid grid-cols-2 gap-3"
-                            >
-                              <Label
-                                className={`flex flex-col gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer ${visibility === "public" ? "border-primary bg-primary/5" : "border-secondary/50 bg-secondary/10 opacity-60"}`}
-                              >
-                                <RadioGroupItem
-                                  value="public"
-                                  className="sr-only"
-                                />
-                                <div className="flex items-center gap-2">
-                                  <Globe
-                                    className={`w-4 h-4 ${visibility === "public" ? "text-primary" : ""}`}
-                                  />
-                                  <span className="text-sm font-bold">
-                                    Public
-                                  </span>
-                                </div>
-                                <span className="text-[10px] text-muted-foreground leading-tight">
-                                  Anyone can search and join
-                                </span>
-                              </Label>
-                              <Label
-                                className={`flex flex-col gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer ${visibility === "private" ? "border-primary bg-primary/5" : "border-secondary/50 bg-secondary/10 opacity-60"}`}
-                              >
-                                <RadioGroupItem
-                                  value="private"
-                                  className="sr-only"
-                                />
-                                <div className="flex items-center gap-2">
-                                  <Lock
-                                    className={`w-4 h-4 ${visibility === "private" ? "text-primary" : ""}`}
-                                  />
-                                  <span className="text-sm font-bold">
-                                    Private
-                                  </span>
-                                </div>
-                                <span className="text-[10px] text-muted-foreground leading-tight">
-                                  Only via invite link
-                                </span>
-                              </Label>
-                            </RadioGroup>
-                          </div>
-
-                          {visibility === "public" && (
-                            <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                              <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                                Public Link
-                              </Label>
-                              <div className="flex items-center rounded-xl bg-secondary/30 border border-transparent focus-within:ring-1 focus-within:ring-primary h-11 overflow-hidden transition-all">
-                                <span className="flex items-center justify-center w-10 h-full bg-secondary/20 text-muted-foreground text-sm font-bold border-r border-background/5">
-                                  @
-                                </span>
-                                <input
-                                  {...register("slug")}
-                                  className="flex-1 bg-transparent px-3 text-sm outline-none w-full h-full"
-                                  placeholder="link"
-                                />
-                              </div>
+                      {visibility === "private" && (
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+                            Invite Link
+                          </Label>
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex-1 flex items-center rounded-xl bg-secondary/20 border border-secondary/40 h-10 overflow-hidden px-3">
+                              <span className="text-[10px] text-muted-foreground truncate w-full font-mono">
+                                {fullInviteLink || "..."}
+                              </span>
                             </div>
-                          )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleCopyLink}
+                              className="w-10 h-10 p-0 shrink-0 rounded-xl"
+                            >
+                              {isCopied ? (
+                                <Check className="w-3.5 h-3.5 text-green-500" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleRegenerateLink}
+                              disabled={isGeneratingLink}
+                              className="w-10 h-10 p-0 shrink-0 rounded-xl"
+                            >
+                              <RefreshCw
+                                className={`w-3.5 h-3.5 ${isGeneratingLink ? "animate-spin" : ""}`}
+                              />
+                            </Button>
+                          </div>
                         </div>
-                        <Separator className="bg-muted/50" />
-                        <div className="px-1">
-                          <Button
-                            variant="ghost"
-                            type="button"
-                            onClick={handleDeleteChannel}
-                            className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/5 font-medium px-4 rounded-xl"
-                          >
-                            <Trash2 className="w-4 h-4" /> Delete Channel
-                          </Button>
-                        </div>
-                      </div>
-                    </ScrollArea>
-                    <div className="pt-4 mt-auto">
-                      <Button
-                        disabled={!isDirty || isSubmitting}
-                        type="submit"
-                        className="w-full h-11 gap-2 shadow-lg shadow-primary/20 rounded-xl transition-all active:scale-[0.98]"
-                      >
-                        <Save className="w-4 h-4" /> Save Changes
-                      </Button>
+                      )}
                     </div>
+                    <Button
+                      type="submit"
+                      disabled={!isDirty || !isValid || isSubmitting}
+                      className="w-full rounded-xl h-11 font-bold shadow-lg shadow-primary/20"
+                    >
+                      {isSubmitting ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}{" "}
+                      Save Changes
+                    </Button>
                   </form>
                 </TabsContent>
               )}
-            </div>
-          </Tabs>
-        )}
-      </div>
+            </Tabs>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 }

@@ -36,12 +36,13 @@ type Querier interface {
 	GetAttachmentsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]MessageAttachment, error)
 	GetBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) ([]User, error)
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error)
-	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)
+	GetDialogByID(ctx context.Context, arg GetDialogByIDParams) (Dialog, error)
+	GetDialogByIDInternal(ctx context.Context, id uuid.UUID) (Dialog, error)
 	GetDialogByUsername(ctx context.Context, username sql.NullString) (Dialog, error)
 	GetDialogInvites(ctx context.Context, dialogID uuid.UUID) ([]DialogInvite, error)
 	GetDialogMember(ctx context.Context, arg GetDialogMemberParams) (DialogMember, error)
 	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]GetDialogMembersRow, error)
-	GetDialogOpponent(ctx context.Context, arg GetDialogOpponentParams) (DialogMember, error)
+	GetDialogOpponent(ctx context.Context, arg GetDialogOpponentParams) (GetDialogOpponentRow, error)
 	GetDialogSettings(ctx context.Context, dialogID uuid.UUID) (DialogSetting, error)
 	GetInviteByCode(ctx context.Context, inviteCode string) (DialogInvite, error)
 	GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (Message, error)
@@ -80,7 +81,6 @@ type Querier interface {
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
 	UpdateDialogMemberRole(ctx context.Context, arg UpdateDialogMemberRoleParams) error
 	UpdateDialogSettings(ctx context.Context, arg UpdateDialogSettingsParams) error
-	UpdateMemberPinStatus(ctx context.Context, arg UpdateMemberPinStatusParams) error
 	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error
 	UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error)
 	UpdateMessageExtended(ctx context.Context, arg UpdateMessageExtendedParams) (Message, error)

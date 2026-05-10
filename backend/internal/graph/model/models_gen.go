@@ -11,6 +11,10 @@ import (
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 )
 
+type ChatInvitesResult interface {
+	IsChatInvitesResult()
+}
+
 type ChatMembersResult interface {
 	IsChatMembersResult()
 }
@@ -34,6 +38,10 @@ type DeleteChatResult interface {
 type Error interface {
 	IsError()
 	GetMessage() string
+}
+
+type ExportInviteResult interface {
+	IsExportInviteResult()
 }
 
 type InviteResult interface {
@@ -69,6 +77,10 @@ type RemoveMemberResult interface {
 	IsRemoveMemberResult()
 }
 
+type RevokeInviteResult interface {
+	IsRevokeInviteResult()
+}
+
 type SearchResult interface {
 	IsSearchResult()
 }
@@ -92,6 +104,25 @@ type AuthPayload struct {
 	RefreshToken         *string `json:"refreshToken,omitempty"`
 	RequiresVerification bool    `json:"requiresVerification"`
 }
+
+type ChatInvite struct {
+	Code       string      `json:"code"`
+	InviteLink string      `json:"inviteLink"`
+	Creator    *dbgen.User `json:"creator"`
+	UsageCount int         `json:"usageCount"`
+	UsageLimit *int        `json:"usageLimit,omitempty"`
+	ExpireAt   *string     `json:"expireAt,omitempty"`
+	IsRevoked  bool        `json:"isRevoked"`
+	CreatedAt  string      `json:"createdAt"`
+}
+
+func (ChatInvite) IsExportInviteResult() {}
+
+type ChatInvitesList struct {
+	Invites []*ChatInvite `json:"invites"`
+}
+
+func (ChatInvitesList) IsChatInvitesResult() {}
 
 type ChatList struct {
 	Chats []*ChatExtended `json:"chats"`
@@ -164,6 +195,12 @@ func (ForbiddenError) IsInviteResult() {}
 
 func (ForbiddenError) IsRemoveMemberResult() {}
 
+func (ForbiddenError) IsExportInviteResult() {}
+
+func (ForbiddenError) IsRevokeInviteResult() {}
+
+func (ForbiddenError) IsChatInvitesResult() {}
+
 func (ForbiddenError) IsError()                {}
 func (this ForbiddenError) GetMessage() string { return this.Message }
 
@@ -196,6 +233,12 @@ func (InternalError) IsLeaveChatResult() {}
 func (InternalError) IsInviteResult() {}
 
 func (InternalError) IsRemoveMemberResult() {}
+
+func (InternalError) IsExportInviteResult() {}
+
+func (InternalError) IsRevokeInviteResult() {}
+
+func (InternalError) IsChatInvitesResult() {}
 
 func (InternalError) IsError()                {}
 func (this InternalError) GetMessage() string { return this.Message }
@@ -257,6 +300,12 @@ func (NotFoundError) IsInviteResult() {}
 
 func (NotFoundError) IsRemoveMemberResult() {}
 
+func (NotFoundError) IsExportInviteResult() {}
+
+func (NotFoundError) IsRevokeInviteResult() {}
+
+func (NotFoundError) IsChatInvitesResult() {}
+
 func (NotFoundError) IsError()                {}
 func (this NotFoundError) GetMessage() string { return this.Message }
 
@@ -295,6 +344,8 @@ func (SuccessResult) IsLeaveChatResult() {}
 func (SuccessResult) IsInviteResult() {}
 
 func (SuccessResult) IsRemoveMemberResult() {}
+
+func (SuccessResult) IsRevokeInviteResult() {}
 
 type TypingPayload struct {
 	UserID   string `json:"userId"`

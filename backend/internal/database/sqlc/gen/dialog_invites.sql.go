@@ -14,7 +14,12 @@ import (
 
 const createDialogInvite = `-- name: CreateDialogInvite :one
 INSERT INTO dialog_invites (
-    dialog_id, creator_id, invite_code, name, usage_limit, expire_at
+    dialog_id,
+    creator_id,
+    invite_code,
+    name,
+    usage_limit,
+    expire_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6
 ) RETURNING id, dialog_id, creator_id, invite_code, name, usage_limit, usage_count, expire_at, is_revoked, created_at, updated_at
@@ -126,7 +131,8 @@ func (q *Queries) GetInviteByCode(ctx context.Context, inviteCode string) (Dialo
 
 const incrementInviteUsage = `-- name: IncrementInviteUsage :exec
 UPDATE dialog_invites
-SET usage_count = usage_count + 1, updated_at = NOW()
+SET usage_count = usage_count + 1,
+    updated_at = NOW()
 WHERE id = $1
 `
 
@@ -137,11 +143,18 @@ func (q *Queries) IncrementInviteUsage(ctx context.Context, id uuid.UUID) error 
 
 const joinDialogByInvite = `-- name: JoinDialogByInvite :exec
 INSERT INTO dialog_members (
-    dialog_id, user_id, role, invite_id, joined_at, notifications_on, updated_at
+    dialog_id,
+    user_id,
+    role,
+    invite_id,
+    joined_at,
+    notifications_on,
+    updated_at
 ) VALUES (
     $1, $2, $3, $4, NOW(), true, NOW()
 ) ON CONFLICT (dialog_id, user_id) DO UPDATE SET
     is_hidden = false,
+    role = EXCLUDED.role,
     updated_at = NOW()
 `
 
@@ -164,7 +177,8 @@ func (q *Queries) JoinDialogByInvite(ctx context.Context, arg JoinDialogByInvite
 
 const revokeInvite = `-- name: RevokeInvite :exec
 UPDATE dialog_invites
-SET is_revoked = true, updated_at = NOW()
+SET is_revoked = true,
+    updated_at = NOW()
 WHERE invite_code = $1 AND dialog_id = $2
 `
 

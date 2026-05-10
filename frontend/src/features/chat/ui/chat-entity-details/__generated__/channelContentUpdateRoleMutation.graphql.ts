@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5b7646a8e016d9d6e0132ebde39239a0>>
+ * @generated SignedSource<<32a7fac26864c17734ee6826bac23e7c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,6 +16,7 @@ export type channelContentUpdateRoleMutation$variables = {
 };
 export type channelContentUpdateRoleMutation$data = {
   readonly updateMemberRole: {
+    readonly __typename: "SuccessResult";
     readonly success: boolean;
   };
 };
@@ -69,6 +70,13 @@ v3 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
+        "name": "__typename",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
         "name": "success",
         "storageKey": null
       }
@@ -102,16 +110,16 @@ return {
     "selections": (v3/*: any*/)
   },
   "params": {
-    "cacheID": "7b011fb2f8de8e01e8416bd97593fef4",
+    "cacheID": "a9b279557160cd67d207eb984907e3e3",
     "id": null,
     "metadata": {},
     "name": "channelContentUpdateRoleMutation",
     "operationKind": "mutation",
-    "text": "mutation channelContentUpdateRoleMutation(\n  $chatID: ID!\n  $userID: ID!\n  $role: String!\n) {\n  updateMemberRole(chatID: $chatID, userID: $userID, role: $role) {\n    success\n  }\n}\n"
+    "text": "mutation channelContentUpdateRoleMutation(\n  $chatID: ID!\n  $userID: ID!\n  $role: String!\n) {\n  updateMemberRole(chatID: $chatID, userID: $userID, role: $role) {\n    __typename\n    success\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "c5e6fbd358750a9a006f21e864d5d037";
+(node as any).hash = "816a138200e07d3afe167ead9c2140ac";
 
 export default node;

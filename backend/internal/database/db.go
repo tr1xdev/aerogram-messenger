@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -197,4 +198,23 @@ func ToNullInt32(i *int32) sql.NullInt32 {
 		return sql.NullInt32{Valid: false}
 	}
 	return sql.NullInt32{Int32: *i, Valid: true}
+}
+
+func (db *DB) WithTx(ctx context.Context, fn func(*dbgen.Queries) error) error {
+	tx, err := db.Conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	q := db.Queries.WithTx(tx)
+	err = fn(q)
+
+	if err != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
+		}
+		return err
+	}
+
+	return tx.Commit()
 }
