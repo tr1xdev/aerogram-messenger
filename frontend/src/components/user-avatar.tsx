@@ -1,4 +1,10 @@
-import { useMemo, memo, useState, type ReactNode } from "react";
+import {
+  useMemo,
+  memo,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+} from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { getUserColorInfo, type ColorInfo } from "@/lib/user-colors";
@@ -52,7 +58,7 @@ export const UserAvatar = memo(function UserAvatar({
   );
 
   const containerStyle = useMemo(
-    () => ({
+    (): CSSProperties => ({
       width: size,
       height: size,
     }),
@@ -60,7 +66,7 @@ export const UserAvatar = memo(function UserAvatar({
   );
 
   const fallbackStyle = useMemo(
-    () => ({
+    (): CSSProperties => ({
       background:
         color ||
         `linear-gradient(135deg, ${colorInfo.start} 0%, ${colorInfo.end} 100%)`,
@@ -70,37 +76,36 @@ export const UserAvatar = memo(function UserAvatar({
     [color, colorInfo.start, colorInfo.end, isEmoji, size],
   );
 
+  const showImage: boolean = !!(src && !hasError);
+
   return (
     <Avatar
       className={cn(
-        "shrink-0 border-none select-none relative overflow-hidden bg-muted",
+        "shrink-0 border-none select-none relative overflow-hidden isolate transform-gpu",
         className,
       )}
       style={containerStyle}
     >
-      {src && !hasError && (
+      {showImage ? (
         <img
-          src={src}
+          src={src as string}
           alt={fallback}
           loading="eager"
           decoding="sync"
-          fetchPriority="high"
-          className="absolute inset-0 w-full h-full object-cover z-10"
+          className="absolute inset-0 w-full h-full object-cover z-20 rounded-[inherit]"
           onError={(): void => setHasError(true)}
         />
-      )}
-
-      <div className="absolute inset-0 z-0">
+      ) : (
         <AvatarFallback
           className={cn(
-            "font-semibold text-white w-full h-full flex items-center justify-center",
+            "font-semibold text-white w-full h-full flex items-center justify-center z-10",
             !isEmoji && "tracking-tight",
           )}
           style={fallbackStyle}
         >
           {content}
         </AvatarFallback>
-      </div>
+      )}
     </Avatar>
   );
 });
