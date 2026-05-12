@@ -175,6 +175,17 @@ func (q *Queries) JoinDialogByInvite(ctx context.Context, arg JoinDialogByInvite
 	return err
 }
 
+const revokeAllDialogInvites = `-- name: RevokeAllDialogInvites :exec
+UPDATE dialog_invites
+SET is_revoked = true, updated_at = NOW()
+WHERE dialog_id = $1 AND is_revoked = false
+`
+
+func (q *Queries) RevokeAllDialogInvites(ctx context.Context, dialogID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, revokeAllDialogInvites, dialogID)
+	return err
+}
+
 const revokeInvite = `-- name: RevokeInvite :exec
 UPDATE dialog_invites
 SET is_revoked = true,
@@ -189,5 +200,21 @@ type RevokeInviteParams struct {
 
 func (q *Queries) RevokeInvite(ctx context.Context, arg RevokeInviteParams) error {
 	_, err := q.db.ExecContext(ctx, revokeInvite, arg.InviteCode, arg.DialogID)
+	return err
+}
+
+const updateDialogInviteLink = `-- name: UpdateDialogInviteLink :exec
+UPDATE dialogs
+SET invite_link = $2, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateDialogInviteLinkParams struct {
+	ID         uuid.UUID      `json:"id"`
+	InviteLink sql.NullString `json:"invite_link"`
+}
+
+func (q *Queries) UpdateDialogInviteLink(ctx context.Context, arg UpdateDialogInviteLinkParams) error {
+	_, err := q.db.ExecContext(ctx, updateDialogInviteLink, arg.ID, arg.InviteLink)
 	return err
 }

@@ -69,6 +69,7 @@ type Querier interface {
 	MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error
 	PinDialog(ctx context.Context, arg PinDialogParams) error
 	RemoveDialogMember(ctx context.Context, arg RemoveDialogMemberParams) error
+	RevokeAllDialogInvites(ctx context.Context, dialogID uuid.UUID) error
 	RevokeInvite(ctx context.Context, arg RevokeInviteParams) error
 	SearchPublicDialogs(ctx context.Context, arg SearchPublicDialogsParams) ([]SearchPublicDialogsRow, error)
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
@@ -79,6 +80,7 @@ type Querier interface {
 	UpdateBot(ctx context.Context, arg UpdateBotParams) (User, error)
 	UpdateChatMetadata(ctx context.Context, arg UpdateChatMetadataParams) (Dialog, error)
 	UpdateDialogCreator(ctx context.Context, arg UpdateDialogCreatorParams) error
+	UpdateDialogInviteLink(ctx context.Context, arg UpdateDialogInviteLinkParams) error
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
 	UpdateDialogMemberRole(ctx context.Context, arg UpdateDialogMemberRoleParams) error
 	UpdateDialogSettings(ctx context.Context, arg UpdateDialogSettingsParams) error

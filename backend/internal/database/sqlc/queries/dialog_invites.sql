@@ -50,3 +50,13 @@ UPDATE dialog_invites
 SET is_revoked = true,
     updated_at = NOW()
 WHERE invite_code = $1 AND dialog_id = $2;
+
+-- name: RevokeAllDialogInvites :exec
+UPDATE dialog_invites
+SET is_revoked = true, updated_at = NOW()
+WHERE dialog_id = $1 AND is_revoked = false;
+
+-- name: UpdateDialogInviteLink :exec
+UPDATE dialogs
+SET invite_link = $2, updated_at = NOW()
+WHERE id = $1;

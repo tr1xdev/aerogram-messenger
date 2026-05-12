@@ -881,33 +881,29 @@ func (s *Server) ExportChatInvite(ctx context.Context, req *chatpb.ExportChatInv
 	}
 
 	if member.Role != "owner" && member.Role != "admin" {
-		return nil, status.Error(codes.PermissionDenied, "insufficient permissions to export invite")
+		return nil, status.Error(codes.PermissionDenied, "insufficient permissions")
+	}
+
+	err = s.db.Queries.RevokeAllDialogInvites(ctx, did)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to revoke old invites")
 	}
 
 	code := uuid.New().String()[:12]
 
 	var expireAt sql.NullTime
 	if req.ExpireAt != nil {
-		expireAt = sql.NullTime{
-			Time:  time.Unix(*req.ExpireAt, 0),
-			Valid: true,
-		}
+		expireAt = sql.NullTime{Time: time.Unix(*req.ExpireAt, 0), Valid: true}
 	}
 
 	var usageLimit sql.NullInt32
 	if req.UsageLimit != nil {
-		usageLimit = sql.NullInt32{
-			Int32: *req.UsageLimit,
-			Valid: true,
-		}
+		usageLimit = sql.NullInt32{Int32: *req.UsageLimit, Valid: true}
 	}
 
 	var inviteName sql.NullString
 	if req.Name != nil {
-		inviteName = sql.NullString{
-			String: *req.Name,
-			Valid:  true,
-		}
+		inviteName = sql.NullString{String: *req.Name, Valid: true}
 	}
 
 	_, err = s.db.Queries.CreateDialogInvite(ctx, dbgen.CreateDialogInviteParams{
@@ -919,7 +915,15 @@ func (s *Server) ExportChatInvite(ctx context.Context, req *chatpb.ExportChatInv
 		ExpireAt:   expireAt,
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to store invite in database")
+		return nil, status.Error(codes.Internal, "failed to create invite")
+	}
+
+	err = s.db.Queries.UpdateDialogInviteLink(ctx, dbgen.UpdateDialogInviteLinkParams{
+		ID:         did,
+		InviteLink: sql.NullString{String: code, Valid: true},
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to update dialog link")
 	}
 
 	return &chatpb.ExportChatInviteResponse{
