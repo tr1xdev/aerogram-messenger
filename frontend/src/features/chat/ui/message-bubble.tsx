@@ -56,7 +56,7 @@ export const MessageBubble = memo(function MessageBubble({
       }>;
       if (customEvent.detail.id === message.id) {
         setIsHighlighted(true);
-        setTimeout((): void => setIsHighlighted(false), 1000);
+        setTimeout((): void => setIsHighlighted(false), 1500);
       }
     };
 
@@ -149,7 +149,9 @@ export const MessageBubble = memo(function MessageBubble({
                 className={cn(
                   "absolute inset-0 pointer-events-none transition-opacity duration-500 z-0",
                   isHighlighted ? "opacity-100" : "opacity-0",
-                  isMe ? "bg-black/20" : "bg-primary/20",
+                  isMe
+                    ? "bg-white/30 dark:bg-black/40"
+                    : "bg-primary/20 dark:bg-primary/30",
                 )}
               />
 
