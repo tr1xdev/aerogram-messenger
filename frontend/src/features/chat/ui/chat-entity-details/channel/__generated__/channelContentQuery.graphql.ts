@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ae6d9a4f2df82b7153527e6ebd920ef8>>
+ * @generated SignedSource<<70c44525210d5bd4309db4c62ee5d62a>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,10 +9,10 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type groupContentQuery$variables = {
+export type channelContentQuery$variables = {
   id: string;
 };
-export type groupContentQuery$data = {
+export type channelContentQuery$data = {
   readonly chat: {
     readonly __typename: "Chat";
     readonly id: string;
@@ -27,10 +27,6 @@ export type groupContentQuery$data = {
     }> | null | undefined;
     readonly membersCount: number;
     readonly myRole: string;
-    readonly permissions: {
-      readonly canAssignAdmins: boolean;
-      readonly canInviteUsers: boolean;
-    };
     readonly photoUrl: string | null | undefined;
     readonly slug: string | null | undefined;
     readonly title: string;
@@ -39,10 +35,24 @@ export type groupContentQuery$data = {
     // value in case none of the concrete values match.
     readonly __typename: "%other";
   };
+  readonly chatInvites: {
+    readonly __typename: "ChatInvitesList";
+    readonly invites: ReadonlyArray<{
+      readonly code: string;
+      readonly inviteLink: string;
+    }>;
+  } | {
+    // This will never be '%other', but we need some
+    // value in case none of the concrete values match.
+    readonly __typename: "%other";
+  };
+  readonly me: {
+    readonly id: string;
+  };
 };
-export type groupContentQuery = {
-  response: groupContentQuery$data;
-  variables: groupContentQuery$variables;
+export type channelContentQuery = {
+  response: channelContentQuery$data;
+  variables: channelContentQuery$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -53,38 +63,51 @@ var v0 = [
     "name": "id"
   }
 ],
-v1 = [
-  {
-    "kind": "Variable",
-    "name": "id",
-    "variableName": "id"
-  }
-],
-v2 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
-  "name": "__typename",
-  "storageKey": null
-},
-v3 = {
+v1 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "id",
   "storageKey": null
 },
-v4 = {
+v2 = [
+  (v1/*: any*/)
+],
+v3 = {
+  "alias": null,
+  "args": null,
+  "concreteType": "User",
+  "kind": "LinkedField",
+  "name": "me",
+  "plural": false,
+  "selections": (v2/*: any*/),
+  "storageKey": null
+},
+v4 = [
+  {
+    "kind": "Variable",
+    "name": "id",
+    "variableName": "id"
+  }
+],
+v5 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "__typename",
+  "storageKey": null
+},
+v6 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
   "name": "photoUrl",
   "storageKey": null
 },
-v5 = {
+v7 = {
   "kind": "InlineFragment",
   "selections": [
-    (v3/*: any*/),
+    (v1/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -99,7 +122,7 @@ v5 = {
       "name": "slug",
       "storageKey": null
     },
-    (v4/*: any*/),
+    (v6/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -112,31 +135,6 @@ v5 = {
       "args": null,
       "kind": "ScalarField",
       "name": "myRole",
-      "storageKey": null
-    },
-    {
-      "alias": null,
-      "args": null,
-      "concreteType": "ChatPermissions",
-      "kind": "LinkedField",
-      "name": "permissions",
-      "plural": false,
-      "selections": [
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "canInviteUsers",
-          "storageKey": null
-        },
-        {
-          "alias": null,
-          "args": null,
-          "kind": "ScalarField",
-          "name": "canAssignAdmins",
-          "storageKey": null
-        }
-      ],
       "storageKey": null
     },
     {
@@ -155,7 +153,7 @@ v5 = {
           "name": "user",
           "plural": false,
           "selections": [
-            (v3/*: any*/),
+            (v1/*: any*/),
             {
               "alias": null,
               "args": null,
@@ -170,7 +168,7 @@ v5 = {
               "name": "firstName",
               "storageKey": null
             },
-            (v4/*: any*/)
+            (v6/*: any*/)
           ],
           "storageKey": null
         },
@@ -187,27 +185,79 @@ v5 = {
   ],
   "type": "Chat",
   "abstractKey": null
+},
+v8 = {
+  "alias": null,
+  "args": [
+    {
+      "kind": "Variable",
+      "name": "chatID",
+      "variableName": "id"
+    }
+  ],
+  "concreteType": null,
+  "kind": "LinkedField",
+  "name": "chatInvites",
+  "plural": false,
+  "selections": [
+    (v5/*: any*/),
+    {
+      "kind": "InlineFragment",
+      "selections": [
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "ChatInvite",
+          "kind": "LinkedField",
+          "name": "invites",
+          "plural": true,
+          "selections": [
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "code",
+              "storageKey": null
+            },
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "inviteLink",
+              "storageKey": null
+            }
+          ],
+          "storageKey": null
+        }
+      ],
+      "type": "ChatInvitesList",
+      "abstractKey": null
+    }
+  ],
+  "storageKey": null
 };
 return {
   "fragment": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "groupContentQuery",
+    "name": "channelContentQuery",
     "selections": [
+      (v3/*: any*/),
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v4/*: any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "chat",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
-          (v5/*: any*/)
+          (v5/*: any*/),
+          (v7/*: any*/)
         ],
         "storageKey": null
-      }
+      },
+      (v8/*: any*/)
     ],
     "type": "Query",
     "abstractKey": null
@@ -216,42 +266,42 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "groupContentQuery",
+    "name": "channelContentQuery",
     "selections": [
+      (v3/*: any*/),
       {
         "alias": null,
-        "args": (v1/*: any*/),
+        "args": (v4/*: any*/),
         "concreteType": null,
         "kind": "LinkedField",
         "name": "chat",
         "plural": false,
         "selections": [
-          (v2/*: any*/),
           (v5/*: any*/),
+          (v7/*: any*/),
           {
             "kind": "InlineFragment",
-            "selections": [
-              (v3/*: any*/)
-            ],
+            "selections": (v2/*: any*/),
             "type": "Node",
             "abstractKey": "__isNode"
           }
         ],
         "storageKey": null
-      }
+      },
+      (v8/*: any*/)
     ]
   },
   "params": {
-    "cacheID": "0b3281f2640f1249d655df433b16f5d9",
+    "cacheID": "7704ef0b51ec1be79318e99731f66f69",
     "id": null,
     "metadata": {},
-    "name": "groupContentQuery",
+    "name": "channelContentQuery",
     "operationKind": "query",
-    "text": "query groupContentQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      id\n      title\n      slug\n      photoUrl\n      membersCount\n      myRole\n      permissions {\n        canInviteUsers\n        canAssignAdmins\n      }\n      members {\n        user {\n          id\n          displayName\n          firstName\n          photoUrl\n        }\n        role\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "query channelContentQuery(\n  $id: ID!\n) {\n  me {\n    id\n  }\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      id\n      title\n      slug\n      photoUrl\n      membersCount\n      myRole\n      members {\n        user {\n          id\n          displayName\n          firstName\n          photoUrl\n        }\n        role\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n  chatInvites(chatID: $id) {\n    __typename\n    ... on ChatInvitesList {\n      invites {\n        code\n        inviteLink\n      }\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "12be50e38356f27df4e9bc0203e6f610";
+(node as any).hash = "440c368944ae60ff905aa0a6ba22f45e";
 
 export default node;

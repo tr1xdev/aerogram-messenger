@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<c0ba20a18abbb7253530b5b1203a2a96>>
+ * @generated SignedSource<<e293e75672924220da6ea0f6f5cda8eb>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,19 +9,19 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type groupContentUpdateRoleMutation$variables = {
+export type channelContentUpdateRoleMutation$variables = {
   chatID: string;
   role: string;
   userID: string;
 };
-export type groupContentUpdateRoleMutation$data = {
+export type channelContentUpdateRoleMutation$data = {
   readonly updateMemberRole: {
     readonly success: boolean;
   };
 };
-export type groupContentUpdateRoleMutation = {
-  response: groupContentUpdateRoleMutation$data;
-  variables: groupContentUpdateRoleMutation$variables;
+export type channelContentUpdateRoleMutation = {
+  response: channelContentUpdateRoleMutation$data;
+  variables: channelContentUpdateRoleMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -85,7 +85,7 @@ return {
     ],
     "kind": "Fragment",
     "metadata": null,
-    "name": "groupContentUpdateRoleMutation",
+    "name": "channelContentUpdateRoleMutation",
     "selections": (v3/*: any*/),
     "type": "Mutation",
     "abstractKey": null
@@ -98,20 +98,20 @@ return {
       (v1/*: any*/)
     ],
     "kind": "Operation",
-    "name": "groupContentUpdateRoleMutation",
+    "name": "channelContentUpdateRoleMutation",
     "selections": (v3/*: any*/)
   },
   "params": {
-    "cacheID": "f29d7abdb1642f26a2815eec7231d363",
+    "cacheID": "7b011fb2f8de8e01e8416bd97593fef4",
     "id": null,
     "metadata": {},
-    "name": "groupContentUpdateRoleMutation",
+    "name": "channelContentUpdateRoleMutation",
     "operationKind": "mutation",
-    "text": "mutation groupContentUpdateRoleMutation(\n  $chatID: ID!\n  $userID: ID!\n  $role: String!\n) {\n  updateMemberRole(chatID: $chatID, userID: $userID, role: $role) {\n    success\n  }\n}\n"
+    "text": "mutation channelContentUpdateRoleMutation(\n  $chatID: ID!\n  $userID: ID!\n  $role: String!\n) {\n  updateMemberRole(chatID: $chatID, userID: $userID, role: $role) {\n    success\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "0d06269c271d7c8652246b33c8ee94a1";
+(node as any).hash = "7df891a4151baafd6f27b46e7481f4e9";
 
 export default node;

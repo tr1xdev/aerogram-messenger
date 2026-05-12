@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<013bd49759dc5521f625bf7c8542bc29>>
+ * @generated SignedSource<<f9be5e20b7adf99423b10d839052aab9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,11 +9,12 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type channelContentDeleteMutation$variables = {
-  id: string;
+export type channelSettingsRotateInviteMutation$variables = {
+  chatID: string;
+  inviteCode: string;
 };
-export type channelContentDeleteMutation$data = {
-  readonly deleteChat: {
+export type channelSettingsRotateInviteMutation$data = {
+  readonly revokeChatInvite: {
     readonly __typename: "SuccessResult";
     readonly success: boolean;
   } | {
@@ -22,9 +23,9 @@ export type channelContentDeleteMutation$data = {
     readonly __typename: "%other";
   };
 };
-export type channelContentDeleteMutation = {
-  response: channelContentDeleteMutation$data;
-  variables: channelContentDeleteMutation$variables;
+export type channelSettingsRotateInviteMutation = {
+  response: channelSettingsRotateInviteMutation$data;
+  variables: channelSettingsRotateInviteMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -32,7 +33,12 @@ var v0 = [
   {
     "defaultValue": null,
     "kind": "LocalArgument",
-    "name": "id"
+    "name": "chatID"
+  },
+  {
+    "defaultValue": null,
+    "kind": "LocalArgument",
+    "name": "inviteCode"
   }
 ],
 v1 = [
@@ -41,13 +47,18 @@ v1 = [
     "args": [
       {
         "kind": "Variable",
-        "name": "id",
-        "variableName": "id"
+        "name": "chatID",
+        "variableName": "chatID"
+      },
+      {
+        "kind": "Variable",
+        "name": "inviteCode",
+        "variableName": "inviteCode"
       }
     ],
     "concreteType": null,
     "kind": "LinkedField",
-    "name": "deleteChat",
+    "name": "revokeChatInvite",
     "plural": false,
     "selections": [
       {
@@ -80,7 +91,7 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "channelContentDeleteMutation",
+    "name": "channelSettingsRotateInviteMutation",
     "selections": (v1/*: any*/),
     "type": "Mutation",
     "abstractKey": null
@@ -89,20 +100,20 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "channelContentDeleteMutation",
+    "name": "channelSettingsRotateInviteMutation",
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "8d391ecfef0d4f7ca58a0f4d65c3ee96",
+    "cacheID": "91a4945bc50beb6f575fab04d3c6a2ae",
     "id": null,
     "metadata": {},
-    "name": "channelContentDeleteMutation",
+    "name": "channelSettingsRotateInviteMutation",
     "operationKind": "mutation",
-    "text": "mutation channelContentDeleteMutation(\n  $id: ID!\n) {\n  deleteChat(id: $id) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n  }\n}\n"
+    "text": "mutation channelSettingsRotateInviteMutation(\n  $chatID: ID!\n  $inviteCode: String!\n) {\n  revokeChatInvite(chatID: $chatID, inviteCode: $inviteCode) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "85498d4f669921ba31594f5ba543c72a";
+(node as any).hash = "61392e8bf00779e432255a545dea77e7";
 
 export default node;

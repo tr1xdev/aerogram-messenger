@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<5435761c5cc6a278c07b22018359a6be>>
+ * @generated SignedSource<<5899ab7640290d25bc4348a5e08ad6ae>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,26 +9,21 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type channelContentUpdateMetadataMutation$variables = {
+export type channelSettingsUpdateMetadataMutation$variables = {
   id: string;
   slug?: string | null | undefined;
   title?: string | null | undefined;
 };
-export type channelContentUpdateMetadataMutation$data = {
+export type channelSettingsUpdateMetadataMutation$data = {
   readonly updateChatMetadata: {
-    readonly __typename: "Chat";
-    readonly id: string;
-    readonly slug: string | null | undefined;
-    readonly title: string;
-  } | {
-    // This will never be '%other', but we need some
-    // value in case none of the concrete values match.
-    readonly __typename: "%other";
+    readonly id?: string;
+    readonly slug?: string | null | undefined;
+    readonly title?: string;
   };
 };
-export type channelContentUpdateMetadataMutation = {
-  response: channelContentUpdateMetadataMutation$data;
-  variables: channelContentUpdateMetadataMutation$variables;
+export type channelSettingsUpdateMetadataMutation = {
+  response: channelSettingsUpdateMetadataMutation$data;
+  variables: channelSettingsUpdateMetadataMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -68,20 +63,13 @@ v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "__typename",
-  "storageKey": null
-},
-v5 = {
-  "alias": null,
-  "args": null,
-  "kind": "ScalarField",
   "name": "id",
   "storageKey": null
 },
-v6 = {
+v5 = {
   "kind": "InlineFragment",
   "selections": [
-    (v5/*: any*/),
+    (v4/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -109,7 +97,7 @@ return {
     ],
     "kind": "Fragment",
     "metadata": null,
-    "name": "channelContentUpdateMetadataMutation",
+    "name": "channelSettingsUpdateMetadataMutation",
     "selections": [
       {
         "alias": null,
@@ -119,8 +107,7 @@ return {
         "name": "updateChatMetadata",
         "plural": false,
         "selections": [
-          (v4/*: any*/),
-          (v6/*: any*/)
+          (v5/*: any*/)
         ],
         "storageKey": null
       }
@@ -136,7 +123,7 @@ return {
       (v1/*: any*/)
     ],
     "kind": "Operation",
-    "name": "channelContentUpdateMetadataMutation",
+    "name": "channelSettingsUpdateMetadataMutation",
     "selections": [
       {
         "alias": null,
@@ -146,12 +133,18 @@ return {
         "name": "updateChatMetadata",
         "plural": false,
         "selections": [
-          (v4/*: any*/),
-          (v6/*: any*/),
+          {
+            "alias": null,
+            "args": null,
+            "kind": "ScalarField",
+            "name": "__typename",
+            "storageKey": null
+          },
+          (v5/*: any*/),
           {
             "kind": "InlineFragment",
             "selections": [
-              (v5/*: any*/)
+              (v4/*: any*/)
             ],
             "type": "Node",
             "abstractKey": "__isNode"
@@ -162,16 +155,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "24db8f018c56f86c21b1c14895de86a3",
+    "cacheID": "373ec8fe31e16501644068fc00f14303",
     "id": null,
     "metadata": {},
-    "name": "channelContentUpdateMetadataMutation",
+    "name": "channelSettingsUpdateMetadataMutation",
     "operationKind": "mutation",
-    "text": "mutation channelContentUpdateMetadataMutation(\n  $id: ID!\n  $title: String\n  $slug: String\n) {\n  updateChatMetadata(id: $id, title: $title, slug: $slug) {\n    __typename\n    ... on Chat {\n      id\n      title\n      slug\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "mutation channelSettingsUpdateMetadataMutation(\n  $id: ID!\n  $title: String\n  $slug: String\n) {\n  updateChatMetadata(id: $id, title: $title, slug: $slug) {\n    __typename\n    ... on Chat {\n      id\n      title\n      slug\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "c1508f1f37bf6680bc8dcae37abbf749";
+(node as any).hash = "78977dda6e7864e0c457b95148c3dbaf";
 
 export default node;

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<20c3fcf820e8218e8feee425c3a66ff6>>
+ * @generated SignedSource<<8bdaa45f679f9040e6bda29711de1248>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,11 +9,11 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type channelContentRemoveMemberMutation$variables = {
+export type useChannelActionsRemoveMemberMutation$variables = {
   chatID: string;
   userID: string;
 };
-export type channelContentRemoveMemberMutation$data = {
+export type useChannelActionsRemoveMemberMutation$data = {
   readonly removeChatMember: {
     readonly __typename: "SuccessResult";
     readonly success: boolean;
@@ -23,9 +23,9 @@ export type channelContentRemoveMemberMutation$data = {
     readonly __typename: "%other";
   };
 };
-export type channelContentRemoveMemberMutation = {
-  response: channelContentRemoveMemberMutation$data;
-  variables: channelContentRemoveMemberMutation$variables;
+export type useChannelActionsRemoveMemberMutation = {
+  response: useChannelActionsRemoveMemberMutation$data;
+  variables: useChannelActionsRemoveMemberMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -91,7 +91,7 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "channelContentRemoveMemberMutation",
+    "name": "useChannelActionsRemoveMemberMutation",
     "selections": (v1/*: any*/),
     "type": "Mutation",
     "abstractKey": null
@@ -100,20 +100,20 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "channelContentRemoveMemberMutation",
+    "name": "useChannelActionsRemoveMemberMutation",
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "16f68ea19a3b3078832a3955e0f76488",
+    "cacheID": "2be9f19670771893947a49da660df8a0",
     "id": null,
     "metadata": {},
-    "name": "channelContentRemoveMemberMutation",
+    "name": "useChannelActionsRemoveMemberMutation",
     "operationKind": "mutation",
-    "text": "mutation channelContentRemoveMemberMutation(\n  $chatID: ID!\n  $userID: ID!\n) {\n  removeChatMember(chatID: $chatID, userID: $userID) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n  }\n}\n"
+    "text": "mutation useChannelActionsRemoveMemberMutation(\n  $chatID: ID!\n  $userID: ID!\n) {\n  removeChatMember(chatID: $chatID, userID: $userID) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "b051497bc1a40be9c0b8f284033813c3";
+(node as any).hash = "1207c60372d2cf1c7edb425c507bb062";
 
 export default node;

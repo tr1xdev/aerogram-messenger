@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<7e9c9410cde82f26e7289313cb01ec38>>
+ * @generated SignedSource<<a3feb4cf9cc82d9b59307f15e983d000>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,18 +9,18 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type groupContentRemoveMemberMutation$variables = {
+export type channelContentRemoveMemberMutation$variables = {
   chatID: string;
   userID: string;
 };
-export type groupContentRemoveMemberMutation$data = {
+export type channelContentRemoveMemberMutation$data = {
   readonly removeChatMember: {
     readonly success?: boolean;
   };
 };
-export type groupContentRemoveMemberMutation = {
-  response: groupContentRemoveMemberMutation$data;
-  variables: groupContentRemoveMemberMutation$variables;
+export type channelContentRemoveMemberMutation = {
+  response: channelContentRemoveMemberMutation$data;
+  variables: channelContentRemoveMemberMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -67,7 +67,7 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "groupContentRemoveMemberMutation",
+    "name": "channelContentRemoveMemberMutation",
     "selections": [
       {
         "alias": null,
@@ -89,7 +89,7 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "groupContentRemoveMemberMutation",
+    "name": "channelContentRemoveMemberMutation",
     "selections": [
       {
         "alias": null,
@@ -113,16 +113,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "f11189fc2f397860d77836dc42cbece8",
+    "cacheID": "16f68ea19a3b3078832a3955e0f76488",
     "id": null,
     "metadata": {},
-    "name": "groupContentRemoveMemberMutation",
+    "name": "channelContentRemoveMemberMutation",
     "operationKind": "mutation",
-    "text": "mutation groupContentRemoveMemberMutation(\n  $chatID: ID!\n  $userID: ID!\n) {\n  removeChatMember(chatID: $chatID, userID: $userID) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n  }\n}\n"
+    "text": "mutation channelContentRemoveMemberMutation(\n  $chatID: ID!\n  $userID: ID!\n) {\n  removeChatMember(chatID: $chatID, userID: $userID) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "58f6429d14a4effcd686ba0282d0b5d9";
+(node as any).hash = "72b3e9e345a765369718056fe10f9059";
 
 export default node;

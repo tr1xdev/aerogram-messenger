@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<dfd35f76285fbd71ee58bb8fa645b0a0>>
+ * @generated SignedSource<<125e566a39e34d47084b0e8876cf256b>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,23 +9,23 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type channelContentGenerateInviteLinkMutation$variables = {
-  id: string;
+export type channelContentRotateInviteMutation$variables = {
+  chatID: string;
+  inviteCode: string;
 };
-export type channelContentGenerateInviteLinkMutation$data = {
-  readonly exportChatInvite: {
-    readonly __typename: "ChatInvite";
-    readonly code: string;
-    readonly inviteLink: string;
+export type channelContentRotateInviteMutation$data = {
+  readonly revokeChatInvite: {
+    readonly __typename: "SuccessResult";
+    readonly success: boolean;
   } | {
     // This will never be '%other', but we need some
     // value in case none of the concrete values match.
     readonly __typename: "%other";
   };
 };
-export type channelContentGenerateInviteLinkMutation = {
-  response: channelContentGenerateInviteLinkMutation$data;
-  variables: channelContentGenerateInviteLinkMutation$variables;
+export type channelContentRotateInviteMutation = {
+  response: channelContentRotateInviteMutation$data;
+  variables: channelContentRotateInviteMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -33,7 +33,12 @@ var v0 = [
   {
     "defaultValue": null,
     "kind": "LocalArgument",
-    "name": "id"
+    "name": "chatID"
+  },
+  {
+    "defaultValue": null,
+    "kind": "LocalArgument",
+    "name": "inviteCode"
   }
 ],
 v1 = [
@@ -43,12 +48,17 @@ v1 = [
       {
         "kind": "Variable",
         "name": "chatID",
-        "variableName": "id"
+        "variableName": "chatID"
+      },
+      {
+        "kind": "Variable",
+        "name": "inviteCode",
+        "variableName": "inviteCode"
       }
     ],
     "concreteType": null,
     "kind": "LinkedField",
-    "name": "exportChatInvite",
+    "name": "revokeChatInvite",
     "plural": false,
     "selections": [
       {
@@ -65,18 +75,11 @@ v1 = [
             "alias": null,
             "args": null,
             "kind": "ScalarField",
-            "name": "code",
-            "storageKey": null
-          },
-          {
-            "alias": null,
-            "args": null,
-            "kind": "ScalarField",
-            "name": "inviteLink",
+            "name": "success",
             "storageKey": null
           }
         ],
-        "type": "ChatInvite",
+        "type": "SuccessResult",
         "abstractKey": null
       }
     ],
@@ -88,7 +91,7 @@ return {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Fragment",
     "metadata": null,
-    "name": "channelContentGenerateInviteLinkMutation",
+    "name": "channelContentRotateInviteMutation",
     "selections": (v1/*: any*/),
     "type": "Mutation",
     "abstractKey": null
@@ -97,20 +100,20 @@ return {
   "operation": {
     "argumentDefinitions": (v0/*: any*/),
     "kind": "Operation",
-    "name": "channelContentGenerateInviteLinkMutation",
+    "name": "channelContentRotateInviteMutation",
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "316e7c0058e1d19c22d73052b0d01c88",
+    "cacheID": "3dc65bdd9d05e496779a5ce3e528ff98",
     "id": null,
     "metadata": {},
-    "name": "channelContentGenerateInviteLinkMutation",
+    "name": "channelContentRotateInviteMutation",
     "operationKind": "mutation",
-    "text": "mutation channelContentGenerateInviteLinkMutation(\n  $id: ID!\n) {\n  exportChatInvite(chatID: $id) {\n    __typename\n    ... on ChatInvite {\n      code\n      inviteLink\n    }\n  }\n}\n"
+    "text": "mutation channelContentRotateInviteMutation(\n  $chatID: ID!\n  $inviteCode: String!\n) {\n  revokeChatInvite(chatID: $chatID, inviteCode: $inviteCode) {\n    __typename\n    ... on SuccessResult {\n      success\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "d405b79cd6907f552914e3b10d3e00e1";
+(node as any).hash = "121d6dd0c1bcedb9635b4b3461fe000d";
 
 export default node;

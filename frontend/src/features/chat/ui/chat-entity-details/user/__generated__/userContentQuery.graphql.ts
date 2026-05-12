@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f2242490856d017c8183bce87f3e3d2a>>
+ * @generated SignedSource<<461e1c2401b1ad66d81d4730d681d7cf>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,11 +15,9 @@ export type userContentQuery$variables = {
 export type userContentQuery$data = {
   readonly user: {
     readonly bio: string | null | undefined;
-    readonly botDescription: string | null | undefined;
     readonly displayName: string | null | undefined;
     readonly firstName: string;
     readonly id: string;
-    readonly isBot: boolean;
     readonly lastName: string | null | undefined;
     readonly photoUrl: string | null | undefined;
     readonly status: string;
@@ -65,20 +63,6 @@ v1 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
-        "name": "username",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "displayName",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
         "name": "firstName",
         "storageKey": null
       },
@@ -93,14 +77,21 @@ v1 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
-        "name": "photoUrl",
+        "name": "displayName",
         "storageKey": null
       },
       {
         "alias": null,
         "args": null,
         "kind": "ScalarField",
-        "name": "bio",
+        "name": "username",
+        "storageKey": null
+      },
+      {
+        "alias": null,
+        "args": null,
+        "kind": "ScalarField",
+        "name": "photoUrl",
         "storageKey": null
       },
       {
@@ -114,14 +105,7 @@ v1 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
-        "name": "isBot",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
-        "name": "botDescription",
+        "name": "bio",
         "storageKey": null
       }
     ],
@@ -146,16 +130,16 @@ return {
     "selections": (v1/*: any*/)
   },
   "params": {
-    "cacheID": "c9967633ba31046ab6aa69a4793f14cd",
+    "cacheID": "fddf727e94a28d6e5895ec2cf36ba981",
     "id": null,
     "metadata": {},
     "name": "userContentQuery",
     "operationKind": "query",
-    "text": "query userContentQuery(\n  $id: ID!\n) {\n  user(id: $id) {\n    id\n    username\n    displayName\n    firstName\n    lastName\n    photoUrl\n    bio\n    status\n    isBot\n    botDescription\n  }\n}\n"
+    "text": "query userContentQuery(\n  $id: ID!\n) {\n  user(id: $id) {\n    id\n    firstName\n    lastName\n    displayName\n    username\n    photoUrl\n    status\n    bio\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "b4482d022e377eaa194b9ba39d5029c1";
+(node as any).hash = "d1acfe66dfc67731ac1286fa800c8d8c";
 
 export default node;

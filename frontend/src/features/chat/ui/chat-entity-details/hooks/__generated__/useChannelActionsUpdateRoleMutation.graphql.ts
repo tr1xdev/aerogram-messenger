@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<32a7fac26864c17734ee6826bac23e7c>>
+ * @generated SignedSource<<a3e6d9472be25dae9a1f0760028df0d4>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -9,20 +9,19 @@
 // @ts-nocheck
 
 import { ConcreteRequest } from 'relay-runtime';
-export type channelContentUpdateRoleMutation$variables = {
+export type useChannelActionsUpdateRoleMutation$variables = {
   chatID: string;
   role: string;
   userID: string;
 };
-export type channelContentUpdateRoleMutation$data = {
+export type useChannelActionsUpdateRoleMutation$data = {
   readonly updateMemberRole: {
-    readonly __typename: "SuccessResult";
     readonly success: boolean;
   };
 };
-export type channelContentUpdateRoleMutation = {
-  response: channelContentUpdateRoleMutation$data;
-  variables: channelContentUpdateRoleMutation$variables;
+export type useChannelActionsUpdateRoleMutation = {
+  response: useChannelActionsUpdateRoleMutation$data;
+  variables: useChannelActionsUpdateRoleMutation$variables;
 };
 
 const node: ConcreteRequest = (function(){
@@ -70,13 +69,6 @@ v3 = [
         "alias": null,
         "args": null,
         "kind": "ScalarField",
-        "name": "__typename",
-        "storageKey": null
-      },
-      {
-        "alias": null,
-        "args": null,
-        "kind": "ScalarField",
         "name": "success",
         "storageKey": null
       }
@@ -93,7 +85,7 @@ return {
     ],
     "kind": "Fragment",
     "metadata": null,
-    "name": "channelContentUpdateRoleMutation",
+    "name": "useChannelActionsUpdateRoleMutation",
     "selections": (v3/*: any*/),
     "type": "Mutation",
     "abstractKey": null
@@ -106,20 +98,20 @@ return {
       (v1/*: any*/)
     ],
     "kind": "Operation",
-    "name": "channelContentUpdateRoleMutation",
+    "name": "useChannelActionsUpdateRoleMutation",
     "selections": (v3/*: any*/)
   },
   "params": {
-    "cacheID": "a9b279557160cd67d207eb984907e3e3",
+    "cacheID": "de3f680b4419e7261d0bd5c493de404d",
     "id": null,
     "metadata": {},
-    "name": "channelContentUpdateRoleMutation",
+    "name": "useChannelActionsUpdateRoleMutation",
     "operationKind": "mutation",
-    "text": "mutation channelContentUpdateRoleMutation(\n  $chatID: ID!\n  $userID: ID!\n  $role: String!\n) {\n  updateMemberRole(chatID: $chatID, userID: $userID, role: $role) {\n    __typename\n    success\n  }\n}\n"
+    "text": "mutation useChannelActionsUpdateRoleMutation(\n  $chatID: ID!\n  $userID: ID!\n  $role: String!\n) {\n  updateMemberRole(chatID: $chatID, userID: $userID, role: $role) {\n    success\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "816a138200e07d3afe167ead9c2140ac";
+(node as any).hash = "71694aee5728c18d9013e9cb0dc537d2";
 
 export default node;
