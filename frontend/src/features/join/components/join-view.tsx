@@ -152,25 +152,6 @@ export function JoinView({ slug }: JoinViewProps): ReactNode {
           },
         });
       }
-    } else if (result.__typename === "NotFoundError") {
-      commitInvite({
-        variables: { code: slug },
-        onCompleted: (response): void => {
-          const joinResult = response.joinChatByInvite;
-          if (joinResult.__typename === "Chat" && joinResult.id) {
-            navigate({
-              to: "/chat/$chatId",
-              params: { chatId: joinResult.id },
-              replace: true,
-            });
-          } else if ("message" in joinResult) {
-            setMutationError(joinResult.message as string);
-          }
-        },
-        onError: (): void => {
-          setMutationError("Network error occurred. Please try again.");
-        },
-      });
     }
   };
 
@@ -185,16 +166,10 @@ export function JoinView({ slug }: JoinViewProps): ReactNode {
 
   if (result.__typename === "NotFoundError") {
     return (
-      <JoinCard
-        title="Private Invite"
-        slug={slug}
-        photoUrl={null}
-        membersCount={0}
-        type="GROUP"
-        isPending={isPending}
-        error={mutationError}
-        onJoin={handleJoin}
-        onCancel={handleCancel}
+      <JoinError
+        title="Invite Link Invalid"
+        message="This invite link has expired or the chat no longer exists."
+        onBack={handleCancel}
       />
     );
   }
