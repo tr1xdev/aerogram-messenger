@@ -29,6 +29,8 @@ interface MessageBubbleProps {
   onForward?: (message: Message) => void;
 }
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
 export const MessageBubble = memo(function MessageBubble({
   message,
   isMe,
@@ -77,6 +79,31 @@ export const MessageBubble = memo(function MessageBubble({
         }),
       );
     }
+  };
+
+  const renderText = (text: string): (string | ReactElement)[] => {
+    return text.split(URL_REGEX).map((part, index) => {
+      if (part.match(URL_REGEX)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "underline break-all",
+              isMe
+                ? "text-primary-foreground decoration-primary-foreground/40 hover:decoration-primary-foreground"
+                : "text-primary decoration-primary/40 hover:decoration-primary",
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   const senderName: string = useMemo((): string => {
@@ -198,7 +225,7 @@ export const MessageBubble = memo(function MessageBubble({
 
               <div className="flex flex-col w-full relative z-10">
                 <div className="text-[15px] leading-snug whitespace-pre-wrap select-text break-words [word-break:break-word] [overflow-wrap:anywhere]">
-                  {message.text}
+                  {renderText(message.text)}
                 </div>
 
                 <div
