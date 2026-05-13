@@ -36,9 +36,9 @@ type RecordSourceWithLinkedIDs = MutableRecordSource & {
 };
 
 const HTTP_ENDPOINT: string =
-  import.meta.env.VITE_API_URL || "https://localhost:8080/query";
+  import.meta.env.VITE_API_URL || "https://localhost:3443/query";
 const WS_ENDPOINT: string =
-  import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
+  import.meta.env.VITE_WS_URL || "wss://localhost:3443/query";
 const THROTTLE_MS: number = 5000;
 
 const LOG_STYLES: Record<string, string> = {

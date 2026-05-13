@@ -26,10 +26,19 @@ const messagesFragment = graphql`
       ... on MessageConnection {
         messages {
           id
+          ...messageList_metadata
           text
           sentAt
           sequence
           isEdited
+          attachments {
+            id
+            type
+            url
+            fileName
+            fileSize
+            contentType
+          }
           sender {
             id
             firstName
@@ -73,6 +82,7 @@ export function useChatHistory(chatId: string) {
     useMessagesQuery,
     useMessages_history$key
   >(messagesFragment, queryData);
+
   const history = data?.messageHistory;
 
   const messages = useMemo((): readonly MessageType[] => {

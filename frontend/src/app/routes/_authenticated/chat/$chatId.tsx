@@ -25,11 +25,13 @@ import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
 import { AlertCircle, ArrowLeft } from "lucide-react";
-import type { Message, User, ChatMember } from "@/entities/chat/model/types";
+import type { Message, User } from "@/entities/chat/model/types";
 import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generated__/useMarkDialog_chat.graphql";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 import type { chatHeader_user$key } from "@/features/chat/ui/__generated__/chatHeader_user.graphql";
 import type { useChatsDetailsQuery$data } from "@/features/chat/lib/chat/__generated__/useChatsDetailsQuery.graphql";
+import type { messageBubble_message$data } from "@/features/chat/ui/__generated__/messageBubble_message.graphql";
+import type { messageList_metadata$key } from "@/features/chat/ui/__generated__/messageList_metadata.graphql";
 
 type ChatNode = Extract<
   useChatsDetailsQuery$data["chat"],
@@ -39,8 +41,8 @@ type ChatNode = Extract<
 type RelayMember = NonNullable<ChatNode["members"]>[number];
 
 interface ExtendedUser extends Omit<User, "lastName"> {
-  lastName?: string | null;
-  displayName?: string | null;
+  lastName: string | null;
+  displayName: string | null;
 }
 
 interface ChatStoreState {
@@ -79,12 +81,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const chatData: ChatDetailsResponse = useChatDetails(chatId);
   const chatsData: MyChatsResponse = useMyChats();
 
-  const me: User | undefined = meData?.me ? (meData.me as User) : undefined;
+  const me: User | undefined = meData?.me
+    ? (meData.me as unknown as User)
+    : undefined;
   const chatRaw = chatData.chat;
 
   const chatNode = useMemo((): (ChatNode & { slug?: string }) | null => {
     if (chatRaw?.__typename === "Chat") {
-      return chatRaw as ChatNode & { slug?: string };
+      return chatRaw as unknown as ChatNode & { slug?: string };
     }
     return null;
   }, [chatRaw]);
@@ -132,13 +136,22 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const isNotFound: boolean =
     !chatNode && !isInitialLoading && chatRaw?.__typename !== "InternalError";
 
-  const lastSequence: number = useMemo((): number => {
-    if (!messagesFromHistory || messagesFromHistory.length === 0) return 0;
-    const lastMsg = messagesFromHistory[
-      messagesFromHistory.length - 1
-    ] as Message;
-    return Number(lastMsg.sequence) || 0;
+  const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
+    const raw = (messagesFromHistory ?? []) as unknown as Message[];
+    return [...raw]
+      .filter((m: Message): boolean => !!m)
+      .sort((a: Message, b: Message): number => {
+        const seqA: number = Number(a.sequence) || 0;
+        const seqB: number = Number(b.sequence) || 0;
+        if (seqA !== seqB) return seqA - seqB;
+        return new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
+      });
   }, [messagesFromHistory]);
+
+  const lastSequence: number = useMemo((): number => {
+    if (allMessages.length === 0) return 0;
+    return Number(allMessages[allMessages.length - 1].sequence) || 0;
+  }, [allMessages]);
 
   const { checkAndMarkRead } = useMarkDialog(
     (chatNode ? chatNode : null) as unknown as useMarkDialog_chat$key,
@@ -173,26 +186,33 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }, [resetInput, stopTypingHook]);
 
   const handleEditInitiate = useCallback(
-    (msg: Message): void => {
+    (msg: messageBubble_message$data): void => {
+      const fullMsg: Message = msg as unknown as Message;
       setReplyingTo(null);
-      setEditingMessage(msg);
-      setInput(msg.text);
+      setEditingMessage(fullMsg);
+      setInput(fullMsg.text);
     },
     [setInput],
   );
 
-  const handleReplyInitiate = useCallback((msg: Message): void => {
-    setEditingMessage(null);
-    setReplyingTo(msg);
-  }, []);
+  const handleReplyInitiate = useCallback(
+    (msg: messageBubble_message$data): void => {
+      setEditingMessage(null);
+      setReplyingTo(msg as unknown as Message);
+    },
+    [],
+  );
 
   const handleDeleteMessage = useCallback((id: string): void => {
-    console.log("Delete triggered for:", id);
+    void id;
   }, []);
 
-  const handleForwardMessage = useCallback((msg: Message): void => {
-    console.log("Forward triggered for:", msg.id);
-  }, []);
+  const handleForwardMessage = useCallback(
+    (msg: messageBubble_message$data): void => {
+      void msg;
+    },
+    [],
+  );
 
   const handleTyping = useCallback(
     (isTyping: boolean): void => {
@@ -240,18 +260,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     return otherMember?.user?.isBot ?? false;
   }, [chatNode, me, normalizedChatType]);
 
-  const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
-    const rawMessages: Message[] = (messagesFromHistory ?? []) as Message[];
-    return [...rawMessages]
-      .filter((m: Message | null): m is Message => !!m)
-      .sort((a: Message, b: Message): number => {
-        const seqA: number = Number(a.sequence) || 0;
-        const seqB: number = Number(b.sequence) || 0;
-        if (seqA !== seqB) return seqA - seqB;
-        return new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
-      });
-  }, [messagesFromHistory]);
-
   useEffect((): (() => void) => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const triggerRead = (): void => {
@@ -278,27 +286,31 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }, [checkAndMarkRead, markAsRead, lastSequence, isAtBottom]);
 
   const handleSend = useCallback(
-    (text?: string): void => {
+    (text?: string, attachments: File[] = []): void => {
       const val: string = (text ?? inputRef.current).trim();
-      if (!val || !me) return;
+
+      if ((!val && attachments.length === 0) || !me) {
+        return;
+      }
+
       if (editingMessage) {
         editMessage(editingMessage.id, val)
-          .then((): void => cancelAction())
+          .then((): void => {
+            cancelAction();
+          })
           .catch((): void => {
             toast.error("Failed to edit message");
           });
         return;
       }
+
       const originalReply: Message | null = replyingTo;
       const tempId: string = `temp-${Date.now()}`;
-      const extendedMe: ExtendedUser = me as ExtendedUser;
+      const extendedMe: ExtendedUser = me as unknown as ExtendedUser;
+
       cancelAction();
-      sendMessage(val, {
-        variables: {
-          chatId,
-          text: val,
-          replyToId: originalReply?.id ?? null,
-        },
+
+      sendMessage(val, attachments, {
         optimisticResponse: {
           sendMessage: {
             __typename: "Message",
@@ -333,11 +345,13 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
               : null,
           },
         },
-      }).catch((): void => {
-        setInput(val);
-        if (originalReply) setReplyingTo(originalReply);
-        toast.error("Message not sent");
-      });
+      })
+        .then((): void => {})
+        .catch((): void => {
+          setInput(val);
+          if (originalReply) setReplyingTo(originalReply);
+          toast.error("Message not sent");
+        });
     },
     [
       me,
@@ -400,8 +414,9 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         ) : (
           <MessageList
             chatId={chatId}
-            messages={allMessages}
-            members={(chatNode?.members as unknown as ChatMember[]) ?? []}
+            messages={
+              messagesFromHistory as unknown as messageList_metadata$key
+            }
             myId={me?.id}
             chatType={normalizedChatType}
             lastReadSequence={Number(chatNode?.lastReadSequence) || 0}

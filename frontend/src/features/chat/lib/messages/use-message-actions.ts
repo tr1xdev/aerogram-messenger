@@ -25,8 +25,14 @@ const sendMessageMutation = graphql`
     $chatId: ID!
     $text: String!
     $replyToId: ID
+    $attachments: [Upload!]
   ) {
-    sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {
+    sendMessage(
+      chatId: $chatId
+      text: $text
+      replyToId: $replyToId
+      attachments: $attachments
+    ) {
       ... on Message {
         id
         chatId
@@ -101,6 +107,7 @@ export function useMessageActions(chatId: string) {
   const sendMessage = useCallback(
     (
       text: string,
+      files?: File[],
       config?: Partial<UseMutationConfig<useMessageActionsSendMutation>>,
     ): Promise<void> => {
       return new Promise((resolve, reject): void => {
@@ -109,13 +116,22 @@ export function useMessageActions(chatId: string) {
           return;
         }
 
+        const uploadables: Record<string, File> = {};
+        if (files && files.length > 0) {
+          files.forEach((file: File, index: number) => {
+            uploadables[`attachments.${index}`] = file;
+          });
+        }
+
         send({
           ...config,
           variables: {
             chatId,
             text,
             replyToId: config?.variables?.replyToId ?? null,
+            attachments: files ? new Array(files.length).fill(null) : [],
           },
+          uploadables,
           updater: (store: RecordSourceSelectorProxy): void => {
             const payload: RecordProxy | null | undefined =
               store.getRootField("sendMessage");

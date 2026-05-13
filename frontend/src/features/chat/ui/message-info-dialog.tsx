@@ -7,12 +7,13 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Message } from "@/entities/chat/model/types";
+import type { messageBubble_message$data } from "@/features/chat/ui/__generated__/messageBubble_message.graphql";
 import { Terminal, Copy, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 interface MessageInfoDialogProps {
-  message: Message;
+  message: messageBubble_message$data;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -43,25 +44,25 @@ export const MessageInfoDialog = memo(function MessageInfoDialog({
   const [copied, setCopied] = useState<boolean>(false);
 
   const jsonString: string = useMemo((): string => {
+    if (!message) return "";
+
+    const msg = message as unknown as Message;
+
     const debugData: DebugData = {
-      id: message.id,
-      seq: message.sequence,
-      type: message.replyTo
-        ? "reply"
-        : message.forwardedFrom
-          ? "forward"
-          : "message",
+      id: msg.id,
+      seq: msg.sequence,
+      type: msg.replyTo ? "reply" : msg.forwardedFrom ? "forward" : "message",
       meta: {
-        sentAt: message.sentAt,
-        isEdited: message.isEdited,
+        sentAt: msg.sentAt,
+        isEdited: msg.isEdited,
       },
       sender: {
-        id: message.sender.id,
+        id: msg.sender?.id ?? "unknown",
       },
-      replyTo: message.replyTo
+      replyTo: msg.replyTo
         ? {
-            id: message.replyTo.id,
-            senderId: message.replyTo.sender.id,
+            id: msg.replyTo.id,
+            senderId: msg.replyTo.sender?.id ?? "unknown",
           }
         : null,
     };
@@ -78,6 +79,7 @@ export const MessageInfoDialog = memo(function MessageInfoDialog({
   }, [copied]);
 
   const handleCopy = async (): Promise<void> => {
+    if (!jsonString) return;
     try {
       await navigator.clipboard.writeText(jsonString);
       setCopied(true);
@@ -85,6 +87,8 @@ export const MessageInfoDialog = memo(function MessageInfoDialog({
       setCopied(false);
     }
   };
+
+  if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,8 +107,9 @@ export const MessageInfoDialog = memo(function MessageInfoDialog({
           </DialogTitle>
           <button
             onClick={handleCopy}
+            disabled={!jsonString}
             aria-label={copied ? "Copied" : "Copy to clipboard"}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-all hover:bg-zinc-800 hover:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-700 active:scale-95"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-all hover:bg-zinc-800 hover:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-700 active:scale-95 disabled:opacity-50"
           >
             {copied ? (
               <Check className="h-3.5 w-3.5 text-green-500 animate-in zoom-in" />
@@ -122,7 +127,7 @@ export const MessageInfoDialog = memo(function MessageInfoDialog({
         >
           <div className="p-4 font-mono text-[11px] leading-relaxed select-text">
             <pre className="text-blue-400/90 whitespace-pre-wrap break-all">
-              {jsonString}
+              {jsonString || "No data available"}
             </pre>
           </div>
         </ScrollArea>
