@@ -75,7 +75,7 @@ type Mutation {
   updateChatPermissions(chatID: ID!, permissions: ChatPermissionsInput!): SuccessResult!
   updateChatMetadata(id: ID!, title: String, slug: String): ChatResult!
   sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
-  sendMessage(chatId: ID!, text: String!, replyToId: ID): SendMessageResult!
+  sendMessage(chatId: ID!, text: String!, replyToId: ID, attachments: [Upload!]): SendMessageResult!
   updateMessage(id: ID!, text: String!): SendMessageResult!
   deleteMessage(id: ID!): Boolean!
   markDialogAsRead(chatId: ID!): Boolean!

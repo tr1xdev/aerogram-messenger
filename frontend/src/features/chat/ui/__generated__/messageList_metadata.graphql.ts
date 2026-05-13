@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<fd10587f8e122af3009b6e9a97830b50>>
+ * @generated SignedSource<<5ac106c468ec41be9408ea25d1ee47f9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -16,6 +16,7 @@ export type messageList_metadata$data = ReadonlyArray<{
     readonly id: string;
   } | null | undefined;
   readonly sentAt: string;
+  readonly " $fragmentSpreads": FragmentRefs<"messageList_message" | "messageList_nextMessage" | "messageList_prevMessage">;
   readonly " $fragmentType": "messageList_metadata";
 }>;
 export type messageList_metadata$key = ReadonlyArray<{
@@ -58,6 +59,21 @@ return {
         (v0/*: any*/)
       ],
       "storageKey": null
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "messageList_message"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "messageList_prevMessage"
+    },
+    {
+      "args": null,
+      "kind": "FragmentSpread",
+      "name": "messageList_nextMessage"
     }
   ],
   "type": "Message",
@@ -65,6 +81,6 @@ return {
 };
 })();
 
-(node as any).hash = "abc6cbe0649207fcbf9e8b65860a814d";
+(node as any).hash = "9baf6c30e49a9acd0aeb77a1c132dc71";
 
 export default node;
