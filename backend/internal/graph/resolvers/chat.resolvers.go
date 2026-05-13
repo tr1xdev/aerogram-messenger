@@ -25,10 +25,12 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/middleware"
 )
 
+// ID is the resolver for the id field.
 func (r *chatResolver) ID(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	return helpers.EncodeGlobalID("Chat", obj.ID.String()), nil
 }
 
+// Type is the resolver for the type field.
 func (r *chatResolver) Type(ctx context.Context, obj *model.ChatExtended) (model.ChatType, error) {
 	switch strings.ToUpper(obj.Type) {
 	case "GROUP":
@@ -40,6 +42,7 @@ func (r *chatResolver) Type(ctx context.Context, obj *model.ChatExtended) (model
 	}
 }
 
+// Slug is the resolver for the slug field.
 func (r *chatResolver) Slug(ctx context.Context, obj *model.ChatExtended) (*string, error) {
 	if !obj.Username.Valid || obj.Username.String == "" {
 		return nil, nil
@@ -47,6 +50,7 @@ func (r *chatResolver) Slug(ctx context.Context, obj *model.ChatExtended) (*stri
 	return &obj.Username.String, nil
 }
 
+// Title is the resolver for the title field.
 func (r *chatResolver) Title(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	if obj.Name.Valid && obj.Name.String != "" {
 		return obj.Name.String, nil
@@ -57,6 +61,7 @@ func (r *chatResolver) Title(ctx context.Context, obj *model.ChatExtended) (stri
 	return "Untitled Chat", nil
 }
 
+// PhotoURL is the resolver for the photoUrl field.
 func (r *chatResolver) PhotoURL(ctx context.Context, obj *model.ChatExtended) (*string, error) {
 	if !obj.PhotoUrl.Valid || obj.PhotoUrl.String == "" {
 		return nil, nil
@@ -64,26 +69,32 @@ func (r *chatResolver) PhotoURL(ctx context.Context, obj *model.ChatExtended) (*
 	return &obj.PhotoUrl.String, nil
 }
 
+// UnreadCount is the resolver for the unreadCount field.
 func (r *chatResolver) UnreadCount(ctx context.Context, obj *model.ChatExtended) (int, error) {
 	return obj.UnreadCount, nil
 }
 
+// MyReadSequence is the resolver for the myReadSequence field.
 func (r *chatResolver) MyReadSequence(ctx context.Context, obj *model.ChatExtended) (int64, error) {
 	return obj.MyReadSequence, nil
 }
 
+// LastReadSequence is the resolver for the lastReadSequence field.
 func (r *chatResolver) LastReadSequence(ctx context.Context, obj *model.ChatExtended) (int64, error) {
 	return obj.ReadOutboxMaxId, nil
 }
 
+// IsPinned is the resolver for the isPinned field.
 func (r *chatResolver) IsPinned(ctx context.Context, obj *model.ChatExtended) (bool, error) {
 	return obj.IsPinned, nil
 }
 
+// CanWrite is the resolver for the canWrite field.
 func (r *chatResolver) CanWrite(ctx context.Context, obj *model.ChatExtended) (bool, error) {
 	return obj.IsActive, nil
 }
 
+// Permissions is the resolver for the permissions field.
 func (r *chatResolver) Permissions(ctx context.Context, obj *model.ChatExtended) (*model.ChatPermissions, error) {
 	isPrivate := strings.ToUpper(obj.Type) == "PRIVATE"
 	return &model.ChatPermissions{
@@ -97,6 +108,7 @@ func (r *chatResolver) Permissions(ctx context.Context, obj *model.ChatExtended)
 	}, nil
 }
 
+// LastMessage is the resolver for the lastMessage field.
 func (r *chatResolver) LastMessage(ctx context.Context, obj *model.ChatExtended) (*model.Message, error) {
 	if !obj.LastMessageID.Valid {
 		return nil, nil
@@ -104,6 +116,7 @@ func (r *chatResolver) LastMessage(ctx context.Context, obj *model.ChatExtended)
 	return r.Enricher.EnrichMessage(ctx, obj.LastMessageID.UUID.String())
 }
 
+// Members is the resolver for the members field.
 func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, limit *int, offset *int) ([]*model.ChatMember, error) {
 	var globalID string
 	if strings.Contains(obj.ID.String(), ":") {
@@ -129,6 +142,7 @@ func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, lim
 	return []*model.ChatMember{}, nil
 }
 
+// MyRole is the resolver for the myRole field.
 func (r *chatResolver) MyRole(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	if obj.Role == "" || obj.Role == "NONE" {
 		return "NONE", nil
@@ -136,10 +150,12 @@ func (r *chatResolver) MyRole(ctx context.Context, obj *model.ChatExtended) (str
 	return obj.Role, nil
 }
 
+// CreatedAt is the resolver for the createdAt field.
 func (r *chatResolver) CreatedAt(ctx context.Context, obj *model.ChatExtended) (string, error) {
 	return obj.CreatedAt.Format(time.RFC3339), nil
 }
 
+// CreateChat is the resolver for the createChat field.
 func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatType, participantIds []string, slug *string, title *string) (model.CreateChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -164,6 +180,7 @@ func (r *mutationResolver) CreateChat(ctx context.Context, typeArg model.ChatTyp
 	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
+// CreateDirectChat is the resolver for the createDirectChat field.
 func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) (model.CreateChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -182,6 +199,7 @@ func (r *mutationResolver) CreateDirectChat(ctx context.Context, userID string) 
 	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
+// PinChat is the resolver for the pinChat field.
 func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) (model.PinChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -199,6 +217,7 @@ func (r *mutationResolver) PinChat(ctx context.Context, id string, pinned bool) 
 	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
 }
 
+// DeleteChat is the resolver for the deleteChat field.
 func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryone *bool) (model.DeleteChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -220,6 +239,7 @@ func (r *mutationResolver) DeleteChat(ctx context.Context, id string, forEveryon
 	return &model.SuccessResult{Success: resp.GetSuccess()}, nil
 }
 
+// LeaveChat is the resolver for the leaveChat field.
 func (r *mutationResolver) LeaveChat(ctx context.Context, chatID string) (model.LeaveChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -235,6 +255,7 @@ func (r *mutationResolver) LeaveChat(ctx context.Context, chatID string) (model.
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
+// InviteToChat is the resolver for the inviteToChat field.
 func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, userIds []string) (model.InviteResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -258,6 +279,7 @@ func (r *mutationResolver) InviteToChat(ctx context.Context, chatID string, user
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
+// JoinChatBySlug is the resolver for the joinChatBySlug field.
 func (r *mutationResolver) JoinChatBySlug(ctx context.Context, slug string) (model.JoinChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -283,6 +305,7 @@ func (r *mutationResolver) JoinChatBySlug(ctx context.Context, slug string) (mod
 	return r.Enricher.EnrichChat(ctx, authID, chatResp.Chat)
 }
 
+// JoinChatByInvite is the resolver for the joinChatByInvite field.
 func (r *mutationResolver) JoinChatByInvite(ctx context.Context, inviteCode string) (model.JoinChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -308,6 +331,7 @@ func (r *mutationResolver) JoinChatByInvite(ctx context.Context, inviteCode stri
 	return r.Enricher.EnrichChat(ctx, authID, chatResp.Chat)
 }
 
+// ExportChatInvite is the resolver for the exportChatInvite field.
 func (r *mutationResolver) ExportChatInvite(ctx context.Context, chatID string, name *string, usageLimit *int, expireAt *int) (model.ExportInviteResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -350,6 +374,7 @@ func (r *mutationResolver) ExportChatInvite(ctx context.Context, chatID string, 
 	}, nil
 }
 
+// RevokeChatInvite is the resolver for the revokeChatInvite field.
 func (r *mutationResolver) RevokeChatInvite(ctx context.Context, chatID string, inviteCode string) (model.RevokeInviteResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -367,6 +392,7 @@ func (r *mutationResolver) RevokeChatInvite(ctx context.Context, chatID string, 
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
+// RemoveChatMember is the resolver for the removeChatMember field.
 func (r *mutationResolver) RemoveChatMember(ctx context.Context, chatID string, userID string) (model.RemoveMemberResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -383,6 +409,7 @@ func (r *mutationResolver) RemoveChatMember(ctx context.Context, chatID string, 
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
+// UpdateMemberRole is the resolver for the updateMemberRole field.
 func (r *mutationResolver) UpdateMemberRole(ctx context.Context, chatID string, userID string, role string) (*model.SuccessResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -400,6 +427,7 @@ func (r *mutationResolver) UpdateMemberRole(ctx context.Context, chatID string, 
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
+// UpdateChatPermissions is the resolver for the updateChatPermissions field.
 func (r *mutationResolver) UpdateChatPermissions(ctx context.Context, chatID string, permissions model.ChatPermissionsInput) (*model.SuccessResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -425,6 +453,7 @@ func (r *mutationResolver) UpdateChatPermissions(ctx context.Context, chatID str
 	return &model.SuccessResult{Success: resp.Success}, nil
 }
 
+// UpdateChatMetadata is the resolver for the updateChatMetadata field.
 func (r *mutationResolver) UpdateChatMetadata(ctx context.Context, id string, title *string, slug *string) (model.ChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -452,6 +481,7 @@ func (r *mutationResolver) UpdateChatMetadata(ctx context.Context, id string, ti
 	return r.Enricher.EnrichChat(ctx, authID, resp.Chat)
 }
 
+// SendTypingEvent is the resolver for the sendTypingEvent field.
 func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string, typing bool) (bool, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -464,6 +494,7 @@ func (r *mutationResolver) SendTypingEvent(ctx context.Context, chatID string, t
 	return true, nil
 }
 
+// MyChats is the resolver for the myChats field.
 func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -485,6 +516,7 @@ func (r *queryResolver) MyChats(ctx context.Context) (model.MyChatsResult, error
 	return &model.ChatList{Chats: chats}, nil
 }
 
+// Chat is the resolver for the chat field.
 func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (model.ChatResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -519,6 +551,7 @@ func (r *queryResolver) Chat(ctx context.Context, id *string, slug *string) (mod
 	return chatExtended, nil
 }
 
+// ChatMembers is the resolver for the chatMembers field.
 func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *int, offset *int) (model.ChatMembersResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -583,6 +616,7 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 	}, nil
 }
 
+// SearchGlobal is the resolver for the searchGlobal field.
 func (r *queryResolver) SearchGlobal(ctx context.Context, query string) (*model.GlobalSearchList, error) {
 	cleanQuery := strings.TrimSpace(query)
 	if len(cleanQuery) < 2 {
@@ -632,6 +666,7 @@ func (r *queryResolver) SearchGlobal(ctx context.Context, query string) (*model.
 	return &model.GlobalSearchList{Results: results}, nil
 }
 
+// ChatInvites is the resolver for the chatInvites field.
 func (r *queryResolver) ChatInvites(ctx context.Context, chatID string) (model.ChatInvitesResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
@@ -671,6 +706,7 @@ func (r *queryResolver) ChatInvites(ctx context.Context, chatID string) (model.C
 	return &model.ChatInvitesList{Invites: results}, nil
 }
 
+// ChatCreated is the resolver for the chatCreated field.
 func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (<-chan *model.ChatExtended, error) {
 	authID := middleware.GetUserID(ctx)
 	rawUserID := helpers.ToRawID(userID)
@@ -709,6 +745,7 @@ func (r *subscriptionResolver) ChatCreated(ctx context.Context, userID string) (
 	return chatChan, nil
 }
 
+// ChatDeleted is the resolver for the chatDeleted field.
 func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (<-chan string, error) {
 	authID := middleware.GetUserID(ctx)
 	rawUserID := helpers.ToRawID(userID)
@@ -745,6 +782,7 @@ func (r *subscriptionResolver) ChatDeleted(ctx context.Context, userID string) (
 	return deleteChan, nil
 }
 
+// UserTyping is the resolver for the userTyping field.
 func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<-chan *model.TypingPayload, error) {
 	rawChatID := helpers.ToRawID(chatID)
 	stream, err := r.PresenceClient.SubscribeTyping(ctx, &presencev1.SubscribeTypingRequest{ChatId: rawChatID})
@@ -775,6 +813,7 @@ func (r *subscriptionResolver) UserTyping(ctx context.Context, chatID string) (<
 	return out, nil
 }
 
+// Chat returns graph.ChatResolver implementation.
 func (r *Resolver) Chat() graph.ChatResolver { return &chatResolver{r} }
 
 type chatResolver struct{ *Resolver }

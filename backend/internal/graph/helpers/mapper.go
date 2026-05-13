@@ -9,38 +9,53 @@ import (
 	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
 )
 
-func MapMessageToModel(m *messagesv1.Message) *model.Message {
-	if m == nil {
+func (e *ChatEnricher) MapMessageToModel(pb *messagesv1.Message) *model.Message {
+	if pb == nil {
 		return nil
 	}
 
 	msg := &model.Message{
-		ID:       m.Id,
-		ChatID:   EncodeGlobalID("Chat", m.ChatId),
-		Text:     m.Text,
-		SentAt:   m.SentAt,
-		Sequence: m.Sequence,
-		IsEdited: m.IsEdited,
+		ID:       EncodeGlobalID("Message", pb.Id),
+		Text:     pb.Text,
+		Sequence: pb.Sequence,
+		SentAt:   pb.SentAt,
+		IsEdited: pb.IsEdited,
 	}
 
-	if m.SenderId != "" {
-		if uid, err := uuid.Parse(ToRawID(m.SenderId)); err == nil {
-			msg.Sender = &dbgen.User{
-				ID: uid,
-			}
+	if pb.ChatId != "" {
+		msg.ChatID = EncodeGlobalID("Chat", ToRawID(pb.ChatId))
+	}
+
+	if pb.SenderId != "" {
+		parsedID, _ := uuid.Parse(pb.SenderId)
+		msg.Sender = &dbgen.User{
+			ID: parsedID,
 		}
 	}
 
-	if m.ReplyToId != nil && *m.ReplyToId != "" {
+	if pb.ReplyToId != nil && *pb.ReplyToId != "" {
 		msg.ReplyTo = &model.Message{
-			ID: EncodeGlobalID("Message", ToRawID(*m.ReplyToId)),
+			ID: EncodeGlobalID("Message", *pb.ReplyToId),
+		}
+	}
+
+	if len(pb.Attachments) > 0 {
+		msg.Attachments = make([]*model.Attachment, 0, len(pb.Attachments))
+		for _, a := range pb.Attachments {
+			msg.Attachments = append(msg.Attachments, &model.Attachment{
+				ID:       EncodeGlobalID("Attachment", a.Id),
+				Type:     a.Type,
+				URL:      a.Url,
+				FileName: a.FileName,
+				FileSize: a.FileSize,
+			})
 		}
 	}
 
 	return msg
 }
 
-func MapDBMessageToModel(m *dbgen.Message) *model.Message {
+func (e *ChatEnricher) MapDBMessageToModel(m *dbgen.Message) *model.Message {
 	if m == nil {
 		return nil
 	}
@@ -54,10 +69,8 @@ func MapDBMessageToModel(m *dbgen.Message) *model.Message {
 		IsEdited: m.IsEdited,
 	}
 
-	if m.AuthorID != uuid.Nil {
-		msg.Sender = &dbgen.User{
-			ID: m.AuthorID,
-		}
+	msg.Sender = &dbgen.User{
+		ID: m.AuthorID,
 	}
 
 	if m.ReplyToID.Valid {

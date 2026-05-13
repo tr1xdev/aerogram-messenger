@@ -76,21 +76,19 @@ type DialogSetting struct {
 }
 
 type Message struct {
-	ID            uuid.UUID      `json:"id"`
-	DialogID      uuid.UUID      `json:"dialog_id"`
-	AuthorID      uuid.UUID      `json:"author_id"`
-	Content       string         `json:"content"`
-	IsEncrypted   bool           `json:"is_encrypted"`
-	EncryptionIv  sql.NullString `json:"encryption_iv"`
-	Sequence      int64          `json:"sequence"`
-	ReplyToID     uuid.NullUUID  `json:"reply_to_id"`
-	ForwardFromID uuid.NullUUID  `json:"forward_from_id"`
-	IsEdited      bool           `json:"is_edited"`
-	IsDeleted     bool           `json:"is_deleted"`
-	IsSystem      bool           `json:"is_system"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-	DeletedAt     sql.NullTime   `json:"deleted_at"`
+	ID            uuid.UUID     `json:"id"`
+	DialogID      uuid.UUID     `json:"dialog_id"`
+	AuthorID      uuid.UUID     `json:"author_id"`
+	Content       string        `json:"content"`
+	Sequence      int64         `json:"sequence"`
+	ReplyToID     uuid.NullUUID `json:"reply_to_id"`
+	ForwardFromID uuid.NullUUID `json:"forward_from_id"`
+	IsEdited      bool          `json:"is_edited"`
+	IsDeleted     bool          `json:"is_deleted"`
+	IsSystem      bool          `json:"is_system"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
+	DeletedAt     sql.NullTime  `json:"deleted_at"`
 }
 
 type MessageAction struct {

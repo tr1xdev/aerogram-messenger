@@ -15,7 +15,9 @@ import (
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
 	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
+	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/storage"
 	"github.com/tr1xdev/aerogram-messenger/internal/repositories"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -34,16 +36,18 @@ type Server struct {
 	messageRepo *repositories.MessageRepository
 	dialogRepo  *repositories.DialogRepository
 	limiter     limiter.RateLimiter
+	s3          storage.Provider
 	cfg         config.MessagesLimitConfig
 }
 
-func NewServer(db *database.DB, rdb *redis.Client, l limiter.RateLimiter, cfg config.MessagesLimitConfig) *Server {
+func NewServer(db *database.DB, rdb *redis.Client, l limiter.RateLimiter, s3 storage.Provider, cfg config.MessagesLimitConfig) *Server {
 	return &Server{
 		db:          db,
 		rdb:         rdb,
 		messageRepo: repositories.NewMessageRepository(db),
 		dialogRepo:  repositories.NewDialogRepository(db),
 		limiter:     l,
+		s3:          s3,
 		cfg:         cfg,
 	}
 }
@@ -108,26 +112,21 @@ func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID
 
 func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageRequest) (*messagespb.SendMessageResponse, error) {
 	senderIDStr := s.getUserID(ctx, req.SenderId)
-	log.Printf("[SEND-MESSAGE] Request from user %s to chat %s", senderIDStr, req.ChatId)
-
 	if senderIDStr == "" {
 		return nil, status.Error(codes.Unauthenticated, "unauthorized")
 	}
 
 	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
-		log.Printf("[SEND-MESSAGE] Invalid ChatID: %v", err)
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
 	senderID, err := uuid.Parse(senderIDStr)
 	if err != nil {
-		log.Printf("[SEND-MESSAGE] Invalid SenderID: %v", err)
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
 
 	allowed, err := s.checkPermission(ctx, chatID, senderID, PermSendMessages)
 	if err != nil {
-		log.Printf("[SEND-MESSAGE] Permission check failed: %v", err)
 		return nil, err
 	}
 	if !allowed {
@@ -135,7 +134,6 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	}
 
 	if err := s.limiter.Check(ctx, "msg:send:"+senderIDStr, s.cfg.Send.Limit, s.cfg.Send.Window); err != nil {
-		log.Printf("[SEND-MESSAGE] Rate limit exceeded for %s", senderIDStr)
 		return nil, status.Error(codes.ResourceExhausted, "too many messages")
 	}
 
@@ -143,14 +141,11 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	if req.ReplyToId != nil && *req.ReplyToId != "" {
 		if rUUID, err := uuid.Parse(*req.ReplyToId); err == nil {
 			replyToID = uuid.NullUUID{UUID: rUUID, Valid: true}
-		} else {
-			log.Printf("[SEND-MESSAGE] Warning: Invalid ReplyToID %s", *req.ReplyToId)
 		}
 	}
 
 	tx, err := s.db.Conn.BeginTx(ctx, nil)
 	if err != nil {
-		log.Printf("[SEND-MESSAGE] DB Transaction error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to begin transaction")
 	}
 	defer func() {
@@ -160,18 +155,32 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 	qtx := s.db.Queries.WithTx(tx)
 
 	msg, err := qtx.CreateMessage(ctx, dbgen.CreateMessageParams{
-		ID:           uuid.New(),
-		DialogID:     chatID,
-		AuthorID:     senderID,
-		Content:      req.Text,
-		IsEncrypted:  false,
-		EncryptionIv: sql.NullString{Valid: false},
-		ReplyToID:    replyToID,
-		IsSystem:     false,
+		ID:            uuid.New(),
+		DialogID:      chatID,
+		AuthorID:      senderID,
+		Content:       req.Text,
+		ReplyToID:     replyToID,
+		ForwardFromID: uuid.NullUUID{Valid: false},
+		IsSystem:      false,
 	})
 	if err != nil {
-		log.Printf("[SEND-MESSAGE] CreateMessage error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to save message")
+	}
+
+	if len(req.Attachments) > 0 {
+		for _, att := range req.Attachments {
+			_, err = qtx.CreateAttachment(ctx, dbgen.CreateAttachmentParams{
+				ID:          uuid.New(),
+				MessageID:   msg.ID,
+				Type:        att.Type,
+				FileName:    att.FileName,
+				FileSize:    att.FileSize,
+				ContentType: att.Type,
+			})
+			if err != nil {
+				return nil, status.Error(codes.Internal, "failed to save attachment")
+			}
+		}
 	}
 
 	err = qtx.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
@@ -180,7 +189,6 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		LastReadSequence: msg.Sequence,
 	})
 	if err != nil {
-		log.Printf("[SEND-MESSAGE] UpdateReadSequence error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to update read sequence")
 	}
 
@@ -190,18 +198,37 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		LastMessageAt: sql.NullTime{Time: msg.CreatedAt, Valid: true},
 	})
 	if err != nil {
-		log.Printf("[SEND-MESSAGE] UpdateDialogLastMessage error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to update last message")
 	}
 
 	_ = qtx.UnhideDialogForMembers(ctx, chatID)
 
 	if err := tx.Commit(); err != nil {
-		log.Printf("[SEND-MESSAGE] Commit error: %v", err)
 		return nil, status.Error(codes.Internal, "failed to commit transaction")
 	}
 
 	protoMsg := s.mapDBToProto(msg)
+
+	attachments, err := s.messageRepo.GetAttachmentsByMessageID(ctx, msg.ID)
+	if err == nil && len(attachments) > 0 {
+		protoMsg.Attachments = make([]*messagespb.Attachment, 0, len(attachments))
+		for _, a := range attachments {
+			url := a.FileName
+			if s.s3 != nil {
+				if signed, err := s.s3.GetPresignedURL(ctx, a.FileName, time.Hour*24); err == nil {
+					url = signed
+				}
+			}
+			protoMsg.Attachments = append(protoMsg.Attachments, &messagespb.Attachment{
+				Id:       a.ID.String(),
+				Type:     a.Type,
+				Url:      url,
+				FileName: a.FileName,
+				FileSize: a.FileSize,
+			})
+		}
+	}
+
 	marshaller := protojson.MarshalOptions{UseProtoNames: true, EmitUnpopulated: true}
 	msgPayload, err := marshaller.Marshal(protoMsg)
 	if err == nil {
@@ -233,7 +260,6 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		}
 	}
 
-	log.Printf("[SEND-MESSAGE] Success: Message %s sent to chat %s", msg.ID, chatID)
 	return &messagespb.SendMessageResponse{Message: protoMsg}, nil
 }
 
@@ -306,12 +332,7 @@ func (s *Server) UpdateMessage(ctx context.Context, req *messagespb.UpdateMessag
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid sender id")
 	}
-	msg, err := s.messageRepo.UpdateExtended(ctx, dbgen.UpdateMessageExtendedParams{
-		ID:           id,
-		AuthorID:     sid,
-		Content:      req.Text,
-		EncryptionIv: sql.NullString{Valid: false},
-	})
+	msg, err := s.messageRepo.UpdateExtended(ctx, id, sid, req.Text)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update message")
 	}
@@ -363,29 +384,44 @@ func (s *Server) mapDBToProto(m dbgen.Message) *messagespb.Message {
 	return pb
 }
 
-func (s *Server) mapHistoryRowToProto(m dbgen.GetChatHistoryRow) *messagespb.Message {
-	pb := &messagespb.Message{
-		Id:       m.ID.String(),
-		ChatId:   m.DialogID.String(),
-		SenderId: m.AuthorID.String(),
-		Text:     m.Content,
-		SentAt:   m.CreatedAt.Format(time.RFC3339),
-		Sequence: m.Sequence,
-		IsEdited: m.IsEdited,
-		IsSystem: m.IsSystem,
-		Sender: &messagespb.User{
-			Id:        m.AuthorID.String(),
-			Username:  m.AuthorUsername.String,
-			FirstName: m.AuthorFirstName,
-			LastName:  m.AuthorLastName.String,
-			PhotoUrl:  m.AuthorPhotoUrl.String,
-		},
+func (s *Server) mapHistoryRowToProto(row dbgen.GetChatHistoryRow) *messagespb.Message {
+	msg := &messagespb.Message{
+		Id:       row.ID.String(),
+		ChatId:   row.DialogID.String(),
+		SenderId: row.AuthorID.String(),
+		Text:     row.Content,
+		SentAt:   row.CreatedAt.Format(time.RFC3339),
+		Sequence: row.Sequence,
+		IsEdited: row.IsEdited,
 	}
-	if m.ReplyToID.Valid {
-		rid := m.ReplyToID.UUID.String()
-		pb.ReplyToId = &rid
+
+	if row.ReplyToID.Valid {
+		replyID := row.ReplyToID.UUID.String()
+		msg.ReplyToId = &replyID
 	}
-	return pb
+
+	attachments, err := s.messageRepo.GetAttachmentsByMessageID(context.Background(), row.ID)
+	if err == nil && len(attachments) > 0 {
+		msg.Attachments = make([]*messagesv1.Attachment, 0, len(attachments))
+		for _, a := range attachments {
+			url := a.FileName
+			if s.s3 != nil {
+				if signed, err := s.s3.GetPresignedURL(context.Background(), a.FileName, time.Hour*24); err == nil {
+					url = signed
+				}
+			}
+
+			msg.Attachments = append(msg.Attachments, &messagesv1.Attachment{
+				Id:       a.ID.String(),
+				Type:     a.Type,
+				Url:      url,
+				FileName: a.FileName,
+				FileSize: a.FileSize,
+			})
+		}
+	}
+
+	return msg
 }
 
 func (s *Server) mapDBDialogToProto(d dbgen.Dialog) *chatv1.Chat {

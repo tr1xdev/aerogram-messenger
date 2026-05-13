@@ -6,6 +6,7 @@ import (
 
 	"github.com/graph-gophers/dataloader/v7"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
 	presencepb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
 	userpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
@@ -21,21 +22,26 @@ type Loaders struct {
 	MessageLoader  *dataloader.Loader[string, *model.Message]
 }
 
-func NewLoaders(userClient userpb.UserServiceClient, presenceClient presencepb.PresenceServiceClient, store *dbgen.Queries) *Loaders {
-	return &Loaders{
-		UserLoader: dataloader.NewBatchedLoader(newUserBatchFn(userClient)),
-		PresenceLoader: dataloader.NewBatchedLoader(
-			newPresenceBatchFn(presenceClient),
-			dataloader.WithCache[string, string](&dataloader.NoCache[string, string]{}),
-		),
-		MessageLoader: dataloader.NewBatchedLoader(newMessageBatchFn(store)),
+func NewLoaders(userClient userpb.UserServiceClient, presenceClient presencepb.PresenceServiceClient, store *dbgen.Queries, enricher *helpers.ChatEnricher) *Loaders {
+	l := &Loaders{}
+
+	l.UserLoader = dataloader.NewBatchedLoader(newUserBatchFn(userClient))
+	l.PresenceLoader = dataloader.NewBatchedLoader(
+		newPresenceBatchFn(presenceClient),
+		dataloader.WithCache[string, string](&dataloader.NoCache[string, string]{}),
+	)
+
+	if store != nil && enricher != nil {
+		l.MessageLoader = dataloader.NewBatchedLoader(newMessageBatchFn(store, enricher))
 	}
+
+	return l
 }
 
-func LoaderMiddleware(userClient userpb.UserServiceClient, presenceClient presencepb.PresenceServiceClient, store *dbgen.Queries) func(http.Handler) http.Handler {
+func LoaderMiddleware(userClient userpb.UserServiceClient, presenceClient presencepb.PresenceServiceClient, store *dbgen.Queries, enricher *helpers.ChatEnricher) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			l := NewLoaders(userClient, presenceClient, store)
+			l := NewLoaders(userClient, presenceClient, store, enricher)
 			ctx := AttachToContext(r.Context(), l)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

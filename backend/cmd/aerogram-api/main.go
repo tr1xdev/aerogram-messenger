@@ -94,7 +94,7 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	registerGRPCServices(grpcServer, db, rdb, emailSvc, cfg, pSvc)
+	registerGRPCServices(grpcServer, db, rdb, emailSvc, s3Storage, cfg, pSvc)
 
 	go func() {
 		log.Printf("gRPC server listening on %s", grpcAddr)
@@ -208,7 +208,7 @@ func main() {
 	log.Println("Server stopped")
 }
 
-func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pSvc *presence_svc.Server) {
+func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, s3Storage storage.Provider, cfg *config.Config, pSvc *presence_svc.Server) {
 	authLimiter := limiter.NewRedisLimiter(rdb)
 
 	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, authLimiter, rdb, mailer, cfg))
@@ -220,7 +220,7 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 		cfg.RateLimit.Chat,
 	))
 
-	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb, authLimiter, cfg.RateLimit.Messages))
+	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb, authLimiter, s3Storage, cfg.RateLimit.Messages))
 	presencev1.RegisterPresenceServiceServer(s, pSvc)
 
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db, authLimiter, cfg))
@@ -234,8 +234,13 @@ func initGraphQL(
 	geoSvc *geo_svc.Service,
 	uaSvc *ua_svc.Service,
 	pSvc *presence_svc.Server,
-	s3Storage *storage.S3Storage,
+	s3Storage storage.Provider,
 ) *handler.Server {
+	s3Concrete, ok := s3Storage.(*storage.S3Storage)
+	if !ok {
+		log.Fatal("failed to cast storage provider to S3Storage")
+	}
+
 	resolver := resolvers.NewResolver(
 		db,
 		db.Queries,
@@ -248,7 +253,7 @@ func initGraphQL(
 		rdb,
 		geoSvc,
 		uaSvc,
-		s3Storage,
+		s3Concrete,
 	)
 
 	return graph_api.NewGraphQLServer(resolver, cfg, db)

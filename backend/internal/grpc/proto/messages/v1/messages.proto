@@ -21,6 +21,14 @@ message User {
   string photo_url = 6;
 }
 
+message Attachment {
+  string id = 1;
+  string type = 2;
+  string url = 3;
+  string file_name = 4;
+  int64 file_size = 5;
+}
+
 message Message {
   string id = 1;
   string chat_id = 2;
@@ -31,10 +39,9 @@ message Message {
   bool is_edited = 7;
   optional string reply_to_id = 8;
   optional string forwarded_from_id = 9;
-  optional string media_url = 10;
-  optional string media_type = 11;
   bool is_system = 12;
   User sender = 13;
+  repeated Attachment attachments = 14;
 }
 
 message SendMessageRequest {
@@ -42,8 +49,7 @@ message SendMessageRequest {
   string sender_id = 2;
   string text = 3;
   optional string reply_to_id = 4;
-  optional string media_url = 5;
-  optional string media_type = 6;
+  repeated Attachment attachments = 5;
 }
 
 message SendMessageResponse {

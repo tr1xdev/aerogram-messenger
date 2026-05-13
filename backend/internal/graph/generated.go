@@ -185,7 +185,7 @@ type ComplexityRoot struct {
 		RemoveChatMember          func(childComplexity int, chatID string, userID string) int
 		RevokeChatInvite          func(childComplexity int, chatID string, inviteCode string) int
 		RotateBotToken            func(childComplexity int, id string) int
-		SendMessage               func(childComplexity int, chatID string, text string, replyToID *string) int
+		SendMessage               func(childComplexity int, chatID string, text string, replyToID *string, attachments []*graphql.Upload) int
 		SendTypingEvent           func(childComplexity int, chatID string, typing bool) int
 		SignUp                    func(childComplexity int, input model.SignUpInput) int
 		TerminateAllOtherSessions func(childComplexity int) int
@@ -342,7 +342,7 @@ type MutationResolver interface {
 	UpdateChatPermissions(ctx context.Context, chatID string, permissions model.ChatPermissionsInput) (*model.SuccessResult, error)
 	UpdateChatMetadata(ctx context.Context, id string, title *string, slug *string) (model.ChatResult, error)
 	SendTypingEvent(ctx context.Context, chatID string, typing bool) (bool, error)
-	SendMessage(ctx context.Context, chatID string, text string, replyToID *string) (model.SendMessageResult, error)
+	SendMessage(ctx context.Context, chatID string, text string, replyToID *string, attachments []*graphql.Upload) (model.SendMessageResult, error)
 	UpdateMessage(ctx context.Context, id string, text string) (model.SendMessageResult, error)
 	DeleteMessage(ctx context.Context, id string) (bool, error)
 	MarkDialogAsRead(ctx context.Context, chatID string) (bool, error)
@@ -1053,7 +1053,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SendMessage(childComplexity, args["chatId"].(string), args["text"].(string), args["replyToId"].(*string)), true
+		return e.complexity.Mutation.SendMessage(childComplexity, args["chatId"].(string), args["text"].(string), args["replyToId"].(*string), args["attachments"].([]*graphql.Upload)), true
 	case "Mutation.sendTypingEvent":
 		if e.complexity.Mutation.SendTypingEvent == nil {
 			break
@@ -2082,6 +2082,11 @@ func (ec *executionContext) field_Mutation_sendMessage_args(ctx context.Context,
 		return nil, err
 	}
 	args["replyToId"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "attachments", ec.unmarshalOUpload2ᚕᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUploadᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["attachments"] = arg3
 	return args, nil
 }
 
@@ -5739,7 +5744,7 @@ func (ec *executionContext) _Mutation_sendMessage(ctx context.Context, field gra
 		ec.fieldContext_Mutation_sendMessage,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().SendMessage(ctx, fc.Args["chatId"].(string), fc.Args["text"].(string), fc.Args["replyToId"].(*string))
+			return ec.resolvers.Mutation().SendMessage(ctx, fc.Args["chatId"].(string), fc.Args["text"].(string), fc.Args["replyToId"].(*string), fc.Args["attachments"].([]*graphql.Upload))
 		},
 		nil,
 		ec.marshalNSendMessageResult2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋgraphᚋmodelᚐSendMessageResult,
@@ -15112,6 +15117,28 @@ func (ec *executionContext) marshalNUpload2githubᚗcomᚋ99designsᚋgqlgenᚋg
 	return res
 }
 
+func (ec *executionContext) unmarshalNUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx context.Context, v any) (*graphql.Upload, error) {
+	res, err := graphql.UnmarshalUpload(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx context.Context, sel ast.SelectionSet, v *graphql.Upload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalUpload(*v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) marshalNUser2githubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUser(ctx context.Context, sel ast.SelectionSet, v dbgen.User) graphql.Marshaler {
 	return ec._User(ctx, sel, &v)
 }
@@ -15698,6 +15725,42 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOUpload2ᚕᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUploadᚄ(ctx context.Context, v any) ([]*graphql.Upload, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]*graphql.Upload, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOUpload2ᚕᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUploadᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql.Upload) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOUser2ᚖgithubᚗcomᚋtr1xdevᚋaerogramᚑmessengerᚋinternalᚋdatabaseᚋsqlcᚋgenᚐUser(ctx context.Context, sel ast.SelectionSet, v *dbgen.User) graphql.Marshaler {

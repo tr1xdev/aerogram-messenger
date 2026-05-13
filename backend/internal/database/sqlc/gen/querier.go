@@ -34,6 +34,7 @@ type Querier interface {
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
 	FindNewDialogOwner(ctx context.Context, arg FindNewDialogOwnerParams) (uuid.UUID, error)
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
+	GetAttachmentsByMessageID(ctx context.Context, messageID uuid.UUID) ([]MessageAttachment, error)
 	GetAttachmentsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]MessageAttachment, error)
 	GetBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) ([]User, error)
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error)
@@ -86,7 +87,6 @@ type Querier interface {
 	UpdateDialogSettings(ctx context.Context, arg UpdateDialogSettingsParams) error
 	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error
 	UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error)
-	UpdateMessageExtended(ctx context.Context, arg UpdateMessageExtendedParams) (Message, error)
 	UpdateSessionActivity(ctx context.Context, id uuid.UUID) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserPhoto(ctx context.Context, arg UpdateUserPhotoParams) (User, error)

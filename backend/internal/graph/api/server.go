@@ -80,7 +80,7 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 				newCtx = context.WithValue(newCtx, middleware.AuthSessionIDKey, sidStr)
 			}
 
-			l := loaders.NewLoaders(res.UserClient, res.PresenceClient, db.Queries)
+			l := loaders.NewLoaders(res.UserClient, res.PresenceClient, db.Queries, res.Enricher)
 			newCtx = loaders.AttachToContext(newCtx, l)
 
 			go func(userID string, socketCtx context.Context) {
@@ -113,11 +113,9 @@ func NewGraphQLServer(res *resolvers.Resolver, cfg *config.Config, db *database.
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
 	srv.AddTransport(transport.POST{})
-	srv.AddTransport(transport.MultipartForm{})
-
 	srv.AddTransport(transport.MultipartForm{
-		MaxMemory:     32 << 20, // 32MB
-		MaxUploadSize: 50 << 20, // 50MB
+		MaxMemory:     32 << 20,
+		MaxUploadSize: 50 << 20,
 	})
 
 	return srv

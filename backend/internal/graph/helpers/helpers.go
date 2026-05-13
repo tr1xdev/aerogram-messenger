@@ -19,10 +19,10 @@ import (
 
 type ChatEnricher struct {
 	store dbgen.Querier
-	s3    *storage.S3Storage
+	s3    storage.Provider
 }
 
-func NewChatEnricher(store dbgen.Querier, s3 *storage.S3Storage) *ChatEnricher {
+func NewChatEnricher(store dbgen.Querier, s3 storage.Provider) *ChatEnricher {
 	return &ChatEnricher{
 		store: store,
 		s3:    s3,
@@ -142,7 +142,51 @@ func (e *ChatEnricher) EnrichMessage(ctx context.Context, messageID string) (*mo
 		return nil, err
 	}
 
-	return MapDBMessageToModel(&msg), nil
+	mapped := e.MapDBMessageToModel(&msg)
+	mapped.ChatID = EncodeGlobalID("Chat", msg.DialogID.String())
+
+	author, err := e.store.GetUserByID(ctx, msg.AuthorID)
+	if err == nil {
+		if author.PhotoUrl.Valid && author.PhotoUrl.String != "" && e.s3 != nil {
+			if signed, err := e.s3.GetPresignedURL(ctx, author.PhotoUrl.String, time.Hour*24); err == nil {
+				author.PhotoUrl.String = signed
+			}
+		}
+		mapped.Sender = &author
+	}
+
+	if msg.ReplyToID.Valid {
+		replyMsg, err := e.store.GetMessageByID(ctx, msg.ReplyToID.UUID)
+		if err == nil {
+			mapped.ReplyTo = e.MapDBMessageToModel(&replyMsg)
+			replyAuthor, err := e.store.GetUserByID(ctx, replyMsg.AuthorID)
+			if err == nil {
+				mapped.ReplyTo.Sender = &replyAuthor
+			}
+		}
+	}
+
+	attachments, err := e.store.GetAttachmentsByMessageID(ctx, uid)
+	if err == nil && len(attachments) > 0 {
+		mapped.Attachments = make([]*model.Attachment, 0, len(attachments))
+		for _, a := range attachments {
+			url := a.FileName
+			if e.s3 != nil {
+				if signed, err := e.s3.GetPresignedURL(ctx, a.FileName, time.Hour*24); err == nil {
+					url = signed
+				}
+			}
+			mapped.Attachments = append(mapped.Attachments, &model.Attachment{
+				ID:       EncodeGlobalID("Attachment", a.ID.String()),
+				Type:     a.Type,
+				URL:      url,
+				FileName: a.FileName,
+				FileSize: a.FileSize,
+			})
+		}
+	}
+
+	return mapped, nil
 }
 
 func (e *ChatEnricher) EnrichUser(ctx context.Context, userID string) (*dbgen.User, error) {
@@ -155,8 +199,10 @@ func (e *ChatEnricher) EnrichUser(ctx context.Context, userID string) (*dbgen.Us
 		return nil, err
 	}
 	if user.PhotoUrl.Valid && user.PhotoUrl.String != "" {
-		if signed, err := e.s3.GetPresignedURL(ctx, user.PhotoUrl.String, time.Hour*24); err == nil {
-			user.PhotoUrl.String = signed
+		if e.s3 != nil {
+			if signed, err := e.s3.GetPresignedURL(ctx, user.PhotoUrl.String, time.Hour*24); err == nil {
+				user.PhotoUrl.String = signed
+			}
 		}
 	}
 	return &user, nil

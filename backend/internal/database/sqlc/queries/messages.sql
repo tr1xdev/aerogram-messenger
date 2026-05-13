@@ -1,9 +1,9 @@
 -- name: CreateMessage :one
 INSERT INTO messages (
-    id, dialog_id, author_id, content, is_encrypted,
-    encryption_iv, reply_to_id, forward_from_id, is_system, is_deleted, created_at, updated_at
+    id, dialog_id, author_id, content, reply_to_id,
+    forward_from_id, is_system, is_deleted, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, false, NOW(), NOW()
+    $1, $2, $3, $4, $5, $6, $7, false, NOW(), NOW()
 ) RETURNING *;
 
 -- name: GetMessageByID :one
@@ -84,15 +84,6 @@ LIMIT 1;
 -- name: GetMessagesByIDs :many
 SELECT * FROM messages WHERE id = ANY($1::uuid[]);
 
--- name: UpdateMessageExtended :one
-UPDATE messages
-SET content = $2,
-    encryption_iv = $3,
-    is_edited = true,
-    updated_at = NOW()
-WHERE id = $1 AND author_id = $4
-RETURNING *;
-
 -- name: CreateAttachment :one
 INSERT INTO message_attachments (
     id, message_id, type, file_name, file_size, content_type, created_at
@@ -103,4 +94,9 @@ INSERT INTO message_attachments (
 -- name: GetAttachmentsByMessageIDs :many
 SELECT * FROM message_attachments
 WHERE message_id = ANY($1::uuid[])
+ORDER BY created_at ASC;
+
+-- name: GetAttachmentsByMessageID :many
+SELECT * FROM message_attachments
+WHERE message_id = $1
 ORDER BY created_at ASC;

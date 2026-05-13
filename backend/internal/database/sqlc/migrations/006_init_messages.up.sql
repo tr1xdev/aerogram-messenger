@@ -3,8 +3,6 @@ CREATE TABLE IF NOT EXISTS messages (
     dialog_id       UUID NOT NULL REFERENCES dialogs(id) ON DELETE CASCADE,
     author_id       UUID NOT NULL REFERENCES users(id),
     content         TEXT NOT NULL,
-    is_encrypted    BOOLEAN NOT NULL DEFAULT FALSE,
-    encryption_iv   TEXT,
     sequence        BIGSERIAL NOT NULL,
     reply_to_id     UUID REFERENCES messages(id) ON DELETE SET NULL,
     forward_from_id UUID,
