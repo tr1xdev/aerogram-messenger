@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useFragment, graphql } from "react-relay";
-import { MessageBubble } from "./message-bubble";
+import { MessageBubble } from "./message-bubble/index";
 import { DateDivider } from "./date-divider";
 import { useChatScroll } from "../lib/chat/use-chat-scroll";
 
@@ -112,7 +112,7 @@ const MessageItem = memo(
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
         className={cn(
-          "w-full flex flex-col",
+          "w-full flex flex-col min-w-0",
           isFirstInGroup ? "mt-3 first:mt-0" : "",
         )}
       >
@@ -190,19 +190,22 @@ export const MessageList = memo(function MessageList({
   }, [isAtBottom, onScrollAtBottomChange]);
 
   return (
-    <div className="h-full w-full relative bg-transparent overflow-hidden">
-      <ScrollArea ref={scrollRef} type="auto" className="h-full w-full">
+    <div className="h-full w-full relative bg-transparent overflow-hidden isolate flex flex-col">
+      <ScrollArea ref={scrollRef} type="auto" className="flex-1 w-full min-h-0">
         <div
-          className="px-2 sm:px-4 py-6 mx-auto min-h-full flex flex-col w-full max-w-4xl"
-          style={{ overflowAnchor: "none" }}
+          className="px-2 sm:px-4 py-6 mx-auto min-h-full flex flex-col w-full max-w-4xl min-w-0"
+          style={{
+            overflowAnchor: "none",
+            contain: "inline-size",
+          }}
         >
           {groupedMessages.map(
             (g: { date: string; items: MessageItemData[] }) => (
-              <div key={g.date} className="flex flex-col mb-6 w-full">
+              <div key={g.date} className="flex flex-col mb-6 w-full min-w-0">
                 <div className="mb-4">
                   <DateDivider date={g.items[0].sentAt} />
                 </div>
-                <div className="flex flex-col space-y-0.5 w-full">
+                <div className="flex flex-col space-y-0.5 w-full min-w-0">
                   {g.items.map((m: MessageItemData, index: number) => (
                     <MessageItem
                       key={m.id}
