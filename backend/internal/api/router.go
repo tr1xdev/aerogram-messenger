@@ -47,6 +47,7 @@ func NewRouter(c RouterConfig) *chi.Mux {
 			time.Second,
 		))
 		r.Handle("/query", c.GQLServer)
+		r.Get("/api/media/*", c.HandleGetAttachment)
 	})
 
 	return r
