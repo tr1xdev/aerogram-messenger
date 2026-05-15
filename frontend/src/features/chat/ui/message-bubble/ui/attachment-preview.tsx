@@ -5,6 +5,7 @@ import {
   useRef,
   type ReactElement,
   type ReactNode,
+  type PointerEvent,
   useCallback,
 } from "react";
 import { createPortal } from "react-dom";
@@ -18,6 +19,8 @@ import {
   ShieldAlert,
   FileText,
   ImageOff,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useFileDownload } from "../hooks/use-file-download";
@@ -31,8 +34,16 @@ interface Attachment {
 
 interface AttachmentPreviewProps {
   file: Attachment;
+  allFiles?: readonly Attachment[];
   children: ReactNode;
   className?: string;
+}
+
+interface DragConstraints {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
 }
 
 const formatBytes = (bytes: string | number | null): string => {
@@ -45,13 +56,16 @@ const formatBytes = (bytes: string | number | null): string => {
 
 export const AttachmentPreview = ({
   file,
+  allFiles = [],
   children,
   className = "",
 }: AttachmentPreviewProps): ReactElement => {
   const { downloadFile } = useFileDownload();
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [activeIndex, setActiveIndex] = useState<number>(0);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isZoomed, setIsZoomed] = useState<boolean>(false);
+  const [zoomOrigin, setZoomOrigin] = useState<string>("center center");
   const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -61,7 +75,7 @@ export const AttachmentPreview = ({
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
-  const [constraints, setConstraints] = useState({
+  const [constraints, setConstraints] = useState<DragConstraints>({
     left: 0,
     right: 0,
     top: 0,
@@ -70,12 +84,40 @@ export const AttachmentPreview = ({
 
   const ZOOM_LEVEL: number = 2.5;
 
+  const filesList = useMemo((): readonly Attachment[] => {
+    return allFiles.length > 0 ? allFiles : [file];
+  }, [allFiles, file]);
+
+  const currentFile = useMemo((): Attachment => {
+    return filesList[activeIndex] ?? file;
+  }, [filesList, activeIndex, file]);
+
+  useEffect((): void => {
+    if (isOpen) {
+      const idx: number = filesList.findIndex(
+        (f: Attachment): boolean => f.url === file.url,
+      );
+      if (idx !== -1) {
+        setActiveIndex(idx);
+      }
+    }
+  }, [isOpen, filesList, file]);
+
+  useEffect((): void => {
+    setIsImageLoading(true);
+    setHasError(false);
+    setIsZoomed(false);
+    setZoomOrigin("center center");
+    setTextContent(null);
+    setShowConfirm(false);
+  }, [activeIndex]);
+
   const fileExtension: string = useMemo((): string => {
-    return file.fileName.split(".").pop()?.toLowerCase() ?? "";
-  }, [file.fileName]);
+    return currentFile.fileName.split(".").pop()?.toLowerCase() ?? "";
+  }, [currentFile.fileName]);
 
   const isImage: boolean = useMemo((): boolean => {
-    if (file.contentType?.startsWith("image/")) return true;
+    if (currentFile.contentType?.startsWith("image/")) return true;
     const imageExtensions: string[] = [
       "jpg",
       "jpeg",
@@ -86,7 +128,7 @@ export const AttachmentPreview = ({
       "avif",
     ];
     return imageExtensions.includes(fileExtension);
-  }, [file.contentType, fileExtension]);
+  }, [currentFile.contentType, fileExtension]);
 
   const isTextFile: boolean = useMemo((): boolean => {
     const textExtensions: string[] = [
@@ -106,9 +148,9 @@ export const AttachmentPreview = ({
     ];
     return (
       textExtensions.includes(fileExtension) ||
-      (file.contentType?.startsWith("text/") ?? false)
+      (currentFile.contentType?.startsWith("text/") ?? false)
     );
-  }, [fileExtension, file.contentType]);
+  }, [fileExtension, currentFile.contentType]);
 
   const isDangerous: boolean = useMemo((): boolean => {
     const dangerousExtensions: string[] = [
@@ -126,7 +168,7 @@ export const AttachmentPreview = ({
   const fetchTextContent = useCallback(async (): Promise<void> => {
     setIsTextLoading(true);
     try {
-      const response: Response = await fetch(file.url);
+      const response: Response = await fetch(currentFile.url);
       if (!response.ok) throw new Error();
       const text: string = await response.text();
       setTextContent(text);
@@ -135,7 +177,7 @@ export const AttachmentPreview = ({
     } finally {
       setIsTextLoading(false);
     }
-  }, [file.url]);
+  }, [currentFile.url]);
 
   useEffect((): void => {
     if (isOpen && isTextFile && !textContent) {
@@ -172,6 +214,7 @@ export const AttachmentPreview = ({
   const handleClose = (): void => {
     setIsOpen(false);
     setIsZoomed(false);
+    setZoomOrigin("center center");
     setIsImageLoading(true);
     setHasError(false);
     setShowConfirm(false);
@@ -185,14 +228,41 @@ export const AttachmentPreview = ({
   };
 
   const confirmDownload = async (): Promise<void> => {
-    await downloadFile(file.url, file.fileName);
+    await downloadFile(currentFile.url, currentFile.fileName);
     setShowConfirm(false);
   };
 
   const handleDownloadClick = (): void => {
     if (isDangerous) setShowConfirm(true);
-    else void downloadFile(file.url, file.fileName);
+    else void downloadFile(currentFile.url, currentFile.fileName);
   };
+
+  const handlePrev = useCallback((): void => {
+    if (filesList.length <= 1) return;
+    setActiveIndex((prev: number): number =>
+      prev > 0 ? prev - 1 : filesList.length - 1,
+    );
+  }, [filesList]);
+
+  const handleNext = useCallback((): void => {
+    if (filesList.length <= 1) return;
+    setActiveIndex((prev: number): number =>
+      prev < filesList.length - 1 ? prev + 1 : 0,
+    );
+  }, [filesList]);
+
+  useEffect((): (() => void) => {
+    if (!isOpen) return (): void => {};
+
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "Escape") handleClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return (): void => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, handlePrev, handleNext]);
 
   useEffect((): (() => void) => {
     if (!isOpen) return (): void => {};
@@ -206,13 +276,13 @@ export const AttachmentPreview = ({
   const copyToClipboard = async (): Promise<void> => {
     try {
       if (isImage && !hasError) {
-        const response: Response = await fetch(file.url);
+        const response: Response = await fetch(currentFile.url);
         const blob: Blob = await response.blob();
         await navigator.clipboard.write([
           new ClipboardItem({ [blob.type]: blob }),
         ]);
       } else {
-        await navigator.clipboard.writeText(textContent || file.url);
+        await navigator.clipboard.writeText(textContent || currentFile.url);
       }
       setIsCopied(true);
       setTimeout((): void => setIsCopied(false), 2000);
@@ -237,9 +307,13 @@ export const AttachmentPreview = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[9999] bg-black/95 flex flex-col overflow-hidden"
+              className="fixed inset-0 z-[9999] bg-black/95 flex flex-col overflow-hidden select-none"
             >
               <div className="absolute inset-0 z-0" onClick={handleClose} />
+
+              <div className="absolute top-6 left-6 z-[101] text-white/80 bg-zinc-900/90 border border-white/10 px-4 py-2 rounded-full font-mono text-sm backdrop-blur-md">
+                {activeIndex + 1} / {filesList.length}
+              </div>
 
               <div className="absolute top-6 right-6 z-[101] flex items-center gap-3">
                 <button
@@ -256,7 +330,7 @@ export const AttachmentPreview = ({
                 <button
                   type="button"
                   onClick={(): void => {
-                    window.open(file.url, "_blank");
+                    window.open(currentFile.url, "_blank");
                   }}
                   className="p-3 bg-zinc-900/90 text-white rounded-full border border-white/10 hover:bg-zinc-800 backdrop-blur-md transition-colors"
                 >
@@ -269,14 +343,36 @@ export const AttachmentPreview = ({
                 >
                   <Download size={20} />
                 </button>
+
+                <div className="w-px h-6 bg-white/20 mx-1 self-center" />
+
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="p-3 bg-zinc-900/90 text-white rounded-full border border-white/10 hover:bg-zinc-800 backdrop-blur-md ml-2 transition-colors"
+                  className="p-3 bg-zinc-900/90 text-white rounded-full border border-white/10 hover:bg-zinc-800 backdrop-blur-md transition-colors"
                 >
-                  <X size={24} />
+                  <X size={20} />
                 </button>
               </div>
+
+              {filesList.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handlePrev}
+                    className="absolute left-6 top-1/2 -translate-y-1/2 z-[101] p-4 bg-zinc-900/60 text-white rounded-full border border-white/5 hover:bg-zinc-800/90 hover:border-white/20 backdrop-blur-sm transition-all active:scale-95 pointer-events-auto"
+                  >
+                    <ChevronLeft size={28} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="absolute right-6 top-1/2 -translate-y-1/2 z-[101] p-4 bg-zinc-900/60 text-white rounded-full border border-white/5 hover:bg-zinc-800/90 hover:border-white/20 backdrop-blur-sm transition-all active:scale-95 pointer-events-auto"
+                  >
+                    <ChevronRight size={28} />
+                  </button>
+                </>
+              )}
 
               <div
                 ref={containerRef}
@@ -303,6 +399,7 @@ export const AttachmentPreview = ({
                       </motion.div>
                     ) : (
                       <motion.div
+                        key={activeIndex}
                         drag={isZoomed}
                         dragConstraints={constraints}
                         dragMomentum={false}
@@ -311,28 +408,44 @@ export const AttachmentPreview = ({
                         onDragEnd={(): void => {
                           setTimeout((): void => setIsDragging(false), 50);
                         }}
-                        initial={{ scale: 0.98, opacity: 0 }}
+                        initial={{ scale: 0.95, opacity: 0 }}
                         animate={{
                           scale: isZoomed ? ZOOM_LEVEL : 1,
                           opacity: isImageLoading ? 0 : 1,
                           x: isZoomed ? undefined : 0,
                           y: isZoomed ? undefined : 0,
                         }}
+                        exit={{ scale: 0.95, opacity: 0 }}
                         transition={{
                           type: "spring",
                           mass: 0.5,
                           stiffness: 400,
                           damping: 35,
                         }}
-                        style={{ willChange: "transform", touchAction: "none" }}
+                        style={{
+                          willChange: "transform",
+                          touchAction: "none",
+                          transformOrigin: zoomOrigin,
+                        }}
                         className="pointer-events-auto"
                       >
                         <img
                           ref={imageRef}
-                          src={file.url}
-                          alt={file.fileName}
-                          onPointerUp={(e: React.PointerEvent): void => {
+                          src={currentFile.url}
+                          alt={currentFile.fileName}
+                          onPointerUp={(
+                            e: PointerEvent<HTMLImageElement>,
+                          ): void => {
                             if (e.button !== 0 || isDragging) return;
+                            if (!isZoomed) {
+                              const rect: DOMRect =
+                                e.currentTarget.getBoundingClientRect();
+                              const x: number =
+                                ((e.clientX - rect.left) / rect.width) * 100;
+                              const y: number =
+                                ((e.clientY - rect.top) / rect.height) * 100;
+                              setZoomOrigin(`${x}% ${y}%`);
+                            }
                             toggleZoom();
                           }}
                           onLoad={(): void => {
@@ -343,7 +456,7 @@ export const AttachmentPreview = ({
                             setHasError(true);
                             setIsImageLoading(false);
                           }}
-                          className={`max-w-[95vw] max-h-[85vh] object-contain shadow-2xl rounded-sm select-none ${isZoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
+                          className={`max-w-[75vw] max-h-[72vh] object-contain shadow-2xl rounded-sm select-none ${isZoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
                           draggable={false}
                         />
                       </motion.div>
@@ -351,14 +464,16 @@ export const AttachmentPreview = ({
                   </div>
                 ) : isTextFile ? (
                   <motion.div
+                    key={activeIndex}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
                     className="pointer-events-auto bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl mx-4 overflow-hidden"
                   >
                     <div className="p-4 border-b border-white/5 flex items-center gap-3 bg-white/[0.02]">
                       <FileText size={18} className="text-zinc-400" />
                       <span className="text-zinc-300 text-sm font-medium truncate">
-                        {file.fileName}
+                        {currentFile.fileName}
                       </span>
                     </div>
                     <div className="flex-1 overflow-auto p-6 scrollbar-thin scrollbar-thumb-zinc-700">
@@ -375,8 +490,10 @@ export const AttachmentPreview = ({
                   </motion.div>
                 ) : (
                   <motion.div
+                    key={activeIndex}
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
                     className="pointer-events-auto bg-zinc-900 border border-white/10 p-10 rounded-2xl flex flex-col items-center gap-6 max-w-sm w-full shadow-2xl mx-4"
                   >
                     <div className="w-20 h-20 bg-zinc-800 rounded-3xl flex items-center justify-center shadow-inner">
@@ -384,12 +501,12 @@ export const AttachmentPreview = ({
                     </div>
                     <div className="text-center space-y-2">
                       <h3 className="text-white font-semibold text-lg line-clamp-2 break-all px-2">
-                        {file.fileName}
+                        {currentFile.fileName}
                       </h3>
                       <div className="flex items-center justify-center gap-2 text-zinc-500 text-sm font-medium">
                         <span>{fileExtension.toUpperCase()}</span>
                         <span className="w-1 h-1 bg-zinc-700 rounded-full" />
-                        <span>{formatBytes(file.fileSize)}</span>
+                        <span>{formatBytes(currentFile.fileSize)}</span>
                       </div>
                     </div>
                     <button
@@ -431,7 +548,7 @@ export const AttachmentPreview = ({
                           This file type may harm your computer. Do you really
                           want to download{" "}
                           <span className="text-zinc-200 break-all font-medium">
-                            [{file.fileName}]
+                            [{currentFile.fileName}]
                           </span>
                           ?
                         </p>
@@ -458,7 +575,8 @@ export const AttachmentPreview = ({
               </div>
 
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-zinc-500 text-xs font-medium tracking-wide select-none bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/5 z-[101]">
-                {file.fileName.toUpperCase()} • {formatBytes(file.fileSize)}
+                {currentFile.fileName.toUpperCase()} •{" "}
+                {formatBytes(currentFile.fileSize)}
               </div>
             </motion.div>
           )}

@@ -8,9 +8,21 @@ type Attachment = NonNullable<
   messageBubble_message$data["attachments"]
 >[number];
 
+interface PreviewAttachment {
+  readonly url: string;
+  readonly fileName: string;
+  readonly fileSize: string | number | null;
+  readonly contentType: string | null;
+}
+
 interface AttachmentListProps {
   attachments: readonly Attachment[];
   isMe: boolean;
+}
+
+interface FilteredAttachments {
+  readonly images: readonly Attachment[];
+  readonly files: readonly Attachment[];
 }
 
 export const AttachmentList = ({
@@ -18,7 +30,7 @@ export const AttachmentList = ({
   isMe,
 }: AttachmentListProps): ReactElement | null => {
   const { images, files } = useMemo(
-    () => ({
+    (): FilteredAttachments => ({
       images: attachments.filter(
         (a: Attachment): boolean =>
           a.contentType?.startsWith("image/") ?? false,
@@ -30,6 +42,17 @@ export const AttachmentList = ({
     }),
     [attachments],
   );
+
+  const mappedAllFiles = useMemo((): readonly PreviewAttachment[] => {
+    return attachments.map(
+      (a: Attachment): PreviewAttachment => ({
+        url: a.url ?? "",
+        fileName: a.fileName ?? "file",
+        fileSize: a.fileSize ?? "0",
+        contentType: a.contentType ?? "application/octet-stream",
+      }),
+    );
+  }, [attachments]);
 
   if (attachments.length === 0) return null;
 
@@ -46,6 +69,7 @@ export const AttachmentList = ({
             (img: Attachment): ReactElement => (
               <AttachmentPreview
                 key={img.id}
+                allFiles={mappedAllFiles}
                 file={{
                   url: img.url ?? "",
                   fileName: img.fileName ?? "image",
@@ -72,6 +96,7 @@ export const AttachmentList = ({
         (file: Attachment): ReactElement => (
           <AttachmentPreview
             key={file.id}
+            allFiles={mappedAllFiles}
             file={{
               url: file.url ?? "",
               fileName: file.fileName ?? "file",
