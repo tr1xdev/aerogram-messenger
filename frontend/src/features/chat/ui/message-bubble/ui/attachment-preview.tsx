@@ -5,6 +5,7 @@ import {
   useRef,
   type ReactElement,
   type ReactNode,
+  useCallback,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -16,6 +17,7 @@ import {
   FileIcon,
   ShieldAlert,
   FileText,
+  ImageOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useFileDownload } from "../hooks/use-file-download";
@@ -51,6 +53,7 @@ export const AttachmentPreview = ({
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isZoomed, setIsZoomed] = useState<boolean>(false);
   const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
+  const [hasError, setHasError] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [showConfirm, setShowConfirm] = useState<boolean>(false);
   const [textContent, setTextContent] = useState<string | null>(null);
@@ -120,25 +123,25 @@ export const AttachmentPreview = ({
     return dangerousExtensions.includes(fileExtension);
   }, [fileExtension]);
 
-  useEffect((): void => {
-    if (isOpen && isTextFile && !textContent) {
-      void fetchTextContent();
-    }
-  }, [isOpen, isTextFile]);
-
-  const fetchTextContent = async (): Promise<void> => {
+  const fetchTextContent = useCallback(async (): Promise<void> => {
     setIsTextLoading(true);
     try {
       const response: Response = await fetch(file.url);
+      if (!response.ok) throw new Error();
       const text: string = await response.text();
       setTextContent(text);
-    } catch (err: unknown) {
-      console.error(err);
+    } catch {
       setTextContent("Failed to load file content.");
     } finally {
       setIsTextLoading(false);
     }
-  };
+  }, [file.url]);
+
+  useEffect((): void => {
+    if (isOpen && isTextFile && !textContent) {
+      void fetchTextContent();
+    }
+  }, [isOpen, isTextFile, textContent, fetchTextContent]);
 
   const calculateConstraints = (): void => {
     if (!containerRef.current || !imageRef.current) return;
@@ -170,11 +173,13 @@ export const AttachmentPreview = ({
     setIsOpen(false);
     setIsZoomed(false);
     setIsImageLoading(true);
+    setHasError(false);
     setShowConfirm(false);
     setTextContent(null);
   };
 
   const toggleZoom = (): void => {
+    if (hasError) return;
     if (!isZoomed) setTimeout(calculateConstraints, 50);
     setIsZoomed((prev: boolean): boolean => !prev);
   };
@@ -200,7 +205,7 @@ export const AttachmentPreview = ({
 
   const copyToClipboard = async (): Promise<void> => {
     try {
-      if (isImage) {
+      if (isImage && !hasError) {
         const response: Response = await fetch(file.url);
         const blob: Blob = await response.blob();
         await navigator.clipboard.write([
@@ -279,52 +284,70 @@ export const AttachmentPreview = ({
               >
                 {isImage ? (
                   <div className="relative flex items-center justify-center w-full h-full overflow-hidden">
-                    {isImageLoading && (
+                    {isImageLoading && !hasError && (
                       <div className="absolute inset-0 flex items-center justify-center z-10">
                         <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                       </div>
                     )}
-                    <motion.div
-                      drag={isZoomed}
-                      dragConstraints={constraints}
-                      dragMomentum={false}
-                      dragElastic={0}
-                      onDragStart={(): void => setIsDragging(true)}
-                      onDragEnd={(): void => {
-                        setTimeout((): void => setIsDragging(false), 50);
-                      }}
-                      initial={{ scale: 0.98, opacity: 0 }}
-                      animate={{
-                        scale: isZoomed ? ZOOM_LEVEL : 1,
-                        opacity: isImageLoading ? 0 : 1,
-                        x: isZoomed ? undefined : 0,
-                        y: isZoomed ? undefined : 0,
-                      }}
-                      transition={{
-                        type: "spring",
-                        mass: 0.5,
-                        stiffness: 400,
-                        damping: 35,
-                      }}
-                      style={{ willChange: "transform", touchAction: "none" }}
-                      className="pointer-events-auto"
-                    >
-                      <img
-                        ref={imageRef}
-                        src={file.url}
-                        alt={file.fileName}
-                        onPointerUp={(e: React.PointerEvent): void => {
-                          if (e.button !== 0 || isDragging) return;
-                          toggleZoom();
+
+                    {hasError ? (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex flex-col items-center gap-4 text-zinc-500 pointer-events-auto"
+                      >
+                        <ImageOff size={48} strokeWidth={1.5} />
+                        <span className="text-sm font-medium">
+                          Image could not be loaded
+                        </span>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        drag={isZoomed}
+                        dragConstraints={constraints}
+                        dragMomentum={false}
+                        dragElastic={0}
+                        onDragStart={(): void => setIsDragging(true)}
+                        onDragEnd={(): void => {
+                          setTimeout((): void => setIsDragging(false), 50);
                         }}
-                        onLoad={(): void => {
-                          setIsImageLoading(false);
-                          calculateConstraints();
+                        initial={{ scale: 0.98, opacity: 0 }}
+                        animate={{
+                          scale: isZoomed ? ZOOM_LEVEL : 1,
+                          opacity: isImageLoading ? 0 : 1,
+                          x: isZoomed ? undefined : 0,
+                          y: isZoomed ? undefined : 0,
                         }}
-                        className={`max-w-[95vw] max-h-[85vh] object-contain shadow-2xl rounded-sm select-none ${isZoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
-                        draggable={false}
-                      />
-                    </motion.div>
+                        transition={{
+                          type: "spring",
+                          mass: 0.5,
+                          stiffness: 400,
+                          damping: 35,
+                        }}
+                        style={{ willChange: "transform", touchAction: "none" }}
+                        className="pointer-events-auto"
+                      >
+                        <img
+                          ref={imageRef}
+                          src={file.url}
+                          alt={file.fileName}
+                          onPointerUp={(e: React.PointerEvent): void => {
+                            if (e.button !== 0 || isDragging) return;
+                            toggleZoom();
+                          }}
+                          onLoad={(): void => {
+                            setIsImageLoading(false);
+                            calculateConstraints();
+                          }}
+                          onError={(): void => {
+                            setHasError(true);
+                            setIsImageLoading(false);
+                          }}
+                          className={`max-w-[95vw] max-h-[85vh] object-contain shadow-2xl rounded-sm select-none ${isZoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
+                          draggable={false}
+                        />
+                      </motion.div>
+                    )}
                   </div>
                 ) : isTextFile ? (
                   <motion.div
