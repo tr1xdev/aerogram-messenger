@@ -116,7 +116,8 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		if upload == nil {
 			continue
 		}
-		fileName := uuid.New().String() + "_" + upload.Filename
+
+		fileName := "attachments/" + uuid.New().String() + "_" + upload.Filename
 
 		_, err := r.Storage.UploadFile(ctx, fileName, upload.File, upload.ContentType)
 		if err != nil {
