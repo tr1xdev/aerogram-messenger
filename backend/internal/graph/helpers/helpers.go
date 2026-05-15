@@ -170,16 +170,11 @@ func (e *ChatEnricher) EnrichMessage(ctx context.Context, messageID string) (*mo
 	if err == nil && len(attachments) > 0 {
 		mapped.Attachments = make([]*model.Attachment, 0, len(attachments))
 		for _, a := range attachments {
-			url := a.FileName
-			if e.s3 != nil {
-				if signed, err := e.s3.GetPresignedURL(ctx, a.FileName, time.Hour*24); err == nil {
-					url = signed
-				}
-			}
+			cleanPath := strings.TrimPrefix(a.FileName, "attachments/")
 			mapped.Attachments = append(mapped.Attachments, &model.Attachment{
 				ID:       EncodeGlobalID("Attachment", a.ID.String()),
 				Type:     a.Type,
-				URL:      url,
+				URL:      "/api/media/" + cleanPath,
 				FileName: a.FileName,
 				FileSize: a.FileSize,
 			})

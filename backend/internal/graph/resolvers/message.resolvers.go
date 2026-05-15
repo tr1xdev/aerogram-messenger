@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -99,11 +100,14 @@ func (r *messageResolver) ForwardedFrom(ctx context.Context, obj *model.Message)
 func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text string, replyToID *string, attachments []*graphql.Upload) (model.SendMessageResult, error) {
 	authID := middleware.GetUserID(ctx)
 	if authID == "" {
+		log.Printf("[SendMessage] Unauthorized attempt to send message to chat %s", chatID)
 		return nil, &gqlerror.Error{
 			Message:    "Unauthorized access",
 			Extensions: map[string]interface{}{"code": "UNAUTHORIZED"},
 		}
 	}
+
+	log.Printf("[SendMessage] Started for user %s in chat %s with %d attachments", authID, chatID, len(attachments))
 
 	var rawReplyTo *string
 	if replyToID != nil {
@@ -112,15 +116,17 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	}
 
 	var pbAttachments []*messagesv1.Attachment
-	for _, upload := range attachments {
+	for i, upload := range attachments {
 		if upload == nil {
 			continue
 		}
 
 		fileName := "attachments/" + uuid.New().String() + "_" + upload.Filename
+		log.Printf("[SendMessage] Uploading attachment [%d/%d]: %s (Type: %s, Size: %d bytes)", i+1, len(attachments), fileName, upload.ContentType, upload.Size)
 
 		_, err := r.Storage.UploadFile(ctx, fileName, upload.File, upload.ContentType)
 		if err != nil {
+			log.Printf("[SendMessage] Failed to upload attachment %s to S3: %v", fileName, err)
 			return nil, &gqlerror.Error{
 				Message:    "Failed to upload attachment",
 				Extensions: map[string]interface{}{"code": "UPLOAD_ERROR"},
@@ -134,6 +140,7 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		})
 	}
 
+	log.Printf("[SendMessage] Sending gRPC request to MessagesClient for chat %s", chatID)
 	resp, err := r.MessagesClient.SendMessage(ctx, &messagesv1.SendMessageRequest{
 		ChatId:      helpers.ToRawID(chatID),
 		SenderId:    authID,
@@ -145,22 +152,28 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	if err != nil {
 		st, ok := status.FromError(err)
 		if ok && st.Code() == codes.ResourceExhausted {
+			log.Printf("[SendMessage] gRPC Rate limit exceeded for user %s", authID)
 			return nil, &gqlerror.Error{
 				Message:    "Rate limit exceeded",
 				Extensions: map[string]interface{}{"code": "RESOURCE_EXHAUSTED"},
 			}
 		}
+		log.Printf("[SendMessage] gRPC error from MessagesClient: %v", err)
 		return nil, &gqlerror.Error{
 			Message:    "Internal server error",
 			Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
 		}
 	}
 
+	log.Printf("[SendMessage] Message successfully created with ID: %s. Attempting DB enrichment...", resp.Message.Id)
 	msg, err := r.Enricher.EnrichMessage(ctx, resp.Message.Id)
 	if err != nil {
-		return r.Enricher.MapMessageToModel(resp.Message), nil
+		log.Printf("[SendMessage] Local DB enrichment failed (normal for new messages): %v. Falling back to gRPC response mapping.", err)
+		mapped := r.Enricher.MapMessageToModel(ctx, resp.Message)
+		return mapped, nil
 	}
 
+	log.Printf("[SendMessage] Successfully enriched message %s from local DB", resp.Message.Id)
 	return msg, nil
 }
 
@@ -182,7 +195,7 @@ func (r *mutationResolver) UpdateMessage(ctx context.Context, id string, text st
 
 	msg, err := r.Enricher.EnrichMessage(ctx, resp.Message.Id)
 	if err != nil {
-		return r.Enricher.MapMessageToModel(resp.Message), nil
+		return r.Enricher.MapMessageToModel(ctx, resp.Message), nil
 	}
 
 	return msg, nil
@@ -259,7 +272,7 @@ func (r *queryResolver) MessageHistory(ctx context.Context, chatID string, limit
 		enriched, err := r.Enricher.EnrichMessage(ctx, m.Id)
 		if err == nil {
 			messages = append(messages, enriched)
-		} else if mapped := r.Enricher.MapMessageToModel(m); mapped != nil {
+		} else if mapped := r.Enricher.MapMessageToModel(ctx, m); mapped != nil {
 			messages = append(messages, mapped)
 		}
 	}
@@ -325,7 +338,7 @@ func (r *subscriptionResolver) MessageAdded(ctx context.Context, chatID string) 
 
 				m, err := r.Enricher.EnrichMessage(ctx, pbMsg.Id)
 				if err != nil {
-					m = r.Enricher.MapMessageToModel(&pbMsg)
+					m = r.Enricher.MapMessageToModel(ctx, &pbMsg)
 				}
 
 				if m != nil {
@@ -363,7 +376,7 @@ func (r *subscriptionResolver) MessageUpdated(ctx context.Context, chatID string
 				}
 				m, err := r.Enricher.EnrichMessage(ctx, pbMsg.Id)
 				if err != nil {
-					m = r.Enricher.MapMessageToModel(&pbMsg)
+					m = r.Enricher.MapMessageToModel(ctx, &pbMsg)
 				}
 				if m != nil {
 					select {
