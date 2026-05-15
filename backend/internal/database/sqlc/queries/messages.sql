@@ -100,3 +100,13 @@ ORDER BY created_at ASC;
 SELECT * FROM message_attachments
 WHERE message_id = $1
 ORDER BY created_at ASC;
+
+-- name: CheckFileAccess :one
+SELECT EXISTS (
+    SELECT 1
+    FROM message_attachments ma
+    JOIN messages m ON ma.message_id = m.id
+    JOIN dialog_members dm ON m.dialog_id = dm.dialog_id
+    WHERE ma.file_name = $1
+      AND dm.user_id = $2
+) AS has_access;

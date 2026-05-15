@@ -14,6 +14,29 @@ import (
 	"github.com/lib/pq"
 )
 
+const checkFileAccess = `-- name: CheckFileAccess :one
+SELECT EXISTS (
+    SELECT 1
+    FROM message_attachments ma
+    JOIN messages m ON ma.message_id = m.id
+    JOIN dialog_members dm ON m.dialog_id = dm.dialog_id
+    WHERE ma.file_name = $1
+      AND dm.user_id = $2
+) AS has_access
+`
+
+type CheckFileAccessParams struct {
+	FileName string    `json:"file_name"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) CheckFileAccess(ctx context.Context, arg CheckFileAccessParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkFileAccess, arg.FileName, arg.UserID)
+	var has_access bool
+	err := row.Scan(&has_access)
+	return has_access, err
+}
+
 const countUnreadMessages = `-- name: CountUnreadMessages :one
 SELECT count(*) FROM messages
 WHERE dialog_id = $1 AND author_id != $2 AND sequence > $3 AND is_deleted = false

@@ -14,6 +14,7 @@ import (
 type Querier interface {
 	AddDialogMember(ctx context.Context, arg AddDialogMemberParams) error
 	CanDeletePrivateDialog(ctx context.Context, arg CanDeletePrivateDialogParams) (bool, error)
+	CheckFileAccess(ctx context.Context, arg CheckFileAccessParams) (bool, error)
 	CheckUserExists(ctx context.Context, id uuid.UUID) (bool, error)
 	CountBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) (int64, error)
 	CountDialogAdmins(ctx context.Context, dialogID uuid.UUID) (int64, error)
