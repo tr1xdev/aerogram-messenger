@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<e4a87d54e03309deff0723509e2c2985>>
+ * @generated SignedSource<<d7817f820c9337a3c7fbd5bb00a97aec>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -17,6 +17,14 @@ export type useMessageActionsSendMutation$variables = {
 };
 export type useMessageActionsSendMutation$data = {
   readonly sendMessage: {
+    readonly attachments?: ReadonlyArray<{
+      readonly contentType: string;
+      readonly fileName: string;
+      readonly fileSize: any;
+      readonly id: string;
+      readonly type: string;
+      readonly url: string;
+    }> | null | undefined;
     readonly chatId?: string;
     readonly id?: string;
     readonly isEdited?: boolean;
@@ -161,6 +169,53 @@ v10 = {
     {
       "alias": null,
       "args": null,
+      "concreteType": "Attachment",
+      "kind": "LinkedField",
+      "name": "attachments",
+      "plural": true,
+      "selections": [
+        (v5/*: any*/),
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "type",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "url",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "fileName",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "fileSize",
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "kind": "ScalarField",
+          "name": "contentType",
+          "storageKey": null
+        }
+      ],
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
       "concreteType": "User",
       "kind": "LinkedField",
       "name": "sender",
@@ -281,16 +336,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "2fdceb9a8cc4a91eb81d5b317bf4e001",
+    "cacheID": "55cbf2557a46da7ffe2dca8a40acbb6d",
     "id": null,
     "metadata": {},
     "name": "useMessageActionsSendMutation",
     "operationKind": "mutation",
-    "text": "mutation useMessageActionsSendMutation(\n  $chatId: ID!\n  $text: String!\n  $replyToId: ID\n  $attachments: [Upload!]\n) {\n  sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId, attachments: $attachments) {\n    __typename\n    ... on Message {\n      id\n      chatId\n      text\n      sentAt\n      sequence\n      isEdited\n      sender {\n        id\n        firstName\n        lastName\n        photoUrl\n        displayName\n      }\n      replyTo {\n        id\n        text\n        sender {\n          id\n          firstName\n          lastName\n          displayName\n        }\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
+    "text": "mutation useMessageActionsSendMutation(\n  $chatId: ID!\n  $text: String!\n  $replyToId: ID\n  $attachments: [Upload!]\n) {\n  sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId, attachments: $attachments) {\n    __typename\n    ... on Message {\n      id\n      chatId\n      text\n      sentAt\n      sequence\n      isEdited\n      attachments {\n        id\n        type\n        url\n        fileName\n        fileSize\n        contentType\n      }\n      sender {\n        id\n        firstName\n        lastName\n        photoUrl\n        displayName\n      }\n      replyTo {\n        id\n        text\n        sender {\n          id\n          firstName\n          lastName\n          displayName\n        }\n      }\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "aa872903fad35a0570afa9e58bf12186";
+(node as any).hash = "bd56104a3cc1693bc70480b1d6ec145b";
 
 export default node;

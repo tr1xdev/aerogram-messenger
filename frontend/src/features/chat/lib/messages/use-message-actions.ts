@@ -40,6 +40,14 @@ const sendMessageMutation = graphql`
         sentAt
         sequence
         isEdited
+        attachments {
+          id
+          type
+          url
+          fileName
+          fileSize
+          contentType
+        }
         sender {
           id
           firstName

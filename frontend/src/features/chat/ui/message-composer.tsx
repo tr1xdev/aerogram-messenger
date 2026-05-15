@@ -57,18 +57,6 @@ export const MessageComposer = memo(function MessageComposer({
   isMember,
   chatType,
 }: MessageComposerProps): ReactNode {
-  console.log("[MessageComposer] Render", {
-    input,
-    disabled,
-    isBot,
-    isEmpty,
-    canWrite,
-    isMember,
-    chatType,
-    hasReplyingTo: !!replyingTo,
-    hasEditingMessage: !!editingMessage,
-  });
-
   const [attachments, setAttachments] = useState<File[]>([]);
   const activeAction: Message | null = editingMessage || replyingTo;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -77,27 +65,21 @@ export const MessageComposer = memo(function MessageComposer({
   const isTypingRef = useRef<boolean>(false);
 
   const showStartButton: boolean = useMemo(() => {
-    const result: boolean =
+    return (
       isBot &&
       chatType === "PRIVATE" &&
       isEmpty &&
       !activeAction &&
-      attachments.length === 0;
-    console.log("[MessageComposer] showStartButton calculation:", result);
-    return result;
+      attachments.length === 0
+    );
   }, [isBot, chatType, isEmpty, activeAction, attachments.length]);
 
   const showJoinButton: boolean = useMemo(() => {
-    const result: boolean =
-      !isMember && (chatType === "CHANNEL" || chatType === "GROUP");
-    console.log("[MessageComposer] showJoinButton calculation:", result);
-    return result;
+    return !isMember && (chatType === "CHANNEL" || chatType === "GROUP");
   }, [isMember, chatType]);
 
   const stopTyping = useCallback((): void => {
-    console.log("[MessageComposer] stopTyping triggered");
     if (isTypingRef.current && onTyping) {
-      console.log("[MessageComposer] Notifying parent: typing stopped");
       onTyping(false);
       isTypingRef.current = false;
     }
@@ -110,13 +92,11 @@ export const MessageComposer = memo(function MessageComposer({
   const handleInputChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>): void => {
       const value: string = e.target.value;
-      console.log("[MessageComposer] handleInputChange:", value);
       setInput(value);
 
       if (!onTyping) return;
 
       if (!isTypingRef.current && value.length > 0) {
-        console.log("[MessageComposer] Notifying parent: typing started");
         isTypingRef.current = true;
         onTyping(true);
       }
@@ -136,14 +116,9 @@ export const MessageComposer = memo(function MessageComposer({
 
   const handleFileChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>): void => {
-      console.log("[MessageComposer] handleFileChange", e.target.files);
       if (e.target.files) {
         const newFiles: File[] = Array.from(e.target.files);
-        setAttachments((prev: File[]) => {
-          const updated: File[] = [...prev, ...newFiles];
-          console.log("[MessageComposer] Attachments updated:", updated);
-          return updated;
-        });
+        setAttachments((prev: File[]) => [...prev, ...newFiles]);
       }
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -153,19 +128,12 @@ export const MessageComposer = memo(function MessageComposer({
   );
 
   const removeAttachment = useCallback((index: number): void => {
-    console.log("[MessageComposer] removeAttachment at index:", index);
     setAttachments((prev: File[]) =>
       prev.filter((_, i: number) => i !== index),
     );
   }, []);
 
   const handleSendAndStopTyping = useCallback((): void => {
-    console.log("[MessageComposer] handleSendAndStopTyping", {
-      input,
-      attachmentsCount: attachments.length,
-      disabled,
-      canWrite,
-    });
     if (disabled || !canWrite) return;
     if (input.trim().length === 0 && attachments.length === 0) return;
 
@@ -175,12 +143,10 @@ export const MessageComposer = memo(function MessageComposer({
   }, [onSend, stopTyping, disabled, canWrite, input, attachments]);
 
   const handleStartBot = useCallback((): void => {
-    console.log("[MessageComposer] handleStartBot executing /start");
     onSend("/start");
   }, [onSend]);
 
   const handleJoinClick = useCallback((): void => {
-    console.log("[MessageComposer] handleJoinClick triggered");
     if (!onJoin || disabled) return;
     onJoin();
   }, [onJoin, disabled]);
@@ -191,19 +157,13 @@ export const MessageComposer = memo(function MessageComposer({
       textarea.style.height = "38px";
       const scrollHeight: number = textarea.scrollHeight;
       if (scrollHeight > 38) {
-        const newHeight: string = `${Math.min(scrollHeight, 200)}px`;
-        textarea.style.height = newHeight;
-        console.log(
-          "[MessageComposer] Textarea height adjusted to:",
-          newHeight,
-        );
+        textarea.style.height = `${Math.min(scrollHeight, 200)}px`;
       }
     }
   }, []);
 
   useEffect((): void => {
     if (activeAction) {
-      console.log("[MessageComposer] Action detected, focusing textarea");
       textareaRef.current?.focus();
     }
   }, [activeAction]);
@@ -214,7 +174,6 @@ export const MessageComposer = memo(function MessageComposer({
 
   useEffect((): (() => void) => {
     return (): void => {
-      console.log("[MessageComposer] Component unmounting, cleaning up");
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
@@ -224,7 +183,6 @@ export const MessageComposer = memo(function MessageComposer({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>): void => {
       if (e.key === "Enter" && !e.shiftKey) {
-        console.log("[MessageComposer] Enter key pressed");
         e.preventDefault();
         handleSendAndStopTyping();
       }
@@ -344,10 +302,7 @@ export const MessageComposer = memo(function MessageComposer({
             <Button
               type="button"
               size="icon"
-              onClick={() => {
-                console.log("[MessageComposer] Attach button clicked");
-                fileInputRef.current?.click();
-              }}
+              onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
               className="h-[38px] w-[38px] rounded-full shrink-0 bg-muted/40 text-muted-foreground hover:text-primary transition-colors"
             >

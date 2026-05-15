@@ -308,6 +308,17 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       const tempId: string = `temp-${Date.now()}`;
       const extendedMe: ExtendedUser = me as unknown as ExtendedUser;
 
+      const optimisticAttachments = attachments.map(
+        (file: File, index: number) => ({
+          id: `temp-att-${tempId}-${index}`,
+          type: file.type.split("/")[0] || "document",
+          url: URL.createObjectURL(file),
+          fileName: file.name,
+          fileSize: file.size,
+          contentType: file.type,
+        }),
+      );
+
       cancelAction();
 
       sendMessage(val, attachments, {
@@ -324,6 +335,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
                   1
                 : 1,
             isEdited: false,
+            attachments: optimisticAttachments,
             sender: {
               id: extendedMe.id,
               firstName: extendedMe.firstName,
