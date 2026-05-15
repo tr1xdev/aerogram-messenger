@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -31,7 +32,15 @@ func (r *attachmentResolver) URL(ctx context.Context, obj *model.Attachment) (st
 		}
 	}
 
-	url, err := r.Storage.GetPresignedURL(ctx, obj.FileName, 15*time.Minute)
+	if obj == nil || obj.URL == "" {
+		return "", nil
+	}
+
+	if strings.HasPrefix(obj.URL, "http://") || strings.HasPrefix(obj.URL, "https://") {
+		return obj.URL, nil
+	}
+
+	url, err := r.Storage.GetPresignedURL(ctx, obj.URL, 15*time.Minute)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate secure url: %w", err)
 	}
@@ -121,12 +130,12 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 			continue
 		}
 
-		fileName := "attachments/" + uuid.New().String() + "_" + upload.Filename
-		log.Printf("[SendMessage] Uploading attachment [%d/%d]: %s (Type: %s, Size: %d bytes)", i+1, len(attachments), fileName, upload.ContentType, upload.Size)
+		s3Key := "attachments/" + uuid.New().String() + "_" + upload.Filename
+		log.Printf("[SendMessage] Uploading attachment [%d/%d]: %s (Type: %s, Size: %d bytes)", i+1, len(attachments), s3Key, upload.ContentType, upload.Size)
 
-		_, err := r.Storage.UploadFile(ctx, fileName, upload.File, upload.ContentType)
+		_, err := r.Storage.UploadFile(ctx, s3Key, upload.File, upload.ContentType)
 		if err != nil {
-			log.Printf("[SendMessage] Failed to upload attachment %s to S3: %v", fileName, err)
+			log.Printf("[SendMessage] Failed to upload attachment %s to S3: %v", s3Key, err)
 			return nil, &gqlerror.Error{
 				Message:    "Failed to upload attachment",
 				Extensions: map[string]interface{}{"code": "UPLOAD_ERROR"},
@@ -135,7 +144,8 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 
 		pbAttachments = append(pbAttachments, &messagesv1.Attachment{
 			Type:     upload.ContentType,
-			FileName: fileName,
+			FileName: s3Key,
+			Url:      upload.Filename,
 			FileSize: int64(upload.Size),
 		})
 	}

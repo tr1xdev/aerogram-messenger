@@ -21,7 +21,13 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	graph_api "github.com/tr1xdev/aerogram-messenger/internal/graph/api"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
+	authv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
+	userv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/storage"
@@ -34,12 +40,6 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/services/presence_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/ua_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/user_svc"
-
-	authv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
-	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
-	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
-	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
-	userv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 )
 
 func main() {
@@ -110,6 +110,7 @@ func main() {
 	defer conn.Close()
 
 	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc, s3Storage)
+	enricher := helpers.NewChatEnricher(db.Queries, s3Storage)
 
 	router := api.NewRouter(api.RouterConfig{
 		Cfg:            cfg,
@@ -118,6 +119,7 @@ func main() {
 		GQLServer:      gqlServer,
 		UserClient:     userv1.NewUserServiceClient(conn),
 		PresenceClient: presencev1.NewPresenceServiceClient(conn),
+		Enricher:       enricher,
 	})
 
 	certPath := os.Getenv("TLS_CERT_PATH")

@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,12 +53,11 @@ func (e *ChatEnricher) MapMessageToModel(ctx context.Context, pb *messagesv1.Mes
 	if len(pb.Attachments) > 0 {
 		msg.Attachments = make([]*model.Attachment, 0, len(pb.Attachments))
 		for _, a := range pb.Attachments {
-			cleanPath := strings.TrimPrefix(a.FileName, "attachments/")
 			msg.Attachments = append(msg.Attachments, &model.Attachment{
 				ID:       EncodeGlobalID("Attachment", a.Id),
 				Type:     a.Type,
-				URL:      "/api/media/" + cleanPath,
-				FileName: a.FileName,
+				URL:      "/api/media/" + a.FileName,
+				FileName: ExtractOriginalFileName(a.FileName),
 				FileSize: a.FileSize,
 			})
 		}

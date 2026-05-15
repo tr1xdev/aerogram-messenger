@@ -170,13 +170,13 @@ func (e *ChatEnricher) EnrichMessage(ctx context.Context, messageID string) (*mo
 	if err == nil && len(attachments) > 0 {
 		mapped.Attachments = make([]*model.Attachment, 0, len(attachments))
 		for _, a := range attachments {
-			cleanPath := strings.TrimPrefix(a.FileName, "attachments/")
 			mapped.Attachments = append(mapped.Attachments, &model.Attachment{
-				ID:       EncodeGlobalID("Attachment", a.ID.String()),
-				Type:     a.Type,
-				URL:      "/api/media/" + cleanPath,
-				FileName: a.FileName,
-				FileSize: a.FileSize,
+				ID:          EncodeGlobalID("Attachment", a.ID.String()),
+				Type:        a.Type,
+				URL:         a.FileName,
+				FileName:    ExtractOriginalFileName(a.FileName),
+				FileSize:    a.FileSize,
+				ContentType: a.Type,
 			})
 		}
 	}
@@ -247,4 +247,22 @@ func GetUserIDFromContext(ctx context.Context) string {
 		return userID
 	}
 	return ""
+}
+
+func ExtractOriginalFileName(storedName string) string {
+	clean := storedName
+	clean = strings.TrimPrefix(clean, "attachments/")
+	clean = strings.TrimPrefix(clean, "attachments_")
+
+	before, after, ok := strings.Cut(clean, "_")
+	if !ok {
+		return clean
+	}
+
+	potentialUUID := before
+	if _, err := uuid.Parse(potentialUUID); err == nil {
+		return after
+	}
+
+	return clean
 }
