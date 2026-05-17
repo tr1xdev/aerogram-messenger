@@ -137,6 +137,11 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		return nil, status.Error(codes.ResourceExhausted, "too many messages")
 	}
 
+	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId, senderID)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "chat details not found")
+	}
+
 	var replyToID uuid.NullUUID
 	if req.ReplyToId != nil && *req.ReplyToId != "" {
 		if rUUID, err := uuid.Parse(*req.ReplyToId); err == nil {
@@ -183,10 +188,17 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		}
 	}
 
+	var targetReadSequence int64
+	if dialog.Type == "private" {
+		targetReadSequence = msg.Sequence
+	} else {
+		targetReadSequence = msg.Sequence - 1
+	}
+
 	err = qtx.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
 		DialogID:         chatID,
 		UserID:           senderID,
-		LastReadSequence: msg.Sequence,
+		LastReadSequence: targetReadSequence,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update read sequence")
@@ -235,28 +247,25 @@ func (s *Server) SendMessage(ctx context.Context, req *messagespb.SendMessageReq
 		s.rdb.Publish(context.Background(), "chat:"+req.ChatId, msgPayload)
 	}
 
-	readPayload := map[string]interface{}{"chatId": req.ChatId, "userId": senderIDStr, "lastSequence": msg.Sequence}
+	readPayload := map[string]interface{}{"chatId": req.ChatId, "userId": senderIDStr, "lastSequence": targetReadSequence}
 	readData, _ := json.Marshal(readPayload)
 	s.rdb.Publish(context.Background(), "chat:"+req.ChatId+":read", readData)
 
-	dialog, err := s.dialogRepo.GetDialogByID(ctx, req.ChatId, senderID)
+	protoChat := s.mapDBDialogToProto(dialog)
+	chatType := strings.ToUpper(strings.TrimPrefix(protoChat.Type.String(), "CHAT_TYPE_"))
+	chatNotification := map[string]interface{}{
+		"id":           protoChat.Id,
+		"title":        protoChat.Title,
+		"type":         chatType,
+		"slug":         protoChat.Slug,
+		"membersCount": protoChat.MembersCount,
+		"lastMessage":  protoMsg,
+	}
+	chatJson, _ := json.Marshal(chatNotification)
+	members, err := s.db.Queries.GetDialogMembers(ctx, chatID)
 	if err == nil {
-		protoChat := s.mapDBDialogToProto(dialog)
-		chatType := strings.ToUpper(strings.TrimPrefix(protoChat.Type.String(), "CHAT_TYPE_"))
-		chatNotification := map[string]interface{}{
-			"id":           protoChat.Id,
-			"title":        protoChat.Title,
-			"type":         chatType,
-			"slug":         protoChat.Slug,
-			"membersCount": protoChat.MembersCount,
-			"lastMessage":  protoMsg,
-		}
-		chatJson, _ := json.Marshal(chatNotification)
-		members, err := s.db.Queries.GetDialogMembers(ctx, chatID)
-		if err == nil {
-			for _, m := range members {
-				s.rdb.Publish(context.Background(), "user_chats:"+m.UserID.String(), chatJson)
-			}
+		for _, m := range members {
+			s.rdb.Publish(context.Background(), "user_chats:"+m.UserID.String(), chatJson)
 		}
 	}
 
@@ -308,6 +317,7 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "message not found")
 	}
+
 	err = s.db.Queries.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
 		DialogID:         chatID,
 		UserID:           userID,
@@ -316,6 +326,20 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update read sequence")
 	}
+
+	readPayload := map[string]interface{}{"chatId": req.ChatId, "userId": userIDStr, "lastSequence": msg.Sequence}
+	readData, err := json.Marshal(readPayload)
+	if err == nil {
+		s.rdb.Publish(context.Background(), "chat:"+req.ChatId+":read", readData)
+	}
+
+	user, err := s.db.Queries.GetUserByID(ctx, userID)
+	if err != nil {
+		log.Printf("[ERROR] Failed to get user with id %s (%s)", userID, err.Error())
+	} else {
+		log.Printf("[SUCCESS] Message read by: %s | AuthorID: %s | Content: '%s'", user.ID, msg.AuthorID, msg.Content)
+	}
+
 	return &messagespb.MarkAsReadResponse{Success: true}, nil
 }
 

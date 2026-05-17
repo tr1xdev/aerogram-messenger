@@ -239,11 +239,24 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string) 
 		return true, nil
 	}
 
+	member, err := r.Store.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
+		DialogID: chatUUID,
+		UserID:   authUUID,
+	})
+
+	if err == nil && member.LastReadSequence >= msg.Sequence {
+		return true, nil
+	}
+
 	_ = r.Store.UpdateMemberReadSequence(ctx, dbgen.UpdateMemberReadSequenceParams{
 		DialogID:         chatUUID,
 		UserID:           authUUID,
 		LastReadSequence: msg.Sequence,
 	})
+
+	if msg.AuthorID == authUUID {
+		return true, nil
+	}
 
 	_, _ = r.MessagesClient.MarkAsRead(ctx, &messagesv1.MarkAsReadRequest{
 		ChatId:        rawChatID,
@@ -251,10 +264,10 @@ func (r *mutationResolver) MarkDialogAsRead(ctx context.Context, chatID string) 
 		LastMessageId: msg.ID.String(),
 	})
 
-	payload := model.ReadPayload{
-		ChatID:       helpers.EncodeGlobalID("Chat", rawChatID),
-		UserID:       helpers.EncodeGlobalID("User", authID),
-		LastSequence: msg.Sequence,
+	payload := map[string]interface{}{
+		"chatId":       rawChatID,
+		"userId":       authID,
+		"lastSequence": msg.Sequence,
 	}
 	data, _ := json.Marshal(payload)
 	r.RedisClient.Publish(ctx, "chat:"+rawChatID+":read", data)
@@ -433,6 +446,12 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 	readChan := make(chan *model.ReadPayload, 1)
 	pubsub := r.RedisClient.Subscribe(ctx, "chat:"+rawChatID+":read")
 
+	type redisPayload struct {
+		ChatID       string `json:"chatId"`
+		UserID       string `json:"userId"`
+		LastSequence int64  `json:"lastSequence"`
+	}
+
 	go func() {
 		defer pubsub.Close()
 		defer close(readChan)
@@ -444,10 +463,23 @@ func (r *subscriptionResolver) DialogRead(ctx context.Context, chatID string) (<
 				if !ok {
 					return
 				}
-				var payload model.ReadPayload
-				if err := json.Unmarshal([]byte(msg.Payload), &payload); err == nil {
-					payload.ChatID = helpers.EncodeGlobalID("Chat", helpers.ToRawID(payload.ChatID))
-					payload.UserID = helpers.EncodeGlobalID("User", helpers.ToRawID(payload.UserID))
+
+				var rPayload redisPayload
+				if err := json.Unmarshal([]byte(msg.Payload), &rPayload); err == nil {
+					cID := rPayload.ChatID
+					if _, err := uuid.Parse(cID); err != nil {
+						cID = helpers.ToRawID(cID)
+					}
+					uID := rPayload.UserID
+					if _, err := uuid.Parse(uID); err != nil {
+						uID = helpers.ToRawID(uID)
+					}
+					payload := model.ReadPayload{
+						ChatID:       helpers.EncodeGlobalID("Chat", cID),
+						UserID:       helpers.EncodeGlobalID("User", uID),
+						LastSequence: rPayload.LastSequence,
+					}
+
 					select {
 					case readChan <- &payload:
 					case <-ctx.Done():

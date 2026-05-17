@@ -125,8 +125,6 @@ func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, lim
 		globalID = helpers.EncodeGlobalID("Chat", obj.ID.String())
 	}
 
-	log.Printf("[ChatResolver.Members] Input ID: %s, Generated GlobalID: %s", obj.ID.String(), globalID)
-
 	res, err := r.Query().ChatMembers(ctx, globalID, limit, offset)
 	if err != nil {
 		log.Printf("[ChatResolver.Members] Query.ChatMembers error: %v", err)
@@ -138,7 +136,6 @@ func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, lim
 		return list.Members, nil
 	}
 
-	log.Printf("[ChatResolver.Members] No members list found in result, returning empty slice")
 	return []*model.ChatMember{}, nil
 }
 
@@ -566,7 +563,6 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 		o = *offset
 	}
 	rawID := helpers.ToRawID(chatID)
-	log.Printf("[ChatMembers] Fetching members. AuthID: %s, GlobalID: %s, RawID: %s", authID, chatID, rawID)
 	resp, err := r.ChatClient.GetChatMembers(ctx, &chatv1.GetChatMembersRequest{
 		ChatId: rawID,
 		Limit:  int32(l),
@@ -576,7 +572,6 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 		log.Printf("[ChatMembers] gRPC error: %v", err)
 		return r.mapToChatMembersError(err), nil
 	}
-	log.Printf("[ChatMembers] gRPC returned %d members", len(resp.Members))
 	members := make([]*model.ChatMember, 0, len(resp.Members))
 	for _, m := range resp.Members {
 		user, err := r.Enricher.EnrichUser(ctx, m.UserId)
@@ -609,7 +604,6 @@ func (r *queryResolver) ChatMembers(ctx context.Context, chatID string, limit *i
 			Permissions:      p,
 		})
 	}
-	log.Printf("[ChatMembers] Successfully processed %d members", len(members))
 	return &model.ChatMembersList{
 		Members:    members,
 		TotalCount: int(resp.TotalCount),
