@@ -250,6 +250,9 @@ export function ChatMenuItem({
                         <div className="flex items-center gap-1.5 shrink-0">
                           <MessageStatus
                             isMe={isMe}
+                            chatType={
+                              chat.type as "PRIVATE" | "GROUP" | "CHANNEL"
+                            }
                             sequence={lastMessage.sequence ?? 0}
                             lastReadSequence={chat.lastReadSequence}
                             isSending={false}

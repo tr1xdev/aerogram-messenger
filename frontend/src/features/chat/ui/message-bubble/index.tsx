@@ -191,6 +191,7 @@ export const MessageBubble = memo(function MessageBubble({
                     <MessageStatus
                       messageId={message.id}
                       isMe={isMe}
+                      chatType={chatType}
                       sequence={Number(message.sequence)}
                       lastReadSequence={lastReadSequence ?? 0}
                       className="w-3.5 h-3.5"

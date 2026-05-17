@@ -124,15 +124,17 @@ export function useGlobalSubscriptions(
 
             if (!isFromMe && !isCurrentChatActive) {
               const currentUnread: number =
-                Number(chatRecord.getValue("unreadCount")) || 0;
+                document.visibilityState === "visible"
+                  ? Number(chatRecord.getValue("unreadCount")) || 0
+                  : 0;
               chatRecord.setValue(currentUnread + 1, "unreadCount");
             }
 
             if (isFromMe) {
-              chatRecord.setValue(
-                rootField.getValue("sequence"),
-                "myReadSequence",
+              const currentSequence: number = Number(
+                rootField.getValue("sequence") ?? 0,
               );
+              chatRecord.setValue(currentSequence, "myReadSequence");
             }
 
             chatRecord.setLinkedRecord(rootField, "lastMessage");

@@ -139,7 +139,6 @@ export function useMessageActions(chatId: string) {
             replyToId: config?.variables?.replyToId ?? null,
             attachments: files ? new Array(files.length).fill(null) : [],
           },
-          uploadables,
           updater: (store: RecordSourceSelectorProxy): void => {
             const payload: RecordProxy | null | undefined =
               store.getRootField("sendMessage");
@@ -149,6 +148,17 @@ export function useMessageActions(chatId: string) {
               store.get(chatId);
             if (chatRecord) {
               const newSeq: number = Number(payload.getValue("sequence") ?? 0);
+              const chatType: string = String(
+                chatRecord.getValue("type") ?? "GROUP",
+              );
+
+              const beforeLastReadSeq: number = Number(
+                chatRecord.getValue("lastReadSequence") ?? 0,
+              );
+              const beforeMyReadSeq: number = Number(
+                chatRecord.getValue("myReadSequence") ?? 0,
+              );
+
               const currentLastMsg: RecordProxy | null | undefined =
                 chatRecord.getLinkedRecord("lastMessage");
               const currentSeq: number = currentLastMsg
@@ -161,6 +171,21 @@ export function useMessageActions(chatId: string) {
 
               chatRecord.setValue(0, "unreadCount");
               chatRecord.setValue(newSeq, "myReadSequence");
+
+              console.group(
+                `[RELAY-MUTATION] sendMessage Done (Chat: ${chatId})`,
+              );
+              console.log(`Chat Type: ${chatType}`);
+              console.table({
+                "Message Sequence (new)": newSeq,
+                "lastReadSequence (Before)": beforeLastReadSeq,
+                "lastReadSequence (After)": Number(
+                  chatRecord.getValue("lastReadSequence") ?? 0,
+                ),
+                "myReadSequence (Before)": beforeMyReadSeq,
+                "myReadSequence (After)": newSeq,
+              });
+              console.groupEnd();
 
               const root: RecordProxy = store.getRoot();
               const history: RecordProxy | null | undefined =
@@ -239,6 +264,9 @@ export function useMessageActions(chatId: string) {
           if (lastMsg) {
             const seq: number = Number(lastMsg.getValue("sequence") ?? 0);
             chatRecord.setValue(seq, "myReadSequence");
+            console.log(
+              `[RELAY-MUTATION] markAsRead (Optimistic). myReadSequence -> ${seq}`,
+            );
           }
         }
       },

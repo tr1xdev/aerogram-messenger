@@ -38,7 +38,7 @@ export function useChatScroll({
     useRef<HTMLDivElement | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
+  const [isAtBottom, setIsAtBottom] = useState<boolean>(false);
 
   const isPinnedToBottom: RefObject<boolean> = useRef<boolean>(true);
   const prevMessagesLength: RefObject<number> = useRef<number>(0);
@@ -132,7 +132,7 @@ export function useChatScroll({
       isPinnedToBottom.current = true;
 
       requestAnimationFrame((): void => {
-        setIsAtBottom(true);
+        setIsAtBottom(false);
         setUnreadCount(0);
       });
     }

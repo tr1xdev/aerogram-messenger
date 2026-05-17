@@ -1,5 +1,5 @@
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
-import { useMemo } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
 import { logger } from "@/shared/lib/logger";
@@ -189,7 +189,7 @@ export function useSearchUsers(
     },
   );
 
-  useMemo((): void => {
+  useEffect((): void => {
     if (isEnabled && data) {
       logger.info("CHAT", "Search execution", {
         query,

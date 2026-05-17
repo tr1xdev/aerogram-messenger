@@ -66,7 +66,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
-  const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
+  const [isAtBottom, setIsAtBottom] = useState<boolean>(false);
   const [isOptimisticJoined, setIsOptimisticJoined] = useState<boolean>(false);
 
   const { input, setInput, resetInput, setActiveChatId } =
@@ -161,7 +161,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   useEffect((): (() => void) => {
     let timer: ReturnType<typeof setTimeout> | null = null;
-    if (!historyLoading && chatNode) {
+    if (!historyLoading) {
       timer = setTimeout((): void => {
         setIsFirstLoad(false);
       }, 100);
@@ -169,7 +169,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     return (): void => {
       if (timer) clearTimeout(timer);
     };
-  }, [historyLoading, chatNode]);
+  }, [historyLoading]);
 
   useEffect((): (() => void) => {
     setActiveChatId(chatId);
@@ -262,11 +262,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
   useEffect((): (() => void) => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const triggerRead = (): void => {
       if (
         document.visibilityState === "visible" &&
         lastSequence > 0 &&
-        isAtBottom
+        isAtBottom &&
+        !isInitialLoading &&
+        !historyLoading
       ) {
         if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout((): void => {
@@ -275,15 +278,24 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         }, 300);
       }
     };
+
     triggerRead();
     window.addEventListener("visibilitychange", triggerRead);
     window.addEventListener("focus", triggerRead);
+
     return (): void => {
       if (timeoutId) clearTimeout(timeoutId);
       window.removeEventListener("visibilitychange", triggerRead);
       window.removeEventListener("focus", triggerRead);
     };
-  }, [checkAndMarkRead, markAsRead, lastSequence, isAtBottom]);
+  }, [
+    checkAndMarkRead,
+    markAsRead,
+    lastSequence,
+    isAtBottom,
+    isInitialLoading,
+    historyLoading,
+  ]);
 
   const handleSend = useCallback(
     (text?: string, attachments: File[] = []): void => {

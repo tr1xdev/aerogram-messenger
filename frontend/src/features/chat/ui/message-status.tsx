@@ -5,6 +5,7 @@ interface MessageStatusProps {
   messageId?: string;
   isSending?: boolean;
   isMe: boolean;
+  chatType: "PRIVATE" | "GROUP" | "CHANNEL";
   sequence: number;
   lastReadSequence: number;
   className?: string;
@@ -14,6 +15,7 @@ export function MessageStatus({
   messageId,
   isSending,
   isMe,
+  chatType,
   sequence,
   lastReadSequence,
   className,
@@ -22,8 +24,10 @@ export function MessageStatus({
 
   const isTemp: boolean = messageId?.startsWith("temp-") ?? false;
   const isPending: boolean = isSending || isTemp || sequence === 0;
+
+  const isReadContext: boolean = chatType === "PRIVATE" || chatType === "GROUP";
   const isActuallyRead: boolean =
-    !isPending && sequence > 0 && sequence <= lastReadSequence;
+    !isPending && isReadContext && sequence > 0 && sequence <= lastReadSequence;
 
   return (
     <div
