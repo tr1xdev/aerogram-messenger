@@ -86,11 +86,12 @@ export const MessageBubble = memo(function MessageBubble({
   const isHighlighted: boolean = useMessageHighlight(message.id);
 
   const isGroup: boolean = chatType === "GROUP";
+  const isChannel: boolean = chatType === "CHANNEL";
   const showAvatar: boolean = !isMe && isGroup && isLastInGroup;
   const showName: boolean = !isMe && isGroup && isFirstInGroup;
 
   const senderName: string = useMemo(
-    () =>
+    (): string =>
       [message.sender?.firstName, message.sender?.lastName]
         .filter(Boolean)
         .join(" ") ||
@@ -100,11 +101,11 @@ export const MessageBubble = memo(function MessageBubble({
   );
 
   const userColor: ColorInfo = useMemo(
-    () => getUserColorInfo(message.sender?.id ?? "", senderName),
+    (): ColorInfo => getUserColorInfo(message.sender?.id ?? "", senderName),
     [message.sender?.id, senderName],
   );
 
-  const bubbleRadius: string = useMemo(() => {
+  const bubbleRadius: string = useMemo((): string => {
     const rB: string = "20px";
     const rS: string = "4px";
     return isMe
@@ -187,7 +188,7 @@ export const MessageBubble = memo(function MessageBubble({
                       minute: "2-digit",
                     })}
                   </span>
-                  {isMe && (
+                  {isMe && !isChannel && (
                     <MessageStatus
                       messageId={message.id}
                       isMe={isMe}
@@ -211,7 +212,7 @@ export const MessageBubble = memo(function MessageBubble({
           onEdit={onEdit}
           onForward={onForward}
           onDelete={onDelete}
-          onShowInfo={() => setIsInfoOpen(true)}
+          onShowInfo={(): void => setIsInfoOpen(true)}
         />
       </ContextMenu>
 
