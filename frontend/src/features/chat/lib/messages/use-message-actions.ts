@@ -116,6 +116,7 @@ export function useMessageActions(chatId: string) {
     (
       text: string,
       files?: File[],
+      replyToId: string | null = null,
       config?: Partial<UseMutationConfig<useMessageActionsSendMutation>>,
     ): Promise<void> => {
       return new Promise((resolve, reject): void => {
@@ -136,7 +137,7 @@ export function useMessageActions(chatId: string) {
           variables: {
             chatId,
             text,
-            replyToId: config?.variables?.replyToId ?? null,
+            replyToId,
             attachments: files ? new Array(files.length).fill(null) : [],
           },
           updater: (store: RecordSourceSelectorProxy): void => {

@@ -333,7 +333,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
 
       cancelAction();
 
-      sendMessage(val, attachments, {
+      sendMessage(val, attachments, originalReply?.id ?? null, {
         optimisticResponse: {
           sendMessage: {
             __typename: "Message",
