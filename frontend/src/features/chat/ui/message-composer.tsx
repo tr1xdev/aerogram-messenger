@@ -60,10 +60,18 @@ export const MessageComposer = memo(function MessageComposer({
       isBot &&
       chatType === "PRIVATE" &&
       isEmpty &&
-      !activeAction &&
+      !editingMessage &&
+      !replyingTo &&
       attachments.length === 0
     );
-  }, [isBot, chatType, isEmpty, activeAction, attachments.length]);
+  }, [
+    isBot,
+    chatType,
+    isEmpty,
+    editingMessage,
+    replyingTo,
+    attachments.length,
+  ]);
 
   const showJoinButton: boolean = useMemo((): boolean => {
     return !isMember && (chatType === "CHANNEL" || chatType === "GROUP");
@@ -80,10 +88,22 @@ export const MessageComposer = memo(function MessageComposer({
     }
   }, [onTyping]);
 
+  const adjustHeight = useCallback((): void => {
+    const textarea: HTMLTextAreaElement | null = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "38px";
+      const scrollHeight: number = textarea.scrollHeight;
+      if (scrollHeight > 38) {
+        textarea.style.height = `${Math.min(scrollHeight, 200)}px`;
+      }
+    }
+  }, []);
+
   const handleInputChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>): void => {
       const value: string = e.target.value;
       setInput(value);
+      adjustHeight();
 
       if (!onTyping) return;
 
@@ -102,7 +122,7 @@ export const MessageComposer = memo(function MessageComposer({
         typingTimeoutRef.current = setTimeout(stopTyping, 3000);
       }
     },
-    [setInput, onTyping, stopTyping],
+    [setInput, onTyping, stopTyping, adjustHeight],
   );
 
   const handleFileChange = useCallback(
@@ -142,17 +162,6 @@ export const MessageComposer = memo(function MessageComposer({
     onJoin();
   }, [onJoin, disabled]);
 
-  const adjustHeight = useCallback((): void => {
-    const textarea: HTMLTextAreaElement | null = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = "38px";
-      const scrollHeight: number = textarea.scrollHeight;
-      if (scrollHeight > 38) {
-        textarea.style.height = `${Math.min(scrollHeight, 200)}px`;
-      }
-    }
-  }, []);
-
   useEffect((): void => {
     if (activeAction) {
       textareaRef.current?.focus();
@@ -164,9 +173,11 @@ export const MessageComposer = memo(function MessageComposer({
   }, [input, adjustHeight]);
 
   useEffect((): (() => void) => {
+    const timeoutId: ReturnType<typeof setTimeout> | null =
+      typingTimeoutRef.current;
     return (): void => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
     };
   }, []);
@@ -186,6 +197,22 @@ export const MessageComposer = memo(function MessageComposer({
     const { firstName, lastName } = replyingTo.sender;
     return lastName ? `${firstName} ${lastName}` : firstName;
   }, [replyingTo]);
+
+  const actionTextInfo = useMemo((): {
+    text: string;
+    isPlaceholder: boolean;
+  } => {
+    if (!activeAction) return { text: "", isPlaceholder: false };
+
+    const hasContent: boolean =
+      typeof activeAction.text === "string" &&
+      activeAction.text.trim().length > 0;
+    if (hasContent) {
+      return { text: activeAction.text as string, isPlaceholder: false };
+    }
+
+    return { text: "Attachment", isPlaceholder: true };
+  }, [activeAction]);
 
   return (
     <footer className="p-2 md:p-3 bg-background shrink-0 border-t border-border/40 relative">
@@ -307,8 +334,15 @@ export const MessageComposer = memo(function MessageComposer({
                             ? "Edit Message"
                             : `Reply to ${senderName}`}
                         </span>
-                        <span className="text-[13px] text-white truncate block leading-tight mt-0.5">
-                          {activeAction.text}
+                        <span
+                          className={cn(
+                            "text-[13px] truncate block leading-tight mt-0.5",
+                            actionTextInfo.isPlaceholder
+                              ? "text-zinc-500/80 italic font-normal"
+                              : "text-white",
+                          )}
+                        >
+                          {actionTextInfo.text}
                         </span>
                       </div>
                       <button
