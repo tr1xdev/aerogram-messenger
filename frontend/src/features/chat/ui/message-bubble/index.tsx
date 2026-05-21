@@ -113,6 +113,16 @@ export const MessageBubble = memo(function MessageBubble({
       : `${isFirstInGroup ? rB : rS} ${rB} ${rB} ${isLastInGroup ? rB : rS}`;
   }, [isMe, isFirstInGroup, isLastInGroup]);
 
+  const highlightStyle = useMemo(() => {
+    if (!isHighlighted) return { opacity: 0 };
+
+    return {
+      opacity: 1,
+      borderRadius: bubbleRadius,
+      boxShadow: isMe ? "inset 0 0 0 9999px rgba(24, 24, 27, 0.22)" : undefined,
+    };
+  }, [isHighlighted, isMe, bubbleRadius]);
+
   return (
     <>
       <ContextMenu>
@@ -143,16 +153,17 @@ export const MessageBubble = memo(function MessageBubble({
             <div
               style={{ borderRadius: bubbleRadius }}
               className={cn(
-                "relative flex flex-col min-w-[70px] max-w-[85%] sm:max-w-[70%] px-3.5 py-2 transition-all shadow-sm",
+                "relative flex flex-col min-w-[70px] max-w-[85%] sm:max-w-[70%] px-3.5 py-2 transition-all shadow-sm overflow-hidden",
                 isMe
                   ? "bg-white text-zinc-900 border border-neutral-100"
                   : "bg-muted text-foreground",
               )}
             >
               <div
+                style={highlightStyle}
                 className={cn(
-                  "absolute inset-0 pointer-events-none transition-opacity duration-500",
-                  isHighlighted ? "bg-primary/10 opacity-100" : "opacity-0",
+                  "absolute inset-0 pointer-events-none transition-all duration-500 z-0",
+                  !isMe && isHighlighted && "bg-primary/25",
                 )}
               />
 

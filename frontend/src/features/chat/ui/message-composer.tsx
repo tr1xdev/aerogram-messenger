@@ -9,16 +9,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import {
-  X,
-  Pencil,
-  Reply,
-  ArrowUp,
-  Paperclip,
-  Lock,
-  FileIcon,
-  Loader2,
-} from "lucide-react";
+import { X, ArrowUp, Paperclip, Lock, FileIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -64,7 +55,7 @@ export const MessageComposer = memo(function MessageComposer({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef<boolean>(false);
 
-  const showStartButton: boolean = useMemo(() => {
+  const showStartButton: boolean = useMemo((): boolean => {
     return (
       isBot &&
       chatType === "PRIVATE" &&
@@ -74,7 +65,7 @@ export const MessageComposer = memo(function MessageComposer({
     );
   }, [isBot, chatType, isEmpty, activeAction, attachments.length]);
 
-  const showJoinButton: boolean = useMemo(() => {
+  const showJoinButton: boolean = useMemo((): boolean => {
     return !isMember && (chatType === "CHANNEL" || chatType === "GROUP");
   }, [isMember, chatType]);
 
@@ -128,8 +119,8 @@ export const MessageComposer = memo(function MessageComposer({
   );
 
   const removeAttachment = useCallback((index: number): void => {
-    setAttachments((prev: File[]) =>
-      prev.filter((_, i: number) => i !== index),
+    setAttachments((prev: File[]): File[] =>
+      prev.filter((_, i: number): boolean => i !== index),
     );
   }, []);
 
@@ -190,6 +181,12 @@ export const MessageComposer = memo(function MessageComposer({
     [handleSendAndStopTyping],
   );
 
+  const senderName = useMemo((): string => {
+    if (!replyingTo?.sender) return "User";
+    const { firstName, lastName } = replyingTo.sender;
+    return lastName ? `${firstName} ${lastName}` : firstName;
+  }, [replyingTo]);
+
   return (
     <footer className="p-2 md:p-3 bg-background shrink-0 border-t border-border/40 relative">
       <div className="max-w-5xl mx-auto flex flex-col min-w-0">
@@ -201,62 +198,26 @@ export const MessageComposer = memo(function MessageComposer({
               exit={{ opacity: 0, height: 0 }}
               className="flex flex-wrap gap-2 px-3 py-2 bg-muted/10 rounded-t-2xl border-l-2 border-primary/50 mx-1 mb-[-1px]"
             >
-              {attachments.map((file: File, idx: number) => (
-                <div
-                  key={`${file.name}-${idx}`}
-                  className="flex items-center gap-2 px-2 py-1 bg-background border border-border/60 rounded-md max-w-[160px] group"
-                >
-                  <FileIcon className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span className="text-[12px] truncate flex-1">
-                    {file.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(idx)}
-                    className="h-4 w-4 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-colors"
+              {attachments.map(
+                (file: File, idx: number): ReactNode => (
+                  <div
+                    key={`${file.name}-${idx}`}
+                    className="flex items-center gap-2 px-2 py-1 bg-background border border-border/60 rounded-md max-w-[160px] group"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence mode="wait">
-          {activeAction && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ type: "spring", stiffness: 500, damping: 35 }}
-            >
-              <div className="flex items-center gap-3 px-3 py-2 bg-muted/20 rounded-t-2xl border-l-2 border-primary mx-1 ml-[46px] mb-[-1px] relative min-w-0">
-                <div className="shrink-0 text-primary">
-                  {editingMessage ? (
-                    <Pencil className="h-3.5 w-3.5" />
-                  ) : (
-                    <Reply className="h-3.5 w-3.5" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-bold text-primary truncate block uppercase tracking-tight">
-                    {editingMessage
-                      ? "Edit Message"
-                      : (replyingTo?.sender?.firstName ?? "User")}
-                  </span>
-                  <span className="text-[13px] text-muted-foreground truncate block leading-tight">
-                    {activeAction.text}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={onCancelAction}
-                  className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+                    <FileIcon className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="text-[12px] truncate flex-1">
+                      {file.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(): void => removeAttachment(idx)}
+                      className="h-4 w-4 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ),
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -302,7 +263,7 @@ export const MessageComposer = memo(function MessageComposer({
             <Button
               type="button"
               size="icon"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={(): void => fileInputRef.current?.click()}
               disabled={disabled}
               className="h-[38px] w-[38px] rounded-full shrink-0 bg-muted/40 text-muted-foreground hover:text-primary transition-colors"
             >
@@ -312,12 +273,56 @@ export const MessageComposer = memo(function MessageComposer({
             <div className="relative flex-1 min-w-0">
               <div
                 className={cn(
-                  "w-full rounded-[20px] bg-muted/40 border border-border/50 transition-all duration-200 focus-within:bg-muted/60 pr-1",
-                  (activeAction || attachments.length > 0) &&
+                  "w-full rounded-[20px] bg-muted/40 border border-border/50 transition-all duration-200 focus-within:bg-muted/60 pr-1 flex flex-col overflow-hidden",
+                  attachments.length > 0 &&
                     "rounded-tl-none rounded-tr-none border-t-transparent",
                 )}
               >
-                <div className="flex items-end">
+                <AnimatePresence>
+                  {activeAction && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{
+                        duration: 0.1,
+                        ease: "linear",
+                      }}
+                      className="flex items-center gap-3 pt-2 pb-1 pr-4 pl-4 relative min-w-0"
+                    >
+                      <div
+                        className={cn(
+                          "absolute left-4 top-2 bottom-1 w-[3px] rounded-full",
+                          replyingTo ? "bg-sky-500" : "bg-primary",
+                        )}
+                      />
+                      <div className="flex-1 min-w-0 ml-3">
+                        <span
+                          className={cn(
+                            "text-[12px] font-semibold truncate block leading-tight",
+                            replyingTo ? "text-sky-500" : "text-primary",
+                          )}
+                        >
+                          {editingMessage
+                            ? "Edit Message"
+                            : `Reply to ${senderName}`}
+                        </span>
+                        <span className="text-[13px] text-white truncate block leading-tight mt-0.5">
+                          {activeAction.text}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={onCancelAction}
+                        className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted/50 transition-colors text-muted-foreground shrink-0"
+                      >
+                        <X className="h-[18px] w-[18px]" />
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="flex items-end w-full">
                   <textarea
                     ref={textareaRef}
                     placeholder="Message"
