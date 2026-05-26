@@ -327,17 +327,10 @@ func (s *Server) MarkAsRead(ctx context.Context, req *messagespb.MarkAsReadReque
 		return nil, status.Error(codes.Internal, "failed to update read sequence")
 	}
 
-	readPayload := map[string]interface{}{"chatId": req.ChatId, "userId": userIDStr, "lastSequence": msg.Sequence}
+	readPayload := map[string]any{"chatId": req.ChatId, "userId": userIDStr, "lastSequence": msg.Sequence}
 	readData, err := json.Marshal(readPayload)
 	if err == nil {
 		s.rdb.Publish(context.Background(), "chat:"+req.ChatId+":read", readData)
-	}
-
-	user, err := s.db.Queries.GetUserByID(ctx, userID)
-	if err != nil {
-		log.Printf("[ERROR] Failed to get user with id %s (%s)", userID, err.Error())
-	} else {
-		log.Printf("[SUCCESS] Message read by: %s | AuthorID: %s | Content: '%s'", user.ID, msg.AuthorID, msg.Content)
 	}
 
 	return &messagespb.MarkAsReadResponse{Success: true}, nil

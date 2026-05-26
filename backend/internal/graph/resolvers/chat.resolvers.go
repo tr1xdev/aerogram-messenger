@@ -132,7 +132,6 @@ func (r *chatResolver) Members(ctx context.Context, obj *model.ChatExtended, lim
 	}
 
 	if list, ok := res.(*model.ChatMembersList); ok {
-		log.Printf("[ChatResolver.Members] Successfully fetched %d members", len(list.Members))
 		return list.Members, nil
 	}
 
@@ -667,7 +666,6 @@ func (r *queryResolver) ChatInvites(ctx context.Context, chatID string) (model.C
 		return &model.ForbiddenError{Message: "unauthorized"}, nil
 	}
 	did, _ := uuid.Parse(helpers.ToRawID(chatID))
-	log.Printf("[ChatInvites] Fetching invites for Chat: %s (UUID: %s)", chatID, did)
 	invites, err := r.Store.GetDialogInvites(ctx, did)
 	if err != nil {
 		log.Printf("[ChatInvites] DB Error: %v", err)

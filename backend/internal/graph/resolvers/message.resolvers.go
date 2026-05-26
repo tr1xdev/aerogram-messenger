@@ -112,11 +112,9 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		log.Printf("[SendMessage] Unauthorized attempt to send message to chat %s", chatID)
 		return nil, &gqlerror.Error{
 			Message:    "Unauthorized access",
-			Extensions: map[string]interface{}{"code": "UNAUTHORIZED"},
+			Extensions: map[string]any{"code": "UNAUTHORIZED"},
 		}
 	}
-
-	log.Printf("[SendMessage] Started for user %s in chat %s with %d attachments", authID, chatID, len(attachments))
 
 	var rawReplyTo *string
 	if replyToID != nil {
@@ -125,20 +123,19 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 	}
 
 	var pbAttachments []*messagesv1.Attachment
-	for i, upload := range attachments {
+	for _, upload := range attachments {
 		if upload == nil {
 			continue
 		}
 
 		s3Key := "attachments/" + uuid.New().String() + "_" + upload.Filename
-		log.Printf("[SendMessage] Uploading attachment [%d/%d]: %s (Type: %s, Size: %d bytes)", i+1, len(attachments), s3Key, upload.ContentType, upload.Size)
 
 		_, err := r.Storage.UploadFile(ctx, s3Key, upload.File, upload.ContentType)
 		if err != nil {
 			log.Printf("[SendMessage] Failed to upload attachment %s to S3: %v", s3Key, err)
 			return nil, &gqlerror.Error{
 				Message:    "Failed to upload attachment",
-				Extensions: map[string]interface{}{"code": "UPLOAD_ERROR"},
+				Extensions: map[string]any{"code": "UPLOAD_ERROR"},
 			}
 		}
 
@@ -150,7 +147,6 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		})
 	}
 
-	log.Printf("[SendMessage] Sending gRPC request to MessagesClient for chat %s", chatID)
 	resp, err := r.MessagesClient.SendMessage(ctx, &messagesv1.SendMessageRequest{
 		ChatId:      helpers.ToRawID(chatID),
 		SenderId:    authID,
@@ -165,17 +161,16 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 			log.Printf("[SendMessage] gRPC Rate limit exceeded for user %s", authID)
 			return nil, &gqlerror.Error{
 				Message:    "Rate limit exceeded",
-				Extensions: map[string]interface{}{"code": "RESOURCE_EXHAUSTED"},
+				Extensions: map[string]any{"code": "RESOURCE_EXHAUSTED"},
 			}
 		}
 		log.Printf("[SendMessage] gRPC error from MessagesClient: %v", err)
 		return nil, &gqlerror.Error{
 			Message:    "Internal server error",
-			Extensions: map[string]interface{}{"code": "INTERNAL_SERVER_ERROR"},
+			Extensions: map[string]any{"code": "INTERNAL_SERVER_ERROR"},
 		}
 	}
 
-	log.Printf("[SendMessage] Message successfully created with ID: %s. Attempting DB enrichment...", resp.Message.Id)
 	msg, err := r.Enricher.EnrichMessage(ctx, resp.Message.Id)
 	if err != nil {
 		log.Printf("[SendMessage] Local DB enrichment failed (normal for new messages): %v. Falling back to gRPC response mapping.", err)
@@ -183,7 +178,6 @@ func (r *mutationResolver) SendMessage(ctx context.Context, chatID string, text 
 		return mapped, nil
 	}
 
-	log.Printf("[SendMessage] Successfully enriched message %s from local DB", resp.Message.Id)
 	return msg, nil
 }
 
