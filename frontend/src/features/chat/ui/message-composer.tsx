@@ -365,7 +365,7 @@ export const MessageComposer = memo(function MessageComposer({
                     onKeyDown={handleKeyDown}
                     disabled={disabled}
                     rows={1}
-                    className="w-full resize-none bg-transparent px-4 py-[9px] text-[15px] focus:outline-none max-h-[200px] scrollbar-none leading-[20px]"
+                    className="flex-1 resize-none bg-transparent px-4 py-[9px] text-[15px] focus:outline-none max-h-[200px] overflow-y-auto leading-[20px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   />
                   <div className="flex items-center justify-center h-[38px] pr-1">
                     {(input.trim().length > 0 || attachments.length > 0) && (
