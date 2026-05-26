@@ -447,8 +447,11 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 		}
 	}
 
+
 	proto := s.mapDBDialogToProto(dialog, perms, role, lastRead)
 	proto.CanWrite = s.calculateCanWrite(dialog.Type, perms, role, dialog.IsActive)
+
+
 	proto.Permissions = s.calculatePermissions(dialog.Type, perms, role)
 
 	return &chatpb.GetChatResponse{Chat: proto}, nil
@@ -635,34 +638,43 @@ func (s *Server) JoinChatByInvite(ctx context.Context, req *chatpb.JoinChatByInv
 	}, nil
 }
 
-func (s *Server) calculateCanWrite(chatType string, permissions int64, role string, isActive bool) bool {
-	if !isActive {
-		return false
-	}
-	if role == "owner" || role == "admin" {
-		return true
-	}
-	if chatType == "channel" || role == "guest" {
-		return false
-	}
-	return (permissions & int64(PermSendMessages)) == 0
-}
-
 func (s *Server) calculatePermissions(chatType string, perms int64, role string) *chatpb.ChatPermissions {
-	isAdmin := role == "owner" || role == "admin"
+	lowerRole := strings.ToLower(role)
+	isAdmin := lowerRole == "owner" || lowerRole == "admin"
+
 	if chatType == "private" {
 		return &chatpb.ChatPermissions{CanSendMessage: true, CanDeleteMessages: true}
 	}
+
 	check := func(bit int32) bool { return isAdmin || (perms&int64(bit)) == 0 }
+
 	return &chatpb.ChatPermissions{
 		CanSendMessage:    check(PermSendMessages),
 		CanInviteUsers:    check(PermAddMembers),
 		CanEditMetadata:   isAdmin,
 		CanDeleteMessages: isAdmin,
-		CanAssignAdmins:   role == "owner",
+		CanAssignAdmins:   lowerRole == "owner",
 		CanSendMedia:      check(PermSendMedia),
 		CanPinMessages:    check(PermPinMessages),
 	}
+}
+
+func (s *Server) calculateCanWrite(chatType string, permissions int64, role string, isActive bool) bool {
+	lowerRole := strings.ToLower(role)
+
+	if lowerRole == "owner" || lowerRole == "admin" {
+		return true
+	}
+
+	if !isActive {
+		return false
+	}
+
+	if chatType == "channel" || lowerRole == "guest" {
+		return false
+	}
+
+	return (permissions & int64(PermSendMessages)) == 0
 }
 
 func (s *Server) mapDBDialogToProto(d dbgen.Dialog, perms int64, role string, lastRead int64) *chatpb.Chat {

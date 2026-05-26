@@ -470,6 +470,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           canWrite={canWrite}
           isMember={isMember}
           chatType={normalizedChatType}
+          myRole={chatNode?.myRole ?? undefined}
+          permissions={chatNode?.permissions ?? undefined}
         />
       )}
     </div>

@@ -97,13 +97,17 @@ func (r *chatResolver) CanWrite(ctx context.Context, obj *model.ChatExtended) (b
 // Permissions is the resolver for the permissions field.
 func (r *chatResolver) Permissions(ctx context.Context, obj *model.ChatExtended) (*model.ChatPermissions, error) {
 	isPrivate := strings.ToUpper(obj.Type) == "PRIVATE"
+	isAdmin := obj.Role == "OWNER" || obj.Role == "ADMIN"
+
+	canSend := obj.IsActive || isAdmin
+
 	return &model.ChatPermissions{
-		CanSendMessage:    obj.IsActive,
+		CanSendMessage:    canSend,
 		CanInviteUsers:    !isPrivate,
-		CanEditMetadata:   obj.Role == "OWNER" || obj.Role == "ADMIN",
+		CanEditMetadata:   isAdmin,
 		CanDeleteMessages: true,
 		CanAssignAdmins:   obj.Role == "OWNER",
-		CanSendMedia:      obj.IsActive,
+		CanSendMedia:      canSend,
 		CanPinMessages:    !isPrivate,
 	}, nil
 }

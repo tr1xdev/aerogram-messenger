@@ -30,6 +30,14 @@ interface MessageComposerProps {
   canWrite: boolean;
   isMember: boolean;
   chatType?: "PRIVATE" | "GROUP" | "CHANNEL";
+  myRole?: string;
+  permissions?: {
+    canSendMessage: boolean;
+    canInviteUsers: boolean;
+    canEditMetadata: boolean;
+    canDeleteMessages: boolean;
+    canAssignAdmins: boolean;
+  };
 }
 
 export const MessageComposer = memo(function MessageComposer({
@@ -47,6 +55,8 @@ export const MessageComposer = memo(function MessageComposer({
   canWrite,
   isMember,
   chatType,
+  myRole,
+  permissions,
 }: MessageComposerProps): ReactNode {
   const [attachments, setAttachments] = useState<File[]>([]);
   const activeAction: Message | null = editingMessage || replyingTo;
@@ -54,6 +64,15 @@ export const MessageComposer = memo(function MessageComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef<boolean>(false);
+
+  useEffect((): void => {
+    console.log("DEBUG: MessageComposer state", {
+      canWrite,
+      myRole,
+      isMember,
+      permissions,
+    });
+  }, [canWrite, myRole, isMember, permissions]);
 
   const showStartButton: boolean = useMemo((): boolean => {
     return (

@@ -71,7 +71,7 @@ func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID
 		UserID: userID,
 	})
 	if err != nil {
-		log.Printf("[CHECK-PERM] Dialog %s not found or access denied: %v", dialogID, err)
+		log.Printf("[CHECK-PERM] Dialog %s not found or access denied for user %s: %v", dialogID, userID, err)
 		return false, status.Error(codes.NotFound, "chat not found or access denied")
 	}
 
@@ -88,12 +88,13 @@ func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID
 		return false, status.Error(codes.PermissionDenied, "not a member")
 	}
 
-	if member.Role == "owner" || member.Role == "admin" {
+	role := strings.ToLower(strings.TrimSpace(member.Role))
+	if role == "owner" || role == "admin" {
 		return true, nil
 	}
 
 	if dialog.Type == "channel" {
-		log.Printf("[CHECK-PERM] User %s is not admin in channel %s", userID, dialogID)
+		log.Printf("[CHECK-PERM] User %s (role: %s) is not admin in channel %s", userID, role, dialogID)
 		return false, status.Error(codes.PermissionDenied, "only admins can post in channels")
 	}
 
@@ -103,7 +104,6 @@ func (s *Server) checkPermission(ctx context.Context, dialogID uuid.UUID, userID
 	}
 
 	if (settings.Permissions & bit) != 0 {
-		log.Printf("[CHECK-PERM] Action restricted by bitmask %d for user %s in chat %s", bit, userID, dialogID)
 		return false, status.Error(codes.PermissionDenied, "restricted action")
 	}
 
