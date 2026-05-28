@@ -20,7 +20,9 @@ INSERT INTO dialog_members (
 ) VALUES (
     $1, $2, $3, NOW(), $4, $5, $6, $7, NOW(), NOW()
 ) ON CONFLICT (dialog_id, user_id) DO UPDATE SET
-    is_hidden = EXCLUDED.is_hidden,
+    role = EXCLUDED.role,
+    is_hidden = false,
+    joined_at = NOW(),
     updated_at = NOW()
 `
 
@@ -45,6 +47,29 @@ func (q *Queries) AddDialogMember(ctx context.Context, arg AddDialogMemberParams
 		arg.IsHidden,
 	)
 	return err
+}
+
+const canDeletePrivateDialog = `-- name: CanDeletePrivateDialog :one
+SELECT EXISTS (
+    SELECT 1 FROM dialogs d
+    JOIN dialog_members dm ON d.id = dm.dialog_id
+    WHERE d.id = $1
+      AND dm.user_id = $2
+      AND d.type = 'private'
+      AND d.deleted_at IS NULL
+)
+`
+
+type CanDeletePrivateDialogParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) CanDeletePrivateDialog(ctx context.Context, arg CanDeletePrivateDialogParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, canDeletePrivateDialog, arg.ID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const countDialogAdmins = `-- name: CountDialogAdmins :one
@@ -78,11 +103,11 @@ func (q *Queries) CountPinnedDialogs(ctx context.Context, userID uuid.UUID) (int
 const createDialog = `-- name: CreateDialog :one
 INSERT INTO dialogs (
     id, type, name, username, photo_url, bio, description,
-    invite_link, creator_id, members_count, is_active,
-    is_verified, created_at, updated_at
+    invite_link, creator_id, members_count, is_active, is_verified,
+    created_at, updated_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW()
-) RETURNING id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_active, created_at, updated_at, deleted_at
+) RETURNING id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at
 `
 
 type CreateDialogParams struct {
@@ -131,6 +156,7 @@ func (q *Queries) CreateDialog(ctx context.Context, arg CreateDialogParams) (Dia
 		&i.LastMessageAt,
 		&i.MembersCount,
 		&i.IsVerified,
+		&i.IsPrivate,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -146,6 +172,7 @@ INSERT INTO dialog_settings (
 ) VALUES (
     $1, $2, $3, $4, $5, NOW(), NOW()
 ) ON CONFLICT (dialog_id) DO UPDATE SET
+    permissions = EXCLUDED.permissions,
     updated_at = NOW()
 `
 
@@ -170,12 +197,13 @@ func (q *Queries) CreateDialogSettings(ctx context.Context, arg CreateDialogSett
 
 const decrementMembersCount = `-- name: DecrementMembersCount :exec
 UPDATE dialogs
-SET members_count = members_count - 1, updated_at = NOW()
+SET members_count = (SELECT COUNT(*) FROM dialog_members WHERE dialog_id = $1),
+    updated_at = NOW()
 WHERE id = $1
 `
 
-func (q *Queries) DecrementMembersCount(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, decrementMembersCount, id)
+func (q *Queries) DecrementMembersCount(ctx context.Context, dialogID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, decrementMembersCount, dialogID)
 	return err
 }
 
@@ -212,11 +240,22 @@ func (q *Queries) FindNewDialogOwner(ctx context.Context, arg FindNewDialogOwner
 }
 
 const getDialogByID = `-- name: GetDialogByID :one
-SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_active, created_at, updated_at, deleted_at FROM dialogs WHERE id = $1 LIMIT 1
+SELECT d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_private, d.is_active, d.created_at, d.updated_at, d.deleted_at
+FROM dialogs d
+LEFT JOIN dialog_members dm ON d.id = dm.dialog_id AND dm.user_id = $1
+WHERE d.id = $2
+  AND d.deleted_at IS NULL
+  AND (d.username IS NOT NULL OR dm.user_id IS NOT NULL OR d.creator_id = $1)
+LIMIT 1
 `
 
-func (q *Queries) GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error) {
-	row := q.db.QueryRowContext(ctx, getDialogByID, id)
+type GetDialogByIDParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	ID     uuid.UUID `json:"id"`
+}
+
+func (q *Queries) GetDialogByID(ctx context.Context, arg GetDialogByIDParams) (Dialog, error) {
+	row := q.db.QueryRowContext(ctx, getDialogByID, arg.UserID, arg.ID)
 	var i Dialog
 	err := row.Scan(
 		&i.ID,
@@ -233,6 +272,40 @@ func (q *Queries) GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, erro
 		&i.LastMessageAt,
 		&i.MembersCount,
 		&i.IsVerified,
+		&i.IsPrivate,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getDialogByIDInternal = `-- name: GetDialogByIDInternal :one
+SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at FROM dialogs
+WHERE id = $1 AND deleted_at IS NULL
+LIMIT 1
+`
+
+func (q *Queries) GetDialogByIDInternal(ctx context.Context, id uuid.UUID) (Dialog, error) {
+	row := q.db.QueryRowContext(ctx, getDialogByIDInternal, id)
+	var i Dialog
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Name,
+		&i.Username,
+		&i.PhotoUrl,
+		&i.Bio,
+		&i.Description,
+		&i.InviteLink,
+		&i.PinnedMessageID,
+		&i.CreatorID,
+		&i.LastMessageID,
+		&i.LastMessageAt,
+		&i.MembersCount,
+		&i.IsVerified,
+		&i.IsPrivate,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -242,9 +315,10 @@ func (q *Queries) GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, erro
 }
 
 const getDialogByUsername = `-- name: GetDialogByUsername :one
-SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_active, created_at, updated_at, deleted_at FROM dialogs
+SELECT id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at FROM dialogs
 WHERE username = $1
   AND is_active = true
+  AND deleted_at IS NULL
 LIMIT 1
 `
 
@@ -266,6 +340,7 @@ func (q *Queries) GetDialogByUsername(ctx context.Context, username sql.NullStri
 		&i.LastMessageAt,
 		&i.MembersCount,
 		&i.IsVerified,
+		&i.IsPrivate,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -275,8 +350,9 @@ func (q *Queries) GetDialogByUsername(ctx context.Context, username sql.NullStri
 }
 
 const getDialogMember = `-- name: GetDialogMember :one
-SELECT dialog_id, user_id, role, joined_at, last_read_message_id, last_read_sequence, muted_until, is_pinned, is_hidden, custom_title, notifications_on, created_at, updated_at FROM dialog_members
-WHERE dialog_id = $1 AND user_id = $2 LIMIT 1
+SELECT dialog_id, user_id, role, joined_at, last_read_message_id, last_read_sequence, muted_until, is_pinned, is_hidden, custom_title, notifications_on, created_at, updated_at, invite_id FROM dialog_members
+WHERE dialog_id = $1 AND user_id = $2
+LIMIT 1
 `
 
 type GetDialogMemberParams struct {
@@ -301,33 +377,32 @@ func (q *Queries) GetDialogMember(ctx context.Context, arg GetDialogMemberParams
 		&i.NotificationsOn,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.InviteID,
 	)
 	return i, err
 }
 
 const getDialogMembers = `-- name: GetDialogMembers :many
-SELECT dm.dialog_id, dm.user_id, dm.role, dm.joined_at, dm.last_read_message_id, dm.last_read_sequence, dm.muted_until, dm.is_pinned, dm.is_hidden, dm.custom_title, dm.notifications_on, dm.created_at, dm.updated_at, u.is_bot
+SELECT
+    dm.dialog_id, dm.user_id, dm.role, dm.joined_at,
+    u.username, u.first_name, u.last_name, u.photo_url, u.is_bot
 FROM dialog_members dm
 JOIN users u ON dm.user_id = u.id
 WHERE dm.dialog_id = $1
   AND dm.is_hidden = false
+ORDER BY dm.joined_at ASC
 `
 
 type GetDialogMembersRow struct {
-	DialogID          uuid.UUID      `json:"dialog_id"`
-	UserID            uuid.UUID      `json:"user_id"`
-	Role              string         `json:"role"`
-	JoinedAt          time.Time      `json:"joined_at"`
-	LastReadMessageID uuid.NullUUID  `json:"last_read_message_id"`
-	LastReadSequence  int64          `json:"last_read_sequence"`
-	MutedUntil        sql.NullTime   `json:"muted_until"`
-	IsPinned          bool           `json:"is_pinned"`
-	IsHidden          bool           `json:"is_hidden"`
-	CustomTitle       sql.NullString `json:"custom_title"`
-	NotificationsOn   bool           `json:"notifications_on"`
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
-	IsBot             bool           `json:"is_bot"`
+	DialogID  uuid.UUID      `json:"dialog_id"`
+	UserID    uuid.UUID      `json:"user_id"`
+	Role      string         `json:"role"`
+	JoinedAt  time.Time      `json:"joined_at"`
+	Username  sql.NullString `json:"username"`
+	FirstName string         `json:"first_name"`
+	LastName  sql.NullString `json:"last_name"`
+	PhotoUrl  sql.NullString `json:"photo_url"`
+	IsBot     bool           `json:"is_bot"`
 }
 
 func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]GetDialogMembersRow, error) {
@@ -344,15 +419,10 @@ func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]G
 			&i.UserID,
 			&i.Role,
 			&i.JoinedAt,
-			&i.LastReadMessageID,
-			&i.LastReadSequence,
-			&i.MutedUntil,
-			&i.IsPinned,
-			&i.IsHidden,
-			&i.CustomTitle,
-			&i.NotificationsOn,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.Username,
+			&i.FirstName,
+			&i.LastName,
+			&i.PhotoUrl,
 			&i.IsBot,
 		); err != nil {
 			return nil, err
@@ -368,9 +438,55 @@ func (q *Queries) GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]G
 	return items, nil
 }
 
+const getDialogOpponent = `-- name: GetDialogOpponent :one
+SELECT
+    u.id as user_id,
+    u.username,
+    u.first_name,
+    u.last_name,
+    u.photo_url,
+    u.is_bot,
+    dm.last_read_sequence
+FROM users u
+JOIN dialog_members dm ON u.id = dm.user_id
+WHERE dm.dialog_id = $1 AND dm.user_id != $2
+LIMIT 1
+`
+
+type GetDialogOpponentParams struct {
+	DialogID uuid.UUID `json:"dialog_id"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+type GetDialogOpponentRow struct {
+	UserID           uuid.UUID      `json:"user_id"`
+	Username         sql.NullString `json:"username"`
+	FirstName        string         `json:"first_name"`
+	LastName         sql.NullString `json:"last_name"`
+	PhotoUrl         sql.NullString `json:"photo_url"`
+	IsBot            bool           `json:"is_bot"`
+	LastReadSequence int64          `json:"last_read_sequence"`
+}
+
+func (q *Queries) GetDialogOpponent(ctx context.Context, arg GetDialogOpponentParams) (GetDialogOpponentRow, error) {
+	row := q.db.QueryRowContext(ctx, getDialogOpponent, arg.DialogID, arg.UserID)
+	var i GetDialogOpponentRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.PhotoUrl,
+		&i.IsBot,
+		&i.LastReadSequence,
+	)
+	return i, err
+}
+
 const getDialogSettings = `-- name: GetDialogSettings :one
 SELECT dialog_id, permissions, slow_mode_delay, is_history_hidden, is_signatures_enabled, created_at, updated_at FROM dialog_settings
-WHERE dialog_id = $1 LIMIT 1
+WHERE dialog_id = $1
+LIMIT 1
 `
 
 func (q *Queries) GetDialogSettings(ctx context.Context, dialogID uuid.UUID) (DialogSetting, error) {
@@ -389,14 +505,17 @@ func (q *Queries) GetDialogSettings(ctx context.Context, dialogID uuid.UUID) (Di
 }
 
 const getPrivateDialogByMembers = `-- name: GetPrivateDialogByMembers :one
-SELECT d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at, d.deleted_at
+SELECT d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_private, d.is_active, d.created_at, d.updated_at, d.deleted_at
 FROM dialogs d
 JOIN dialog_members dm1 ON d.id = dm1.dialog_id
 JOIN dialog_members dm2 ON d.id = dm2.dialog_id
 WHERE d.type = 'private'
+  AND d.members_count = 2
   AND dm1.user_id = $1
   AND dm2.user_id = $2
+  AND dm1.user_id != dm2.user_id
   AND d.is_active = true
+  AND d.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -423,6 +542,7 @@ func (q *Queries) GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateD
 		&i.LastMessageAt,
 		&i.MembersCount,
 		&i.IsVerified,
+		&i.IsPrivate,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -433,19 +553,9 @@ func (q *Queries) GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateD
 
 const getUserDialogs = `-- name: GetUserDialogs :many
 SELECT
-    d.id,
-    d.type,
-    d.name,
-    d.username,
-    d.photo_url,
-    d.members_count,
-    d.is_verified,
-    d.is_active,
-    d.last_message_id,
-    d.last_message_at,
-    dm.role,
-    dm.is_pinned,
-    dm.last_read_sequence,
+    d.id, d.type, d.name, d.username, d.photo_url, d.members_count,
+    d.is_verified, d.is_active, d.last_message_id, d.last_message_at,
+    dm.role, dm.is_pinned, dm.last_read_sequence,
     m.content AS msg_content,
     m.sequence AS msg_sequence,
     m.author_id AS msg_author_id,
@@ -454,20 +564,22 @@ SELECT
     u.is_bot AS msg_author_is_bot,
     m.created_at AS msg_created_at,
     m.reply_to_id AS msg_reply_to_id,
-    (
-        SELECT count(*)
-        FROM messages m2
-        WHERE m2.dialog_id = d.id
-          AND m2.sequence > dm.last_read_sequence
-          AND m2.author_id != $1
-          AND m2.is_deleted = false
-    ) AS unread_count
+    COALESCE(unread.count, 0) AS unread_count
 FROM dialogs d
 JOIN dialog_members dm ON dm.dialog_id = d.id
 LEFT JOIN messages m ON d.last_message_id = m.id
 LEFT JOIN users u ON m.author_id = u.id
+LEFT JOIN LATERAL (
+    SELECT count(*) as count
+    FROM messages m2
+    WHERE m2.dialog_id = d.id
+      AND m2.sequence > dm.last_read_sequence
+      AND m2.author_id != $1
+      AND m2.is_deleted = false
+) unread ON TRUE
 WHERE dm.user_id = $1
   AND d.is_active = true
+  AND d.deleted_at IS NULL
   AND dm.is_hidden = false
 ORDER BY dm.is_pinned DESC, COALESCE(d.last_message_at, d.created_at) DESC
 `
@@ -570,18 +682,19 @@ func (q *Queries) HideDialogMember(ctx context.Context, arg HideDialogMemberPara
 
 const incrementMembersCount = `-- name: IncrementMembersCount :exec
 UPDATE dialogs
-SET members_count = members_count + 1, updated_at = NOW()
+SET members_count = (SELECT COUNT(*) FROM dialog_members WHERE dialog_id = $1),
+    updated_at = NOW()
 WHERE id = $1
 `
 
-func (q *Queries) IncrementMembersCount(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, incrementMembersCount, id)
+func (q *Queries) IncrementMembersCount(ctx context.Context, dialogID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, incrementMembersCount, dialogID)
 	return err
 }
 
 const isDialogCreator = `-- name: IsDialogCreator :one
 SELECT EXISTS (
-    SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2
+    SELECT 1 FROM dialogs WHERE id = $1 AND creator_id = $2 AND deleted_at IS NULL
 )
 `
 
@@ -629,6 +742,77 @@ func (q *Queries) RemoveDialogMember(ctx context.Context, arg RemoveDialogMember
 	return err
 }
 
+const searchPublicDialogs = `-- name: SearchPublicDialogs :many
+SELECT
+    d.id, d.type, d.name, d.username, d.photo_url, d.description,
+    d.members_count, d.is_verified, d.is_active, d.created_at, d.updated_at,
+    COALESCE(dm.role, 'NONE')::text as user_role
+FROM dialogs d
+LEFT JOIN dialog_members dm ON d.id = dm.dialog_id AND dm.user_id = $2
+WHERE (d.name ILIKE '%' || $1 || '%' OR d.username ILIKE '%' || $1 || '%')
+    AND d.type IN ('group', 'channel')
+    AND d.username IS NOT NULL
+    AND d.is_active = true
+    AND d.deleted_at IS NULL
+LIMIT 20
+`
+
+type SearchPublicDialogsParams struct {
+	Column1 sql.NullString `json:"column_1"`
+	UserID  uuid.UUID      `json:"user_id"`
+}
+
+type SearchPublicDialogsRow struct {
+	ID           uuid.UUID      `json:"id"`
+	Type         string         `json:"type"`
+	Name         sql.NullString `json:"name"`
+	Username     sql.NullString `json:"username"`
+	PhotoUrl     sql.NullString `json:"photo_url"`
+	Description  sql.NullString `json:"description"`
+	MembersCount int32          `json:"members_count"`
+	IsVerified   bool           `json:"is_verified"`
+	IsActive     bool           `json:"is_active"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	UserRole     string         `json:"user_role"`
+}
+
+func (q *Queries) SearchPublicDialogs(ctx context.Context, arg SearchPublicDialogsParams) ([]SearchPublicDialogsRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchPublicDialogs, arg.Column1, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchPublicDialogsRow
+	for rows.Next() {
+		var i SearchPublicDialogsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Name,
+			&i.Username,
+			&i.PhotoUrl,
+			&i.Description,
+			&i.MembersCount,
+			&i.IsVerified,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UserRole,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const unhideDialogForMembers = `-- name: UnhideDialogForMembers :exec
 UPDATE dialog_members
 SET is_hidden = false, updated_at = NOW()
@@ -638,6 +822,64 @@ WHERE dialog_id = $1
 func (q *Queries) UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, unhideDialogForMembers, dialogID)
 	return err
+}
+
+const updateChatMetadata = `-- name: UpdateChatMetadata :one
+UPDATE dialogs
+SET
+    name = COALESCE($1, name),
+    username = CASE
+        WHEN $2::boolean THEN $3
+        ELSE username
+    END,
+    description = COALESCE($4, description),
+    photo_url = COALESCE($5, photo_url),
+    updated_at = NOW()
+WHERE id = $6
+RETURNING id, type, name, username, photo_url, bio, description, invite_link, pinned_message_id, creator_id, last_message_id, last_message_at, members_count, is_verified, is_private, is_active, created_at, updated_at, deleted_at
+`
+
+type UpdateChatMetadataParams struct {
+	Name        sql.NullString `json:"name"`
+	UpdateSlug  bool           `json:"update_slug"`
+	Username    sql.NullString `json:"username"`
+	Description sql.NullString `json:"description"`
+	PhotoUrl    sql.NullString `json:"photo_url"`
+	ID          uuid.UUID      `json:"id"`
+}
+
+func (q *Queries) UpdateChatMetadata(ctx context.Context, arg UpdateChatMetadataParams) (Dialog, error) {
+	row := q.db.QueryRowContext(ctx, updateChatMetadata,
+		arg.Name,
+		arg.UpdateSlug,
+		arg.Username,
+		arg.Description,
+		arg.PhotoUrl,
+		arg.ID,
+	)
+	var i Dialog
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Name,
+		&i.Username,
+		&i.PhotoUrl,
+		&i.Bio,
+		&i.Description,
+		&i.InviteLink,
+		&i.PinnedMessageID,
+		&i.CreatorID,
+		&i.LastMessageID,
+		&i.LastMessageAt,
+		&i.MembersCount,
+		&i.IsVerified,
+		&i.IsPrivate,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }
 
 const updateDialogCreator = `-- name: UpdateDialogCreator :exec
@@ -686,22 +928,5 @@ type UpdateDialogSettingsParams struct {
 
 func (q *Queries) UpdateDialogSettings(ctx context.Context, arg UpdateDialogSettingsParams) error {
 	_, err := q.db.ExecContext(ctx, updateDialogSettings, arg.DialogID, arg.Permissions)
-	return err
-}
-
-const updateMemberPinStatus = `-- name: UpdateMemberPinStatus :exec
-UPDATE dialog_members
-SET is_pinned = $3, updated_at = NOW()
-WHERE dialog_id = $1 AND user_id = $2
-`
-
-type UpdateMemberPinStatusParams struct {
-	DialogID uuid.UUID `json:"dialog_id"`
-	UserID   uuid.UUID `json:"user_id"`
-	IsPinned bool      `json:"is_pinned"`
-}
-
-func (q *Queries) UpdateMemberPinStatus(ctx context.Context, arg UpdateMemberPinStatusParams) error {
-	_, err := q.db.ExecContext(ctx, updateMemberPinStatus, arg.DialogID, arg.UserID, arg.IsPinned)
 	return err
 }

@@ -21,7 +21,13 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	graph_api "github.com/tr1xdev/aerogram-messenger/internal/graph/api"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/resolvers"
+	authv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
+	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
+	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
+	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
+	userv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/mailer"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/storage"
@@ -34,12 +40,6 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/services/presence_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/ua_svc"
 	"github.com/tr1xdev/aerogram-messenger/internal/services/user_svc"
-
-	authv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
-	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
-	messagesv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"
-	presencev1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/presence/v1"
-	userv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/user/v1"
 )
 
 func main() {
@@ -94,7 +94,7 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	registerGRPCServices(grpcServer, db, rdb, emailSvc, cfg, pSvc)
+	registerGRPCServices(grpcServer, db, rdb, emailSvc, s3Storage, cfg, pSvc)
 
 	go func() {
 		log.Printf("gRPC server listening on %s", grpcAddr)
@@ -110,6 +110,7 @@ func main() {
 	defer conn.Close()
 
 	gqlServer := initGraphQL(db, rdb, conn, cfg, geoSvc, uaSvc, pSvc, s3Storage)
+	enricher := helpers.NewChatEnricher(db.Queries, s3Storage)
 
 	router := api.NewRouter(api.RouterConfig{
 		Cfg:            cfg,
@@ -118,6 +119,7 @@ func main() {
 		GQLServer:      gqlServer,
 		UserClient:     userv1.NewUserServiceClient(conn),
 		PresenceClient: presencev1.NewPresenceServiceClient(conn),
+		Enricher:       enricher,
 	})
 
 	certPath := os.Getenv("TLS_CERT_PATH")
@@ -208,7 +210,7 @@ func main() {
 	log.Println("Server stopped")
 }
 
-func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, cfg *config.Config, pSvc *presence_svc.Server) {
+func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, mailer repositories.EmailProvider, s3Storage storage.Provider, cfg *config.Config, pSvc *presence_svc.Server) {
 	authLimiter := limiter.NewRedisLimiter(rdb)
 
 	authv1.RegisterAuthServiceServer(s, auth_svc.NewServer(db, authLimiter, rdb, mailer, cfg))
@@ -220,7 +222,7 @@ func registerGRPCServices(s *grpc.Server, db *database.DB, rdb *redis.Client, ma
 		cfg.RateLimit.Chat,
 	))
 
-	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb, authLimiter, cfg.RateLimit.Messages))
+	messagesv1.RegisterMessagesServiceServer(s, messages_svc.NewServer(db, rdb, authLimiter, s3Storage, cfg.RateLimit.Messages))
 	presencev1.RegisterPresenceServiceServer(s, pSvc)
 
 	userv1.RegisterUserServiceServer(s, user_svc.NewServer(db, authLimiter, cfg))
@@ -234,8 +236,13 @@ func initGraphQL(
 	geoSvc *geo_svc.Service,
 	uaSvc *ua_svc.Service,
 	pSvc *presence_svc.Server,
-	s3Storage *storage.S3Storage,
+	s3Storage storage.Provider,
 ) *handler.Server {
+	s3Concrete, ok := s3Storage.(*storage.S3Storage)
+	if !ok {
+		log.Fatal("failed to cast storage provider to S3Storage")
+	}
+
 	resolver := resolvers.NewResolver(
 		db,
 		db.Queries,
@@ -248,7 +255,7 @@ func initGraphQL(
 		rdb,
 		geoSvc,
 		uaSvc,
-		s3Storage,
+		s3Concrete,
 	)
 
 	return graph_api.NewGraphQLServer(resolver, cfg, db)

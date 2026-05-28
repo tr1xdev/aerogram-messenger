@@ -8,6 +8,7 @@ import {
 } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import { useChatStore } from "@/store/chat";
 import {
   useChatHistory,
@@ -24,12 +25,13 @@ import { ChatHeader } from "@/features/chat/ui/chat-header";
 import { MessageList } from "@/features/chat/ui/message-list";
 import { MessageComposer } from "@/features/chat/ui/message-composer";
 import { AlertCircle, ArrowLeft } from "lucide-react";
-import type { Message, User, ChatMember } from "@/entities/chat/model/types";
+import type { Message, User } from "@/entities/chat/model/types";
 import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generated__/useMarkDialog_chat.graphql";
-import type { useMessageActionsSendMutation$data } from "@/features/chat/lib/messages/__generated__/useMessageActionsSendMutation.graphql";
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 import type { chatHeader_user$key } from "@/features/chat/ui/__generated__/chatHeader_user.graphql";
 import type { useChatsDetailsQuery$data } from "@/features/chat/lib/chat/__generated__/useChatsDetailsQuery.graphql";
+import type { messageBubble_message$data } from "@/features/chat/ui/message-bubble/__generated__/messageBubble_message.graphql";
+import type { messageList_metadata$key } from "@/features/chat/ui/__generated__/messageList_metadata.graphql";
 
 type ChatNode = Extract<
   useChatsDetailsQuery$data["chat"],
@@ -39,8 +41,8 @@ type ChatNode = Extract<
 type RelayMember = NonNullable<ChatNode["members"]>[number];
 
 interface ExtendedUser extends Omit<User, "lastName"> {
-  lastName?: string | null;
-  displayName?: string | null;
+  lastName: string | null;
+  displayName: string | null;
 }
 
 interface ChatStoreState {
@@ -64,7 +66,8 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
-  const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
+  const [isAtBottom, setIsAtBottom] = useState<boolean>(false);
+  const [isOptimisticJoined, setIsOptimisticJoined] = useState<boolean>(false);
 
   const { input, setInput, resetInput, setActiveChatId } =
     useChatStore() as ChatStoreState;
@@ -78,10 +81,31 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const chatData: ChatDetailsResponse = useChatDetails(chatId);
   const chatsData: MyChatsResponse = useMyChats();
 
-  const me: User | undefined = meData?.me as unknown as User | undefined;
+  const me: User | undefined = meData?.me
+    ? (meData.me as unknown as User)
+    : undefined;
   const chatRaw = chatData.chat;
-  const isChatType: boolean = chatRaw?.__typename === "Chat";
-  const chatNode: ChatNode | null = isChatType ? (chatRaw as ChatNode) : null;
+
+  const chatNode = useMemo((): (ChatNode & { slug?: string }) | null => {
+    if (chatRaw?.__typename === "Chat") {
+      return chatRaw as unknown as ChatNode & { slug?: string };
+    }
+    return null;
+  }, [chatRaw]);
+
+  const isMember: boolean = useMemo((): boolean => {
+    if (isOptimisticJoined) return true;
+    if (!chatNode) return false;
+    const role: string = (chatNode.myRole ?? "").toLowerCase();
+    if (role && role !== "none") return true;
+
+    if (chatNode.members && me) {
+      return chatNode.members.some(
+        (m: RelayMember): boolean => m.user?.id === me.id,
+      );
+    }
+    return false;
+  }, [chatNode, me, isOptimisticJoined]);
 
   const normalizedChatType = useMemo((): "PRIVATE" | "GROUP" | "CHANNEL" => {
     const type: string | undefined = chatNode?.type;
@@ -93,45 +117,59 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const partnerUser = useMemo((): chatHeader_user$key | null => {
     if (!chatNode?.members || !me) return null;
     const partner = chatNode.members.find(
-      (m: RelayMember): boolean =>
-        m.user?.id !== undefined && m.user.id !== me.id,
+      (m: RelayMember): boolean => m.user?.id !== me.id,
     );
-    return (partner?.user as unknown as chatHeader_user$key) ?? null;
+    return partner?.user
+      ? (partner.user as unknown as chatHeader_user$key)
+      : null;
   }, [chatNode, me]);
 
   const { messages: messagesFromHistory, isLoading: historyLoading } =
     useChatHistory(chatId);
 
-  const { sendMessage, editMessage, markAsRead } = useMessageActions(chatId);
-  const { handleKeyPress, stopTyping } = useSendTyping(chatId);
+  const { sendMessage, editMessage, markAsRead, joinChat } =
+    useMessageActions(chatId);
+  const { handleKeyPress, stopTyping: stopTypingHook } = useSendTyping(chatId);
 
-  const canWrite: boolean = chatNode ? chatNode.canWrite : true;
+  const canWrite: boolean = chatNode?.canWrite ?? true;
   const isInitialLoading: boolean = isFirstLoad && historyLoading;
   const isNotFound: boolean =
     !chatNode && !isInitialLoading && chatRaw?.__typename !== "InternalError";
 
-  const lastSequence: number = useMemo((): number => {
-    if (!messagesFromHistory || messagesFromHistory.length === 0) return 0;
-    const lastMsg: Message = messagesFromHistory[
-      messagesFromHistory.length - 1
-    ] as unknown as Message;
-    return Number(lastMsg.sequence) || 0;
+  const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
+    const raw = (messagesFromHistory ?? []) as unknown as Message[];
+    return [...raw]
+      .filter((m: Message): boolean => !!m)
+      .sort((a: Message, b: Message): number => {
+        const seqA: number = Number(a.sequence) || 0;
+        const seqB: number = Number(b.sequence) || 0;
+        if (seqA !== seqB) return seqA - seqB;
+        return new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
+      });
   }, [messagesFromHistory]);
 
+  const lastSequence: number = useMemo((): number => {
+    if (allMessages.length === 0) return 0;
+    return Number(allMessages[allMessages.length - 1].sequence) || 0;
+  }, [allMessages]);
+
   const { checkAndMarkRead } = useMarkDialog(
-    (isChatType ? chatRaw : null) as unknown as useMarkDialog_chat$key,
+    (chatNode ? chatNode : null) as unknown as useMarkDialog_chat$key,
     lastSequence,
     me?.id,
   );
 
-  useEffect((): void | (() => void) => {
-    if (!historyLoading && chatNode) {
-      const timer: ReturnType<typeof setTimeout> = setTimeout((): void => {
+  useEffect((): (() => void) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (!historyLoading) {
+      timer = setTimeout((): void => {
         setIsFirstLoad(false);
       }, 100);
-      return (): void => clearTimeout(timer);
     }
-  }, [historyLoading, chatNode]);
+    return (): void => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [historyLoading]);
 
   useEffect((): (() => void) => {
     setActiveChatId(chatId);
@@ -144,49 +182,72 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     setReplyingTo(null);
     setEditingMessage(null);
     resetInput();
-    stopTyping();
-  }, [resetInput, stopTyping]);
+    stopTypingHook();
+  }, [resetInput, stopTypingHook]);
 
   const handleEditInitiate = useCallback(
-    (msg: Message): void => {
+    (msg: messageBubble_message$data): void => {
+      const fullMsg: Message = msg as unknown as Message;
       setReplyingTo(null);
-      setEditingMessage(msg);
-      setInput(msg.text);
+      setEditingMessage(fullMsg);
+      setInput(fullMsg.text);
     },
     [setInput],
   );
 
-  const handleReplyInitiate = useCallback((msg: Message): void => {
-    setEditingMessage(null);
-    setReplyingTo(msg);
+  const handleReplyInitiate = useCallback(
+    (msg: messageBubble_message$data): void => {
+      setEditingMessage(null);
+      setReplyingTo(msg as unknown as Message);
+    },
+    [],
+  );
+
+  const handleDeleteMessage = useCallback((id: string): void => {
+    void id;
   }, []);
+
+  const handleForwardMessage = useCallback(
+    (msg: messageBubble_message$data): void => {
+      void msg;
+    },
+    [],
+  );
 
   const handleTyping = useCallback(
     (isTyping: boolean): void => {
       if (isTyping) {
         handleKeyPress();
       } else {
-        stopTyping();
+        stopTypingHook();
       }
     },
-    [handleKeyPress, stopTyping],
+    [handleKeyPress, stopTypingHook],
   );
+
+  const handleJoin = useCallback((): void => {
+    const slug: string | undefined = chatNode?.slug;
+    if (joinChat && slug) {
+      setIsOptimisticJoined(true);
+      joinChat(slug)
+        .then((): void => {
+          toast.success("Successfully joined the chat");
+        })
+        .catch((): void => {
+          setIsOptimisticJoined(false);
+          toast.error("Failed to join the chat");
+        });
+    }
+  }, [joinChat, chatNode?.slug]);
 
   const totalUnread: number = useMemo((): number => {
     const myChatsResult = chatsData.myChats;
-
-    if (
-      myChatsResult?.__typename === "ChatList" &&
-      Array.isArray(myChatsResult.chats)
-    ) {
+    if (myChatsResult?.__typename === "ChatList") {
       return myChatsResult.chats.reduce((acc: number, c): number => {
-        const unread: number = c?.unreadCount ?? 0;
-        const isCurrentChat: boolean = c?.id === chatId;
-
-        return isCurrentChat ? acc : acc + unread;
+        if (c?.id === chatId) return acc;
+        return acc + (c?.unreadCount ?? 0);
       }, 0);
     }
-
     return 0;
   }, [chatsData.myChats, chatId]);
 
@@ -194,63 +255,64 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     if (!chatNode?.members || !me || normalizedChatType !== "PRIVATE")
       return false;
     const otherMember = chatNode.members.find(
-      (m: RelayMember): boolean =>
-        m?.user?.id !== undefined && m.user.id !== me.id,
+      (m: RelayMember): boolean => m?.user?.id !== me.id,
     );
     return otherMember?.user?.isBot ?? false;
   }, [chatNode, me, normalizedChatType]);
 
-  const allMessages: readonly Message[] = useMemo((): readonly Message[] => {
-    const rawMessages: Message[] = (messagesFromHistory ??
-      []) as unknown as Message[];
-    return [...rawMessages]
-      .filter((m: Message | null): boolean => m !== null && m !== undefined)
-      .sort((a: Message, b: Message): number => {
-        const timeA: number = new Date(a.sentAt).getTime();
-        const timeB: number = new Date(b.sentAt).getTime();
-        if (Math.abs(timeA - timeB) > 3000) return timeA - timeB;
-        return (Number(a.sequence) || 0) - (Number(b.sequence) || 0);
-      });
-  }, [messagesFromHistory]);
+  useEffect((): (() => void) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  useEffect((): void | (() => void) => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-
-    const handleMarkRead = (): void => {
+    const triggerRead = (): void => {
       if (
         document.visibilityState === "visible" &&
         lastSequence > 0 &&
-        isAtBottom
+        isAtBottom &&
+        !isInitialLoading &&
+        !historyLoading
       ) {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout((): void => {
           checkAndMarkRead();
           markAsRead();
-        }, 100);
+        }, 300);
       }
     };
 
-    handleMarkRead();
-
-    window.addEventListener("visibilitychange", handleMarkRead);
-    window.addEventListener("focus", handleMarkRead);
+    triggerRead();
+    window.addEventListener("visibilitychange", triggerRead);
+    window.addEventListener("focus", triggerRead);
 
     return (): void => {
-      clearTimeout(timeoutId);
-      window.removeEventListener("visibilitychange", handleMarkRead);
-      window.removeEventListener("focus", handleMarkRead);
+      if (timeoutId) clearTimeout(timeoutId);
+      window.removeEventListener("visibilitychange", triggerRead);
+      window.removeEventListener("focus", triggerRead);
     };
-  }, [checkAndMarkRead, markAsRead, lastSequence, isAtBottom]);
+  }, [
+    checkAndMarkRead,
+    markAsRead,
+    lastSequence,
+    isAtBottom,
+    isInitialLoading,
+    historyLoading,
+  ]);
 
   const handleSend = useCallback(
-    (text?: string): void => {
+    (text?: string, attachments: File[] = []): void => {
       const val: string = (text ?? inputRef.current).trim();
-      if (!val || !me) return;
+
+      if ((!val && attachments.length === 0) || !me) {
+        return;
+      }
 
       if (editingMessage) {
         editMessage(editingMessage.id, val)
-          .then((): void => cancelAction())
-          .catch((err: Error): void => console.error(err));
+          .then((): void => {
+            cancelAction();
+          })
+          .catch((): void => {
+            toast.error("Failed to edit message");
+          });
         return;
       }
 
@@ -258,14 +320,20 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
       const tempId: string = `temp-${Date.now()}`;
       const extendedMe: ExtendedUser = me as unknown as ExtendedUser;
 
+      const optimisticAttachments = attachments.map(
+        (file: File, index: number) => ({
+          id: `temp-att-${tempId}-${index}`,
+          type: file.type.split("/")[0] || "document",
+          url: URL.createObjectURL(file),
+          fileName: file.name,
+          fileSize: file.size,
+          contentType: file.type,
+        }),
+      );
+
       cancelAction();
 
-      sendMessage(val, {
-        variables: {
-          chatId,
-          text: val,
-          replyToId: originalReply?.id ?? null,
-        },
+      sendMessage(val, attachments, originalReply?.id ?? null, {
         optimisticResponse: {
           sendMessage: {
             __typename: "Message",
@@ -279,6 +347,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
                   1
                 : 1,
             isEdited: false,
+            attachments: optimisticAttachments,
             sender: {
               id: extendedMe.id,
               firstName: extendedMe.firstName,
@@ -299,11 +368,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
                 }
               : null,
           },
-        } as useMessageActionsSendMutation$data,
-      }).catch((): void => {
-        setInput(val);
-        if (originalReply) setReplyingTo(originalReply);
-      });
+        },
+      })
+        .then((): void => {})
+        .catch((): void => {
+          setInput(val);
+          if (originalReply) setReplyingTo(originalReply);
+          toast.error("Message not sent");
+        });
     },
     [
       me,
@@ -326,7 +398,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         </div>
         <h2 className="text-xl font-bold mb-2">Chat not found</h2>
         <p className="text-muted-foreground text-sm max-w-70 mb-8">
-          The chat doesn't exist or you don't have permission to view it.
+          The chat doesn't exist or you don't have access.
         </p>
         <button
           className="gap-2 rounded-xl flex items-center px-4 py-2 border hover:bg-muted"
@@ -351,7 +423,6 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         type={normalizedChatType}
         membersCount={chatNode?.membersCount ?? 0}
       />
-
       <main className="flex-1 relative min-h-0 bg-background overflow-hidden">
         {isInitialLoading ? (
           <div className="absolute inset-0 p-4 flex flex-col gap-6">
@@ -367,18 +438,22 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
         ) : (
           <MessageList
             chatId={chatId}
-            messages={allMessages}
-            members={(chatNode?.members as unknown as ChatMember[]) ?? []}
+            messages={
+              messagesFromHistory as unknown as messageList_metadata$key
+            }
             myId={me?.id}
+            chatType={normalizedChatType}
             lastReadSequence={Number(chatNode?.lastReadSequence) || 0}
+            canWrite={canWrite}
             onMarkRead={markAsRead}
             onReply={handleReplyInitiate}
             onEdit={handleEditInitiate}
+            onDelete={handleDeleteMessage}
+            onForward={handleForwardMessage}
             onScrollAtBottomChange={setIsAtBottom}
           />
         )}
       </main>
-
       {!isInitialLoading && (
         <MessageComposer
           isBot={isBotChat}
@@ -386,13 +461,17 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
           input={input}
           setInput={setInput}
           onSend={handleSend}
+          onJoin={handleJoin}
           onTyping={handleTyping}
           disabled={false}
           replyingTo={replyingTo}
           editingMessage={editingMessage}
           onCancelAction={cancelAction}
           canWrite={canWrite}
+          isMember={isMember}
           chatType={normalizedChatType}
+          myRole={chatNode?.myRole ?? undefined}
+          permissions={chatNode?.permissions ?? undefined}
         />
       )}
     </div>

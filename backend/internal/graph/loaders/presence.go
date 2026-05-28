@@ -26,20 +26,16 @@ func LoadPresence(ctx context.Context, id string) (string, error) {
 
 func newPresenceBatchFn(client presencepb.PresenceServiceClient) dataloader.BatchFunc[string, string] {
 	return func(ctx context.Context, keys []string) []*dataloader.Result[string] {
-		log.Printf("[BATCH-PRESENCE] Requesting bulk presence for %d users", len(keys))
 
 		output := make([]*dataloader.Result[string], len(keys))
 
 		res, err := client.GetBulk(ctx, &presencepb.GetBulkRequest{UserIds: keys})
 		if err != nil {
-			log.Printf("[BATCH-PRESENCE] gRPC GetBulk failed: %v", err)
 			for i := range output {
 				output[i] = &dataloader.Result[string]{Error: err}
 			}
 			return output
 		}
-
-		log.Printf("[BATCH-PRESENCE] Received %d statuses from gRPC", len(res.Statuses))
 
 		for i, id := range keys {
 			status := "offline"

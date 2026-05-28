@@ -40,6 +40,8 @@ export interface Chat {
   id: string;
   type: ChatType;
   title: string;
+  slug?: string | null;
+  membersCount?: number;
   photoUrl?: string | null;
   members: ChatMember[];
   lastMessage?: Message | null;

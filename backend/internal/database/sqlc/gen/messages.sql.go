@@ -14,6 +14,29 @@ import (
 	"github.com/lib/pq"
 )
 
+const checkFileAccess = `-- name: CheckFileAccess :one
+SELECT EXISTS (
+    SELECT 1
+    FROM message_attachments ma
+    JOIN messages m ON ma.message_id = m.id
+    JOIN dialog_members dm ON m.dialog_id = dm.dialog_id
+    WHERE ma.file_name = $1
+      AND dm.user_id = $2
+) AS has_access
+`
+
+type CheckFileAccessParams struct {
+	FileName string    `json:"file_name"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) CheckFileAccess(ctx context.Context, arg CheckFileAccessParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkFileAccess, arg.FileName, arg.UserID)
+	var has_access bool
+	err := row.Scan(&has_access)
+	return has_access, err
+}
+
 const countUnreadMessages = `-- name: CountUnreadMessages :one
 SELECT count(*) FROM messages
 WHERE dialog_id = $1 AND author_id != $2 AND sequence > $3 AND is_deleted = false
@@ -73,23 +96,21 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 
 const createMessage = `-- name: CreateMessage :one
 INSERT INTO messages (
-    id, dialog_id, author_id, content, is_encrypted,
-    encryption_iv, reply_to_id, forward_from_id, is_system, is_deleted, created_at, updated_at
+    id, dialog_id, author_id, content, reply_to_id,
+    forward_from_id, is_system, is_deleted, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, false, NOW(), NOW()
-) RETURNING id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at
+    $1, $2, $3, $4, $5, $6, $7, false, NOW(), NOW()
+) RETURNING id, dialog_id, author_id, content, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at
 `
 
 type CreateMessageParams struct {
-	ID            uuid.UUID      `json:"id"`
-	DialogID      uuid.UUID      `json:"dialog_id"`
-	AuthorID      uuid.UUID      `json:"author_id"`
-	Content       string         `json:"content"`
-	IsEncrypted   bool           `json:"is_encrypted"`
-	EncryptionIv  sql.NullString `json:"encryption_iv"`
-	ReplyToID     uuid.NullUUID  `json:"reply_to_id"`
-	ForwardFromID uuid.NullUUID  `json:"forward_from_id"`
-	IsSystem      bool           `json:"is_system"`
+	ID            uuid.UUID     `json:"id"`
+	DialogID      uuid.UUID     `json:"dialog_id"`
+	AuthorID      uuid.UUID     `json:"author_id"`
+	Content       string        `json:"content"`
+	ReplyToID     uuid.NullUUID `json:"reply_to_id"`
+	ForwardFromID uuid.NullUUID `json:"forward_from_id"`
+	IsSystem      bool          `json:"is_system"`
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error) {
@@ -98,8 +119,6 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		arg.DialogID,
 		arg.AuthorID,
 		arg.Content,
-		arg.IsEncrypted,
-		arg.EncryptionIv,
 		arg.ReplyToID,
 		arg.ForwardFromID,
 		arg.IsSystem,
@@ -110,8 +129,6 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		&i.DialogID,
 		&i.AuthorID,
 		&i.Content,
-		&i.IsEncrypted,
-		&i.EncryptionIv,
 		&i.Sequence,
 		&i.ReplyToID,
 		&i.ForwardFromID,
@@ -123,6 +140,43 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const getAttachmentsByMessageID = `-- name: GetAttachmentsByMessageID :many
+SELECT id, message_id, type, file_name, file_size, content_type, created_at FROM message_attachments
+WHERE message_id = $1
+ORDER BY created_at ASC
+`
+
+func (q *Queries) GetAttachmentsByMessageID(ctx context.Context, messageID uuid.UUID) ([]MessageAttachment, error) {
+	rows, err := q.db.QueryContext(ctx, getAttachmentsByMessageID, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MessageAttachment
+	for rows.Next() {
+		var i MessageAttachment
+		if err := rows.Scan(
+			&i.ID,
+			&i.MessageID,
+			&i.Type,
+			&i.FileName,
+			&i.FileSize,
+			&i.ContentType,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getAttachmentsByMessageIDs = `-- name: GetAttachmentsByMessageIDs :many
@@ -164,7 +218,7 @@ func (q *Queries) GetAttachmentsByMessageIDs(ctx context.Context, dollar_1 []uui
 
 const getChatHistory = `-- name: GetChatHistory :many
 SELECT
-    m.id, m.dialog_id, m.author_id, m.content, m.is_encrypted, m.encryption_iv, m.sequence, m.reply_to_id, m.forward_from_id, m.is_edited, m.is_deleted, m.is_system, m.created_at, m.updated_at, m.deleted_at,
+    m.id, m.dialog_id, m.author_id, m.content, m.sequence, m.reply_to_id, m.forward_from_id, m.is_edited, m.is_deleted, m.is_system, m.created_at, m.updated_at, m.deleted_at,
     u.id as author_id,
     u.username as author_username,
     u.first_name as author_first_name,
@@ -196,8 +250,6 @@ type GetChatHistoryRow struct {
 	DialogID             uuid.UUID      `json:"dialog_id"`
 	AuthorID             uuid.UUID      `json:"author_id"`
 	Content              string         `json:"content"`
-	IsEncrypted          bool           `json:"is_encrypted"`
-	EncryptionIv         sql.NullString `json:"encryption_iv"`
 	Sequence             int64          `json:"sequence"`
 	ReplyToID            uuid.NullUUID  `json:"reply_to_id"`
 	ForwardFromID        uuid.NullUUID  `json:"forward_from_id"`
@@ -234,8 +286,6 @@ func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) 
 			&i.DialogID,
 			&i.AuthorID,
 			&i.Content,
-			&i.IsEncrypted,
-			&i.EncryptionIv,
 			&i.Sequence,
 			&i.ReplyToID,
 			&i.ForwardFromID,
@@ -271,7 +321,7 @@ func (q *Queries) GetChatHistory(ctx context.Context, arg GetChatHistoryParams) 
 }
 
 const getLastChatMessage = `-- name: GetLastChatMessage :one
-SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages
+SELECT id, dialog_id, author_id, content, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages
 WHERE dialog_id = $1 AND is_deleted = false
 ORDER BY sequence DESC
 LIMIT 1
@@ -285,8 +335,6 @@ func (q *Queries) GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (M
 		&i.DialogID,
 		&i.AuthorID,
 		&i.Content,
-		&i.IsEncrypted,
-		&i.EncryptionIv,
 		&i.Sequence,
 		&i.ReplyToID,
 		&i.ForwardFromID,
@@ -313,7 +361,7 @@ func (q *Queries) GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int6
 }
 
 const getMessageByID = `-- name: GetMessageByID :one
-SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages WHERE id = $1 LIMIT 1
+SELECT id, dialog_id, author_id, content, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetMessageByID(ctx context.Context, id uuid.UUID) (Message, error) {
@@ -324,8 +372,6 @@ func (q *Queries) GetMessageByID(ctx context.Context, id uuid.UUID) (Message, er
 		&i.DialogID,
 		&i.AuthorID,
 		&i.Content,
-		&i.IsEncrypted,
-		&i.EncryptionIv,
 		&i.Sequence,
 		&i.ReplyToID,
 		&i.ForwardFromID,
@@ -340,7 +386,7 @@ func (q *Queries) GetMessageByID(ctx context.Context, id uuid.UUID) (Message, er
 }
 
 const getMessageBySequence = `-- name: GetMessageBySequence :one
-SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages
+SELECT id, dialog_id, author_id, content, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages
 WHERE dialog_id = $1 AND sequence = $2 LIMIT 1
 `
 
@@ -357,8 +403,6 @@ func (q *Queries) GetMessageBySequence(ctx context.Context, arg GetMessageBySequ
 		&i.DialogID,
 		&i.AuthorID,
 		&i.Content,
-		&i.IsEncrypted,
-		&i.EncryptionIv,
 		&i.Sequence,
 		&i.ReplyToID,
 		&i.ForwardFromID,
@@ -373,7 +417,7 @@ func (q *Queries) GetMessageBySequence(ctx context.Context, arg GetMessageBySequ
 }
 
 const getMessagesByIDs = `-- name: GetMessagesByIDs :many
-SELECT id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages WHERE id = ANY($1::uuid[])
+SELECT id, dialog_id, author_id, content, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at FROM messages WHERE id = ANY($1::uuid[])
 `
 
 func (q *Queries) GetMessagesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Message, error) {
@@ -390,8 +434,6 @@ func (q *Queries) GetMessagesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([
 			&i.DialogID,
 			&i.AuthorID,
 			&i.Content,
-			&i.IsEncrypted,
-			&i.EncryptionIv,
 			&i.Sequence,
 			&i.ReplyToID,
 			&i.ForwardFromID,
@@ -491,7 +533,7 @@ const updateMessageContent = `-- name: UpdateMessageContent :one
 UPDATE messages
 SET content = $2, is_edited = true, updated_at = NOW()
 WHERE id = $1 AND author_id = $3
-RETURNING id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at
+RETURNING id, dialog_id, author_id, content, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at
 `
 
 type UpdateMessageContentParams struct {
@@ -508,53 +550,6 @@ func (q *Queries) UpdateMessageContent(ctx context.Context, arg UpdateMessageCon
 		&i.DialogID,
 		&i.AuthorID,
 		&i.Content,
-		&i.IsEncrypted,
-		&i.EncryptionIv,
-		&i.Sequence,
-		&i.ReplyToID,
-		&i.ForwardFromID,
-		&i.IsEdited,
-		&i.IsDeleted,
-		&i.IsSystem,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-	)
-	return i, err
-}
-
-const updateMessageExtended = `-- name: UpdateMessageExtended :one
-UPDATE messages
-SET content = $2,
-    encryption_iv = $3,
-    is_edited = true,
-    updated_at = NOW()
-WHERE id = $1 AND author_id = $4
-RETURNING id, dialog_id, author_id, content, is_encrypted, encryption_iv, sequence, reply_to_id, forward_from_id, is_edited, is_deleted, is_system, created_at, updated_at, deleted_at
-`
-
-type UpdateMessageExtendedParams struct {
-	ID           uuid.UUID      `json:"id"`
-	Content      string         `json:"content"`
-	EncryptionIv sql.NullString `json:"encryption_iv"`
-	AuthorID     uuid.UUID      `json:"author_id"`
-}
-
-func (q *Queries) UpdateMessageExtended(ctx context.Context, arg UpdateMessageExtendedParams) (Message, error) {
-	row := q.db.QueryRowContext(ctx, updateMessageExtended,
-		arg.ID,
-		arg.Content,
-		arg.EncryptionIv,
-		arg.AuthorID,
-	)
-	var i Message
-	err := row.Scan(
-		&i.ID,
-		&i.DialogID,
-		&i.AuthorID,
-		&i.Content,
-		&i.IsEncrypted,
-		&i.EncryptionIv,
 		&i.Sequence,
 		&i.ReplyToID,
 		&i.ForwardFromID,

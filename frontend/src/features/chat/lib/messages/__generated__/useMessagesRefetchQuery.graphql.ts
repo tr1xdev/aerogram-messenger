@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<36cb27c506ec011f5935957f77b5c5c3>>
+ * @generated SignedSource<<063db408f84452b7c749637f57c116ea>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -57,28 +57,28 @@ v3 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "text",
+  "name": "firstName",
   "storageKey": null
 },
 v4 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "firstName",
+  "name": "lastName",
   "storageKey": null
 },
 v5 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "lastName",
+  "name": "displayName",
   "storageKey": null
 },
 v6 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "displayName",
+  "name": "text",
   "storageKey": null
 };
 return {
@@ -154,7 +154,6 @@ return {
                 "plural": true,
                 "selections": [
                   (v2/*: any*/),
-                  (v3/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -162,6 +161,36 @@ return {
                     "name": "sentAt",
                     "storageKey": null
                   },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "User",
+                    "kind": "LinkedField",
+                    "name": "sender",
+                    "plural": false,
+                    "selections": [
+                      (v2/*: any*/),
+                      (v3/*: any*/),
+                      (v4/*: any*/),
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "username",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "photoUrl",
+                        "storageKey": null
+                      },
+                      (v5/*: any*/)
+                    ],
+                    "storageKey": null
+                  },
+                  (v6/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -179,22 +208,47 @@ return {
                   {
                     "alias": null,
                     "args": null,
-                    "concreteType": "User",
+                    "concreteType": "Attachment",
                     "kind": "LinkedField",
-                    "name": "sender",
-                    "plural": false,
+                    "name": "attachments",
+                    "plural": true,
                     "selections": [
                       (v2/*: any*/),
-                      (v4/*: any*/),
-                      (v5/*: any*/),
                       {
                         "alias": null,
                         "args": null,
                         "kind": "ScalarField",
-                        "name": "photoUrl",
+                        "name": "url",
                         "storageKey": null
                       },
-                      (v6/*: any*/)
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "fileName",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "fileSize",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "contentType",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "type",
+                        "storageKey": null
+                      }
                     ],
                     "storageKey": null
                   },
@@ -207,7 +261,7 @@ return {
                     "plural": false,
                     "selections": [
                       (v2/*: any*/),
-                      (v3/*: any*/),
+                      (v6/*: any*/),
                       {
                         "alias": null,
                         "args": null,
@@ -216,10 +270,10 @@ return {
                         "name": "sender",
                         "plural": false,
                         "selections": [
-                          (v2/*: any*/),
+                          (v3/*: any*/),
                           (v4/*: any*/),
-                          (v5/*: any*/),
-                          (v6/*: any*/)
+                          (v2/*: any*/),
+                          (v5/*: any*/)
                         ],
                         "storageKey": null
                       }
@@ -260,16 +314,16 @@ return {
     ]
   },
   "params": {
-    "cacheID": "fae799675e8127758c56cb80439a1c43",
+    "cacheID": "fc63a65fe5ac3c1e490d0fb5184b084b",
     "id": null,
     "metadata": {},
     "name": "useMessagesRefetchQuery",
     "operationKind": "query",
-    "text": "query useMessagesRefetchQuery(\n  $chatId: ID!\n  $count: Int = 50\n  $cursor: Long\n) {\n  ...useMessages_history_2v0QF4\n}\n\nfragment useMessages_history_2v0QF4 on Query {\n  messageHistory(chatId: $chatId, limit: $count, beforeSequence: $cursor) {\n    __typename\n    ... on MessageConnection {\n      messages {\n        id\n        text\n        sentAt\n        sequence\n        isEdited\n        sender {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n        }\n        replyTo {\n          id\n          text\n          sender {\n            id\n            firstName\n            lastName\n            displayName\n          }\n        }\n      }\n      hasMore\n    }\n    ... on NotFoundError {\n      message\n    }\n  }\n}\n"
+    "text": "query useMessagesRefetchQuery(\n  $chatId: ID!\n  $count: Int = 50\n  $cursor: Long\n) {\n  ...useMessages_history_2v0QF4\n}\n\nfragment messageBubble_message on Message {\n  id\n  text\n  sentAt\n  sequence\n  isEdited\n  attachments {\n    id\n    url\n    fileName\n    fileSize\n    contentType\n  }\n  sender {\n    id\n    firstName\n    lastName\n    username\n    photoUrl\n  }\n  replyTo {\n    id\n    text\n    sender {\n      firstName\n      lastName\n      id\n    }\n  }\n}\n\nfragment messageList_message on Message {\n  id\n  sentAt\n  sender {\n    id\n  }\n  ...messageBubble_message\n}\n\nfragment messageList_metadata on Message {\n  id\n  sentAt\n  sender {\n    id\n  }\n  ...messageList_message\n  ...messageList_prevMessage\n  ...messageList_nextMessage\n}\n\nfragment messageList_nextMessage on Message {\n  sender {\n    id\n  }\n}\n\nfragment messageList_prevMessage on Message {\n  sender {\n    id\n  }\n}\n\nfragment useMessages_history_2v0QF4 on Query {\n  messageHistory(chatId: $chatId, limit: $count, beforeSequence: $cursor) {\n    __typename\n    ... on MessageConnection {\n      messages {\n        id\n        ...messageList_metadata\n        text\n        sentAt\n        sequence\n        isEdited\n        attachments {\n          id\n          type\n          url\n          fileName\n          fileSize\n          contentType\n        }\n        sender {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n        }\n        replyTo {\n          id\n          text\n          sender {\n            id\n            firstName\n            lastName\n            displayName\n          }\n        }\n      }\n      hasMore\n    }\n    ... on NotFoundError {\n      message\n    }\n  }\n}\n"
   }
 };
 })();
 
-(node as any).hash = "935c54edb6c70bd2e25f62dc98e05f54";
+(node as any).hash = "0c24e8dbea4e2f9ce0fe211adbe5abad";
 
 export default node;

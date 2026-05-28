@@ -23,14 +23,18 @@ const (
 	ChatService_GetMyChats_FullMethodName            = "/chat.v1.ChatService/GetMyChats"
 	ChatService_PinChat_FullMethodName               = "/chat.v1.ChatService/PinChat"
 	ChatService_GetChat_FullMethodName               = "/chat.v1.ChatService/GetChat"
+	ChatService_UpdateChat_FullMethodName            = "/chat.v1.ChatService/UpdateChat"
 	ChatService_DeleteChat_FullMethodName            = "/chat.v1.ChatService/DeleteChat"
 	ChatService_InviteToChat_FullMethodName          = "/chat.v1.ChatService/InviteToChat"
 	ChatService_JoinChatBySlug_FullMethodName        = "/chat.v1.ChatService/JoinChatBySlug"
+	ChatService_ExportChatInvite_FullMethodName      = "/chat.v1.ChatService/ExportChatInvite"
+	ChatService_JoinChatByInvite_FullMethodName      = "/chat.v1.ChatService/JoinChatByInvite"
 	ChatService_UpdateMemberRole_FullMethodName      = "/chat.v1.ChatService/UpdateMemberRole"
 	ChatService_UpdateChatPermissions_FullMethodName = "/chat.v1.ChatService/UpdateChatPermissions"
 	ChatService_GetChatMembers_FullMethodName        = "/chat.v1.ChatService/GetChatMembers"
 	ChatService_LeaveChat_FullMethodName             = "/chat.v1.ChatService/LeaveChat"
 	ChatService_RemoveChatMember_FullMethodName      = "/chat.v1.ChatService/RemoveChatMember"
+	ChatService_RevokeChatInvite_FullMethodName      = "/chat.v1.ChatService/RevokeChatInvite"
 )
 
 // ChatServiceClient is the client API for ChatService service.
@@ -41,14 +45,18 @@ type ChatServiceClient interface {
 	GetMyChats(ctx context.Context, in *GetMyChatsRequest, opts ...grpc.CallOption) (*GetMyChatsResponse, error)
 	PinChat(ctx context.Context, in *PinChatRequest, opts ...grpc.CallOption) (*PinChatResponse, error)
 	GetChat(ctx context.Context, in *GetChatRequest, opts ...grpc.CallOption) (*GetChatResponse, error)
+	UpdateChat(ctx context.Context, in *UpdateChatRequest, opts ...grpc.CallOption) (*UpdateChatResponse, error)
 	DeleteChat(ctx context.Context, in *DeleteChatRequest, opts ...grpc.CallOption) (*DeleteChatResponse, error)
 	InviteToChat(ctx context.Context, in *InviteToChatRequest, opts ...grpc.CallOption) (*InviteToChatResponse, error)
 	JoinChatBySlug(ctx context.Context, in *JoinChatBySlugRequest, opts ...grpc.CallOption) (*JoinChatBySlugResponse, error)
+	ExportChatInvite(ctx context.Context, in *ExportChatInviteRequest, opts ...grpc.CallOption) (*ExportChatInviteResponse, error)
+	JoinChatByInvite(ctx context.Context, in *JoinChatByInviteRequest, opts ...grpc.CallOption) (*JoinChatByInviteResponse, error)
 	UpdateMemberRole(ctx context.Context, in *UpdateMemberRoleRequest, opts ...grpc.CallOption) (*UpdateMemberRoleResponse, error)
 	UpdateChatPermissions(ctx context.Context, in *UpdateChatPermissionsRequest, opts ...grpc.CallOption) (*UpdateChatPermissionsResponse, error)
 	GetChatMembers(ctx context.Context, in *GetChatMembersRequest, opts ...grpc.CallOption) (*GetChatMembersResponse, error)
 	LeaveChat(ctx context.Context, in *LeaveChatRequest, opts ...grpc.CallOption) (*LeaveChatResponse, error)
 	RemoveChatMember(ctx context.Context, in *RemoveChatMemberRequest, opts ...grpc.CallOption) (*RemoveChatMemberResponse, error)
+	RevokeChatInvite(ctx context.Context, in *RevokeChatInviteRequest, opts ...grpc.CallOption) (*RevokeChatInviteResponse, error)
 }
 
 type chatServiceClient struct {
@@ -99,6 +107,16 @@ func (c *chatServiceClient) GetChat(ctx context.Context, in *GetChatRequest, opt
 	return out, nil
 }
 
+func (c *chatServiceClient) UpdateChat(ctx context.Context, in *UpdateChatRequest, opts ...grpc.CallOption) (*UpdateChatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateChatResponse)
+	err := c.cc.Invoke(ctx, ChatService_UpdateChat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *chatServiceClient) DeleteChat(ctx context.Context, in *DeleteChatRequest, opts ...grpc.CallOption) (*DeleteChatResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteChatResponse)
@@ -123,6 +141,26 @@ func (c *chatServiceClient) JoinChatBySlug(ctx context.Context, in *JoinChatBySl
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(JoinChatBySlugResponse)
 	err := c.cc.Invoke(ctx, ChatService_JoinChatBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) ExportChatInvite(ctx context.Context, in *ExportChatInviteRequest, opts ...grpc.CallOption) (*ExportChatInviteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExportChatInviteResponse)
+	err := c.cc.Invoke(ctx, ChatService_ExportChatInvite_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) JoinChatByInvite(ctx context.Context, in *JoinChatByInviteRequest, opts ...grpc.CallOption) (*JoinChatByInviteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinChatByInviteResponse)
+	err := c.cc.Invoke(ctx, ChatService_JoinChatByInvite_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +217,16 @@ func (c *chatServiceClient) RemoveChatMember(ctx context.Context, in *RemoveChat
 	return out, nil
 }
 
+func (c *chatServiceClient) RevokeChatInvite(ctx context.Context, in *RevokeChatInviteRequest, opts ...grpc.CallOption) (*RevokeChatInviteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeChatInviteResponse)
+	err := c.cc.Invoke(ctx, ChatService_RevokeChatInvite_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChatServiceServer is the server API for ChatService service.
 // All implementations must embed UnimplementedChatServiceServer
 // for forward compatibility.
@@ -187,14 +235,18 @@ type ChatServiceServer interface {
 	GetMyChats(context.Context, *GetMyChatsRequest) (*GetMyChatsResponse, error)
 	PinChat(context.Context, *PinChatRequest) (*PinChatResponse, error)
 	GetChat(context.Context, *GetChatRequest) (*GetChatResponse, error)
+	UpdateChat(context.Context, *UpdateChatRequest) (*UpdateChatResponse, error)
 	DeleteChat(context.Context, *DeleteChatRequest) (*DeleteChatResponse, error)
 	InviteToChat(context.Context, *InviteToChatRequest) (*InviteToChatResponse, error)
 	JoinChatBySlug(context.Context, *JoinChatBySlugRequest) (*JoinChatBySlugResponse, error)
+	ExportChatInvite(context.Context, *ExportChatInviteRequest) (*ExportChatInviteResponse, error)
+	JoinChatByInvite(context.Context, *JoinChatByInviteRequest) (*JoinChatByInviteResponse, error)
 	UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error)
 	UpdateChatPermissions(context.Context, *UpdateChatPermissionsRequest) (*UpdateChatPermissionsResponse, error)
 	GetChatMembers(context.Context, *GetChatMembersRequest) (*GetChatMembersResponse, error)
 	LeaveChat(context.Context, *LeaveChatRequest) (*LeaveChatResponse, error)
 	RemoveChatMember(context.Context, *RemoveChatMemberRequest) (*RemoveChatMemberResponse, error)
+	RevokeChatInvite(context.Context, *RevokeChatInviteRequest) (*RevokeChatInviteResponse, error)
 	mustEmbedUnimplementedChatServiceServer()
 }
 
@@ -217,6 +269,9 @@ func (UnimplementedChatServiceServer) PinChat(context.Context, *PinChatRequest) 
 func (UnimplementedChatServiceServer) GetChat(context.Context, *GetChatRequest) (*GetChatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetChat not implemented")
 }
+func (UnimplementedChatServiceServer) UpdateChat(context.Context, *UpdateChatRequest) (*UpdateChatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateChat not implemented")
+}
 func (UnimplementedChatServiceServer) DeleteChat(context.Context, *DeleteChatRequest) (*DeleteChatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteChat not implemented")
 }
@@ -225,6 +280,12 @@ func (UnimplementedChatServiceServer) InviteToChat(context.Context, *InviteToCha
 }
 func (UnimplementedChatServiceServer) JoinChatBySlug(context.Context, *JoinChatBySlugRequest) (*JoinChatBySlugResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method JoinChatBySlug not implemented")
+}
+func (UnimplementedChatServiceServer) ExportChatInvite(context.Context, *ExportChatInviteRequest) (*ExportChatInviteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportChatInvite not implemented")
+}
+func (UnimplementedChatServiceServer) JoinChatByInvite(context.Context, *JoinChatByInviteRequest) (*JoinChatByInviteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method JoinChatByInvite not implemented")
 }
 func (UnimplementedChatServiceServer) UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateMemberRole not implemented")
@@ -240,6 +301,9 @@ func (UnimplementedChatServiceServer) LeaveChat(context.Context, *LeaveChatReque
 }
 func (UnimplementedChatServiceServer) RemoveChatMember(context.Context, *RemoveChatMemberRequest) (*RemoveChatMemberResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveChatMember not implemented")
+}
+func (UnimplementedChatServiceServer) RevokeChatInvite(context.Context, *RevokeChatInviteRequest) (*RevokeChatInviteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeChatInvite not implemented")
 }
 func (UnimplementedChatServiceServer) mustEmbedUnimplementedChatServiceServer() {}
 func (UnimplementedChatServiceServer) testEmbeddedByValue()                     {}
@@ -334,6 +398,24 @@ func _ChatService_GetChat_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChatService_UpdateChat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateChatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).UpdateChat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_UpdateChat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).UpdateChat(ctx, req.(*UpdateChatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ChatService_DeleteChat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteChatRequest)
 	if err := dec(in); err != nil {
@@ -384,6 +466,42 @@ func _ChatService_JoinChatBySlug_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ChatServiceServer).JoinChatBySlug(ctx, req.(*JoinChatBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_ExportChatInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportChatInviteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).ExportChatInvite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_ExportChatInvite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).ExportChatInvite(ctx, req.(*ExportChatInviteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_JoinChatByInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinChatByInviteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).JoinChatByInvite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_JoinChatByInvite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).JoinChatByInvite(ctx, req.(*JoinChatByInviteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -478,6 +596,24 @@ func _ChatService_RemoveChatMember_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChatService_RevokeChatInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeChatInviteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).RevokeChatInvite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_RevokeChatInvite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).RevokeChatInvite(ctx, req.(*RevokeChatInviteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ChatService_ServiceDesc is the grpc.ServiceDesc for ChatService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -502,6 +638,10 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ChatService_GetChat_Handler,
 		},
 		{
+			MethodName: "UpdateChat",
+			Handler:    _ChatService_UpdateChat_Handler,
+		},
+		{
 			MethodName: "DeleteChat",
 			Handler:    _ChatService_DeleteChat_Handler,
 		},
@@ -512,6 +652,14 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "JoinChatBySlug",
 			Handler:    _ChatService_JoinChatBySlug_Handler,
+		},
+		{
+			MethodName: "ExportChatInvite",
+			Handler:    _ChatService_ExportChatInvite_Handler,
+		},
+		{
+			MethodName: "JoinChatByInvite",
+			Handler:    _ChatService_JoinChatByInvite_Handler,
 		},
 		{
 			MethodName: "UpdateMemberRole",
@@ -532,6 +680,10 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveChatMember",
 			Handler:    _ChatService_RemoveChatMember_Handler,
+		},
+		{
+			MethodName: "RevokeChatInvite",
+			Handler:    _ChatService_RevokeChatInvite_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

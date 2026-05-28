@@ -15,14 +15,24 @@ import type {
   useMessageActionsEditMutation$data,
 } from "./__generated__/useMessageActionsEditMutation.graphql";
 import type { useMessageActionsReadMutation } from "./__generated__/useMessageActionsReadMutation.graphql";
+import type {
+  useMessageActionsJoinMutation,
+  useMessageActionsJoinMutation$data,
+} from "./__generated__/useMessageActionsJoinMutation.graphql";
 
 const sendMessageMutation = graphql`
   mutation useMessageActionsSendMutation(
     $chatId: ID!
     $text: String!
     $replyToId: ID
+    $attachments: [Upload!]
   ) {
-    sendMessage(chatId: $chatId, text: $text, replyToId: $replyToId) {
+    sendMessage(
+      chatId: $chatId
+      text: $text
+      replyToId: $replyToId
+      attachments: $attachments
+    ) {
       ... on Message {
         id
         chatId
@@ -30,6 +40,14 @@ const sendMessageMutation = graphql`
         sentAt
         sequence
         isEdited
+        attachments {
+          id
+          type
+          url
+          fileName
+          fileSize
+          contentType
+        }
         sender {
           id
           firstName
@@ -70,16 +88,35 @@ const markAsReadMutation = graphql`
   }
 `;
 
+const joinChatMutation = graphql`
+  mutation useMessageActionsJoinMutation($slug: String!) {
+    joinChatBySlug(slug: $slug) {
+      ... on Chat {
+        id
+        type
+        title
+        slug
+      }
+      ... on Error {
+        message
+      }
+    }
+  }
+`;
+
 export function useMessageActions(chatId: string) {
   const [send, isSending] =
     useMutation<useMessageActionsSendMutation>(sendMessageMutation);
   const [edit] =
     useMutation<useMessageActionsEditMutation>(editMessageMutation);
   const [read] = useMutation<useMessageActionsReadMutation>(markAsReadMutation);
+  const [join] = useMutation<useMessageActionsJoinMutation>(joinChatMutation);
 
   const sendMessage = useCallback(
     (
       text: string,
+      files?: File[],
+      replyToId: string | null = null,
       config?: Partial<UseMutationConfig<useMessageActionsSendMutation>>,
     ): Promise<void> => {
       return new Promise((resolve, reject): void => {
@@ -88,12 +125,20 @@ export function useMessageActions(chatId: string) {
           return;
         }
 
+        const uploadables: Record<string, File> = {};
+        if (files && files.length > 0) {
+          files.forEach((file: File, index: number) => {
+            uploadables[`attachments.${index}`] = file;
+          });
+        }
+
         send({
           ...config,
           variables: {
             chatId,
             text,
-            replyToId: config?.variables?.replyToId ?? null,
+            replyToId,
+            attachments: files ? new Array(files.length).fill(null) : [],
           },
           updater: (store: RecordSourceSelectorProxy): void => {
             const payload: RecordProxy | null | undefined =
@@ -104,6 +149,17 @@ export function useMessageActions(chatId: string) {
               store.get(chatId);
             if (chatRecord) {
               const newSeq: number = Number(payload.getValue("sequence") ?? 0);
+              const chatType: string = String(
+                chatRecord.getValue("type") ?? "GROUP",
+              );
+
+              const beforeLastReadSeq: number = Number(
+                chatRecord.getValue("lastReadSequence") ?? 0,
+              );
+              const beforeMyReadSeq: number = Number(
+                chatRecord.getValue("myReadSequence") ?? 0,
+              );
+
               const currentLastMsg: RecordProxy | null | undefined =
                 chatRecord.getLinkedRecord("lastMessage");
               const currentSeq: number = currentLastMsg
@@ -116,6 +172,21 @@ export function useMessageActions(chatId: string) {
 
               chatRecord.setValue(0, "unreadCount");
               chatRecord.setValue(newSeq, "myReadSequence");
+
+              console.group(
+                `[RELAY-MUTATION] sendMessage Done (Chat: ${chatId})`,
+              );
+              console.log(`Chat Type: ${chatType}`);
+              console.table({
+                "Message Sequence (new)": newSeq,
+                "lastReadSequence (Before)": beforeLastReadSeq,
+                "lastReadSequence (After)": Number(
+                  chatRecord.getValue("lastReadSequence") ?? 0,
+                ),
+                "myReadSequence (Before)": beforeMyReadSeq,
+                "myReadSequence (After)": newSeq,
+              });
+              console.groupEnd();
 
               const root: RecordProxy = store.getRoot();
               const history: RecordProxy | null | undefined =
@@ -194,11 +265,50 @@ export function useMessageActions(chatId: string) {
           if (lastMsg) {
             const seq: number = Number(lastMsg.getValue("sequence") ?? 0);
             chatRecord.setValue(seq, "myReadSequence");
+            console.log(
+              `[RELAY-MUTATION] markAsRead (Optimistic). myReadSequence -> ${seq}`,
+            );
           }
         }
       },
     });
   }, [chatId, read]);
 
-  return { sendMessage, editMessage, markAsRead, isSending };
+  const joinChat = useCallback(
+    (slug: string): Promise<void> => {
+      return new Promise((resolve, reject): void => {
+        if (!slug) {
+          reject(new Error("No slug provided"));
+          return;
+        }
+
+        join({
+          variables: { slug },
+          onCompleted: (
+            response: useMessageActionsJoinMutation$data,
+            err: ReadonlyArray<PayloadError> | null,
+          ): void => {
+            if (err) {
+              reject(err);
+              return;
+            }
+
+            const result = response.joinChatBySlug;
+            if (result && "message" in result && result.message) {
+              reject(new Error(result.message as string));
+              return;
+            }
+
+            resolve();
+          },
+          onError: (err: Error): void => {
+            reject(err);
+          },
+        });
+      });
+    },
+    [join],
+  );
+
+  return { sendMessage, editMessage, markAsRead, joinChat, isSending };
 }

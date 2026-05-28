@@ -13,6 +13,8 @@ import (
 
 type Querier interface {
 	AddDialogMember(ctx context.Context, arg AddDialogMemberParams) error
+	CanDeletePrivateDialog(ctx context.Context, arg CanDeletePrivateDialogParams) (bool, error)
+	CheckFileAccess(ctx context.Context, arg CheckFileAccessParams) (bool, error)
 	CheckUserExists(ctx context.Context, id uuid.UUID) (bool, error)
 	CountBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) (int64, error)
 	CountDialogAdmins(ctx context.Context, dialogID uuid.UUID) (int64, error)
@@ -21,25 +23,31 @@ type Querier interface {
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (MessageAttachment, error)
 	CreateBot(ctx context.Context, arg CreateBotParams) (User, error)
 	CreateDialog(ctx context.Context, arg CreateDialogParams) (Dialog, error)
+	CreateDialogInvite(ctx context.Context, arg CreateDialogInviteParams) (DialogInvite, error)
 	CreateDialogSettings(ctx context.Context, arg CreateDialogSettingsParams) error
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeactivateAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	DeactivateSession(ctx context.Context, id uuid.UUID) error
-	DecrementMembersCount(ctx context.Context, id uuid.UUID) error
+	DecrementMembersCount(ctx context.Context, dialogID uuid.UUID) error
 	DeleteBot(ctx context.Context, arg DeleteBotParams) error
 	DeleteDialog(ctx context.Context, id uuid.UUID) error
 	FindNewDialogOwner(ctx context.Context, arg FindNewDialogOwnerParams) (uuid.UUID, error)
 	GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error)
+	GetAttachmentsByMessageID(ctx context.Context, messageID uuid.UUID) ([]MessageAttachment, error)
 	GetAttachmentsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]MessageAttachment, error)
 	GetBotsByOwnerID(ctx context.Context, botOwnerID uuid.NullUUID) ([]User, error)
 	GetChatHistory(ctx context.Context, arg GetChatHistoryParams) ([]GetChatHistoryRow, error)
-	GetDialogByID(ctx context.Context, id uuid.UUID) (Dialog, error)
+	GetDialogByID(ctx context.Context, arg GetDialogByIDParams) (Dialog, error)
+	GetDialogByIDInternal(ctx context.Context, id uuid.UUID) (Dialog, error)
 	GetDialogByUsername(ctx context.Context, username sql.NullString) (Dialog, error)
+	GetDialogInvites(ctx context.Context, dialogID uuid.UUID) ([]DialogInvite, error)
 	GetDialogMember(ctx context.Context, arg GetDialogMemberParams) (DialogMember, error)
 	GetDialogMembers(ctx context.Context, dialogID uuid.UUID) ([]GetDialogMembersRow, error)
+	GetDialogOpponent(ctx context.Context, arg GetDialogOpponentParams) (GetDialogOpponentRow, error)
 	GetDialogSettings(ctx context.Context, dialogID uuid.UUID) (DialogSetting, error)
+	GetInviteByCode(ctx context.Context, inviteCode string) (DialogInvite, error)
 	GetLastChatMessage(ctx context.Context, dialogID uuid.UUID) (Message, error)
 	GetLastSequence(ctx context.Context, dialogID uuid.UUID) (int64, error)
 	GetMessageByID(ctx context.Context, id uuid.UUID) (Message, error)
@@ -56,25 +64,30 @@ type Querier interface {
 	GetUsersByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]User, error)
 	HardDeleteDialog(ctx context.Context, id uuid.UUID) error
 	HideDialogMember(ctx context.Context, arg HideDialogMemberParams) error
-	IncrementMembersCount(ctx context.Context, id uuid.UUID) error
+	IncrementInviteUsage(ctx context.Context, id uuid.UUID) error
+	IncrementMembersCount(ctx context.Context, dialogID uuid.UUID) error
 	IsDialogCreator(ctx context.Context, arg IsDialogCreatorParams) (bool, error)
+	JoinDialogByInvite(ctx context.Context, arg JoinDialogByInviteParams) error
 	MarkAllAsRead(ctx context.Context, arg MarkAllAsReadParams) error
 	PinDialog(ctx context.Context, arg PinDialogParams) error
 	RemoveDialogMember(ctx context.Context, arg RemoveDialogMemberParams) error
+	RevokeAllDialogInvites(ctx context.Context, dialogID uuid.UUID) error
+	RevokeInvite(ctx context.Context, arg RevokeInviteParams) error
+	SearchPublicDialogs(ctx context.Context, arg SearchPublicDialogsParams) ([]SearchPublicDialogsRow, error)
 	SearchUsersByUsername(ctx context.Context, dollar_1 string) ([]User, error)
 	SearchUsersGlobal(ctx context.Context, dollar_1 sql.NullString) ([]User, error)
 	SoftDeleteMessage(ctx context.Context, arg SoftDeleteMessageParams) error
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	UnhideDialogForMembers(ctx context.Context, dialogID uuid.UUID) error
 	UpdateBot(ctx context.Context, arg UpdateBotParams) (User, error)
+	UpdateChatMetadata(ctx context.Context, arg UpdateChatMetadataParams) (Dialog, error)
 	UpdateDialogCreator(ctx context.Context, arg UpdateDialogCreatorParams) error
+	UpdateDialogInviteLink(ctx context.Context, arg UpdateDialogInviteLinkParams) error
 	UpdateDialogLastMessage(ctx context.Context, arg UpdateDialogLastMessageParams) error
 	UpdateDialogMemberRole(ctx context.Context, arg UpdateDialogMemberRoleParams) error
 	UpdateDialogSettings(ctx context.Context, arg UpdateDialogSettingsParams) error
-	UpdateMemberPinStatus(ctx context.Context, arg UpdateMemberPinStatusParams) error
 	UpdateMemberReadSequence(ctx context.Context, arg UpdateMemberReadSequenceParams) error
 	UpdateMessageContent(ctx context.Context, arg UpdateMessageContentParams) (Message, error)
-	UpdateMessageExtended(ctx context.Context, arg UpdateMessageExtendedParams) (Message, error)
 	UpdateSessionActivity(ctx context.Context, id uuid.UUID) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserPhoto(ctx context.Context, arg UpdateUserPhotoParams) (User, error)

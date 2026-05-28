@@ -14,6 +14,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+type Provider interface {
+	UploadFile(ctx context.Context, key string, body io.Reader, contentType string) (string, error)
+	GetPresignedURL(ctx context.Context, key string, expires time.Duration) (string, error)
+}
+
 type S3Storage struct {
 	client        *s3.Client
 	presignClient *s3.PresignClient

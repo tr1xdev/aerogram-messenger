@@ -1,6 +1,13 @@
-import { useState, useMemo, type ReactNode } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  useMemo,
+  memo,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+} from "react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { getUserColorInfo, type ColorInfo } from "@/lib/user-colors";
 
 interface UserAvatarProps {
   src?: string | null;
@@ -8,116 +15,97 @@ interface UserAvatarProps {
   className?: string;
   userId?: string;
   size?: number;
+  color?: string;
 }
 
-const COLORS: string[][] = [
-  ["#ff516a", "#ff885e"], // red
-  ["#55d067", "#a4e063"], // green
-  ["#ffa85c", "#ffcd6a"], // orange
-  ["#2a9ef1", "#72d5fd"], // light blue
-  ["#665fff", "#82b1ff"], // blue
-  ["#8d61ee", "#c382f3"], // purple
-  ["#f65a92", "#f999b0"], // pink
-];
-
-export function UserAvatar({
+export const UserAvatar = memo(function UserAvatar({
   src,
   fallback,
   className,
+  userId,
   size = 40,
+  color,
 }: UserAvatarProps): ReactNode {
-  const pureSrc: string | undefined = useMemo((): string | undefined => {
-    if (!src) return undefined;
-    try {
-      const url = new URL(src);
-      return `${url.origin}${url.pathname}`;
-    } catch {
-      return src;
-    }
-  }, [src]);
-
-  const [stableSrc, setStableSrc] = useState<string | undefined>(
-    src ?? undefined,
-  );
-
-  const prevPureSrc = useMemo((): string | undefined => {
-    if (!stableSrc) return undefined;
-    try {
-      const url = new URL(stableSrc);
-      return `${url.origin}${url.pathname}`;
-    } catch {
-      return stableSrc;
-    }
-  }, [stableSrc]);
-
-  if (src && pureSrc !== prevPureSrc) {
-    setStableSrc(src);
-  } else if (!src && stableSrc !== undefined) {
-    setStableSrc(undefined);
-  }
+  const [hasError, setHasError] = useState<boolean>(false);
 
   const { content, isEmoji } = useMemo((): {
     content: string;
     isEmoji: boolean;
   } => {
-    const trimmed = fallback.trim() || "?";
-    const emojiRegex =
-      /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/;
-    const segments = Array.from(trimmed);
-    const firstChar = segments[0];
+    const trimmed: string = fallback.trim() || "?";
+    const segments: string[] = Array.from(trimmed);
+    const firstChar: string = segments[0] || "?";
 
+    const emojiRegex: RegExp = /\p{Extended_Pictographic}/u;
     if (emojiRegex.test(firstChar)) {
       return { content: firstChar, isEmoji: true };
     }
 
-    const initials = trimmed
+    const initials: string = trimmed
       .split(/\s+/)
+      .filter(Boolean)
       .map((n: string): string => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2);
 
-    return { content: initials, isEmoji: false };
+    return { content: initials || "?", isEmoji: false };
   }, [fallback]);
 
-  const gradientStyle = useMemo((): { background: string } => {
-    let hash = 0;
-    const key = fallback || "default";
-    for (let i = 0; i < key.length; i++) {
-      hash = key.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % COLORS.length;
-    const [start, end] = COLORS[index];
+  const colorInfo: ColorInfo = useMemo(
+    (): ColorInfo => getUserColorInfo(userId, fallback),
+    [userId, fallback],
+  );
 
-    return {
-      background: `linear-gradient(135deg, ${start} 0%, ${end} 100%)`,
-    };
-  }, [fallback]);
+  const containerStyle = useMemo(
+    (): CSSProperties => ({
+      width: size,
+      height: size,
+    }),
+    [size],
+  );
+
+  const fallbackStyle = useMemo(
+    (): CSSProperties => ({
+      background:
+        color ||
+        `linear-gradient(135deg, ${colorInfo.start} 0%, ${colorInfo.end} 100%)`,
+      fontSize: isEmoji ? size * 0.45 : Math.max(size * 0.38, 12),
+      textShadow: isEmoji ? "none" : "0px 1px 1px rgba(0,0,0,0.15)",
+    }),
+    [color, colorInfo.start, colorInfo.end, isEmoji, size],
+  );
+
+  const showImage: boolean = !!(src && !hasError);
 
   return (
     <Avatar
-      className={cn("shrink-0 border-none", className)}
-      style={{ width: size, height: size }}
+      className={cn(
+        "shrink-0 border-none select-none relative overflow-hidden isolate transform-gpu",
+        className,
+      )}
+      style={containerStyle}
     >
-      <AvatarImage
-        src={stableSrc}
-        alt={fallback}
-        className="aspect-square object-cover"
-      />
-      <AvatarFallback
-        className={cn(
-          "select-none font-semibold text-white",
-          !isEmoji && "tracking-tight",
-        )}
-        style={{
-          ...gradientStyle,
-          fontSize: isEmoji ? size * 0.45 : Math.max(size * 0.38, 12),
-          color: "#FFFFFF",
-          textShadow: isEmoji ? "none" : "0px 1px 1px rgba(0,0,0,0.12)",
-        }}
-      >
-        {content}
-      </AvatarFallback>
+      {showImage ? (
+        <img
+          src={src as string}
+          alt={fallback}
+          loading="eager"
+          decoding="sync"
+          className="absolute inset-0 w-full h-full object-cover z-20 rounded-[inherit]"
+          onError={(): void => setHasError(true)}
+        />
+      ) : (
+        <AvatarFallback
+          className={cn(
+            "font-semibold text-white w-full h-full flex items-center justify-center z-10",
+            !isEmoji && "tracking-tight",
+          )}
+          style={fallbackStyle}
+        >
+          {content}
+        </AvatarFallback>
+      )}
     </Avatar>
   );
-}
+});

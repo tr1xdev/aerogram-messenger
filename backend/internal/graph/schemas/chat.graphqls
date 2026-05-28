@@ -40,6 +40,17 @@ type Chat implements Node {
     createdAt: String!
 }
 
+type ChatInvite {
+    code: String!
+    inviteLink: String!
+    creator: User!
+    usageCount: Int!
+    usageLimit: Int
+    expireAt: String
+    isRevoked: Boolean!
+    createdAt: String!
+}
+
 type ChatList {
     chats: [Chat!]!
 }
@@ -49,9 +60,23 @@ type ChatMembersList {
     totalCount: Int!
 }
 
+type ChatInvitesList {
+    invites: [ChatInvite!]!
+}
+
+type GlobalSearchList {
+    results: [SearchResult!]!
+}
+
+type TypingPayload {
+    userId: ID!
+    isTyping: Boolean!
+}
+
 union ChatResult = Chat | NotFoundError | ForbiddenError | InternalError
 union MyChatsResult = ChatList | ForbiddenError | InternalError
 union JoinChatResult = Chat | NotFoundError | ForbiddenError | InternalError
+union SearchResult = User | Chat
 union ChatMembersResult =
     | ChatMembersList
     | ForbiddenError
@@ -89,16 +114,38 @@ union RemoveMemberResult =
     | ForbiddenError
     | NotFoundError
     | InternalError
+union ExportInviteResult =
+    | ChatInvite
+    | ForbiddenError
+    | InternalError
+    | NotFoundError
+union RevokeInviteResult =
+    | SuccessResult
+    | ForbiddenError
+    | InternalError
+    | NotFoundError
+union ChatInvitesResult =
+    | ChatInvitesList
+    | ForbiddenError
+    | InternalError
+    | NotFoundError
 
-type TypingPayload {
-    userId: ID!
-    isTyping: Boolean!
+input ChatPermissionsInput {
+    canSendMessage: Boolean
+    canInviteUsers: Boolean
+    canEditMetadata: Boolean
+    canDeleteMessages: Boolean
+    canAssignAdmins: Boolean
+    canSendMedia: Boolean
+    canPinMessages: Boolean
 }
 
 extend type Query {
     myChats: MyChatsResult!
     chat(id: ID, slug: String): ChatResult!
     chatMembers(chatID: ID!, limit: Int, offset: Int): ChatMembersResult!
+    searchGlobal(query: String!): GlobalSearchList!
+    chatInvites(chatID: ID!): ChatInvitesResult!
 }
 
 extend type Mutation {
@@ -114,23 +161,22 @@ extend type Mutation {
     leaveChat(chatID: ID!): LeaveChatResult!
     inviteToChat(chatID: ID!, userIds: [ID!]!): InviteResult!
     joinChatBySlug(slug: String!): JoinChatResult!
+    joinChatByInvite(inviteCode: String!): JoinChatResult!
+    exportChatInvite(
+        chatID: ID!
+        name: String
+        usageLimit: Int
+        expireAt: Int
+    ): ExportInviteResult!
+    revokeChatInvite(chatID: ID!, inviteCode: String!): RevokeInviteResult!
     removeChatMember(chatID: ID!, userID: ID!): RemoveMemberResult!
     updateMemberRole(chatID: ID!, userID: ID!, role: String!): SuccessResult!
     updateChatPermissions(
         chatID: ID!
         permissions: ChatPermissionsInput!
     ): SuccessResult!
+    updateChatMetadata(id: ID!, title: String, slug: String): ChatResult!
     sendTypingEvent(chatID: ID!, typing: Boolean!): Boolean!
-}
-
-input ChatPermissionsInput {
-    canSendMessage: Boolean
-    canInviteUsers: Boolean
-    canEditMetadata: Boolean
-    canDeleteMessages: Boolean
-    canAssignAdmins: Boolean
-    canSendMedia: Boolean
-    canPinMessages: Boolean
 }
 
 extend type Subscription {

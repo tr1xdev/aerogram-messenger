@@ -1,7 +1,14 @@
 package resolvers
 
 import (
+	"database/sql"
+	"strings"
+
+	"github.com/google/uuid"
+	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	"github.com/tr1xdev/aerogram-messenger/internal/graph/model"
+	chatv1 "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -99,5 +106,30 @@ func (r *Resolver) mapToLeaveChatError(err error) model.LeaveChatResult {
 		return &model.ForbiddenError{Message: st.Message()}
 	default:
 		return &model.InternalError{Message: "internal error"}
+	}
+}
+
+func (r *Resolver) mapToChatModel(pbChat *chatv1.Chat) *model.ChatExtended {
+	if pbChat == nil {
+		return nil
+	}
+
+	id, _ := uuid.Parse(helpers.ToRawID(pbChat.Id))
+	chatType := strings.ToLower(strings.TrimPrefix(pbChat.Type.String(), "CHAT_TYPE_"))
+
+	return &model.ChatExtended{
+		Dialog: dbgen.Dialog{
+			ID:           id,
+			Type:         chatType,
+			Name:         sql.NullString{String: pbChat.Title, Valid: pbChat.Title != ""},
+			Username:     sql.NullString{String: pbChat.Slug, Valid: pbChat.Slug != ""},
+			PhotoUrl:     sql.NullString{String: pbChat.PhotoUrl, Valid: pbChat.PhotoUrl != ""},
+			Bio:          helpers.ToNullString(pbChat.Bio),
+			Description:  helpers.ToNullString(pbChat.Description),
+			MembersCount: pbChat.MembersCount,
+			IsVerified:   pbChat.IsVerified,
+		},
+		Role:        pbChat.MyRole,
+		UnreadCount: int(pbChat.UnreadCount),
 	}
 }

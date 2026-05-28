@@ -4,6 +4,7 @@ import {
   RecordSource,
   Store,
   Observable,
+  type MutableRecordSource,
   type RequestParameters,
   type Variables,
   type GraphQLResponse,
@@ -18,13 +19,6 @@ import { useConnectionStore } from "@/store/connection";
 import { toast } from "sonner";
 import { logger } from "@/shared/lib/logger";
 
-interface ExtendedRecordSource extends RecordSource {
-  getLinkedRecordIDs(
-    dataID: string,
-    storageKey: string,
-  ): (string | null)[] | null | undefined;
-}
-
 interface RefreshTokenResponse {
   data?: {
     refreshToken?: {
@@ -34,11 +28,32 @@ interface RefreshTokenResponse {
   };
 }
 
+type RecordSourceWithLinkedIDs = MutableRecordSource & {
+  getLinkedRecordIDs?: (
+    dataID: string,
+    storageKey: string,
+  ) => (string | null)[] | null | undefined;
+};
+
 const HTTP_ENDPOINT: string =
-  import.meta.env.VITE_API_URL || "https://localhost:8080/query";
+  import.meta.env.VITE_API_URL || "https://localhost:3443/query";
 const WS_ENDPOINT: string =
-  import.meta.env.VITE_WS_URL || "wss://localhost:8080/query";
+  import.meta.env.VITE_WS_URL || "wss://localhost:3443/query";
 const THROTTLE_MS: number = 5000;
+
+const LOG_STYLES: Record<string, string> = {
+  query:
+    "color: #00ff00; font-weight: bold; background: #002200; padding: 2px 5px; border-radius: 3px;",
+  mutation:
+    "color: #ffaa00; font-weight: bold; background: #221100; padding: 2px 5px; border-radius: 3px;",
+  subscription:
+    "color: #00d4ff; font-weight: bold; background: #001122; padding: 2px 5px; border-radius: 3px;",
+  error:
+    "color: #ff4444; font-weight: bold; background: #220000; padding: 2px 5px; border-radius: 3px;",
+  success:
+    "color: #ffffff; font-weight: bold; background: #004400; padding: 2px 5px; border-radius: 3px;",
+  info: "color: #888888; font-style: italic;",
+};
 
 const inFlightRequests: Map<string, Promise<GraphQLResponse>> = new Map();
 
@@ -61,17 +76,29 @@ const wsClient: Client = createClient({
   },
   on: {
     connected: (): void => {
-      logger.ws("Handshake established");
+      console.log(
+        "%c WS %c Handshake established ",
+        LOG_STYLES.subscription,
+        LOG_STYLES.info,
+      );
       Promise.resolve().then((): void => {
         useConnectionStore.getState().setIsWsConnected(true);
       });
     },
     closed: (): void => {
+      console.log(
+        "%c WS %c Connection closed ",
+        LOG_STYLES.subscription,
+        LOG_STYLES.info,
+      );
       Promise.resolve().then((): void => {
         useConnectionStore.getState().setIsWsConnected(false);
       });
     },
-    error: (err: unknown): void => logger.error("WS", "Connection error", err),
+    error: (err: unknown): void => {
+      console.error("%c WS ERROR %c", LOG_STYLES.error, "", err);
+      logger.error("WS", "Connection error", err);
+    },
   },
 });
 
@@ -110,6 +137,17 @@ async function performFetch(
   token: string | null,
   uploadables?: UploadableMap | null,
 ): Promise<GraphQLResponse> {
+  const startTime: number = performance.now();
+  const type: string = params.operationKind;
+  const style: string = LOG_STYLES[type] || LOG_STYLES.info;
+
+  console.groupCollapsed(
+    `%c ${type.toUpperCase()} %c ${params.name} `,
+    style,
+    "color: white; font-weight: normal;",
+  );
+  console.log("%c Variables: ", LOG_STYLES.info, variables);
+
   const headers: Record<string, string> = getAuthHeaders(token);
   let body: BodyInit;
 
@@ -133,36 +171,76 @@ async function performFetch(
     body = JSON.stringify({ query: params.text, variables });
   }
 
-  const response: Response = await fetch(HTTP_ENDPOINT, {
-    method: "POST",
-    headers,
-    body,
-  });
+  try {
+    const response: Response = await fetch(HTTP_ENDPOINT, {
+      method: "POST",
+      headers,
+      body,
+    });
 
-  if (response.status === 429) {
-    const now: number = Date.now();
-    if (now - lastRateLimitNotification > THROTTLE_MS) {
-      toast.error("Rate limit exceeded");
-      lastRateLimitNotification = now;
+    const duration: string = (performance.now() - startTime).toFixed(2);
+
+    if (response.status === 429) {
+      const now: number = Date.now();
+      if (now - lastRateLimitNotification > THROTTLE_MS) {
+        toast.error("Rate limit exceeded");
+        lastRateLimitNotification = now;
+      }
+      throw new Error("RATE_LIMIT");
     }
-    throw new Error("RATE_LIMIT");
-  }
 
-  if (response.status >= 500) {
-    const now: number = Date.now();
-    if (now - lastServerErrorNotification > THROTTLE_MS) {
-      toast.error(`Server error (${response.status})`);
-      lastServerErrorNotification = now;
+    if (response.status >= 500) {
+      const now: number = Date.now();
+      if (now - lastServerErrorNotification > THROTTLE_MS) {
+        toast.error(`Server error (${response.status})`);
+        lastServerErrorNotification = now;
+      }
+      throw new Error(`SERVER_ERROR_${response.status}`);
     }
-    throw new Error(`SERVER_ERROR_${response.status}`);
+
+    if (!response.ok) throw new Error(`NETWORK_ERROR_${response.status}`);
+
+    const json: GraphQLResponse = (await response.json()) as GraphQLResponse;
+
+    if (!Array.isArray(json)) {
+      if ("errors" in json && json.errors && json.errors.length > 0) {
+        console.log(
+          `%c FAILED %c ${duration}ms `,
+          LOG_STYLES.error,
+          LOG_STYLES.info,
+        );
+        console.log("%c Errors: ", LOG_STYLES.error, json.errors);
+      } else if ("data" in json) {
+        console.log(
+          `%c SUCCESS %c ${duration}ms `,
+          LOG_STYLES.success,
+          LOG_STYLES.info,
+        );
+        console.log("%c Payload: ", LOG_STYLES.info, json.data);
+      }
+    } else {
+      console.log(
+        `%c BATCH SUCCESS %c ${duration}ms `,
+        LOG_STYLES.success,
+        LOG_STYLES.info,
+      );
+    }
+
+    console.groupEnd();
+    return json;
+  } catch (error: unknown) {
+    console.log(`%c CRASHED %c`, LOG_STYLES.error, LOG_STYLES.info);
+    console.groupEnd();
+    throw error;
   }
-
-  if (!response.ok) throw new Error(`NETWORK_ERROR_${response.status}`);
-
-  return (await response.json()) as GraphQLResponse;
 }
 
 async function executeRefresh(): Promise<string | null> {
+  console.log(
+    "%c AUTH %c Refreshing session... ",
+    LOG_STYLES.mutation,
+    LOG_STYLES.info,
+  );
   try {
     const rt: string | null = useAuthStore.getState().refreshToken;
     if (!rt) return null;
@@ -184,10 +262,16 @@ async function executeRefresh(): Promise<string | null> {
       useAuthStore
         .getState()
         .setTokens(tokens.accessToken, tokens.refreshToken);
+      console.log(
+        "%c AUTH %c Session renewed ",
+        LOG_STYLES.success,
+        LOG_STYLES.info,
+      );
       return tokens.accessToken;
     }
     return null;
   } catch (err: unknown) {
+    console.error("%c AUTH ERROR %c", LOG_STYLES.error, "", err);
     logger.error("AUTH", "Refresh failed", err);
     return null;
   } finally {
@@ -208,7 +292,14 @@ async function fetchRelay(
 
   const pending: Promise<GraphQLResponse> | undefined =
     inFlightRequests.get(cacheKey);
-  if (pending && !uploadables) return pending;
+  if (pending && !uploadables) {
+    console.log(
+      `%c CACHE %c Deduplicating request: ${params.name}`,
+      LOG_STYLES.info,
+      "",
+    );
+    return pending;
+  }
 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
   if (isQuery) {
@@ -228,6 +319,11 @@ async function fetchRelay(
       );
 
       if (hasUnauthorizedError(json)) {
+        console.warn(
+          `%c AUTH %c Unauthorized detected in ${params.name}, retrying...`,
+          LOG_STYLES.mutation,
+          LOG_STYLES.info,
+        );
         if (!refreshPromise) refreshPromise = executeRefresh();
         const newToken: string | null = await refreshPromise;
         if (newToken) {
@@ -267,13 +363,42 @@ const subscribe: SubscribeFunction = (
       sink.error(new Error("No query text"));
       return (): void => {};
     }
+
+    console.log(
+      `%c SUB START %c ${operation.name}`,
+      LOG_STYLES.subscription,
+      LOG_STYLES.info,
+    );
+
     return wsClient.subscribe(
       { query: operation.text, variables },
       {
-        next: (data: unknown): void => sink.next(data as GraphQLResponse),
-        error: (err: unknown): void =>
-          sink.error(err instanceof Error ? err : new Error(String(err))),
-        complete: (): void => sink.complete(),
+        next: (data: unknown): void => {
+          console.log(
+            `%c SUB DATA %c ${operation.name}`,
+            LOG_STYLES.subscription,
+            LOG_STYLES.info,
+            data,
+          );
+          sink.next(data as GraphQLResponse);
+        },
+        error: (err: unknown): void => {
+          console.error(
+            `%c SUB ERROR %c ${operation.name}`,
+            LOG_STYLES.error,
+            "",
+            err,
+          );
+          sink.error(err instanceof Error ? err : new Error(String(err)));
+        },
+        complete: (): void => {
+          console.log(
+            `%c SUB COMPLETE %c ${operation.name}`,
+            LOG_STYLES.subscription,
+            LOG_STYLES.info,
+          );
+          sink.complete();
+        },
       },
     );
   });
@@ -282,24 +407,28 @@ const subscribe: SubscribeFunction = (
 function createStore(): Store {
   const source: RecordSource = new RecordSource();
   const store: Store = new Store(source, { gcReleaseBufferSize: 10 });
-  const recordSource: ExtendedRecordSource =
-    store.getSource() as unknown as ExtendedRecordSource;
+  const recordSource: RecordSourceWithLinkedIDs =
+    store.getSource() as RecordSourceWithLinkedIDs;
 
   if (typeof recordSource.getLinkedRecordIDs === "function") {
-    const originalGetLinkedRecordIDs =
+    const originalGetLinkedRecordIDs: (
+      dataID: string,
+      storageKey: string,
+    ) => (string | null)[] | null | undefined =
       recordSource.getLinkedRecordIDs.bind(recordSource);
 
     recordSource.getLinkedRecordIDs = (
       dataID: string,
       storageKey: string,
     ): (string | null)[] | null | undefined => {
-      const result = originalGetLinkedRecordIDs(dataID, storageKey);
+      const result: (string | null)[] | null | undefined =
+        originalGetLinkedRecordIDs(dataID, storageKey);
 
       if (!result || !Array.isArray(result)) return result;
 
       return result.filter((id: string | null): boolean => {
         if (id === null) return false;
-        const record = recordSource.get(id);
+        const record: unknown = recordSource.get(id);
         return record !== undefined && record !== null;
       });
     };

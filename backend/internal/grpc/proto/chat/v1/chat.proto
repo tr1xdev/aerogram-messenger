@@ -11,14 +11,18 @@ service ChatService {
   rpc GetMyChats(GetMyChatsRequest) returns (GetMyChatsResponse);
   rpc PinChat(PinChatRequest) returns (PinChatResponse);
   rpc GetChat(GetChatRequest) returns (GetChatResponse);
+  rpc UpdateChat(UpdateChatRequest) returns (UpdateChatResponse);
   rpc DeleteChat(DeleteChatRequest) returns (DeleteChatResponse);
   rpc InviteToChat(InviteToChatRequest) returns (InviteToChatResponse);
   rpc JoinChatBySlug(JoinChatBySlugRequest) returns (JoinChatBySlugResponse);
+  rpc ExportChatInvite(ExportChatInviteRequest) returns (ExportChatInviteResponse);
+  rpc JoinChatByInvite(JoinChatByInviteRequest) returns (JoinChatByInviteResponse);
   rpc UpdateMemberRole(UpdateMemberRoleRequest) returns (UpdateMemberRoleResponse);
   rpc UpdateChatPermissions(UpdateChatPermissionsRequest) returns (UpdateChatPermissionsResponse);
   rpc GetChatMembers(GetChatMembersRequest) returns (GetChatMembersResponse);
   rpc LeaveChat(LeaveChatRequest) returns (LeaveChatResponse);
   rpc RemoveChatMember(RemoveChatMemberRequest) returns (RemoveChatMemberResponse);
+  rpc RevokeChatInvite(RevokeChatInviteRequest) returns (RevokeChatInviteResponse);
 }
 
 enum ChatType {
@@ -42,6 +46,7 @@ message ChatMember {
   string user_id = 1;
   string role = 2;
   ChatPermissions permissions = 3;
+  int64 last_read_sequence = 4;
 }
 
 message Chat {
@@ -63,6 +68,47 @@ message Chat {
   bool can_write = 16;
   ChatPermissions permissions = 17;
   string my_role = 18;
+}
+
+message RevokeChatInviteRequest {
+  string chat_id = 1;
+  string invite_code = 2;
+}
+
+message RevokeChatInviteResponse {
+  bool success = 1;
+}
+
+message UpdateChatRequest {
+  string chat_id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional string slug = 4;
+  optional string photo_url = 5;
+}
+
+message UpdateChatResponse {
+  Chat chat = 1;
+}
+
+message ExportChatInviteRequest {
+  string chat_id = 1;
+  optional string name = 2;
+  optional int32 usage_limit = 3;
+  optional int64 expire_at = 4;
+}
+
+message ExportChatInviteResponse {
+  string invite_link = 1;
+}
+
+message JoinChatByInviteRequest {
+  string invite_code = 1;
+}
+
+message JoinChatByInviteResponse {
+  string chat_id = 1;
+  bool success = 2;
 }
 
 message JoinChatBySlugRequest {

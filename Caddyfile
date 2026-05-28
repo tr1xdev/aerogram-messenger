@@ -1,4 +1,5 @@
 {
+    debug
 }
 
 localhost:3443, :3443 {
@@ -6,15 +7,25 @@ localhost:3443, :3443 {
     encode zstd gzip
 
     handle /query* {
-        reverse_proxy api:8080 {
-            header_up Host {host}
+        reverse_proxy https://api:8080 {
+            transport http {
+                versions 1.1
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.request.host}
             header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
 
     handle /media/* {
         uri strip_prefix /media
-        reverse_proxy minio:9000
+        reverse_proxy minio:9000 {
+            transport http {
+                versions 1.1
+            }
+        }
     }
 
     handle {
@@ -34,8 +45,12 @@ localhost:3443, :3443 {
     root * /usr/share/caddy
 
     handle /query* {
-        reverse_proxy api:8080 {
-            header_up Host {host}
+        reverse_proxy https://api:8080 {
+            transport http {
+                versions 1.1
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.request.host}
             header_up X-Real-IP {remote_host}
         }
     }

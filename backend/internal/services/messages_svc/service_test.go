@@ -3,6 +3,7 @@ package messages_svc
 import (
 	"context"
 	"database/sql"
+	"io"
 	"testing"
 	"time"
 
@@ -20,6 +21,16 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 )
+
+type MockS3 struct{}
+
+func (m *MockS3) UploadFile(ctx context.Context, key string, body io.Reader, contentType string) (string, error) {
+	return key, nil
+}
+
+func (m *MockS3) GetPresignedURL(ctx context.Context, key string, expires time.Duration) (string, error) {
+	return "https://s3.mock.url/" + key, nil
+}
 
 type testEnv struct {
 	server *Server
@@ -45,7 +56,8 @@ func setupTest(t *testing.T) *testEnv {
 		Delete:  config.LimitEntry{Limit: 5, Window: 5 * time.Second},
 	}
 
-	server := NewServer(db, rdb, l, cfg)
+	mockS3 := &MockS3{}
+	server := NewServer(db, rdb, l, mockS3, cfg)
 
 	return &testEnv{
 		server: server,

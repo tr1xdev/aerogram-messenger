@@ -23,9 +23,27 @@ func DecodeGlobalID(globalID string) (string, string, error) {
 }
 
 func ToRawID(id string) string {
-	_, raw, err := DecodeGlobalID(id)
-	if err != nil {
-		return id
+	if id == "" {
+		return ""
 	}
-	return raw
+
+	decoded, err := base64.StdEncoding.DecodeString(id)
+	if err != nil {
+		return extractID(id)
+	}
+
+	strDecoded := string(decoded)
+	if strings.Contains(strDecoded, ":") {
+		return extractID(strDecoded)
+	}
+
+	return id
+}
+
+func extractID(s string) string {
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return s
 }

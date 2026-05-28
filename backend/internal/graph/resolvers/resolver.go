@@ -4,7 +4,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
-	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers" // Импортируем хелперы
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	authpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/auth/v1"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	messagespb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/messages/v1"

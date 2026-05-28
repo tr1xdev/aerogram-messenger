@@ -62,11 +62,10 @@ func (r *MessageRepository) GetByID(ctx context.Context, id uuid.UUID) (dbgen.Me
 }
 
 func (r *MessageRepository) Update(ctx context.Context, id, authorID uuid.UUID, content string) (dbgen.Message, error) {
-	return r.db.Queries.UpdateMessageExtended(ctx, dbgen.UpdateMessageExtendedParams{
-		ID:           id,
-		AuthorID:     authorID,
-		Content:      content,
-		EncryptionIv: database.ToNullString(nil),
+	return r.db.Queries.UpdateMessageContent(ctx, dbgen.UpdateMessageContentParams{
+		ID:       id,
+		AuthorID: authorID,
+		Content:  content,
 	})
 }
 
@@ -85,6 +84,18 @@ func (r *MessageRepository) MarkRead(ctx context.Context, chatID, userID uuid.UU
 	})
 }
 
-func (r *MessageRepository) UpdateExtended(ctx context.Context, arg dbgen.UpdateMessageExtendedParams) (dbgen.Message, error) {
-	return r.db.Queries.UpdateMessageExtended(ctx, arg)
+func (r *MessageRepository) UpdateExtended(ctx context.Context, id, authorID uuid.UUID, content string) (dbgen.Message, error) {
+	return r.db.Queries.UpdateMessageContent(ctx, dbgen.UpdateMessageContentParams{
+		ID:       id,
+		AuthorID: authorID,
+		Content:  content,
+	})
+}
+
+func (r *MessageRepository) GetAttachmentsByMessageID(ctx context.Context, messageID uuid.UUID) ([]dbgen.MessageAttachment, error) {
+	return r.db.Queries.GetAttachmentsByMessageID(ctx, messageID)
+}
+
+func (r *MessageRepository) GetAttachmentsByMessageIDs(ctx context.Context, messageIDs []uuid.UUID) ([]dbgen.MessageAttachment, error) {
+	return r.db.Queries.GetAttachmentsByMessageIDs(ctx, messageIDs)
 }

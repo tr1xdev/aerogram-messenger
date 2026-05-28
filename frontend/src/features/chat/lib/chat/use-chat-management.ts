@@ -1,4 +1,5 @@
 import { graphql, useLazyLoadQuery, useMutation } from "react-relay";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
 import { logger } from "@/shared/lib/logger";
@@ -12,14 +13,46 @@ import type {
   ChatType,
 } from "./__generated__/useChatManagementCreateComplexMutation.graphql";
 
-const searchUsersQuery = graphql`
-  query useChatManagementSearchQuery($username: String!) {
-    searchUsers(username: $username) {
-      id
-      username
-      firstName
-      lastName
-      photoUrl
+export const deleteFromChatList = (
+  store: RecordSourceSelectorProxy,
+  chatId: string,
+): void => {
+  const root: RecordProxy = store.getRoot();
+  const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
+
+  if (myChats && myChats.getType() === "ChatList") {
+    const chats: readonly RecordProxy[] =
+      myChats.getLinkedRecords("chats") ?? [];
+
+    const filteredChats: RecordProxy[] = chats.filter(
+      (c: RecordProxy): boolean => (c.getValue("id") as string) !== chatId,
+    );
+
+    myChats.setLinkedRecords(filteredChats, "chats");
+  }
+};
+
+const searchGlobalQuery = graphql`
+  query useChatManagementSearchQuery($query: String!) {
+    searchGlobal(query: $query) {
+      results {
+        __typename
+        ... on User {
+          id
+          username
+          firstName
+          lastName
+          photoUrl
+        }
+        ... on Chat {
+          id
+          title
+          type
+          slug
+          photoUrl
+          membersCount
+        }
+      }
     }
   }
 `;
@@ -142,17 +175,29 @@ const inviteToChatMutation = graphql`
 `;
 
 export function useSearchUsers(
-  username: string,
+  query: string,
 ): useChatManagementSearchQuery["response"] | null {
-  const isEnabled: boolean = username.trim().length > 0;
+  const isEnabled: boolean = query.trim().length > 0;
+
   const data = useLazyLoadQuery<useChatManagementSearchQuery>(
-    searchUsersQuery,
-    { username: isEnabled ? username : "" },
+    searchGlobalQuery,
+    { query: isEnabled ? query : "" },
     {
       fetchPolicy: "store-or-network",
-      fetchKey: isEnabled ? username : "disabled",
+      fetchKey: isEnabled ? query : "disabled",
+      networkCacheConfig: { force: false },
     },
   );
+
+  useEffect((): void => {
+    if (isEnabled && data) {
+      logger.info("CHAT", "Search execution", {
+        query,
+        resultsCount: data.searchGlobal?.results?.length ?? 0,
+      });
+    }
+  }, [data, isEnabled, query]);
+
   return isEnabled ? data : null;
 }
 
@@ -172,20 +217,31 @@ export function useChatActions(chatId?: string) {
   const updateStoreAfterCreate = (
     store: RecordSourceSelectorProxy,
     payload: RecordProxy | null,
+    source: string,
   ): void => {
-    if (!payload || payload.getType() !== "Chat") return;
+    if (!payload || payload.getType() !== "Chat") {
+      logger.warn(
+        "CHAT",
+        `Store update skipped: invalid payload from ${source}`,
+      );
+      return;
+    }
 
     const root: RecordProxy = store.getRoot();
     const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
+
     if (myChats && myChats.getType() === "ChatList") {
       const chats: readonly RecordProxy[] =
         myChats.getLinkedRecords("chats") ?? [];
       const newId: string = payload.getValue("id") as string;
 
-      if (
-        !chats.some((c: RecordProxy): boolean => c.getValue("id") === newId)
-      ) {
+      const exists: boolean = chats.some(
+        (c: RecordProxy): boolean => (c.getValue("id") as string) === newId,
+      );
+
+      if (!exists) {
         myChats.setLinkedRecords([payload, ...chats], "chats");
+        logger.info("CHAT", "New chat added to store", { id: newId, source });
       }
     }
   };
@@ -194,10 +250,15 @@ export function useChatActions(chatId?: string) {
     userID: string,
     options?: { onCompleted?: (id: string) => void },
   ): void => {
+    logger.info("CHAT", "Creating direct chat", { userID });
     createDirect({
       variables: { userID },
       updater: (store: RecordSourceSelectorProxy): void => {
-        updateStoreAfterCreate(store, store.getRootField("createDirectChat"));
+        updateStoreAfterCreate(
+          store,
+          store.getRootField("createDirectChat"),
+          "createDirectChat",
+        );
       },
       onCompleted: (
         response: useChatManagementCreateMutation["response"],
@@ -225,10 +286,15 @@ export function useChatActions(chatId?: string) {
     },
     options?: { onCompleted?: (id: string) => void },
   ): void => {
+    logger.info("CHAT", "Creating complex chat", input);
     createComplex({
       variables: input,
       updater: (store: RecordSourceSelectorProxy): void => {
-        updateStoreAfterCreate(store, store.getRootField("createChat"));
+        updateStoreAfterCreate(
+          store,
+          store.getRootField("createChat"),
+          "createChat",
+        );
       },
       onCompleted: (
         response: useChatManagementCreateComplexMutation["response"],
@@ -249,6 +315,7 @@ export function useChatActions(chatId?: string) {
 
   const togglePin = (pinned: boolean): void => {
     if (!chatId) return;
+    logger.info("CHAT", "Toggling pin", { chatId, pinned });
     pin({
       variables: { id: chatId, pinned },
       onCompleted: (
@@ -267,21 +334,11 @@ export function useChatActions(chatId?: string) {
 
   const deleteChat = (forEveryone: boolean = false): void => {
     if (!chatId) return;
+    logger.info("CHAT", "Deleting chat", { chatId, forEveryone });
     remove({
       variables: { id: chatId, forEveryone },
       updater: (store: RecordSourceSelectorProxy): void => {
-        const root: RecordProxy = store.getRoot();
-        const myChats: RecordProxy | null = root.getLinkedRecord("myChats");
-        if (myChats && myChats.getType() === "ChatList") {
-          const chats: readonly RecordProxy[] =
-            myChats.getLinkedRecords("chats") ?? [];
-          myChats.setLinkedRecords(
-            chats.filter(
-              (c: RecordProxy): boolean => c.getValue("id") !== chatId,
-            ),
-            "chats",
-          );
-        }
+        deleteFromChatList(store, chatId);
         store.delete(chatId);
       },
       onCompleted: (
@@ -301,6 +358,7 @@ export function useChatActions(chatId?: string) {
 
   const inviteUsers = (userIds: string[]): void => {
     if (!chatId) return;
+    logger.info("CHAT", "Inviting users", { chatId, userIds });
     invite({
       variables: { chatID: chatId, userIds },
       onCompleted: (

@@ -15,6 +15,7 @@ import (
 	"github.com/tr1xdev/aerogram-messenger/internal/config"
 	"github.com/tr1xdev/aerogram-messenger/internal/database"
 	dbgen "github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen"
+	"github.com/tr1xdev/aerogram-messenger/internal/graph/helpers"
 	chatpb "github.com/tr1xdev/aerogram-messenger/internal/grpc/gen/chat/v1"
 	"github.com/tr1xdev/aerogram-messenger/internal/infrastructure/limiter"
 	"google.golang.org/grpc/codes"
@@ -28,6 +29,11 @@ func ptr[T any](v T) *T {
 
 func nullStr(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: s != ""}
+}
+
+func withAuth(ctx context.Context, userID string) context.Context {
+	md := metadata.Pairs("user-id", userID)
+	return metadata.NewIncomingContext(ctx, md)
 }
 
 func setupTest(t *testing.T) (*Server, *miniredis.Miniredis) {
@@ -87,7 +93,8 @@ func TestChatServer(t *testing.T) {
 			Title:          ptr("Private Chat"),
 		}
 
-		res, err := server.CreateChat(ctx, req)
+		authCtx := withAuth(ctx, cID)
+		res, err := server.CreateChat(authCtx, req)
 		require.NoError(t, err)
 		assert.NotNil(t, res.Chat)
 		assert.Equal(t, "Private Chat", res.Chat.Title)
@@ -101,7 +108,8 @@ func TestChatServer(t *testing.T) {
 		createUser(t, server, creatorID)
 		createUser(t, server, joinerID)
 
-		_, err := server.CreateChat(ctx, &chatpb.CreateChatRequest{
+		creatorCtx := withAuth(ctx, creatorID)
+		createRes, err := server.CreateChat(creatorCtx, &chatpb.CreateChatRequest{
 			CreatorId: creatorID,
 			Type:      chatpb.ChatType_CHAT_TYPE_CHANNEL,
 			Title:     ptr("Public Channel"),
@@ -109,10 +117,8 @@ func TestChatServer(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		md := metadata.Pairs("user-id", joinerID)
-		authCtx := metadata.NewIncomingContext(ctx, md)
-
-		res, err := server.JoinChatBySlug(authCtx, &chatpb.JoinChatBySlugRequest{
+		joinerCtx := withAuth(ctx, joinerID)
+		res, err := server.JoinChatBySlug(joinerCtx, &chatpb.JoinChatBySlugRequest{
 			Slug: slug,
 		})
 
@@ -121,7 +127,7 @@ func TestChatServer(t *testing.T) {
 		assert.NotEmpty(t, res.ChatId)
 
 		uUUID := uuid.MustParse(joinerID)
-		chatID := uuid.MustParse(res.ChatId)
+		chatID := uuid.MustParse(helpers.ToRawID(createRes.Chat.Id))
 		member, err := server.db.Queries.GetDialogMember(ctx, dbgen.GetDialogMemberParams{
 			DialogID: chatID,
 			UserID:   uUUID,
@@ -134,9 +140,7 @@ func TestChatServer(t *testing.T) {
 		uID := uuid.New().String()
 		createUser(t, server, uID)
 
-		md := metadata.Pairs("user-id", uID)
-		authCtx := metadata.NewIncomingContext(ctx, md)
-
+		authCtx := withAuth(ctx, uID)
 		_, err := server.JoinChatBySlug(authCtx, &chatpb.JoinChatBySlugRequest{
 			Slug: "non_existent_slug",
 		})
@@ -160,10 +164,11 @@ func TestChatServer(t *testing.T) {
 			Type:           chatpb.ChatType_CHAT_TYPE_PRIVATE,
 		}
 
-		_, err := server.CreateChat(ctx, req)
+		authCtx := withAuth(ctx, uID)
+		_, err := server.CreateChat(authCtx, req)
 		require.NoError(t, err)
 
-		_, err = server.CreateChat(ctx, req)
+		_, err = server.CreateChat(authCtx, req)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -176,9 +181,7 @@ func TestChatServer(t *testing.T) {
 		uID := uuid.New().String()
 		createUser(t, server, uID)
 
-		md := metadata.Pairs("user-id", uID)
-		authCtx := metadata.NewIncomingContext(ctx, md)
-
+		authCtx := withAuth(ctx, uID)
 		res, err := server.GetMyChats(authCtx, &chatpb.GetMyChatsRequest{})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
@@ -207,9 +210,7 @@ func TestChatServer(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		md := metadata.Pairs("user-id", uID)
-		authCtx := metadata.NewIncomingContext(ctx, md)
-
+		authCtx := withAuth(ctx, uID)
 		req := &chatpb.PinChatRequest{
 			ChatId: chatID.String(),
 			UserId: uID,

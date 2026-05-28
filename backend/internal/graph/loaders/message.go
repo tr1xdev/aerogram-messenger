@@ -13,19 +13,27 @@ import (
 
 func LoadMessage(ctx context.Context, id string) (*model.Message, error) {
 	l := ForContext(ctx)
-	if l == nil {
-		return nil, fmt.Errorf("dataloaders not found")
+	if l == nil || l.MessageLoader == nil {
+		return nil, fmt.Errorf("message loader not initialized")
 	}
 	return l.MessageLoader.Load(ctx, id)()
 }
 
-func newMessageBatchFn(store *dbgen.Queries) dataloader.BatchFunc[string, *model.Message] {
+func newMessageBatchFn(store *dbgen.Queries, enricher *helpers.ChatEnricher) dataloader.BatchFunc[string, *model.Message] {
 	return func(ctx context.Context, keys []string) []*dataloader.Result[*model.Message] {
 		output := make([]*dataloader.Result[*model.Message], len(keys))
 
+		if enricher == nil {
+			for i := range output {
+				output[i] = &dataloader.Result[*model.Message]{Error: fmt.Errorf("enricher is nil")}
+			}
+			return output
+		}
+
 		uuids := make([]uuid.UUID, 0, len(keys))
 		for _, k := range keys {
-			if u, err := uuid.Parse(k); err == nil {
+			rawID := helpers.ToRawID(k)
+			if u, err := uuid.Parse(rawID); err == nil {
 				uuids = append(uuids, u)
 			}
 		}
@@ -40,11 +48,16 @@ func newMessageBatchFn(store *dbgen.Queries) dataloader.BatchFunc[string, *model
 
 		msgMap := make(map[string]*model.Message)
 		for _, m := range messages {
-			msgMap[m.ID.String()] = helpers.MapDBMessageToModel(&m)
+			enriched, err := enricher.EnrichMessage(ctx, m.ID.String())
+			if err != nil {
+				continue
+			}
+			msgMap[m.ID.String()] = enriched
 		}
 
 		for i, id := range keys {
-			if m, ok := msgMap[id]; ok {
+			rawID := helpers.ToRawID(id)
+			if m, ok := msgMap[rawID]; ok {
 				output[i] = &dataloader.Result[*model.Message]{Data: m}
 			} else {
 				output[i] = &dataloader.Result[*model.Message]{Error: fmt.Errorf("message %s not found", id)}

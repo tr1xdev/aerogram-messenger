@@ -49,7 +49,7 @@ extend type Query {
     me: User!
     user(id: ID!): User!
     getUser(id: ID!): User!
-    searchUsers(username: String!): [User!]!
+    searchUsers(username: String!): [User!]! # deprecated
     myBots: [User!]!
 }
 

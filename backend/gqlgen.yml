@@ -36,15 +36,26 @@ models:
             bio: { resolver: true }
             status: { resolver: true }
 
+    Chat:
+        model: github.com/tr1xdev/aerogram-messenger/internal/graph/model.ChatExtended
+        fields:
+            id: { resolver: true }
+            type: { resolver: true }
+            title: { resolver: true }
+            photoUrl: { resolver: true }
+            unreadCount: { resolver: true }
+            myReadSequence: { resolver: true }
+            lastReadSequence: { resolver: true }
+            isPinned: { resolver: true }
+            canWrite: { resolver: true }
+            permissions: { resolver: true }
+            lastMessage: { resolver: true }
+            myRole: { resolver: true }
+
     Session:
         model: github.com/tr1xdev/aerogram-messenger/internal/database/sqlc/gen.Session
         fields:
             id: { resolver: true }
-
-    Chat:
-        fields:
-            id: { resolver: true }
-            canWrite: { resolver: true }
 
     Message:
         fields:
@@ -53,7 +64,3 @@ models:
             replyTo: { resolver: true }
             forwardedFrom: { resolver: true }
             attachments: { resolver: true }
-
-    Attachment:
-        fields:
-            url: { resolver: true }

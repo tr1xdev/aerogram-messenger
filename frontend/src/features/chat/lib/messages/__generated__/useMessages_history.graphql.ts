@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<719c688b1f9c32e9f482c6f59b191917>>
+ * @generated SignedSource<<e1e5dd5f5b3582a3710b16c0bacccc8c>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,6 +15,14 @@ export type useMessages_history$data = {
     readonly __typename: "MessageConnection";
     readonly hasMore: boolean;
     readonly messages: ReadonlyArray<{
+      readonly attachments: ReadonlyArray<{
+        readonly contentType: string;
+        readonly fileName: string;
+        readonly fileSize: any;
+        readonly id: string;
+        readonly type: string;
+        readonly url: string;
+      }> | null | undefined;
       readonly id: string;
       readonly isEdited: boolean;
       readonly replyTo: {
@@ -37,6 +45,7 @@ export type useMessages_history$data = {
       readonly sentAt: string;
       readonly sequence: any;
       readonly text: string;
+      readonly " $fragmentSpreads": FragmentRefs<"messageList_metadata">;
     }>;
   } | {
     readonly __typename: "NotFoundError";
@@ -162,6 +171,11 @@ return {
               "plural": true,
               "selections": [
                 (v0/*: any*/),
+                {
+                  "args": null,
+                  "kind": "FragmentSpread",
+                  "name": "messageList_metadata"
+                },
                 (v1/*: any*/),
                 {
                   "alias": null,
@@ -182,6 +196,53 @@ return {
                   "args": null,
                   "kind": "ScalarField",
                   "name": "isEdited",
+                  "storageKey": null
+                },
+                {
+                  "alias": null,
+                  "args": null,
+                  "concreteType": "Attachment",
+                  "kind": "LinkedField",
+                  "name": "attachments",
+                  "plural": true,
+                  "selections": [
+                    (v0/*: any*/),
+                    {
+                      "alias": null,
+                      "args": null,
+                      "kind": "ScalarField",
+                      "name": "type",
+                      "storageKey": null
+                    },
+                    {
+                      "alias": null,
+                      "args": null,
+                      "kind": "ScalarField",
+                      "name": "url",
+                      "storageKey": null
+                    },
+                    {
+                      "alias": null,
+                      "args": null,
+                      "kind": "ScalarField",
+                      "name": "fileName",
+                      "storageKey": null
+                    },
+                    {
+                      "alias": null,
+                      "args": null,
+                      "kind": "ScalarField",
+                      "name": "fileSize",
+                      "storageKey": null
+                    },
+                    {
+                      "alias": null,
+                      "args": null,
+                      "kind": "ScalarField",
+                      "name": "contentType",
+                      "storageKey": null
+                    }
+                  ],
                   "storageKey": null
                 },
                 {
@@ -271,6 +332,6 @@ return {
 };
 })();
 
-(node as any).hash = "935c54edb6c70bd2e25f62dc98e05f54";
+(node as any).hash = "0c24e8dbea4e2f9ce0fe211adbe5abad";
 
 export default node;

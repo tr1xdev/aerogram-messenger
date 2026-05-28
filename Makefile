@@ -1,4 +1,4 @@
-.PHONY: all proto gql generate build-backend build-frontend install-deps \
+.PHONY: all proto gql generate sqlc build-backend build-frontend install-deps \
         dev-backend dev-frontend test test-coverage clean download-geoip \
         infra stop-infra help setup-certs
 
@@ -13,7 +13,7 @@ FRONTEND_DIR := frontend
 ASSETS_DIR := $(BACKEND_DIR)/assets
 CERTS_DIR := certs
 
-all: install-deps proto gql generate test build-backend build-frontend
+all: install-deps proto sqlc gql generate test build-backend build-frontend
 
 help:
 	@echo "$(YELLOW)Aerogram Messenger - Development Toolkit$(RESET)"
@@ -29,6 +29,7 @@ help:
 	@echo ""
 	@echo "$(CYAN)Code Generation:$(RESET)"
 	@echo "  make proto            - Generate gRPC code using Buf"
+	@echo "  make sqlc             - Generate type-safe Go from SQL"
 	@echo "  make gql              - Generate GraphQL resolvers & models"
 	@echo "  make generate         - Run standard go generate"
 	@echo ""
@@ -89,9 +90,13 @@ proto:
 	@echo "$(GREEN)▶ Generating gRPC code...$(RESET)"
 	@cd $(BACKEND_DIR)/internal/grpc/proto && buf format -w && buf lint && buf generate
 
+sqlc:
+	@echo "$(GREEN)▶ Generating SQLC code...$(RESET)"
+	@cd $(BACKEND_DIR) && sqlc generate
+
 gql:
 	@echo "$(GREEN)▶ Generating GraphQL code...$(RESET)"
-	@cd $(BACKEND_DIR) && go run github.com/99designs/gqlgen generate --config gqlgen.yml
+	@cd $(BACKEND_DIR) && go run -mod=mod github.com/99designs/gqlgen generate --config gqlgen.yml
 
 generate:
 	@echo "$(GREEN)▶ Running go generate...$(RESET)"

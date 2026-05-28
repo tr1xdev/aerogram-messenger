@@ -35,6 +35,7 @@ const chatDetailsQuery = graphql`
         ...useMarkDialog_chat
         ...chatMenuItem_chat
         id
+        slug
         title
         type
         photoUrl
@@ -44,6 +45,7 @@ const chatDetailsQuery = graphql`
         lastReadSequence
         myReadSequence
         canWrite
+        myRole
         permissions {
           canSendMessage
           canInviteUsers
@@ -82,7 +84,10 @@ export function useMyChats(): MyChatsResponse {
   return useLazyLoadQuery<useChatsMyChatsQuery>(
     myChatsQuery,
     {},
-    { fetchPolicy: "store-or-network" },
+    {
+      fetchPolicy: "store-or-network",
+      UNSTABLE_renderPolicy: "partial",
+    },
   );
 }
 
@@ -93,6 +98,7 @@ export function useChatDetails(chatId: string): ChatDetailsResponse {
     {
       fetchPolicy: "store-or-network",
       fetchKey: chatId,
+      UNSTABLE_renderPolicy: "partial",
     },
   );
 }

@@ -1,5 +1,5 @@
-import { useState, type ReactNode, Suspense } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useState, Suspense } from "react";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import {
   Dialog,
   DialogContent,
@@ -7,21 +7,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { UserContent } from "./user-content";
-import { GroupContent } from "./group-content";
-import { ChannelContent } from "./channel-content";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ChannelContent } from "./channel/channel-content";
+import { GroupContent } from "./group/group-content";
+import { UserContent } from "./user/user-content";
 
 interface ChatEntityDetailsProps {
   id: string;
-  type: "PRIVATE" | "GROUP" | "CHANNEL";
+  type: "CHANNEL" | "GROUP" | "PRIVATE";
   children: ReactNode;
 }
 
@@ -30,84 +22,37 @@ export function ChatEntityDetails({
   type,
   children,
 }: ChatEntityDetailsProps): ReactNode {
-  const isMobile: boolean = useIsMobile();
-  const navigate = useNavigate();
-  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
-  const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false);
-
-  const handleTriggerClick = (e: React.MouseEvent): void => {
-    if (isMobile) {
-      e.preventDefault();
-      if (type === "PRIVATE") {
-        void navigate({ to: "/users/$userId", params: { userId: id } });
-      } else {
-        void navigate({ to: "/chat/$chatId", params: { chatId: id } });
-      }
-    } else {
-      setIsDialogOpen(true);
-      setIsPopoverOpen(false);
-    }
-  };
-
-  const renderContent = (isPreview: boolean = false) => {
-    if (type === "PRIVATE")
-      return <UserContent userId={id} isPreview={isPreview} />;
-    if (type === "CHANNEL")
-      return <ChannelContent id={id} isPreview={isPreview} />;
-    return <GroupContent id={id} isPreview={isPreview} />;
-  };
-
-  if (isMobile) return <div onClick={handleTriggerClick}>{children}</div>;
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-        <PopoverTrigger asChild>
-          <DialogTrigger asChild onClick={handleTriggerClick}>
-            <div className="cursor-pointer outline-none">{children}</div>
-          </DialogTrigger>
-        </PopoverTrigger>
-        <PopoverContent
-          side="bottom"
-          align="start"
-          className="w-80 p-0 overflow-hidden border-border/50 shadow-2xl"
-        >
-          <Suspense fallback={<EntitySkeleton />}>
-            {renderContent(true)}
-          </Suspense>
-        </PopoverContent>
-      </Popover>
-
-      <DialogContent className="max-w-[480px] p-0 overflow-hidden border-none shadow-2xl bg-background">
-        <VisuallyHidden>
-          <DialogTitle>
-            {type === "PRIVATE"
-              ? "User Profile"
-              : type === "CHANNEL"
-                ? "Channel Details"
-                : "Group Details"}
-          </DialogTitle>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <div className="flex items-center min-w-0 flex-1 h-full cursor-pointer">
+          {children}
+        </div>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl p-0 overflow-hidden border-none shadow-2xl sm:rounded-2xl bg-background outline-none h-[600px] max-h-[90vh]">
+        <VisuallyHidden.Root>
+          <DialogTitle>Chat Details</DialogTitle>
           <DialogDescription>
-            Detailed information about the selected entity
+            Information and settings for this chat entity
           </DialogDescription>
-        </VisuallyHidden>
-        <Suspense fallback={<EntitySkeleton />}>
-          {renderContent(false)}
+        </VisuallyHidden.Root>
+
+        <Suspense
+          fallback={
+            <div className="h-full w-full bg-background animate-pulse flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-muted" />
+            </div>
+          }
+        >
+          {type === "CHANNEL" && <ChannelContent id={id} />}
+          {type === "GROUP" && (
+            <GroupContent id={id} open={isOpen} onOpenChange={setIsOpen} />
+          )}
+          {type === "PRIVATE" && <UserContent id={id} />}
         </Suspense>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function EntitySkeleton(): ReactNode {
-  return (
-    <div className="flex flex-col w-full">
-      <Skeleton className="h-24 w-full rounded-none" />
-      <div className="p-5 space-y-4">
-        <Skeleton className="h-20 w-20 rounded-full -mt-12 border-4 border-background" />
-        <Skeleton className="h-6 w-1/2" />
-        <Skeleton className="h-20 w-full" />
-      </div>
-    </div>
   );
 }
