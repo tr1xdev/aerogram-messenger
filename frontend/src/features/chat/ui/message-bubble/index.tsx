@@ -6,17 +6,15 @@ import { UserAvatar } from "@/components/user-avatar";
 import { MessageInfoDialog } from "../message-info-dialog";
 import { MessageStatus } from "../message-status";
 import { getUserColorInfo, type ColorInfo } from "@/lib/user-colors";
-
 import { useMessageHighlight } from "./hooks/use-message-highlight";
 import { AttachmentList } from "./ui/attachment-list";
 import { MessageReplyPreview } from "./ui/message-reply-preview";
 import { MessageText } from "./ui/message-text";
 import { MessageContextMenuContent } from "./ui/message-context-menu-content";
-
 import type {
   messageBubble_message$key,
   messageBubble_message$data,
-} from "../__generated__/messageBubble_message.graphql";
+} from "./__generated__/messageBubble_message.graphql";
 
 const MessageFragment = graphql`
   fragment messageBubble_message on Message {
@@ -24,6 +22,7 @@ const MessageFragment = graphql`
     text
     sentAt
     sequence
+    isEdited
     attachments {
       id
       url
@@ -115,7 +114,6 @@ export const MessageBubble = memo(function MessageBubble({
 
   const highlightStyle = useMemo(() => {
     if (!isHighlighted) return { opacity: 0 };
-
     return {
       opacity: 1,
       borderRadius: bubbleRadius,
@@ -149,7 +147,6 @@ export const MessageBubble = memo(function MessageBubble({
                 />
               )}
             </div>
-
             <div
               style={{ borderRadius: bubbleRadius }}
               className={cn(
@@ -166,7 +163,6 @@ export const MessageBubble = memo(function MessageBubble({
                   !isMe && isHighlighted && "bg-primary/25",
                 )}
               />
-
               {showName && (
                 <span
                   style={{ color: userColor.text }}
@@ -175,25 +171,29 @@ export const MessageBubble = memo(function MessageBubble({
                   {senderName}
                 </span>
               )}
-
               {message.replyTo && (
                 <MessageReplyPreview replyTo={message.replyTo} isMe={isMe} />
               )}
-
               {message.attachments && (
                 <AttachmentList attachments={message.attachments} isMe={isMe} />
               )}
-
               <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-3">
                 {message.text && <MessageText text={message.text} />}
-
                 <div
                   className={cn(
-                    "flex items-center gap-1 h-4 select-none ml-auto",
-                    isMe ? "text-zinc-400" : "text-muted-foreground/60",
+                    "flex items-center gap-1 h-4 select-none ml-auto text-[10px]",
+                    isMe ? "text-zinc-500" : "text-muted-foreground/85",
                   )}
                 >
-                  <span className="text-[10px] font-medium">
+                  {message.isEdited && (
+                    <>
+                      <span className="font-normal">edited</span>
+                      <span className="text-[8px] px-0.5 select-none opacity-70">
+                        ·
+                      </span>
+                    </>
+                  )}
+                  <span className="font-medium">
                     {new Date(message.sentAt).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -206,7 +206,7 @@ export const MessageBubble = memo(function MessageBubble({
                       chatType={chatType}
                       sequence={Number(message.sequence)}
                       lastReadSequence={lastReadSequence ?? 0}
-                      className="w-3.5 h-3.5"
+                      className="w-3.5 h-3.5 ml-0.5"
                     />
                   )}
                 </div>
@@ -214,7 +214,6 @@ export const MessageBubble = memo(function MessageBubble({
             </div>
           </div>
         </ContextMenuTrigger>
-
         <MessageContextMenuContent
           message={message}
           isMe={isMe}
@@ -226,7 +225,6 @@ export const MessageBubble = memo(function MessageBubble({
           onShowInfo={(): void => setIsInfoOpen(true)}
         />
       </ContextMenu>
-
       <MessageInfoDialog
         message={message}
         open={isInfoOpen}

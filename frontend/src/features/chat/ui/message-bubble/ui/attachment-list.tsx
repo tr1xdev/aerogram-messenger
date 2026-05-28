@@ -2,7 +2,7 @@ import { useMemo, memo, useState, type ReactElement } from "react";
 import { FileIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AttachmentPreview } from "./attachment-preview";
-import type { messageBubble_message$data } from "../../__generated__/messageBubble_message.graphql";
+import type { messageBubble_message$data } from "../__generated__/messageBubble_message.graphql";
 
 type Attachment = NonNullable<
   messageBubble_message$data["attachments"]

@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Message } from "@/entities/chat/model/types";
-import type { messageBubble_message$data } from "@/features/chat/ui/__generated__/messageBubble_message.graphql";
+import type { messageBubble_message$data } from "@/features/chat/ui/message-bubble/__generated__/messageBubble_message.graphql";
 import { Terminal, Copy, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";

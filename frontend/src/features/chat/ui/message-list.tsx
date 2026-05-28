@@ -16,7 +16,7 @@ import type {
   messageList_metadata$key,
   messageList_metadata$data,
 } from "./__generated__/messageList_metadata.graphql";
-import type { messageBubble_message$data } from "./__generated__/messageBubble_message.graphql";
+import type { messageBubble_message$data } from "@/features/chat/ui/message-bubble/__generated__/messageBubble_message.graphql";
 
 interface MessageListProps {
   chatId: string;

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<3b48ccdba1bfec91a7b2fd43133ccd1f>>
+ * @generated SignedSource<<8d2c33df32513aad53218e30c5e0b0a9>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -201,6 +201,13 @@ return {
                   {
                     "alias": null,
                     "args": null,
+                    "kind": "ScalarField",
+                    "name": "isEdited",
+                    "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
                     "concreteType": "Attachment",
                     "kind": "LinkedField",
                     "name": "attachments",
@@ -272,13 +279,6 @@ return {
                       }
                     ],
                     "storageKey": null
-                  },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "isEdited",
-                    "storageKey": null
                   }
                 ],
                 "storageKey": null
@@ -314,12 +314,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "28a605bdbbc8dd1ed5d1d489e5cb1549",
+    "cacheID": "6addf33d10f1256cb7c653c3c5b6f9c1",
     "id": null,
     "metadata": {},
     "name": "useMessagesQuery",
     "operationKind": "query",
-    "text": "query useMessagesQuery(\n  $chatId: ID!\n  $count: Int!\n  $cursor: Long\n) {\n  ...useMessages_history_2v0QF4\n}\n\nfragment messageBubble_message on Message {\n  id\n  text\n  sentAt\n  sequence\n  attachments {\n    id\n    url\n    fileName\n    fileSize\n    contentType\n  }\n  sender {\n    id\n    firstName\n    lastName\n    username\n    photoUrl\n  }\n  replyTo {\n    id\n    text\n    sender {\n      firstName\n      lastName\n      id\n    }\n  }\n}\n\nfragment messageList_message on Message {\n  id\n  sentAt\n  sender {\n    id\n  }\n  ...messageBubble_message\n}\n\nfragment messageList_metadata on Message {\n  id\n  sentAt\n  sender {\n    id\n  }\n  ...messageList_message\n  ...messageList_prevMessage\n  ...messageList_nextMessage\n}\n\nfragment messageList_nextMessage on Message {\n  sender {\n    id\n  }\n}\n\nfragment messageList_prevMessage on Message {\n  sender {\n    id\n  }\n}\n\nfragment useMessages_history_2v0QF4 on Query {\n  messageHistory(chatId: $chatId, limit: $count, beforeSequence: $cursor) {\n    __typename\n    ... on MessageConnection {\n      messages {\n        id\n        ...messageList_metadata\n        text\n        sentAt\n        sequence\n        isEdited\n        attachments {\n          id\n          type\n          url\n          fileName\n          fileSize\n          contentType\n        }\n        sender {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n        }\n        replyTo {\n          id\n          text\n          sender {\n            id\n            firstName\n            lastName\n            displayName\n          }\n        }\n      }\n      hasMore\n    }\n    ... on NotFoundError {\n      message\n    }\n  }\n}\n"
+    "text": "query useMessagesQuery(\n  $chatId: ID!\n  $count: Int!\n  $cursor: Long\n) {\n  ...useMessages_history_2v0QF4\n}\n\nfragment messageBubble_message on Message {\n  id\n  text\n  sentAt\n  sequence\n  isEdited\n  attachments {\n    id\n    url\n    fileName\n    fileSize\n    contentType\n  }\n  sender {\n    id\n    firstName\n    lastName\n    username\n    photoUrl\n  }\n  replyTo {\n    id\n    text\n    sender {\n      firstName\n      lastName\n      id\n    }\n  }\n}\n\nfragment messageList_message on Message {\n  id\n  sentAt\n  sender {\n    id\n  }\n  ...messageBubble_message\n}\n\nfragment messageList_metadata on Message {\n  id\n  sentAt\n  sender {\n    id\n  }\n  ...messageList_message\n  ...messageList_prevMessage\n  ...messageList_nextMessage\n}\n\nfragment messageList_nextMessage on Message {\n  sender {\n    id\n  }\n}\n\nfragment messageList_prevMessage on Message {\n  sender {\n    id\n  }\n}\n\nfragment useMessages_history_2v0QF4 on Query {\n  messageHistory(chatId: $chatId, limit: $count, beforeSequence: $cursor) {\n    __typename\n    ... on MessageConnection {\n      messages {\n        id\n        ...messageList_metadata\n        text\n        sentAt\n        sequence\n        isEdited\n        attachments {\n          id\n          type\n          url\n          fileName\n          fileSize\n          contentType\n        }\n        sender {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n        }\n        replyTo {\n          id\n          text\n          sender {\n            id\n            firstName\n            lastName\n            displayName\n          }\n        }\n      }\n      hasMore\n    }\n    ... on NotFoundError {\n      message\n    }\n  }\n}\n"
   }
 };
 })();

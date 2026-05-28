@@ -30,7 +30,7 @@ import type { useMarkDialog_chat$key } from "@/features/chat/lib/chat/__generate
 import type { useMeQuery$data } from "@/features/chat/lib/common/__generated__/useMeQuery.graphql";
 import type { chatHeader_user$key } from "@/features/chat/ui/__generated__/chatHeader_user.graphql";
 import type { useChatsDetailsQuery$data } from "@/features/chat/lib/chat/__generated__/useChatsDetailsQuery.graphql";
-import type { messageBubble_message$data } from "@/features/chat/ui/__generated__/messageBubble_message.graphql";
+import type { messageBubble_message$data } from "@/features/chat/ui/message-bubble/__generated__/messageBubble_message.graphql";
 import type { messageList_metadata$key } from "@/features/chat/ui/__generated__/messageList_metadata.graphql";
 
 type ChatNode = Extract<

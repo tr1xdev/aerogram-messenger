@@ -5,8 +5,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
-import type { messageBubble_message$data } from "../../__generated__/messageBubble_message.graphql";
-
+import type { messageBubble_message$data } from "../__generated__/messageBubble_message.graphql";
 interface MessageContextMenuContentProps {
   message: messageBubble_message$data;
   isMe: boolean;
