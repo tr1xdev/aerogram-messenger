@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<221b36d6d4999976a9000cb38fc3fda0>>
+ * @generated SignedSource<<cf90465762faf8802f0e916b78cb9329>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -19,6 +19,7 @@ export type messageBubble_message$data = {
     readonly url: string;
   }> | null | undefined;
   readonly id: string;
+  readonly isEdited: boolean;
   readonly replyTo: {
     readonly id: string;
     readonly sender: {
@@ -93,6 +94,13 @@ return {
       "args": null,
       "kind": "ScalarField",
       "name": "sequence",
+      "storageKey": null
+    },
+    {
+      "alias": null,
+      "args": null,
+      "kind": "ScalarField",
+      "name": "isEdited",
       "storageKey": null
     },
     {
@@ -195,6 +203,6 @@ return {
 };
 })();
 
-(node as any).hash = "504c7752f7a454d58bd23737400bb6d3";
+(node as any).hash = "1940ed91b0b79b5bf84629a7f53236c2";
 
 export default node;
