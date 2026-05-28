@@ -139,6 +139,8 @@ export function ChatMenuItem({
   const senderName: string | null = useMemo((): string | null => {
     if (!lastMessage?.sender || chat.type === "CHANNEL") return null;
     if (isMe) return "You";
+    if (chat.type === "PRIVATE") return null;
+
     const s = lastMessage.sender;
     return (
       `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() || s.username || null
