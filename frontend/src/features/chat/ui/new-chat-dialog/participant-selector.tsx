@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo, useCallback } from "react";
 import type { ReactElement, ChangeEvent } from "react";
-import { Search, Check } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,130 +23,157 @@ interface SearchResponse {
 }
 
 interface ParticipantSelectorProps {
-  isMulti?: boolean;
   onSelect: (ids: string[]) => void;
   onBack?: () => void;
   excludeIds?: string[];
+  currentUserId?: string;
+  currentUsername?: string;
 }
 
+interface UserRowProps {
+  user: SearchedUser;
+  onSelect: (id: string) => void;
+}
+
+const UserRow = memo(function UserRow({
+  user,
+  onSelect,
+}: UserRowProps): ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={(): void => onSelect(user.id)}
+      className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 transition-all hover:bg-muted/60 active:scale-[0.98] text-left"
+    >
+      <Avatar className="h-8 w-8 rounded-full border border-border/40">
+        <AvatarImage src={user.photoUrl ?? undefined} />
+        <AvatarFallback className="text-[10px] font-medium bg-background text-muted-foreground">
+          {(user.firstName?.[0] || user.username?.[0] || "?").toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 overflow-hidden">
+        <p className="text-xs font-normal tracking-tight text-foreground truncate">
+          {user.firstName} {user.lastName ?? ""}
+        </p>
+        {user.username && (
+          <p className="text-[10px] text-muted-foreground/80 truncate font-mono mt-0.5">
+            @{user.username}
+          </p>
+        )}
+      </div>
+    </button>
+  );
+});
+
 export function ParticipantSelector({
-  isMulti,
   onSelect,
   onBack,
   excludeIds = [],
+  currentUserId,
+  currentUsername,
 }: ParticipantSelectorProps): ReactElement {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedQuery, setDebouncedQuery] = useState<string>("");
-  const [selected, setSelected] = useState<string[]>([]);
 
   useEffect((): (() => void) => {
     const handler: number = window.setTimeout((): void => {
       setDebouncedQuery(searchTerm);
-    }, 300);
+    }, 200);
     return (): void => window.clearTimeout(handler);
   }, [searchTerm]);
 
   const data = useSearchUsers(debouncedQuery) as SearchResponse | null;
 
-  const toggleUser = (id: string): void => {
-    if (!isMulti) {
+  const handleInputChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>): void => {
+      setSearchTerm(e.target.value);
+    },
+    [],
+  );
+
+  const handleUserSelect = useCallback(
+    (id: string): void => {
       onSelect([id]);
-      return;
-    }
-    setSelected((prev: string[]): string[] =>
-      prev.includes(id)
-        ? prev.filter((i: string): boolean => i !== id)
-        : [...prev, id],
-    );
-  };
+    },
+    [onSelect],
+  );
 
   const users: readonly SearchedUser[] =
     useMemo((): readonly SearchedUser[] => {
       const rawResults = data?.searchGlobal?.results ?? [];
-      return rawResults.filter(
-        (u: SearchedUser): boolean =>
-          u.__typename === "User" && !excludeIds.includes(u.id),
-      );
-    }, [data?.searchGlobal?.results, excludeIds]);
+      return rawResults.filter((u: SearchedUser): boolean => {
+        if (u.__typename !== "User") return false;
+
+        const isSelfId =
+          currentUserId && String(u.id).trim() === String(currentUserId).trim();
+        const isSelfUsername =
+          currentUsername &&
+          u.username &&
+          u.username.toLowerCase().trim() ===
+            currentUsername.toLowerCase().trim();
+
+        return !isSelfId && !isSelfUsername && !excludeIds.includes(u.id);
+      });
+    }, [
+      data?.searchGlobal?.results,
+      excludeIds,
+      currentUserId,
+      currentUsername,
+    ]);
 
   return (
-    <div className="space-y-4 py-4">
+    <div className="space-y-3 py-1">
       <div className="relative">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
         <Input
           placeholder="Search users..."
-          className="pl-9"
+          className="pl-9 h-9 rounded-lg text-xs bg-muted/40 border-border/50 focus-visible:ring-1 focus-visible:ring-border"
           value={searchTerm}
-          onChange={(e: ChangeEvent<HTMLInputElement>): void =>
-            setSearchTerm(e.target.value)
-          }
+          onChange={handleInputChange}
         />
       </div>
 
-      <ScrollArea className="h-[300px] pr-4">
-        <div className="space-y-1">
-          {users.map(
-            (user: SearchedUser): ReactElement => (
-              <button
-                key={user.id}
-                type="button"
-                onClick={(): void => toggleUser(user.id)}
-                className="flex w-full items-center gap-3 rounded-lg p-2 transition-colors hover:bg-accent text-left"
-              >
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={user.photoUrl ?? undefined} />
-                  <AvatarFallback>
-                    {(
-                      user.firstName?.[0] ||
-                      user.username?.[0] ||
-                      "?"
-                    ).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 overflow-hidden">
-                  <p className="text-sm font-bold leading-none truncate">
-                    {user.firstName} {user.lastName ?? ""}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-1 truncate uppercase font-medium">
-                    {user.username ? `@${user.username}` : ""}
-                  </p>
-                </div>
-                {selected.includes(user.id) && (
-                  <div className="rounded-full bg-primary p-1 text-primary-foreground">
-                    <Check className="h-3 w-3" />
-                  </div>
-                )}
-              </button>
-            ),
+      <ScrollArea className="h-[240px] -mx-1 px-1">
+        <div className="h-full space-y-0.5">
+          {!searchTerm && (
+            <div className="flex flex-col items-center justify-center h-[220px] text-center p-4 animate-in fade-in duration-200">
+              <Users className="h-5 w-5 text-muted-foreground/40 stroke-[1.5] mb-2" />
+              <p className="text-xs font-normal text-muted-foreground/70 tracking-tight">
+                Type a name or username to start chatting
+              </p>
+            </div>
           )}
+
+          {searchTerm &&
+            users.map(
+              (user: SearchedUser): ReactElement => (
+                <UserRow
+                  key={user.id}
+                  user={user}
+                  onSelect={handleUserSelect}
+                />
+              ),
+            )}
+
           {debouncedQuery && users.length === 0 && (
-            <p className="text-center text-xs text-muted-foreground py-8 font-bold uppercase">
-              No users found
+            <p className="text-center text-[11px] text-muted-foreground/70 py-16 tracking-tight">
+              No results found
             </p>
           )}
         </div>
       </ScrollArea>
 
-      <div className="flex gap-3 pt-2 border-t">
-        {onBack && (
+      {onBack && (
+        <div className="pt-2 border-t border-border/40">
           <Button
             variant="ghost"
-            className="flex-1 text-[10px] font-black uppercase"
+            className="w-full h-8.5 text-xs rounded-lg text-muted-foreground hover:text-foreground"
             onClick={onBack}
           >
             Back
           </Button>
-        )}
-        {isMulti && (
-          <Button
-            className="flex-1 text-[10px] font-black uppercase"
-            disabled={selected.length === 0}
-            onClick={(): void => onSelect(selected)}
-          >
-            Add {selected.length} members
-          </Button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
