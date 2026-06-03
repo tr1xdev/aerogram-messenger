@@ -5,6 +5,7 @@ import {
   type ReactNode,
   type CSSProperties,
 } from "react";
+import { Bookmark } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { getUserColorInfo, type ColorInfo } from "@/lib/user-colors";
@@ -16,6 +17,7 @@ interface UserAvatarProps {
   userId?: string;
   size?: number;
   color?: string;
+  isSavedMessages?: boolean;
 }
 
 export const UserAvatar = memo(function UserAvatar({
@@ -25,6 +27,7 @@ export const UserAvatar = memo(function UserAvatar({
   userId,
   size = 40,
   color,
+  isSavedMessages = false,
 }: UserAvatarProps): ReactNode {
   const [hasError, setHasError] = useState<boolean>(false);
 
@@ -32,6 +35,10 @@ export const UserAvatar = memo(function UserAvatar({
     content: string;
     isEmoji: boolean;
   } => {
+    if (isSavedMessages) {
+      return { content: "", isEmoji: false };
+    }
+
     const trimmed: string = fallback.trim() || "?";
     const segments: string[] = Array.from(trimmed);
     const firstChar: string = segments[0] || "?";
@@ -50,7 +57,7 @@ export const UserAvatar = memo(function UserAvatar({
       .slice(0, 2);
 
     return { content: initials || "?", isEmoji: false };
-  }, [fallback]);
+  }, [fallback, isSavedMessages]);
 
   const colorInfo: ColorInfo = useMemo(
     (): ColorInfo => getUserColorInfo(userId, fallback),
@@ -76,7 +83,7 @@ export const UserAvatar = memo(function UserAvatar({
     [color, colorInfo.start, colorInfo.end, isEmoji, size],
   );
 
-  const showImage: boolean = !!(src && !hasError);
+  const showImage: boolean = !!(src && !hasError && !isSavedMessages);
 
   return (
     <Avatar
@@ -103,7 +110,14 @@ export const UserAvatar = memo(function UserAvatar({
           )}
           style={fallbackStyle}
         >
-          {content}
+          {isSavedMessages ? (
+            <Bookmark
+              className="fill-current"
+              style={{ width: size * 0.5, height: size * 0.5 }}
+            />
+          ) : (
+            content
+          )}
         </AvatarFallback>
       )}
     </Avatar>

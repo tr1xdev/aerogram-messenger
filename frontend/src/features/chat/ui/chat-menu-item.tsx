@@ -119,14 +119,22 @@ export function ChatMenuItem({
   const otherUser = otherMember?.user;
   const isPrivate: boolean = chat.type === "PRIVATE";
 
-  const displayName: string = useMemo((): string => {
+  const isSavedMessages = useMemo((): boolean => {
+    if (!isPrivate || !chat.members) return false;
+    return !chat.members.some((m: ChatMember): boolean => m.user?.id !== myId);
+  }, [isPrivate, chat.members, myId]);
+
+  const displayName = useMemo((): string => {
+    if (isSavedMessages) {
+      return "Saved Messages";
+    }
     if (isPrivate && otherUser) {
       const full: string =
         `${otherUser.firstName ?? ""} ${otherUser.lastName ?? ""}`.trim();
       return full || otherUser.username || chat.title || "Chat";
     }
     return chat.title || "Chat";
-  }, [chat.title, isPrivate, otherUser]);
+  }, [chat.title, isPrivate, otherUser, isSavedMessages]);
 
   const avatarUrl: string | undefined = isPrivate
     ? (otherUser?.photoUrl ?? undefined)
@@ -137,7 +145,8 @@ export function ChatMenuItem({
   const isOnline: boolean = otherUser?.status === "online";
 
   const senderName: string | null = useMemo((): string | null => {
-    if (!lastMessage?.sender || chat.type === "CHANNEL") return null;
+    if (!lastMessage?.sender || chat.type === "CHANNEL" || isSavedMessages)
+      return null;
     if (isMe) return "You";
     if (chat.type === "PRIVATE") return null;
 
@@ -145,7 +154,7 @@ export function ChatMenuItem({
     return (
       `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() || s.username || null
     );
-  }, [lastMessage, chat.type, isMe]);
+  }, [lastMessage, chat.type, isMe, isSavedMessages]);
 
   const handleTogglePin = (pinned: boolean): void => {
     handleTogglePinInternal(pinned);
@@ -232,8 +241,9 @@ export function ChatMenuItem({
                       src={avatarUrl}
                       fallback={displayName}
                       size={56}
+                      isSavedMessages={isSavedMessages}
                     />
-                    {isPrivate && isOnline && (
+                    {isPrivate && isOnline && !isSavedMessages && (
                       <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500 z-10" />
                     )}
                   </div>
@@ -244,9 +254,11 @@ export function ChatMenuItem({
                         <span className="text-[15px] font-semibold truncate text-foreground/90">
                           {displayName}
                         </span>
-                        {isPrivate && otherUser?.isVerified && (
-                          <MdVerified className="text-blue-500 shrink-0 text-sm" />
-                        )}
+                        {isPrivate &&
+                          otherUser?.isVerified &&
+                          !isSavedMessages && (
+                            <MdVerified className="text-blue-500 shrink-0 text-sm" />
+                          )}
                       </div>
                       {lastMessage && (
                         <div className="flex items-center gap-1.5 shrink-0">

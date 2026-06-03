@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { graphql, useFragment } from "react-relay";
 import {
   ChevronLeft,
@@ -36,6 +36,7 @@ const ChatHeaderUserFragment = graphql`
     firstName
     lastName
     displayName
+    username
     isTyping
     isVerified
   }
@@ -52,7 +53,7 @@ interface ChatHeaderProps {
   membersCount?: number;
 }
 
-export const ChatHeader = memo(function ChatHeader({
+export function ChatHeader({
   id,
   title,
   photoUrl,
@@ -66,12 +67,11 @@ export const ChatHeader = memo(function ChatHeader({
   const [now, setNow] = useState<number>((): number => Date.now());
   const user = useFragment(ChatHeaderUserFragment, userRef);
 
+  const isSavedMessages: boolean =
+    type === "PRIVATE" && (title === "Saved Messages" || !userRef);
   const isTyping: boolean = user?.isTyping ?? false;
   const rawStatus: string = user?.status ?? "offline";
-  const isOnline: boolean = useMemo(
-    (): boolean => rawStatus.toLowerCase() === "online",
-    [rawStatus],
-  );
+  const isOnline: boolean = rawStatus.toLowerCase() === "online";
 
   useEffect((): (() => void) | void => {
     const interval: ReturnType<typeof setInterval> = setInterval((): void => {
@@ -80,54 +80,58 @@ export const ChatHeader = memo(function ChatHeader({
     return (): void => clearInterval(interval);
   }, []);
 
-  const statusText: string = useMemo((): string => {
-    if (type === "CHANNEL" || type === "GROUP") {
-      return `${membersCount} ${membersCount === 1 ? "member" : "members"}`;
-    }
-    if (isTyping) return "typing...";
-    return formatLastSeen(rawStatus, new Date(now));
-  }, [type, membersCount, isTyping, rawStatus, now]);
+  let statusText: string = formatLastSeen(rawStatus, new Date(now));
+  if (isSavedMessages) {
+    statusText = user?.username ? `@${user.username}` : "";
+  } else if (type === "CHANNEL" || type === "GROUP") {
+    statusText = `${membersCount} ${membersCount === 1 ? "member" : "members"}`;
+  } else if (isTyping) {
+    statusText = "typing...";
+  }
 
-  const effectivePhotoUrl: string | undefined = useMemo(():
-    | string
-    | undefined => {
-    return photoUrl || user?.photoUrl || undefined;
-  }, [user?.photoUrl, photoUrl]);
+  const effectivePhotoUrl: string | undefined = isSavedMessages
+    ? undefined
+    : photoUrl || user?.photoUrl || undefined;
 
-  const showVerifiedBadge: boolean = useMemo((): boolean => {
-    if (type === "PRIVATE") {
-      return user?.isVerified ?? false;
-    }
-    return false;
-  }, [type, user?.isVerified]);
+  const showVerifiedBadge: boolean =
+    !isSavedMessages && type === "PRIVATE" && (user?.isVerified ?? false);
 
   const renderInfo = (): ReactNode => (
-    <div className="flex items-center gap-3 overflow-hidden ml-2 md:ml-0 cursor-pointer hover:opacity-80 transition-opacity text-left">
+    <div
+      className={cn(
+        "flex items-center gap-3 overflow-hidden ml-2 md:ml-0 text-left",
+        !isSavedMessages &&
+          "cursor-pointer hover:opacity-80 transition-opacity",
+      )}
+    >
       <UserAvatar
         src={effectivePhotoUrl}
-        fallback={title || "Chat"}
+        fallback={isSavedMessages ? "Saved Messages" : title || "Chat"}
         size={40}
         className="border border-border/40"
+        isSavedMessages={isSavedMessages}
       />
       <div className="flex flex-col min-w-0 py-0.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[15px] font-bold truncate leading-tight">
-            {title}
+            {isSavedMessages ? "Saved Messages" : title}
           </span>
           {showVerifiedBadge && (
             <MdVerified className="text-[#2196f3] shrink-0 text-[16px] self-center" />
           )}
         </div>
-        <span
-          className={cn(
-            "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",
-            type === "PRIVATE" && (isTyping || isOnline)
-              ? "text-primary"
-              : "text-muted-foreground",
-          )}
-        >
-          {statusText}
-        </span>
+        {statusText && (
+          <span
+            className={cn(
+              "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",
+              type === "PRIVATE" && !isSavedMessages && (isTyping || isOnline)
+                ? "text-primary"
+                : "text-muted-foreground",
+            )}
+          >
+            {statusText}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -161,6 +165,8 @@ export const ChatHeader = memo(function ChatHeader({
               <Skeleton className="h-3 w-16" />
             </div>
           </div>
+        ) : isSavedMessages ? (
+          <div>{renderInfo()}</div>
         ) : (
           <ChatEntityDetails
             id={type === "PRIVATE" ? (user?.id ?? id) : id}
@@ -172,22 +178,26 @@ export const ChatHeader = memo(function ChatHeader({
       </div>
 
       <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={isLoading}
-          className="hidden sm:flex text-muted-foreground"
-        >
-          <Phone className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={isLoading}
-          className="hidden sm:flex text-muted-foreground"
-        >
-          <Video className="h-5 w-5" />
-        </Button>
+        {!isSavedMessages && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={isLoading}
+              className="hidden sm:flex text-muted-foreground"
+            >
+              <Phone className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={isLoading}
+              className="hidden sm:flex text-muted-foreground"
+            >
+              <Video className="h-5 w-5" />
+            </Button>
+          </>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -212,7 +222,7 @@ export const ChatHeader = memo(function ChatHeader({
                 Mute notifications
               </span>
             </DropdownMenuItem>
-            {type === "PRIVATE" && (
+            {type === "PRIVATE" && !isSavedMessages && (
               <DropdownMenuItem>
                 <Shield className="mr-2 h-4 w-4" />
                 <span className="text-xs font-bold uppercase">
@@ -221,10 +231,12 @@ export const ChatHeader = memo(function ChatHeader({
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
-              <Ban className="mr-2 h-4 w-4" />
-              <span className="text-xs font-bold uppercase">Block</span>
-            </DropdownMenuItem>
+            {!isSavedMessages && (
+              <DropdownMenuItem className="text-destructive focus:text-destructive">
+                <Ban className="mr-2 h-4 w-4" />
+                <span className="text-xs font-bold uppercase">Block</span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               <span className="text-xs font-bold uppercase">Delete chat</span>
@@ -234,4 +246,4 @@ export const ChatHeader = memo(function ChatHeader({
       </div>
     </header>
   );
-});
+}
