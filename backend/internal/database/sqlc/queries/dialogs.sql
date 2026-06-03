@@ -246,3 +246,14 @@ SELECT EXISTS (
       AND d.type = 'private'
       AND d.deleted_at IS NULL
 );
+
+-- name: GetSavedMessagesDialog :one
+SELECT d.*
+FROM dialogs d
+JOIN dialog_members dm ON d.id = dm.dialog_id
+WHERE d.type = 'private'
+  AND d.members_count = 1
+  AND dm.user_id = $1
+  AND d.is_active = true
+  AND d.deleted_at IS NULL
+LIMIT 1;

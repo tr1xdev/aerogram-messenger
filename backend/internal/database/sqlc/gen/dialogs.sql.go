@@ -551,6 +551,45 @@ func (q *Queries) GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateD
 	return i, err
 }
 
+const getSavedMessagesDialog = `-- name: GetSavedMessagesDialog :one
+SELECT d.id, d.type, d.name, d.username, d.photo_url, d.bio, d.description, d.invite_link, d.pinned_message_id, d.creator_id, d.last_message_id, d.last_message_at, d.members_count, d.is_verified, d.is_private, d.is_active, d.created_at, d.updated_at, d.deleted_at
+FROM dialogs d
+JOIN dialog_members dm ON d.id = dm.dialog_id
+WHERE d.type = 'private'
+  AND d.members_count = 1
+  AND dm.user_id = $1
+  AND d.is_active = true
+  AND d.deleted_at IS NULL
+LIMIT 1
+`
+
+func (q *Queries) GetSavedMessagesDialog(ctx context.Context, userID uuid.UUID) (Dialog, error) {
+	row := q.db.QueryRowContext(ctx, getSavedMessagesDialog, userID)
+	var i Dialog
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Name,
+		&i.Username,
+		&i.PhotoUrl,
+		&i.Bio,
+		&i.Description,
+		&i.InviteLink,
+		&i.PinnedMessageID,
+		&i.CreatorID,
+		&i.LastMessageID,
+		&i.LastMessageAt,
+		&i.MembersCount,
+		&i.IsVerified,
+		&i.IsPrivate,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const getUserDialogs = `-- name: GetUserDialogs :many
 SELECT
     d.id, d.type, d.name, d.username, d.photo_url, d.members_count,

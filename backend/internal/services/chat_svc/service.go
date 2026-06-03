@@ -131,19 +131,46 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 		if len(req.ParticipantIds) != 2 {
 			return nil, status.Error(codes.InvalidArgument, "private chat requires exactly 2 participants")
 		}
-		p1, p2 := helpers.ToRawID(req.ParticipantIds[0]), helpers.ToRawID(req.ParticipantIds[1])
-		if diag, err := s.dialogRepo.GetPrivateDialogByMembers(ctx, p1, p2); err == nil {
-			return &chatpb.CreateChatResponse{Chat: s.mapDBDialogToProto(diag, 0, "member", 0)}, nil
+
+		p1Raw, p2Raw := helpers.ToRawID(req.ParticipantIds[0]), helpers.ToRawID(req.ParticipantIds[1])
+
+		if _, err := uuid.Parse(p1Raw); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid participant id 1: %s", p1Raw)
+		}
+		if _, err := uuid.Parse(p2Raw); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid participant id 2: %s", p2Raw)
+		}
+
+		if p1Raw == p2Raw {
+			if p1Raw != creatorID.String() {
+				return nil, status.Error(codes.InvalidArgument, "cannot create a private chat between another user and themselves")
+			}
+
+			if diag, err := s.dialogRepo.GetSavedMessagesDialog(ctx, p1Raw); err == nil {
+				proto := s.mapDBDialogToProto(diag, 0, "owner", 0)
+				proto.CanWrite = true
+				proto.Permissions = s.calculatePermissions(diag.Type, 0, "owner")
+				return &chatpb.CreateChatResponse{Chat: proto}, nil
+			}
+		} else {
+			if diag, err := s.dialogRepo.GetPrivateDialogByMembers(ctx, p1Raw, p2Raw); err == nil {
+				proto := s.mapDBDialogToProto(diag, 0, "member", 0)
+				return &chatpb.CreateChatResponse{Chat: proto}, nil
+			}
 		}
 	}
 
 	newID := uuid.New()
 	participants := make(map[uuid.UUID]bool)
 	participants[creatorID] = true
+
 	for _, pid := range req.ParticipantIds {
-		if pUUID, err := uuid.Parse(helpers.ToRawID(pid)); err == nil {
-			participants[pUUID] = true
+		rawID := helpers.ToRawID(pid)
+		pUUID, err := uuid.Parse(rawID)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid participant id structure: %s", rawID)
 		}
+		participants[pUUID] = true
 	}
 
 	dParams := dbgen.CreateDialogParams{
@@ -163,7 +190,10 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 			role = "owner"
 		}
 		mParams = append(mParams, dbgen.AddDialogMemberParams{
-			DialogID: newID, UserID: pUUID, Role: role, NotificationsOn: true,
+			DialogID:        newID,
+			UserID:          pUUID,
+			Role:            role,
+			NotificationsOn: true,
 		})
 	}
 
@@ -173,24 +203,32 @@ func (s *Server) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) 
 	}
 
 	err = s.dialogRepo.CreateDialog(ctx, dParams, mParams, dbgen.CreateDialogSettingsParams{
-		DialogID: newID, Permissions: defaultPerms,
+		DialogID:    newID,
+		Permissions: defaultPerms,
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "transaction failed")
+		return nil, status.Error(codes.Internal, "failed to execute database transaction")
 	}
 
 	dialog, err := s.dialogRepo.GetDialogByID(ctx, newID.String(), creatorID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to retrieve created chat")
+		return nil, status.Error(codes.Internal, "failed to retrieve newly created chat metadata")
 	}
 
-	proto := s.mapDBDialogToProto(dialog, defaultPerms, "owner", 0)
-	proto.CanWrite = true
-	proto.Permissions = s.calculatePermissions(dialog.Type, defaultPerms, "owner")
+	creatorRole := "member"
+	if participants[creatorID] {
+		creatorRole = "owner"
+	}
 
-	payload, _ := json.Marshal(proto)
-	for pUUID := range participants {
-		s.rdb.Publish(ctx, fmt.Sprintf("user_chats:%s", pUUID), payload)
+	proto := s.mapDBDialogToProto(dialog, defaultPerms, creatorRole, 0)
+	proto.CanWrite = true
+	proto.Permissions = s.calculatePermissions(dialog.Type, defaultPerms, creatorRole)
+
+	payload, err := json.Marshal(proto)
+	if err == nil {
+		for pUUID := range participants {
+			s.rdb.Publish(ctx, fmt.Sprintf("user_chats:%s", pUUID), payload)
+		}
 	}
 
 	return &chatpb.CreateChatResponse{Chat: proto}, nil
@@ -447,10 +485,8 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 		}
 	}
 
-
 	proto := s.mapDBDialogToProto(dialog, perms, role, lastRead)
 	proto.CanWrite = s.calculateCanWrite(dialog.Type, perms, role, dialog.IsActive)
-
 
 	proto.Permissions = s.calculatePermissions(dialog.Type, perms, role)
 

@@ -201,3 +201,11 @@ func (r *DialogRepository) DeleteChat(ctx context.Context, dialogID, userID uuid
 
 	return tx.Commit()
 }
+
+func (r *DialogRepository) GetSavedMessagesDialog(ctx context.Context, userID string) (dbgen.Dialog, error) {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return dbgen.Dialog{}, err
+	}
+	return r.db.Queries.GetSavedMessagesDialog(ctx, userUUID)
+}

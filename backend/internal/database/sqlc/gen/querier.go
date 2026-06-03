@@ -54,6 +54,7 @@ type Querier interface {
 	GetMessageBySequence(ctx context.Context, arg GetMessageBySequenceParams) (Message, error)
 	GetMessagesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Message, error)
 	GetPrivateDialogByMembers(ctx context.Context, arg GetPrivateDialogByMembersParams) (Dialog, error)
+	GetSavedMessagesDialog(ctx context.Context, userID uuid.UUID) (Dialog, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	GetUserByBotToken(ctx context.Context, botTokenHash sql.NullString) (User, error)
