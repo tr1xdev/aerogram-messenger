@@ -1,11 +1,12 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
+import { useLazyLoadQuery, graphql } from "react-relay";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription, // Добавили импорт
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { ChatTypeSelector } from "./chat-type-selector";
 import { ChatDetailsForm } from "./chat-details-form";
@@ -13,6 +14,16 @@ import { ParticipantSelector } from "./participant-selector";
 import { useChatActions } from "../../lib/chat/use-chat-management";
 import { useNavigate } from "@tanstack/react-router";
 import type { ChatType } from "../../lib/chat/__generated__/useChatManagementCreateComplexMutation.graphql";
+import type { newChatDialogQuery } from "./__generated__/newChatDialogQuery.graphql";
+
+const meQuery = graphql`
+  query newChatDialogQuery {
+    me {
+      id
+      username
+    }
+  }
+`;
 
 type Step = "TYPE" | "DETAILS" | "PARTICIPANTS";
 type ChatDialogMode = "SELECT" | "GROUP" | "CHANNEL";
@@ -28,34 +39,28 @@ interface NewChatDialogProps {
   initialMode?: ChatDialogMode;
 }
 
-export function NewChatDialog({
-  open,
+interface NewChatDialogInnerProps extends NewChatDialogProps {
+  readonly meData: newChatDialogQuery["response"];
+}
+
+function NewChatDialogInner({
   onOpenChange,
   initialMode = "SELECT",
-}: NewChatDialogProps): ReactElement {
-  const [step, setStep] = useState<Step>("TYPE");
-  const [type, setType] = useState<ChatType>("PRIVATE");
-  const [details, setDetails] = useState<ChatFormData | null>(null);
-  const [prevOpen, setPrevOpen] = useState<boolean>(open);
+  meData,
+}: NewChatDialogInnerProps): ReactElement {
+  const [type, setType] = useState<ChatType>((): ChatType => {
+    if (initialMode === "GROUP") return "GROUP";
+    if (initialMode === "CHANNEL") return "CHANNEL";
+    return "PRIVATE";
+  });
+
+  const [step, setStep] = useState<Step>((): Step => {
+    if (initialMode === "GROUP" || initialMode === "CHANNEL") return "DETAILS";
+    return "TYPE";
+  });
 
   const { createChat, createGroupOrChannel } = useChatActions();
   const navigate = useNavigate();
-
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    if (open) {
-      if (initialMode === "GROUP") {
-        setType("GROUP");
-        setStep("DETAILS");
-      } else if (initialMode === "CHANNEL") {
-        setType("CHANNEL");
-        setStep("DETAILS");
-      } else {
-        setType("PRIVATE");
-        setStep("TYPE");
-      }
-    }
-  }
 
   const handleFinish = (id: string): void => {
     onOpenChange(false);
@@ -65,20 +70,9 @@ export function NewChatDialog({
     });
   };
 
-  const handleCreate = (userIds: string[]): void => {
+  const handleCreatePrivate = (userIds: string[]): void => {
     if (type === "PRIVATE" && userIds.length > 0) {
       createChat(userIds[0], { onCompleted: handleFinish });
-    } else if ((type === "GROUP" || type === "CHANNEL") && details) {
-      // Теперь вызываем мутацию, а не просто лог
-      createGroupOrChannel(
-        {
-          type,
-          title: details.title,
-          slug: details.slug,
-          participantIds: userIds,
-        },
-        { onCompleted: handleFinish },
-      );
     }
   };
 
@@ -88,52 +82,71 @@ export function NewChatDialog({
   };
 
   const handleDetailsSubmit = (data: ChatFormData): void => {
-    setDetails(data);
-    setStep("PARTICIPANTS");
+    if (type === "GROUP" || type === "CHANNEL") {
+      createGroupOrChannel(
+        {
+          type,
+          title: data.title,
+          slug: data.slug,
+          participantIds: [],
+        },
+        { onCompleted: handleFinish },
+      );
+    }
   };
 
   return (
+    <DialogContent className="sm:max-w-[380px] rounded-2xl overflow-hidden p-5 gap-4 border">
+      <DialogHeader className="space-y-1">
+        <DialogTitle className="text-base font-semibold tracking-tight">
+          {step === "TYPE" && "New Message"}
+          {step === "DETAILS" && `New ${type.toLowerCase()}`}
+          {step === "PARTICIPANTS" && "Select User"}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          Create a new chat, group, or broadcast channel.
+        </DialogDescription>
+      </DialogHeader>
+
+      {step === "TYPE" && <ChatTypeSelector onSelect={handleTypeSelect} />}
+
+      {step === "DETAILS" && (type === "GROUP" || type === "CHANNEL") && (
+        <ChatDetailsForm
+          type={type}
+          onBack={(): void => setStep("TYPE")}
+          onSubmit={handleDetailsSubmit}
+        />
+      )}
+
+      {step === "PARTICIPANTS" && (
+        <ParticipantSelector
+          currentUserId={meData.me?.id}
+          currentUsername={meData.me?.username ?? undefined}
+          onBack={(): void => setStep("TYPE")}
+          onSelect={handleCreatePrivate}
+        />
+      )}
+    </DialogContent>
+  );
+}
+
+export function NewChatDialog(props: NewChatDialogProps): ReactElement {
+  const data = useLazyLoadQuery<newChatDialogQuery>(
+    meQuery,
+    {},
+    { fetchPolicy: "store-or-network" },
+  );
+
+  return (
     <Dialog
-      open={open}
+      open={props.open}
       onOpenChange={(o: boolean): void => {
-        onOpenChange(o);
-        if (!o) setStep("TYPE");
+        props.onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-[420px] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle>
-            {step === "TYPE" && "New Message"}
-            {step === "DETAILS" && `Create ${type.toLowerCase()}`}
-            {step === "PARTICIPANTS" &&
-              (type === "PRIVATE" ? "Select User" : "Add Members")}
-          </DialogTitle>
-          {/* Исправляет Warning: Missing Description */}
-          <DialogDescription className="sr-only">
-            Create a new chat, group, or broadcast channel.
-          </DialogDescription>
-        </DialogHeader>
-
-        {step === "TYPE" && <ChatTypeSelector onSelect={handleTypeSelect} />}
-
-        {step === "DETAILS" && (type === "GROUP" || type === "CHANNEL") && (
-          <ChatDetailsForm
-            type={type}
-            onBack={(): void => setStep("TYPE")}
-            onSubmit={handleDetailsSubmit}
-          />
-        )}
-
-        {step === "PARTICIPANTS" && (
-          <ParticipantSelector
-            isMulti={type !== "PRIVATE"}
-            onBack={(): void =>
-              setStep(type === "PRIVATE" ? "TYPE" : "DETAILS")
-            }
-            onSelect={handleCreate}
-          />
-        )}
-      </DialogContent>
+      {props.open && (
+        <NewChatDialogInner key={props.initialMode} {...props} meData={data} />
+      )}
     </Dialog>
   );
 }
