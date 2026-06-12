@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<f38dde23052c4cf1d8d35ebd11918650>>
+ * @generated SignedSource<<c5e0cef54aea65d867431ee574069c31>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -359,6 +359,47 @@ return {
                           (v12/*: any*/)
                         ],
                         "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "Attachment",
+                        "kind": "LinkedField",
+                        "name": "attachments",
+                        "plural": true,
+                        "selections": [
+                          (v0/*: any*/),
+                          (v8/*: any*/),
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "url",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "fileName",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "fileSize",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "contentType",
+                            "storageKey": null
+                          }
+                        ],
+                        "storageKey": null
                       }
                     ],
                     "storageKey": null
@@ -412,12 +453,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "f1c959c46f8688a688ebbf407f464808",
+    "cacheID": "ea59c4923aff7c484846fc004891105b",
     "id": null,
     "metadata": {},
     "name": "appSidebarQuery",
     "operationKind": "query",
-    "text": "query appSidebarQuery {\n  me {\n    id\n    username\n    firstName\n    lastName\n    photoUrl\n    isVerified\n    ...settingsDialog_user\n  }\n  myChats {\n    __typename\n    ... on ChatList {\n      chats {\n        id\n        title\n        type\n        photoUrl\n        unreadCount\n        isPinned\n        ...chatMenuItem_chat\n      }\n    }\n    ... on Error {\n      __isError: __typename\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment profileContent_user on User {\n  id\n  firstName\n  lastName\n  username\n  displayName\n  photoUrl\n  bio\n  isBot\n  isVerified\n  botDescription\n  botCommands\n  createdAt\n}\n\nfragment settingsDialog_user on User {\n  id\n  ...profileContent_user\n}\n"
+    "text": "query appSidebarQuery {\n  me {\n    id\n    username\n    firstName\n    lastName\n    photoUrl\n    isVerified\n    ...settingsDialog_user\n  }\n  myChats {\n    __typename\n    ... on ChatList {\n      chats {\n        id\n        title\n        type\n        photoUrl\n        unreadCount\n        isPinned\n        ...chatMenuItem_chat\n      }\n    }\n    ... on Error {\n      __isError: __typename\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n    attachments {\n      id\n      type\n      url\n      fileName\n      fileSize\n      contentType\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment profileContent_user on User {\n  id\n  firstName\n  lastName\n  username\n  displayName\n  photoUrl\n  bio\n  isBot\n  isVerified\n  botDescription\n  botCommands\n  createdAt\n}\n\nfragment settingsDialog_user on User {\n  id\n  ...profileContent_user\n}\n"
   }
 };
 })();

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<ddb37052efdfc9806c0ba2dd7d309389>>
+ * @generated SignedSource<<433b1f5114aa98e246d9157befd2896e>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -84,24 +84,31 @@ v6 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "photoUrl",
+  "name": "type",
   "storageKey": null
 },
 v7 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "firstName",
+  "name": "photoUrl",
   "storageKey": null
 },
 v8 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "lastName",
+  "name": "firstName",
   "storageKey": null
 },
 v9 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "lastName",
+  "storageKey": null
+},
+v10 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -198,14 +205,8 @@ return {
                     "name": "title",
                     "storageKey": null
                   },
-                  {
-                    "alias": null,
-                    "args": null,
-                    "kind": "ScalarField",
-                    "name": "type",
-                    "storageKey": null
-                  },
                   (v6/*: any*/),
+                  (v7/*: any*/),
                   {
                     "alias": null,
                     "args": null,
@@ -266,14 +267,55 @@ return {
                         "plural": false,
                         "selections": [
                           (v1/*: any*/),
-                          (v7/*: any*/),
                           (v8/*: any*/),
                           (v9/*: any*/),
+                          (v10/*: any*/),
                           {
                             "alias": null,
                             "args": null,
                             "kind": "ScalarField",
                             "name": "displayName",
+                            "storageKey": null
+                          }
+                        ],
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "concreteType": "Attachment",
+                        "kind": "LinkedField",
+                        "name": "attachments",
+                        "plural": true,
+                        "selections": [
+                          (v1/*: any*/),
+                          (v6/*: any*/),
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "url",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "fileName",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "fileSize",
+                            "storageKey": null
+                          },
+                          {
+                            "alias": null,
+                            "args": null,
+                            "kind": "ScalarField",
+                            "name": "contentType",
                             "storageKey": null
                           }
                         ],
@@ -299,10 +341,10 @@ return {
                         "plural": false,
                         "selections": [
                           (v1/*: any*/),
-                          (v7/*: any*/),
                           (v8/*: any*/),
                           (v9/*: any*/),
-                          (v6/*: any*/),
+                          (v10/*: any*/),
+                          (v7/*: any*/),
                           {
                             "alias": null,
                             "args": null,
@@ -338,12 +380,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "165f5aa72ef4a0db99e0821ff3cd5893",
+    "cacheID": "e6d0e630f74eaf7ffe7c4854a7247867",
     "id": null,
     "metadata": {},
     "name": "useChatsMyChatsQuery",
     "operationKind": "query",
-    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      ...useAppTitle_chats\n      chats {\n        id\n        unreadCount\n        ...chatMenuItem_chat\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useAppTitle_chats on ChatList {\n  chats {\n    unreadCount\n    id\n  }\n}\n"
+    "text": "query useChatsMyChatsQuery {\n  myChats {\n    __typename\n    ... on ChatList {\n      ...useAppTitle_chats\n      chats {\n        id\n        unreadCount\n        ...chatMenuItem_chat\n      }\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n  }\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n    attachments {\n      id\n      type\n      url\n      fileName\n      fileSize\n      contentType\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useAppTitle_chats on ChatList {\n  chats {\n    unreadCount\n    id\n  }\n}\n"
   }
 };
 })();

@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<d5b960cf70cb8a98d688b0211ec8c4c9>>
+ * @generated SignedSource<<3f45210e63d7156c62a61b64962b9714>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -500,6 +500,47 @@ return {
                       (v18/*: any*/)
                     ],
                     "storageKey": null
+                  },
+                  {
+                    "alias": null,
+                    "args": null,
+                    "concreteType": "Attachment",
+                    "kind": "LinkedField",
+                    "name": "attachments",
+                    "plural": true,
+                    "selections": [
+                      (v3/*: any*/),
+                      (v6/*: any*/),
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "url",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "fileName",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "fileSize",
+                        "storageKey": null
+                      },
+                      {
+                        "alias": null,
+                        "args": null,
+                        "kind": "ScalarField",
+                        "name": "contentType",
+                        "storageKey": null
+                      }
+                    ],
+                    "storageKey": null
                   }
                 ],
                 "storageKey": null
@@ -529,12 +570,12 @@ return {
     ]
   },
   "params": {
-    "cacheID": "cf3a87ad68a0d8114b8e353536781b8f",
+    "cacheID": "8763fff579940f2187aa569085cf5fc8",
     "id": null,
     "metadata": {},
     "name": "useChatsDetailsQuery",
     "operationKind": "query",
-    "text": "query useChatsDetailsQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      ...useMarkDialog_chat\n      ...chatMenuItem_chat\n      id\n      slug\n      title\n      type\n      photoUrl\n      membersCount\n      unreadCount\n      isPinned\n      lastReadSequence\n      myReadSequence\n      canWrite\n      myRole\n      permissions {\n        canSendMessage\n        canInviteUsers\n        canEditMetadata\n        canDeleteMessages\n        canAssignAdmins\n      }\n      members {\n        user {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n          isBot\n          status\n          isVerified\n          ...chatHeader_user\n        }\n      }\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment chatHeader_user on User {\n  id\n  status\n  photoUrl\n  firstName\n  lastName\n  displayName\n  username\n  isTyping\n  isVerified\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useMarkDialog_chat on Chat {\n  id\n  unreadCount\n  myReadSequence\n  members {\n    user {\n      id\n    }\n    lastReadSequence\n  }\n}\n"
+    "text": "query useChatsDetailsQuery(\n  $id: ID!\n) {\n  chat(id: $id) {\n    __typename\n    ... on Chat {\n      ...useMarkDialog_chat\n      ...chatMenuItem_chat\n      id\n      slug\n      title\n      type\n      photoUrl\n      membersCount\n      unreadCount\n      isPinned\n      lastReadSequence\n      myReadSequence\n      canWrite\n      myRole\n      permissions {\n        canSendMessage\n        canInviteUsers\n        canEditMetadata\n        canDeleteMessages\n        canAssignAdmins\n      }\n      members {\n        user {\n          id\n          firstName\n          lastName\n          photoUrl\n          displayName\n          isBot\n          status\n          isVerified\n          ...chatHeader_user\n        }\n      }\n    }\n    ... on NotFoundError {\n      message\n    }\n    ... on ForbiddenError {\n      message\n    }\n    ... on InternalError {\n      message\n    }\n    ... on Node {\n      __isNode: __typename\n      id\n    }\n  }\n}\n\nfragment chatHeader_user on User {\n  id\n  status\n  photoUrl\n  firstName\n  lastName\n  displayName\n  username\n  isTyping\n  isVerified\n}\n\nfragment chatMenuItem_chat on Chat {\n  id\n  title\n  type\n  photoUrl\n  unreadCount\n  isPinned\n  myRole\n  lastReadSequence\n  lastMessage {\n    id\n    text\n    sentAt\n    sequence\n    sender {\n      id\n      firstName\n      lastName\n      username\n      displayName\n    }\n    attachments {\n      id\n      type\n      url\n      fileName\n      fileSize\n      contentType\n    }\n  }\n  members {\n    user {\n      id\n      firstName\n      lastName\n      username\n      photoUrl\n      isVerified\n      status\n    }\n  }\n}\n\nfragment useMarkDialog_chat on Chat {\n  id\n  unreadCount\n  myReadSequence\n  members {\n    user {\n      id\n    }\n    lastReadSequence\n  }\n}\n"
   }
 };
 })();
