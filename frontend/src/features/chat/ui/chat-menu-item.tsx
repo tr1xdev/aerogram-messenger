@@ -86,6 +86,14 @@ export function ChatMenuItem({
             username
             displayName
           }
+          attachments {
+            id
+            type
+            url
+            fileName
+            fileSize
+            contentType
+          }
         }
         members {
           user {

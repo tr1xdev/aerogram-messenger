@@ -11,6 +11,7 @@ import {
   LuListOrdered,
   LuQuote,
   LuLink,
+  LuPaperclip,
 } from "react-icons/lu";
 import type { chatMenuItem_chat$data } from "./__generated__/chatMenuItem_chat.graphql";
 
@@ -76,14 +77,79 @@ const previewComponents: Components = {
   br: () => <> </>,
 };
 
+function getAttachmentSummary(
+  attachments: NonNullable<
+    chatMenuItem_chat$data["lastMessage"]
+  >["attachments"],
+): string | null {
+  if (!attachments || attachments.length === 0) return null;
+
+  let imageCount = 0;
+  let videoCount = 0;
+  let audioCount = 0;
+  let fileCount = 0;
+
+  for (const att of attachments) {
+    if (!att) continue;
+    const type = att.type?.toLowerCase() || "";
+    const contentType = att.contentType?.toLowerCase() || "";
+    if (type === "image" || contentType.startsWith("image/")) {
+      imageCount++;
+    } else if (type === "video" || contentType.startsWith("video/")) {
+      videoCount++;
+    } else if (type === "audio" || contentType.startsWith("audio/")) {
+      audioCount++;
+    } else {
+      fileCount++;
+    }
+  }
+
+  const parts: string[] = [];
+  if (imageCount > 0) {
+    parts.push(`${imageCount} ${imageCount === 1 ? "Photo" : "Photos"}`);
+  }
+  if (videoCount > 0) {
+    parts.push(`${videoCount} ${videoCount === 1 ? "Video" : "Videos"}`);
+  }
+  if (audioCount > 0) {
+    parts.push(`${audioCount} ${audioCount === 1 ? "Audio" : "Audios"}`);
+  }
+  if (fileCount > 0) {
+    parts.push(`${fileCount} ${fileCount === 1 ? "File" : "Files"}`);
+  }
+
+  return parts.join(", ");
+}
+
 export function LastMessageContent({
   message,
 }: LastMessageContentProps): ReactNode {
   const content: ReactNode = useMemo((): ReactNode => {
     const text: string | undefined | null = message?.text;
-    if (!text) return null;
+    const attachments = message?.attachments;
+    const attachmentSummary = getAttachmentSummary(attachments);
 
-    const previewText: string =
+    const hasAttachments = attachments && attachments.length > 0;
+
+    if (hasAttachments) {
+      return (
+        <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <LuPaperclip className="w-3.5 h-3.5" />
+          <span>{attachmentSummary}</span>
+        </span>
+      );
+    }
+
+    const hasText = !!text;
+    if (!hasText) {
+      return (
+        <span className="text-muted-foreground/40 italic text-[13px]">
+          No content
+        </span>
+      );
+    }
+
+    const previewText =
       text.length > 200 ? `${text.substring(0, 200)}...` : text;
 
     return (
@@ -94,15 +160,7 @@ export function LastMessageContent({
         {previewText}
       </ReactMarkdown>
     );
-  }, [message?.text]);
-
-  if (!message?.text) {
-    return (
-      <span className="text-muted-foreground/40 italic text-[13px]">
-        No text content
-      </span>
-    );
-  }
+  }, [message?.text, message?.attachments]);
 
   return (
     <div className="truncate w-full text-[13px] leading-snug text-muted-foreground">

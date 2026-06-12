@@ -1,5 +1,5 @@
 /**
- * @generated SignedSource<<aa7aba1e2b6e16ab283f31a72f02b0e3>>
+ * @generated SignedSource<<7c60566a630bff3284f895add94e6477>>
  * @lightSyntaxTransform
  * @nogrep
  */
@@ -15,6 +15,14 @@ export type chatMenuItem_chat$data = {
   readonly id: string;
   readonly isPinned: boolean;
   readonly lastMessage: {
+    readonly attachments: ReadonlyArray<{
+      readonly contentType: string;
+      readonly fileName: string;
+      readonly fileSize: any;
+      readonly id: string;
+      readonly type: string;
+      readonly url: string;
+    }> | null | undefined;
     readonly id: string;
     readonly sender: {
       readonly displayName: string | null | undefined;
@@ -63,24 +71,31 @@ v1 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "photoUrl",
+  "name": "type",
   "storageKey": null
 },
 v2 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "firstName",
+  "name": "photoUrl",
   "storageKey": null
 },
 v3 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
-  "name": "lastName",
+  "name": "firstName",
   "storageKey": null
 },
 v4 = {
+  "alias": null,
+  "args": null,
+  "kind": "ScalarField",
+  "name": "lastName",
+  "storageKey": null
+},
+v5 = {
   "alias": null,
   "args": null,
   "kind": "ScalarField",
@@ -101,14 +116,8 @@ return {
       "name": "title",
       "storageKey": null
     },
-    {
-      "alias": null,
-      "args": null,
-      "kind": "ScalarField",
-      "name": "type",
-      "storageKey": null
-    },
     (v1/*: any*/),
+    (v2/*: any*/),
     {
       "alias": null,
       "args": null,
@@ -176,14 +185,55 @@ return {
           "plural": false,
           "selections": [
             (v0/*: any*/),
-            (v2/*: any*/),
             (v3/*: any*/),
             (v4/*: any*/),
+            (v5/*: any*/),
             {
               "alias": null,
               "args": null,
               "kind": "ScalarField",
               "name": "displayName",
+              "storageKey": null
+            }
+          ],
+          "storageKey": null
+        },
+        {
+          "alias": null,
+          "args": null,
+          "concreteType": "Attachment",
+          "kind": "LinkedField",
+          "name": "attachments",
+          "plural": true,
+          "selections": [
+            (v0/*: any*/),
+            (v1/*: any*/),
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "url",
+              "storageKey": null
+            },
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "fileName",
+              "storageKey": null
+            },
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "fileSize",
+              "storageKey": null
+            },
+            {
+              "alias": null,
+              "args": null,
+              "kind": "ScalarField",
+              "name": "contentType",
               "storageKey": null
             }
           ],
@@ -209,10 +259,10 @@ return {
           "plural": false,
           "selections": [
             (v0/*: any*/),
-            (v2/*: any*/),
             (v3/*: any*/),
             (v4/*: any*/),
-            (v1/*: any*/),
+            (v5/*: any*/),
+            (v2/*: any*/),
             {
               "alias": null,
               "args": null,
@@ -239,6 +289,6 @@ return {
 };
 })();
 
-(node as any).hash = "aa4ae83ad5ad706f1ad35bccb8d721fb";
+(node as any).hash = "396f2035243a79f073706c41394d3a65";
 
 export default node;
