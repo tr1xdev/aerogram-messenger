@@ -140,6 +140,7 @@ export function useMessageActions(chatId: string) {
             replyToId,
             attachments: files ? new Array(files.length).fill(null) : [],
           },
+          uploadables,
           updater: (store: RecordSourceSelectorProxy): void => {
             const payload: RecordProxy | null | undefined =
               store.getRootField("sendMessage");
