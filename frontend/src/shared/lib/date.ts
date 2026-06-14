@@ -30,3 +30,24 @@ export function formatDividerDate(date: string | Date): string {
 
   return format(d, dateYear !== currentYear ? "d MMMM yyyy" : "d MMMM");
 }
+
+export function formatChatDate(date: string | Date): string {
+  const d: Date = new Date(date);
+
+  if (isToday(d)) {
+    return format(d, "HH:mm");
+  }
+
+  if (isYesterday(d)) {
+    return "Yesterday";
+  }
+
+  const currentYear: number = new Date().getFullYear();
+  const dateYear: number = d.getFullYear();
+
+  if (dateYear === currentYear) {
+    return format(d, "d MMM");
+  }
+
+  return format(d, "dd.MM.yy");
+}

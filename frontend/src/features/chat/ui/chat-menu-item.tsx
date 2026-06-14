@@ -27,6 +27,7 @@ import type {
   chatMenuItem_chat$key,
   chatMenuItem_chat$data,
 } from "./__generated__/chatMenuItem_chat.graphql";
+import { formatChatDate } from "@/shared/lib/date";
 
 const PinChatMutation = graphql`
   mutation chatMenuItemPinChatMutation($id: ID!, $pinned: Boolean!) {
@@ -280,13 +281,9 @@ export function ChatMenuItem({
                             isSending={false}
                           />
                           <span className="text-[11px] font-medium text-muted-foreground">
-                            {new Date(lastMessage.sentAt).toLocaleTimeString(
-                              [],
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
+                            {lastMessage.sentAt
+                              ? formatChatDate(lastMessage.sentAt)
+                              : ""}
                           </span>
                         </div>
                       )}
