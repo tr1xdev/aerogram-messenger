@@ -2,10 +2,11 @@
 
 # Aerogram
 
+<img src="assets/preview_dark.png" />
 
 ## About
 
-Aerogram is a high-performance, open-source real-time messaging platform built with Go and React. Designed as a modular monolith, it emphasizes end-to-end type safety and system integrity using a gRPC-backed architecture and GraphQL. The project focuses on a modern, low-latency networking stack and architectural scalability, providing a robust foundation for real-time communication.
+Aerogram is a real-time messaging platform built with Go and React. It is designed as a modular monolith focused on low-latency communication, type safety, and scalable architecture. The backend uses a gRPC-based internal system with a GraphQL API layer. The frontend is built with React, Relay, and shadcn/ui, using Tailwind CSS for styling and UI composition. The project provides a solid foundation for building modern real-time chat applications.
 
 ---
 
@@ -80,3 +81,32 @@ The fastest way to launch the entire stack with automatic TLS:
     make dev-backend    # Starts Go server at https://localhost:8080
     make dev-frontend   # Starts Vite at http://localhost:5173
     ```
+
+## Features
+
+### Messaging
+- Private chats, group conversations, and channels
+- Media and file attachments support
+- Rich previews for images (zoom support), text, and file downloads
+- Message actions (reply, edit, delete)
+
+### Accounts & Auth
+- OTP-based registration (optionally enabled for login via config)
+- Session management in user profile
+
+### Presence & Users
+- Online/offline status and last seen activity
+- User avatars
+- User management in groups and channels (kick, promote, demote admins)
+
+### Chats
+- Pinning and deleting chats from chat list
+- Clean and intuitive chat interface
+
+### Platform
+- Rate limiting for API and messaging endpoints
+- Bot development via API-based SDK
+
+### Bots
+- Bot management interface (`/bots`)
+- Extensible system for bot integrations
