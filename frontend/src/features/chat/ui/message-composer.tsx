@@ -55,8 +55,6 @@ export const MessageComposer = memo(function MessageComposer({
   canWrite,
   isMember,
   chatType,
-  myRole,
-  permissions,
 }: MessageComposerProps): ReactNode {
   const [attachments, setAttachments] = useState<File[]>([]);
   const activeAction: Message | null = editingMessage || replyingTo;
@@ -65,36 +63,21 @@ export const MessageComposer = memo(function MessageComposer({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef<boolean>(false);
 
-  useEffect((): void => {
-    console.log("DEBUG: MessageComposer state", {
-      canWrite,
-      myRole,
-      isMember,
-      permissions,
-    });
-  }, [canWrite, myRole, isMember, permissions]);
-
-  const showStartButton: boolean = useMemo((): boolean => {
-    return (
+  const showStartButton = useMemo(
+    () =>
       isBot &&
       chatType === "PRIVATE" &&
       isEmpty &&
       !editingMessage &&
       !replyingTo &&
-      attachments.length === 0
-    );
-  }, [
-    isBot,
-    chatType,
-    isEmpty,
-    editingMessage,
-    replyingTo,
-    attachments.length,
-  ]);
+      attachments.length === 0,
+    [isBot, chatType, isEmpty, editingMessage, replyingTo, attachments.length],
+  );
 
-  const showJoinButton: boolean = useMemo((): boolean => {
-    return !isMember && (chatType === "CHANNEL" || chatType === "GROUP");
-  }, [isMember, chatType]);
+  const showJoinButton = useMemo(
+    () => !isMember && (chatType === "CHANNEL" || chatType === "GROUP"),
+    [isMember, chatType],
+  );
 
   const stopTyping = useCallback((): void => {
     if (isTypingRef.current && onTyping) {
@@ -108,19 +91,20 @@ export const MessageComposer = memo(function MessageComposer({
   }, [onTyping]);
 
   const adjustHeight = useCallback((): void => {
-    const textarea: HTMLTextAreaElement | null = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = "38px";
-      const scrollHeight: number = textarea.scrollHeight;
-      if (scrollHeight > 38) {
-        textarea.style.height = `${Math.min(scrollHeight, 200)}px`;
-      }
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "38px";
+    const scrollHeight = textarea.scrollHeight;
+
+    if (scrollHeight > 38) {
+      textarea.style.height = `${Math.min(scrollHeight, 200)}px`;
     }
   }, []);
 
   const handleInputChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>): void => {
-      const value: string = e.target.value;
+      const value = e.target.value;
       setInput(value);
       adjustHeight();
 
@@ -146,10 +130,10 @@ export const MessageComposer = memo(function MessageComposer({
 
   const handleFileChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>): void => {
-      if (e.target.files) {
-        const newFiles: File[] = Array.from(e.target.files);
-        setAttachments((prev: File[]) => [...prev, ...newFiles]);
-      }
+      if (!e.target.files) return;
+      const newFiles = Array.from(e.target.files);
+      setAttachments((prev) => [...prev, ...newFiles]);
+
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -158,14 +142,12 @@ export const MessageComposer = memo(function MessageComposer({
   );
 
   const removeAttachment = useCallback((index: number): void => {
-    setAttachments((prev: File[]): File[] =>
-      prev.filter((_, i: number): boolean => i !== index),
-    );
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const handleSendAndStopTyping = useCallback((): void => {
     if (disabled || !canWrite) return;
-    if (input.trim().length === 0 && attachments.length === 0) return;
+    if (!input.trim() && attachments.length === 0) return;
 
     stopTyping();
     onSend(input, attachments);
@@ -181,25 +163,13 @@ export const MessageComposer = memo(function MessageComposer({
     onJoin();
   }, [onJoin, disabled]);
 
-  useEffect((): void => {
-    if (activeAction) {
-      textareaRef.current?.focus();
-    }
+  useEffect(() => {
+    if (activeAction) textareaRef.current?.focus();
   }, [activeAction]);
 
-  useEffect((): void => {
+  useEffect(() => {
     adjustHeight();
   }, [input, adjustHeight]);
-
-  useEffect((): (() => void) => {
-    const timeoutId: ReturnType<typeof setTimeout> | null =
-      typingTimeoutRef.current;
-    return (): void => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, []);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -211,21 +181,19 @@ export const MessageComposer = memo(function MessageComposer({
     [handleSendAndStopTyping],
   );
 
-  const senderName = useMemo((): string => {
+  const senderName = useMemo(() => {
     if (!replyingTo?.sender) return "User";
     const { firstName, lastName } = replyingTo.sender;
     return lastName ? `${firstName} ${lastName}` : firstName;
   }, [replyingTo]);
 
-  const actionTextInfo = useMemo((): {
-    text: string;
-    isPlaceholder: boolean;
-  } => {
+  const actionTextInfo = useMemo(() => {
     if (!activeAction) return { text: "", isPlaceholder: false };
 
-    const hasContent: boolean =
+    const hasContent =
       typeof activeAction.text === "string" &&
       activeAction.text.trim().length > 0;
+
     if (hasContent) {
       return { text: activeAction.text as string, isPlaceholder: false };
     }
@@ -244,26 +212,24 @@ export const MessageComposer = memo(function MessageComposer({
               exit={{ opacity: 0, height: 0 }}
               className="flex flex-wrap gap-2 px-3 py-2 bg-muted/10 rounded-t-2xl border-l-2 border-primary/50 mx-1 mb-[-1px]"
             >
-              {attachments.map(
-                (file: File, idx: number): ReactNode => (
-                  <div
-                    key={`${file.name}-${idx}`}
-                    className="flex items-center gap-2 px-2 py-1 bg-background border border-border/60 rounded-md max-w-[160px] group"
+              {attachments.map((file, idx) => (
+                <div
+                  key={`${file.name}-${idx}`}
+                  className="flex items-center gap-2 px-2 py-1 bg-background border border-border/60 rounded-md max-w-[160px] group"
+                >
+                  <FileIcon className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="text-[12px] truncate flex-1">
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(idx)}
+                    className="h-4 w-4 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-colors"
                   >
-                    <FileIcon className="h-3.5 w-3.5 text-primary shrink-0" />
-                    <span className="text-[12px] truncate flex-1">
-                      {file.name}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(): void => removeAttachment(idx)}
-                      className="h-4 w-4 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ),
-              )}
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
             </motion.div>
           )}
         </AnimatePresence>
@@ -306,10 +272,11 @@ export const MessageComposer = memo(function MessageComposer({
               multiple
               onChange={handleFileChange}
             />
+
             <Button
               type="button"
               size="icon"
-              onClick={(): void => fileInputRef.current?.click()}
+              onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
               className="h-[38px] w-[38px] rounded-full shrink-0 bg-muted/40 text-muted-foreground hover:text-primary transition-colors"
             >
@@ -330,10 +297,6 @@ export const MessageComposer = memo(function MessageComposer({
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      transition={{
-                        duration: 0.1,
-                        ease: "linear",
-                      }}
                       className="flex items-center gap-3 pt-2 pb-1 pr-4 pl-4 relative min-w-0"
                     >
                       <div
@@ -342,6 +305,7 @@ export const MessageComposer = memo(function MessageComposer({
                           replyingTo ? "bg-sky-500" : "bg-primary",
                         )}
                       />
+
                       <div className="flex-1 min-w-0 ml-3">
                         <span
                           className={cn(
@@ -353,17 +317,19 @@ export const MessageComposer = memo(function MessageComposer({
                             ? "Edit Message"
                             : `Reply to ${senderName}`}
                         </span>
+
                         <span
                           className={cn(
                             "text-[13px] truncate block leading-tight mt-0.5",
                             actionTextInfo.isPlaceholder
                               ? "text-zinc-500/80 italic font-normal"
-                              : "text-white",
+                              : "text-foreground",
                           )}
                         >
                           {actionTextInfo.text}
                         </span>
                       </div>
+
                       <button
                         type="button"
                         onClick={onCancelAction}
@@ -386,6 +352,7 @@ export const MessageComposer = memo(function MessageComposer({
                     rows={1}
                     className="flex-1 resize-none bg-transparent px-4 py-[9px] text-[15px] focus:outline-none max-h-[200px] overflow-y-auto leading-[20px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   />
+
                   <div className="flex items-center justify-center h-[38px] pr-1">
                     {(input.trim().length > 0 || attachments.length > 0) && (
                       <Button
@@ -412,3 +379,5 @@ export const MessageComposer = memo(function MessageComposer({
     </footer>
   );
 });
+
+MessageComposer.displayName = "MessageComposer";
