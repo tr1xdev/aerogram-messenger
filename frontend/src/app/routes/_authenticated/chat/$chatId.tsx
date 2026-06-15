@@ -127,7 +127,7 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   const { messages: messagesFromHistory, isLoading: historyLoading } =
     useChatHistory(chatId);
 
-  const { sendMessage, editMessage, markAsRead, joinChat } =
+  const { sendMessage, editMessage, markAsRead, joinChat, deleteMessage } =
     useMessageActions(chatId);
   const { handleKeyPress, stopTyping: stopTypingHook } = useSendTyping(chatId);
 
@@ -203,9 +203,14 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
     [],
   );
 
-  const handleDeleteMessage = useCallback((id: string): void => {
-    void id;
-  }, []);
+  const handleDeleteMessage = useCallback(
+    (id: string): void => {
+      deleteMessage(id).catch((): void => {
+        toast.error("Failed to delete message");
+      });
+    },
+    [deleteMessage],
+  );
 
   const handleForwardMessage = useCallback(
     (msg: messageBubble_message$data): void => {

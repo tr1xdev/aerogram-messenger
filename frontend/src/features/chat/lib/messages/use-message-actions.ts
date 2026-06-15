@@ -19,6 +19,7 @@ import type {
   useMessageActionsJoinMutation,
   useMessageActionsJoinMutation$data,
 } from "./__generated__/useMessageActionsJoinMutation.graphql";
+import type { useMessageActionsDeleteMutation } from "./__generated__/useMessageActionsDeleteMutation.graphql";
 
 const sendMessageMutation = graphql`
   mutation useMessageActionsSendMutation(
@@ -104,6 +105,12 @@ const joinChatMutation = graphql`
   }
 `;
 
+const deleteMessageMutation = graphql`
+  mutation useMessageActionsDeleteMutation($id: ID!) {
+    deleteMessage(id: $id)
+  }
+`;
+
 export function useMessageActions(chatId: string) {
   const [send, isSending] =
     useMutation<useMessageActionsSendMutation>(sendMessageMutation);
@@ -111,6 +118,9 @@ export function useMessageActions(chatId: string) {
     useMutation<useMessageActionsEditMutation>(editMessageMutation);
   const [read] = useMutation<useMessageActionsReadMutation>(markAsReadMutation);
   const [join] = useMutation<useMessageActionsJoinMutation>(joinChatMutation);
+  const [del] = useMutation<useMessageActionsDeleteMutation>(
+    deleteMessageMutation,
+  );
 
   const sendMessage = useCallback(
     (
@@ -311,5 +321,45 @@ export function useMessageActions(chatId: string) {
     [join],
   );
 
-  return { sendMessage, editMessage, markAsRead, joinChat, isSending };
+  const deleteMessage = useCallback(
+    (id: string): Promise<void> => {
+      return new Promise((resolve, reject): void => {
+        if (!id) {
+          reject(new Error("No message id provided"));
+          return;
+        }
+
+        del({
+          variables: { id },
+          onCompleted: (
+            response: useMessageActionsDeleteMutation["response"],
+            err: ReadonlyArray<PayloadError> | null,
+          ): void => {
+            if (err) {
+              reject(err);
+              return;
+            }
+
+            if (!response.deleteMessage) {
+              reject(new Error("Failed to delete message"));
+              return;
+            }
+
+            resolve();
+          },
+          onError: (err: Error): void => reject(err),
+        });
+      });
+    },
+    [del],
+  );
+
+  return {
+    sendMessage,
+    editMessage,
+    markAsRead,
+    joinChat,
+    isSending,
+    deleteMessage,
+  };
 }
