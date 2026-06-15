@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { graphql, useMutation } from "react-relay";
 import type { UseMutationConfig } from "react-relay";
 import type {
@@ -121,6 +121,8 @@ export function useMessageActions(chatId: string) {
   const [del] = useMutation<useMessageActionsDeleteMutation>(
     deleteMessageMutation,
   );
+
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   const sendMessage = useCallback(
     (
@@ -276,9 +278,6 @@ export function useMessageActions(chatId: string) {
           if (lastMsg) {
             const seq: number = Number(lastMsg.getValue("sequence") ?? 0);
             chatRecord.setValue(seq, "myReadSequence");
-            console.log(
-              `[RELAY-MUTATION] markAsRead (Optimistic). myReadSequence -> ${seq}`,
-            );
           }
         }
       },
@@ -312,9 +311,7 @@ export function useMessageActions(chatId: string) {
 
             resolve();
           },
-          onError: (err: Error): void => {
-            reject(err);
-          },
+          onError: (err: Error): void => reject(err),
         });
       });
     },
@@ -323,35 +320,66 @@ export function useMessageActions(chatId: string) {
 
   const deleteMessage = useCallback(
     (id: string): Promise<void> => {
-      return new Promise((resolve, reject): void => {
-        if (!id) {
-          reject(new Error("No message id provided"));
-          return;
-        }
+      if (!id) return Promise.reject(new Error("No message id provided"));
+      if (deletingIds.has(id)) {
+        return Promise.reject(new Error("Already deleting"));
+      }
 
+      setDeletingIds((prev) => new Set(prev).add(id));
+
+      return new Promise((resolve, reject) => {
         del({
           variables: { id },
-          onCompleted: (
-            response: useMessageActionsDeleteMutation["response"],
-            err: ReadonlyArray<PayloadError> | null,
-          ): void => {
-            if (err) {
-              reject(err);
-              return;
-            }
+          updater: (store: RecordSourceSelectorProxy): void => {
+            const root = store.getRoot();
+            const messageRecord = store.get(id);
+            if (!messageRecord) return;
 
-            if (!response.deleteMessage) {
-              reject(new Error("Failed to delete message"));
-              return;
+            const chatIdFromMsg = messageRecord.getValue("chatId") as
+              | string
+              | undefined;
+            if (chatIdFromMsg) {
+              const history = root.getLinkedRecord("messageHistory", {
+                chatId: chatIdFromMsg,
+                limit: 50,
+                beforeSequence: null,
+              });
+              if (history) {
+                const messages = history.getLinkedRecords("messages") ?? [];
+                history.setLinkedRecords(
+                  messages.filter((m) => m.getDataID() !== id),
+                  "messages",
+                );
+              }
             }
-
-            resolve();
+            store.delete(id);
           },
-          onError: (err: Error): void => reject(err),
+          onCompleted: (response, errors) => {
+            setDeletingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+            if (errors && errors.length > 0) reject(errors);
+            else resolve();
+          },
+          onError: (error) => {
+            setDeletingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+            reject(error);
+          },
         });
       });
     },
-    [del],
+    [del, deletingIds],
+  );
+
+  const isDeleting = useCallback(
+    (id: string) => deletingIds.has(id),
+    [deletingIds],
   );
 
   return {
@@ -361,5 +389,6 @@ export function useMessageActions(chatId: string) {
     joinChat,
     isSending,
     deleteMessage,
+    isDeleting,
   };
 }
