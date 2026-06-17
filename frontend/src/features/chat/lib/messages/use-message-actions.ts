@@ -354,14 +354,19 @@ export function useMessageActions(chatId: string) {
             }
             store.delete(id);
           },
-          onCompleted: (response, errors) => {
+          onCompleted: (_response, errors) => {
             setDeletingIds((prev) => {
               const next = new Set(prev);
               next.delete(id);
               return next;
             });
-            if (errors && errors.length > 0) reject(errors);
-            else resolve();
+
+            if (errors?.length) {
+              reject(errors);
+              return;
+            }
+
+            resolve();
           },
           onError: (error) => {
             setDeletingIds((prev) => {
