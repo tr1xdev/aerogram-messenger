@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { graphql, useMutation } from "react-relay";
 import type { UseMutationConfig } from "react-relay";
 import type {
@@ -19,6 +19,7 @@ import type {
   useMessageActionsJoinMutation,
   useMessageActionsJoinMutation$data,
 } from "./__generated__/useMessageActionsJoinMutation.graphql";
+import type { useMessageActionsDeleteMutation } from "./__generated__/useMessageActionsDeleteMutation.graphql";
 
 const sendMessageMutation = graphql`
   mutation useMessageActionsSendMutation(
@@ -104,6 +105,12 @@ const joinChatMutation = graphql`
   }
 `;
 
+const deleteMessageMutation = graphql`
+  mutation useMessageActionsDeleteMutation($id: ID!) {
+    deleteMessage(id: $id)
+  }
+`;
+
 export function useMessageActions(chatId: string) {
   const [send, isSending] =
     useMutation<useMessageActionsSendMutation>(sendMessageMutation);
@@ -111,6 +118,11 @@ export function useMessageActions(chatId: string) {
     useMutation<useMessageActionsEditMutation>(editMessageMutation);
   const [read] = useMutation<useMessageActionsReadMutation>(markAsReadMutation);
   const [join] = useMutation<useMessageActionsJoinMutation>(joinChatMutation);
+  const [del] = useMutation<useMessageActionsDeleteMutation>(
+    deleteMessageMutation,
+  );
+
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   const sendMessage = useCallback(
     (
@@ -266,9 +278,6 @@ export function useMessageActions(chatId: string) {
           if (lastMsg) {
             const seq: number = Number(lastMsg.getValue("sequence") ?? 0);
             chatRecord.setValue(seq, "myReadSequence");
-            console.log(
-              `[RELAY-MUTATION] markAsRead (Optimistic). myReadSequence -> ${seq}`,
-            );
           }
         }
       },
@@ -302,14 +311,89 @@ export function useMessageActions(chatId: string) {
 
             resolve();
           },
-          onError: (err: Error): void => {
-            reject(err);
-          },
+          onError: (err: Error): void => reject(err),
         });
       });
     },
     [join],
   );
 
-  return { sendMessage, editMessage, markAsRead, joinChat, isSending };
+  const deleteMessage = useCallback(
+    (id: string): Promise<void> => {
+      if (!id) return Promise.reject(new Error("No message id provided"));
+      if (deletingIds.has(id)) {
+        return Promise.reject(new Error("Already deleting"));
+      }
+
+      setDeletingIds((prev) => new Set(prev).add(id));
+
+      return new Promise((resolve, reject) => {
+        del({
+          variables: { id },
+          updater: (store: RecordSourceSelectorProxy): void => {
+            const root = store.getRoot();
+            const messageRecord = store.get(id);
+            if (!messageRecord) return;
+
+            const chatIdFromMsg = messageRecord.getValue("chatId") as
+              | string
+              | undefined;
+            if (chatIdFromMsg) {
+              const history = root.getLinkedRecord("messageHistory", {
+                chatId: chatIdFromMsg,
+                limit: 50,
+                beforeSequence: null,
+              });
+              if (history) {
+                const messages = history.getLinkedRecords("messages") ?? [];
+                history.setLinkedRecords(
+                  messages.filter((m) => m.getDataID() !== id),
+                  "messages",
+                );
+              }
+            }
+            store.delete(id);
+          },
+          onCompleted: (_response, errors) => {
+            setDeletingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+
+            if (errors?.length) {
+              reject(errors);
+              return;
+            }
+
+            resolve();
+          },
+          onError: (error) => {
+            setDeletingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+            reject(error);
+          },
+        });
+      });
+    },
+    [del, deletingIds],
+  );
+
+  const isDeleting = useCallback(
+    (id: string) => deletingIds.has(id),
+    [deletingIds],
+  );
+
+  return {
+    sendMessage,
+    editMessage,
+    markAsRead,
+    joinChat,
+    isSending,
+    deleteMessage,
+    isDeleting,
+  };
 }

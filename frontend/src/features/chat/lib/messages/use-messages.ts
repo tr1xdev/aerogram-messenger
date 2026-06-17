@@ -87,10 +87,13 @@ export function useChatHistory(chatId: string) {
 
   const messages = useMemo((): readonly MessageType[] => {
     if (history?.__typename === "MessageConnection") {
-      return [...(history.messages ?? [])].sort(
-        (a: MessageType, b: MessageType): number =>
-          Number(a.sequence) - Number(b.sequence),
-      );
+      const raw = history.messages ?? [];
+      return [...raw]
+        .filter((msg): msg is MessageType => msg != null)
+        .sort(
+          (a: MessageType, b: MessageType): number =>
+            Number(a.sequence) - Number(b.sequence),
+        );
     }
     return [];
   }, [history]);

@@ -12,6 +12,7 @@ import type { useGlobalSubscriptionsTypingSubscription } from "./__generated__/u
 import type { useGlobalSubscriptionsChatDeletedSubscription } from "./__generated__/useGlobalSubscriptionsChatDeletedSubscription.graphql";
 import { logger } from "@/shared/lib/logger";
 import { deleteFromChatList } from "@/features/chat/lib/chat/use-chat-management";
+import type { useGlobalSubscriptionsMessageDeletedSubscription } from "./__generated__/useGlobalSubscriptionsMessageDeletedSubscription.graphql";
 
 const messageSubscription = graphql`
   subscription useGlobalSubscriptionsMessageAddedSubscription($chatId: ID!) {
@@ -75,6 +76,12 @@ const typingSubscription = graphql`
 const chatDeletedSubscription = graphql`
   subscription useGlobalSubscriptionsChatDeletedSubscription($userId: ID!) {
     chatDeleted(userId: $userId)
+  }
+`;
+
+const messageDeletedSubscription = graphql`
+  subscription useGlobalSubscriptionsMessageDeletedSubscription($chatId: ID!) {
+    messageDeleted(chatId: $chatId)
   }
 `;
 
@@ -148,18 +155,24 @@ export function useGlobalSubscriptions(
               });
 
             if (history) {
-              const messages: readonly RecordProxy[] =
+              const messages: readonly (RecordProxy | null)[] =
                 (history.getLinkedRecords(
                   "messages",
-                ) as readonly RecordProxy[]) ?? [];
+                ) as (RecordProxy | null)[]) ?? [];
               const messageId: string = rootField.getDataID();
 
               if (
                 !messages.some(
-                  (m: RecordProxy): boolean => m.getDataID() === messageId,
+                  (m): boolean => m != null && m.getDataID() === messageId,
                 )
               ) {
-                history.setLinkedRecords([...messages, rootField], "messages");
+                history.setLinkedRecords(
+                  [
+                    ...messages.filter((m): m is RecordProxy => m != null),
+                    rootField,
+                  ],
+                  "messages",
+                );
               }
             }
           }
@@ -256,18 +269,45 @@ export function useGlobalSubscriptions(
         variables: { userId: myId ?? "" },
         skip: !myId,
         updater: (store: RecordSourceSelectorProxy): void => {
-          const deletedId: string | null | undefined = store.getRootField(
-            "chatDeleted",
-          ) as string | null | undefined;
-
-          if (deletedId) {
-            deleteFromChatList(store, deletedId);
-            store.delete(deletedId);
-            logger.warn("APP", `Chat removed from store: ${deletedId}`);
-          }
+          const root = store.getRoot();
+          const deletedId = root.getValue("chatDeleted") as
+            | string
+            | null
+            | undefined;
+          if (typeof deletedId !== "string") return;
+          deleteFromChatList(store, deletedId);
+          store.delete(deletedId);
+          logger.warn("APP", `Chat removed from store: ${deletedId}`);
         },
       }),
       [myId],
+    ),
+  );
+
+  useSubscription<useGlobalSubscriptionsMessageDeletedSubscription>(
+    useMemo(
+      () => ({
+        subscription: messageDeletedSubscription,
+        variables: { chatId: chatId ?? "" },
+        skip: !chatId,
+        updater: (store: RecordSourceSelectorProxy): void => {
+          if (!chatId) return;
+          const root = store.getRoot();
+          const deletedId = root.getValue("messageDeleted") as
+            | string
+            | null
+            | undefined;
+          if (typeof deletedId !== "string") return;
+
+          store.delete(deletedId);
+
+          const chatRecord = store.get(chatId);
+          if (chatRecord) {
+            chatRecord.invalidateRecord();
+          }
+        },
+      }),
+      [chatId],
     ),
   );
 }
