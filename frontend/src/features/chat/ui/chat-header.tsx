@@ -3,8 +3,6 @@ import { graphql, useFragment } from "react-relay";
 import {
   ChevronLeft,
   MoreVertical,
-  Phone,
-  Video,
   Ban,
   BellOff,
   Search,
@@ -178,26 +176,6 @@ export function ChatHeader({
       </div>
 
       <div className="flex items-center gap-1">
-        {!isSavedMessages && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={isLoading}
-              className="hidden sm:flex text-muted-foreground"
-            >
-              <Phone className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={isLoading}
-              className="hidden sm:flex text-muted-foreground"
-            >
-              <Video className="h-5 w-5" />
-            </Button>
-          </>
-        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
