@@ -42,10 +42,15 @@ const verifyEmailMutation = graphql`
 function normalizeError(message: string): string {
   if (!message) return "An unknown error occurred";
 
-  const cleanMessage = message
-    .replace(/^No data returned for operation `\w+`, got error\(s\): /, "")
-    .split("See the error")[0]
-    .trim();
+  let cleanMessage = message;
+
+  const relayPattern = /^No data returned for operation\s+[`'"]?[\w-]+[`'"]?,\s+got error\(s\):\s*/i;
+
+  if (relayPattern.test(cleanMessage)) {
+    cleanMessage = cleanMessage.replace(relayPattern, "");
+  }
+
+  cleanMessage = cleanMessage.split("See the error")[0].trim();
 
   return cleanMessage.charAt(0).toUpperCase() + cleanMessage.slice(1);
 }
