@@ -1,11 +1,9 @@
 {
     debug
 }
-
 :80 {
     root * /usr/share/caddy
     encode zstd gzip
-
     handle /query* {
         reverse_proxy http://api:8080 {
             header_up Host {http.request.host}
@@ -14,17 +12,38 @@
             header_up X-Forwarded-Proto {scheme}
         }
     }
-
     handle /media/* {
         uri strip_prefix /media
         reverse_proxy http://minio:9000
     }
-
     handle {
         try_files {path} /index.html
         file_server
     }
-
+    handle_errors {
+        rewrite * /{err.status_code}.html
+        file_server
+    }
+}
+:3443 {
+    root * /usr/share/caddy
+    encode zstd gzip
+    handle /query* {
+        reverse_proxy http://api:8080 {
+            header_up Host {http.request.host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    handle /media/* {
+        uri strip_prefix /media
+        reverse_proxy http://minio:9000
+    }
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
     handle_errors {
         rewrite * /{err.status_code}.html
         file_server

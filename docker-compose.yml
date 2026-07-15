@@ -12,6 +12,7 @@ services:
             - DB_HOST=postgres
             - REDIS_HOST=redis
             - S3_ENDPOINT=http://minio:9000
+            - S3_PUBLIC_ENDPOINT=http://localhost:3443/media
         volumes:
             - ./assets:/app/assets:ro
         depends_on:
@@ -23,7 +24,6 @@ services:
                 condition: service_started
         networks:
             - aerogram-net
-
     frontend:
         build:
             context: .
@@ -35,6 +35,7 @@ services:
         restart: always
         ports:
             - "${HTTP_PORT:-8080}:80"
+            - "3443:3443"
         volumes:
             - ./Caddyfile:/etc/caddy/Caddyfile
             - caddy_data:/data
@@ -43,7 +44,6 @@ services:
             - aerogram-net
         depends_on:
             - api
-
     postgres:
         image: postgres:15-alpine
         container_name: aerogram-db
@@ -64,7 +64,6 @@ services:
             retries: 5
         networks:
             - aerogram-net
-
     redis:
         image: redis:7.2-alpine
         container_name: aerogram-redis
@@ -79,7 +78,6 @@ services:
             retries: 5
         networks:
             - aerogram-net
-
     minio:
         image: minio/minio
         container_name: aerogram-s3
@@ -95,11 +93,9 @@ services:
             - s3data:/data
         networks:
             - aerogram-net
-
 networks:
     aerogram-net:
         driver: bridge
-
 volumes:
     pgdata:
     s3data:
