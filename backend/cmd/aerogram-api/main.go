@@ -122,49 +122,62 @@ func main() {
 		Enricher:       enricher,
 	})
 
-	certPath := os.Getenv("TLS_CERT_PATH")
-	if certPath == "" {
-		certPath = "certs/localhost+2.pem"
-	}
-	keyPath := os.Getenv("TLS_KEY_PATH")
-	if keyPath == "" {
-		keyPath = "certs/localhost+2-key.pem"
-	}
-
-	tlsConfig := internal_tls.LoadServerConfig(certPath, keyPath)
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 
 	httpServer := &http.Server{
 		Addr:         httpAddr,
 		Handler:      router,
-		TLSConfig:    tlsConfig,
 		ReadTimeout:  cfg.Server.HTTP.Timeout.Read,
 		WriteTimeout: cfg.Server.HTTP.Timeout.Write,
 		IdleTimeout:  cfg.Server.HTTP.Timeout.Idle,
 	}
 
-	h3Server := &http3.Server{
-		Addr:      httpAddr,
-		Handler:   router,
-		TLSConfig: tlsConfig,
-	}
+	var h3Server *http3.Server
+	isDev := os.Getenv("APP_ENV") == "development"
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		log.Printf("HTTP/2 (TCP) listening on %s", httpAddr)
-		if err := httpServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-			log.Printf("http2 listen error: %v", err)
+	if isDev {
+		go func() {
+			log.Printf("HTTP listening on %s", httpAddr)
+			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("http listen error: %v", err)
+			}
+		}()
+	} else {
+		certPath := os.Getenv("TLS_CERT_PATH")
+		if certPath == "" {
+			certPath = "certs/localhost+2.pem"
 		}
-	}()
+		keyPath := os.Getenv("TLS_KEY_PATH")
+		if keyPath == "" {
+			keyPath = "certs/localhost+2-key.pem"
+		}
 
-	go func() {
-		log.Printf("HTTP/3 (UDP) listening on %s", httpAddr)
-		if err := h3Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("http3 listen error: %v", err)
+		tlsConfig := internal_tls.LoadServerConfig(certPath, keyPath)
+		httpServer.TLSConfig = tlsConfig
+
+		h3Server = &http3.Server{
+			Addr:      httpAddr,
+			Handler:   router,
+			TLSConfig: tlsConfig,
 		}
-	}()
+
+		go func() {
+			log.Printf("HTTP/2 (TCP) listening on %s", httpAddr)
+			if err := httpServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				log.Printf("http2 listen error: %v", err)
+			}
+		}()
+
+		go func() {
+			log.Printf("HTTP/3 (UDP) listening on %s", httpAddr)
+			if err := h3Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("http3 listen error: %v", err)
+			}
+		}()
+	}
 
 	<-stop
 	log.Println("Shutting down gracefully...")
@@ -179,8 +192,10 @@ func main() {
 			log.Printf("HTTP/2 shutdown error: %v", err)
 		}
 
-		if err := h3Server.Close(); err != nil {
-			log.Printf("HTTP/3 close error: %v", err)
+		if h3Server != nil {
+			if err := h3Server.Close(); err != nil {
+				log.Printf("HTTP/3 close error: %v", err)
+			}
 		}
 
 		grpcDone := make(chan struct{})
