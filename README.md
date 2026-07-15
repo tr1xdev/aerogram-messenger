@@ -40,15 +40,15 @@ cp .env.example .env
 
 1. **Clone this repository:**
 
-  ```bash
-  git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
-  ```
+```bash
+git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
+```
 
 2. **Build and start services:**
 
-  ```bash
-  docker compose up --build -d
-  ```
+```bash
+docker compose up --build -d
+```
 
 3. **Access the application:**
     * Open **[https://localhost:8080](https://localhost:8080)** (backend API available at `/query`)
@@ -76,29 +76,10 @@ make dev-frontend   # http://localhost:5173
 
 ## Features
 
-### Messaging
-- Private chats, group conversations, and channels
-- Media and file attachments support
-- Rich previews for images, text, and file downloads
-- Message actions (reply, edit, delete)
+Aerogram supports private chats, groups, channels, media attachments, OTP auth, bot integrations and more.  
+👉 See [docs/FEATURES.md](docs/FEATURES.md) for the full list.
 
-### Accounts & Auth
-- OTP-based registration (optionally enabled for login via config)
-- Session management in user profile
+## Tech Stack
 
-### Presence & Users
-- Online/offline status and last seen activity
-- User avatars
-- User management in groups and channels (kick, promote, demote admins)
-
-### Chats
-- Pinning and deleting chats from chat list
-- Clean and intuitive chat interface
-
-### Platform
-- Rate limiting for API and messaging endpoints
-- Bot development via API-based SDK
-
-### Bots
-- Bot management interface (`/bots`)
-- Extensible system for bot integrations
+Go, gRPC, GraphQL, PostgreSQL, Redis, React, Tailwind CSS and more.  
+👉 See [docs/TECH_STACK.md](docs/TECH_STACK.md) for details.
