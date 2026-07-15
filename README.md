@@ -2,11 +2,9 @@
 
 # Aerogram
 
-<img src="assets/preview_dark.png" />
-
 ## About
 
-Aerogram is a real-time messaging platform built with Go and React. It is designed as a modular monolith focused on low-latency communication, type safety, and scalable architecture. The backend uses a gRPC-based internal system with a GraphQL API layer. The frontend is built with React, Relay, and shadcn/ui, using Tailwind CSS for styling and UI composition. The project provides a solid foundation for building modern real-time chat applications.
+Aerogram is a real-time messaging platform built with **Go** and **React**. It is designed as a modular monolith focused on low-latency communication, type safety, and scalable architecture. The backend uses a **gRPC-based** internal system with a **GraphQL API** layer. The frontend is built with **React**, **Relay**, and **shadcn/ui**, using **Tailwind CSS** for styling and UI composition. The project provides a solid foundation for building modern real-time chat applications.
 
 ---
 
@@ -19,7 +17,7 @@ The following environments are required for local development and have been test
 * **Node.js & npm:** `v24.14.0`+ / `v11.12.0`+
 * **PostgreSQL:** `v16.13`+ (psql client)
 * **Redis:** `v7.0.15`+ (redis-cli)
-* **Tools:** `golang-migrate`, `mkcert`, `sqlc`, and `gqlgen` (optional/development)
+* **Tools:** `golang-migrate`, `sqlc`, and `gqlgen` (optional/development)
 
 ---
 
@@ -40,54 +38,48 @@ cp .env.example .env
 
 ### Docker (Recommended)
 
-The fastest way to launch the entire stack with automatic TLS:
-
 1. **Clone this repository:**
-    ```bash
-    git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
-    ```
+
+  ```bash
+  git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
+  ```
+
 2. **Build and start services:**
-    ```bash
-    docker compose up --build -d
-    ```
-3. **Install SSL Trust:**
-    To trust Caddy's local certificates in your browser and system:
-    
-    ```bash
-    make setup-certs
-    ```
-4. **Access the application:**
-    * **Frontend:** [https://localhost:3443](https://localhost:3443)
-    * **Backend API:** [https://localhost:3443/query](https://localhost:3443/query)
+
+  ```bash
+  docker compose up --build -d
+  ```
+
+3. **Access the application:**
+    * Open **[https://localhost:8080](https://localhost:8080)** (backend API available at `/query`)
 
 ### Local Development
 
-1. **Setup Infrastructure & Deps:**
-    ```bash
-    make infra          # Starts Postgres & Redis containers
-    make install-deps   # Installs Go/NPM modules & GeoIP data
-    ```
-2. **Generate TLS Certificates:**
-    Required for secure communication outside Docker:
-    ```bash
-    mkdir -p certs && mkcert -install && mkcert -destdir certs localhost
-    ```
-3. **Code Generation:**
-    ```bash
-    make proto gql      # Generates gRPC and GraphQL code
-    ```
-4. **Run Services (in separate terminals):**
-    ```bash
-    make dev-backend    # Starts Go server at https://localhost:8080
-    make dev-frontend   # Starts Vite at http://localhost:5173
-    ```
+1. **Setup infrastructure & dependencies:**
+
+```bash
+make infra install-deps   # Postgres & Redis + Go/NPM module + GeoIP data
+```
+
+2. **Generate code:**
+
+```bash
+make proto gql            # gRPC and GraphQL codegen
+```
+  
+3. **Run services** (in separate terminals):
+
+```bash
+make dev-backend    # https://localhost:8080
+make dev-frontend   # http://localhost:5173
+```
 
 ## Features
 
 ### Messaging
 - Private chats, group conversations, and channels
 - Media and file attachments support
-- Rich previews for images (zoom support), text, and file downloads
+- Rich previews for images, text, and file downloads
 - Message actions (reply, edit, delete)
 
 ### Accounts & Auth
