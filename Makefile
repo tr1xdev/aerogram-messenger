@@ -46,15 +46,6 @@ help:
 
 # --- Infrastructure ---
 
-setup-certs:
-	@echo "$(GREEN)▶ Extracting and installing CA certificate...$(RESET)"
-	@docker cp aerogram-ui:/data/caddy/pki/authorities/local/root.crt ./caddy_temp.crt
-	@powershell.exe -Command "Start-Process powershell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command Import-Certificate -FilePath \"./caddy_temp.crt\" -CertStoreLocation \"Cert:\LocalMachine\Root\"' -Verb RunAs"
-	@sudo cp ./caddy_temp.crt /usr/local/share/ca-certificates/caddy_docker_root.crt
-	@sudo update-ca-certificates
-	@rm ./caddy_temp.crt
-	@echo "$(GREEN)▶ Success! Restart Chrome (chrome://restart) to apply changes.$(RESET)"
-
 infra:
 	@echo "$(GREEN)▶ Starting infrastructure...$(RESET)"
 	docker compose up -d postgres redis
