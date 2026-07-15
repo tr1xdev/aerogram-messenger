@@ -74,12 +74,8 @@ make dev-backend    # https://localhost:8080
 make dev-frontend   # http://localhost:5173
 ```
 
-## Features
+## Features & Tech Stack
 
-Aerogram supports private chats, groups, channels, media attachments, OTP auth, bot integrations and more.  
-👉 See [docs/FEATURES.md](docs/FEATURES.md) for the full list.
+Aerogram supports private chats, groups, channels, media attachments, OTP auth, bot integrations and more — built on **Go**, **gRPC**, **GraphQL**, **PostgreSQL**, **Redis**, **React** and **Tailwind CSS**.
 
-## Tech Stack
-
-Go, gRPC, GraphQL, PostgreSQL, Redis, React, Tailwind CSS and more.  
-👉 See [docs/TECH_STACK.md](docs/TECH_STACK.md) for details.
+📋 [Full feature list](docs/FEATURES.md) · 🛠️ [Tech stack details](docs/TECH_STACK.md)
