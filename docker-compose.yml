@@ -6,8 +6,6 @@ services:
         container_name: aerogram-api
         restart: always
         ports:
-            - "${HTTP_PORT:-8080}:8080/tcp"
-            - "${HTTP_PORT:-8080}:8080/udp"
             - "${GRPC_PORT:-50051}:50051/tcp"
         env_file: .env
         environment:
@@ -36,9 +34,7 @@ services:
         container_name: aerogram-ui
         restart: always
         ports:
-            - "3000:80"
-            - "3443:3443"
-            - "3443:3443/udp"
+            - "${HTTP_PORT:-8080}:80"
         volumes:
             - ./Caddyfile:/etc/caddy/Caddyfile
             - caddy_data:/data

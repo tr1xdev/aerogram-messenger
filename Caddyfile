@@ -2,16 +2,12 @@
     debug
 }
 
-localhost:3443, :3443 {
+:80 {
     root * /usr/share/caddy
     encode zstd gzip
 
     handle /query* {
-        reverse_proxy https://api:8080 {
-            transport http {
-                versions 1.1
-                tls_insecure_skip_verify
-            }
+        reverse_proxy http://api:8080 {
             header_up Host {http.request.host}
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
@@ -21,11 +17,7 @@ localhost:3443, :3443 {
 
     handle /media/* {
         uri strip_prefix /media
-        reverse_proxy minio:9000 {
-            transport http {
-                versions 1.1
-            }
-        }
+        reverse_proxy http://minio:9000
     }
 
     handle {
@@ -35,28 +27,6 @@ localhost:3443, :3443 {
 
     handle_errors {
         rewrite * /{err.status_code}.html
-        file_server
-    }
-
-    tls internal
-}
-
-:80 {
-    root * /usr/share/caddy
-
-    handle /query* {
-        reverse_proxy https://api:8080 {
-            transport http {
-                versions 1.1
-                tls_insecure_skip_verify
-            }
-            header_up Host {http.request.host}
-            header_up X-Real-IP {remote_host}
-        }
-    }
-
-    handle {
-        try_files {path} /index.html
         file_server
     }
 }
