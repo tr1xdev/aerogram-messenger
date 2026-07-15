@@ -26,13 +26,14 @@ The following environments are required for local development and have been test
 Before running the application, you must set up your environment variables:
 
 1. Copy the example configuration file:
+
 ```bash
-cp .env.example .env
-````
+   cp .env.example .env
+```
 
-2.  Open `.env` and update the values (API keys, database credentials, etc.) to match your local environment.
+2. Open `.env` and update the values (API keys, database credentials, etc.) to match your local environment.
 
------
+---
 
 ## Quick Start
 
@@ -41,45 +42,44 @@ cp .env.example .env
 1. **Clone this repository:**
 
 ```bash
-git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
+   git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
 ```
 
 2. **Build and start services:**
 
 ```bash
-docker compose up --build -d
+   docker compose up --build -d
 ```
 
 3. **Access the application:**
-    * Open **[https://localhost:8080](https://localhost:8080)** (backend API available at `/query`)
+
+   Open **[https://localhost:8080](https://localhost:8080)** (backend API available at `/query`)
 
 ### Local Development
 
 1. **Setup infrastructure & dependencies:**
 
 ```bash
-make infra install-deps   # Postgres & Redis + Go/NPM module + GeoIP data
+   make infra install-deps   # Postgres & Redis + Go/NPM modules + GeoIP data
 ```
 
 2. **Generate code:**
 
 ```bash
-make proto gql            # gRPC and GraphQL codegen
+   make proto gql   # gRPC and GraphQL codegen
 ```
-  
+
 3. **Run services** (in separate terminals):
 
 ```bash
-make dev-backend    # https://localhost:8080
-make dev-frontend   # http://localhost:5173
+   make dev-backend    # https://localhost:8080
+   make dev-frontend   # http://localhost:5173
 ```
 
-## Features
+---
 
-Aerogram supports private chats, groups, channels, media attachments, OTP auth, bot integrations and more.  
-👉 See [docs/FEATURES.md](docs/FEATURES.md) for the full list.
+## Features & Tech Stack
 
-## Tech Stack
+Aerogram supports private chats, groups, channels, media attachments, OTP auth, bot integrations and more — built on **Go**, **gRPC**, **GraphQL**, **PostgreSQL**, **Redis**, **React** and **Tailwind CSS**.
 
-Go, gRPC, GraphQL, PostgreSQL, Redis, React, Tailwind CSS and more.  
-👉 See [docs/TECH_STACK.md](docs/TECH_STACK.md) for details.
+📋 [Full feature list](docs/FEATURES.md) · 🛠️ [Tech stack details](docs/TECH_STACK.md)
