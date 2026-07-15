@@ -7,7 +7,7 @@ import (
 )
 
 func EncodeGlobalID(kind string, id string) string {
-	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", kind, id)))
+	return base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", kind, id))
 }
 
 func DecodeGlobalID(globalID string) (string, string, error) {
