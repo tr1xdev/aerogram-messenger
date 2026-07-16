@@ -41,7 +41,6 @@ s3:
 auth:
     jwt:
         secret: ${JWT_SECRET} # Secret for signing (from .env)
-        ttl_minutes: ${JWT_TTL:-60} # Access token lifetime in minutes
     two_fa:
         code_ttl: ${2FA_CODE_TTL:-1m} # Time-to-live for 2FA codes
         enabled: ${ENABLE_2FA:-false} # Master flag for 2FA availability
