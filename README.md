@@ -28,7 +28,7 @@ Before running the application, you must set up your environment variables:
 1. Copy the example configuration file:
 
 ```bash
-   cp .env.example .env
+cp .env.example .env
 ```
 
 2. Open `.env` and update the values (API keys, database credentials, etc.) to match your local environment.
@@ -42,13 +42,13 @@ Before running the application, you must set up your environment variables:
 1. **Clone this repository:**
 
 ```bash
-   git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
+git clone https://github.com/tr1xdev/aerogram-messenger.git && cd aerogram-messenger
 ```
 
 2. **Build and start services:**
 
 ```bash
-   docker compose up --build -d
+docker compose up --build -d
 ```
 
 3. **Access the application:**
@@ -60,20 +60,20 @@ Before running the application, you must set up your environment variables:
 1. **Setup infrastructure & dependencies:**
 
 ```bash
-   make infra install-deps   # Postgres & Redis + Go/NPM modules + GeoIP data
+make infra install-deps   # Postgres & Redis + Go/NPM modules + GeoIP data
 ```
 
 2. **Generate code:**
 
 ```bash
-   make proto gql   # gRPC and GraphQL codegen
+  make proto gql   # gRPC and GraphQL codegen
 ```
 
 3. **Run services** (in separate terminals):
 
 ```bash
-   make dev-backend    # https://localhost:8080
-   make dev-frontend   # http://localhost:5173
+make dev-backend    # https://localhost:8080
+make dev-frontend   # http://localhost:5173
 ```
 
 ---
