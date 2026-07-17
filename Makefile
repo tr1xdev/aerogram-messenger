@@ -61,9 +61,6 @@ dev-backend:
 	@cd $(BACKEND_DIR) && \
 	DB_HOST=localhost \
 	REDIS_HOST=localhost \
-	CONFIG_PATH=$(PWD)/config.yaml \
-	CERT_PATH=$(PWD)/$(CERTS_DIR)/localhost+2.pem \
-	KEY_PATH=$(PWD)/$(CERTS_DIR)/localhost+2-key.pem \
 	GEOIP_PATH=$(PWD)/$(ASSETS_DIR)/GeoLite2-City.mmdb \
 	VERIFICATION_TEMPLATE_PATH=$(PWD)/$(BACKEND_DIR)/internal/templates/verification.html \
 	go run cmd/aerogram-api/main.go
@@ -71,8 +68,6 @@ dev-backend:
 dev-frontend:
 	@echo "$(GREEN)▶ Starting Frontend...$(RESET)"
 	@cd $(FRONTEND_DIR) && \
-	# VITE_API_URL=http://localhost:8080/query \
-	# VITE_WS_URL=wss://localhost:8080/query \
 	npm run dev
 
 # --- Code Generation ---
