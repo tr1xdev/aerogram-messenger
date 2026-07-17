@@ -135,6 +135,7 @@ type AuthLimitConfig struct {
 }
 
 type ChatLimitConfig struct {
+	Get    LimitEntry `mapstructure:"get"`
 	Create LimitEntry `mapstructure:"create"`
 	Delete LimitEntry `mapstructure:"delete"`
 }
