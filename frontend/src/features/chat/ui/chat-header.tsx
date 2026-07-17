@@ -25,6 +25,7 @@ import { formatLastSeen } from "@/shared/lib/date";
 import { cn } from "@/lib/utils";
 import { ChatEntityDetails } from "./chat-entity-details";
 import type { chatHeader_user$key } from "./__generated__/chatHeader_user.graphql";
+import { useTypingSubscription } from "@/features/chat/lib/chat/use-typing";
 
 const ChatHeaderUserFragment = graphql`
   fragment chatHeader_user on User {
@@ -42,6 +43,7 @@ const ChatHeaderUserFragment = graphql`
 
 interface ChatHeaderProps {
   id: string;
+  myId?: string;
   title?: string;
   photoUrl?: string;
   totalUnread: number;
@@ -53,6 +55,7 @@ interface ChatHeaderProps {
 
 export function ChatHeader({
   id,
+  myId,
   title,
   photoUrl,
   totalUnread,
@@ -64,10 +67,13 @@ export function ChatHeader({
   const navigate = useNavigate();
   const [now, setNow] = useState<number>((): number => Date.now());
   const user = useFragment(ChatHeaderUserFragment, userRef);
+  const isSomeoneElseTyping = useTypingSubscription(id, myId, type);
 
   const isSavedMessages: boolean =
     type === "PRIVATE" && (title === "Saved Messages" || !userRef);
   const isTyping: boolean = user?.isTyping ?? false;
+  const isGroupTyping: boolean =
+    (type === "GROUP" || type === "CHANNEL") && isSomeoneElseTyping;
   const rawStatus: string = user?.status ?? "offline";
   const isOnline: boolean = rawStatus.toLowerCase() === "online";
 
@@ -82,7 +88,11 @@ export function ChatHeader({
   if (isSavedMessages) {
     statusText = user?.username ? `@${user.username}` : "";
   } else if (type === "CHANNEL" || type === "GROUP") {
-    statusText = `${membersCount} ${membersCount === 1 ? "member" : "members"}`;
+    if (isGroupTyping) {
+      statusText = "typing...";
+    } else {
+      statusText = `${membersCount} ${membersCount === 1 ? "member" : "members"}`;
+    }
   } else if (isTyping) {
     statusText = "typing...";
   }
@@ -122,7 +132,7 @@ export function ChatHeader({
           <span
             className={cn(
               "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",
-              type === "PRIVATE" && !isSavedMessages && (isTyping || isOnline)
+              (type === "PRIVATE" && !isSavedMessages && (isTyping || isOnline)) || isGroupTyping
                 ? "text-primary"
                 : "text-muted-foreground",
             )}

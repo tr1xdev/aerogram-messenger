@@ -88,6 +88,7 @@ const messageDeletedSubscription = graphql`
 export function useGlobalSubscriptions(
   chatId: string | undefined,
   myId: string | undefined,
+  chatType?: "PRIVATE" | "GROUP" | "CHANNEL",
 ): void {
   const params: { chatId?: string } = useParams({ strict: false });
   const activeChatRef = useRef<string | undefined>(params.chatId);
@@ -221,13 +222,15 @@ export function useGlobalSubscriptions(
           const uId: string = String(payload.getValue("userId"));
           if (uId === String(myId)) return;
 
-          const userRecord: RecordProxy | null | undefined = store.get(uId);
-          if (userRecord) {
-            userRecord.setValue(payload.getValue("isTyping"), "isTyping");
+          if (chatType === "PRIVATE") {
+            const userRecord: RecordProxy | null | undefined = store.get(uId);
+            if (userRecord) {
+              userRecord.setValue(payload.getValue("isTyping"), "isTyping");
+            }
           }
         },
       }),
-      [chatId, myId],
+      [chatId, myId, chatType],
     ),
   );
 

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import { graphql, useSubscription, useMutation } from "react-relay";
-import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
+import type { RecordSourceSelectorProxy } from "relay-runtime";
 import type {
   useTypingSubscription as useTypingSubscriptionType,
   useTypingSubscription$data,
@@ -23,50 +23,68 @@ const sendTypingMutation = graphql`
   }
 `;
 
-interface TypingData {
-  userId: string;
-  isTyping: boolean;
-}
+export function useTypingSubscription(
+  chatId: string,
+  myId: string | undefined,
+  chatType?: "PRIVATE" | "GROUP" | "CHANNEL",
+): boolean {
+  const [prevChatId, setPrevChatId] = useState<string>(chatId);
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
 
-export function useTypingSubscription(chatId: string): TypingData | null {
-  const [typingData, setTypingData] = useState<TypingData | null>(null);
+  if (chatId !== prevChatId) {
+    setPrevChatId(chatId);
+    setTypingUsers(new Set());
+  }
 
   const subscriptionConfig = useMemo(
     () => ({
       subscription: typingSubscription,
-      variables: { chatID: chatId } as useTypingSubscription$variables,
+      variables: ({ chatID: chatId } as useTypingSubscription$variables),
       onNext: (
         response: useTypingSubscription$data | null | undefined,
       ): void => {
-        if (response?.userTyping) {
-          setTypingData({
-            userId: String(response.userTyping.userId),
-            isTyping: Boolean(response.userTyping.isTyping),
-          });
-        }
+        if (!response?.userTyping) return;
+
+        const userId = String(response.userTyping.userId);
+        const isTyping = Boolean(response.userTyping.isTyping);
+
+        if (myId && userId === String(myId)) return;
+
+        setTypingUsers((prev) => {
+          const next = new Set(prev);
+          if (isTyping) {
+            next.add(userId);
+          } else {
+            next.delete(userId);
+          }
+          return next;
+        });
       },
       updater: (
         store: RecordSourceSelectorProxy<useTypingSubscription$data>,
       ): void => {
-        const payload: RecordProxy | null | undefined =
-          store.getRootField("userTyping");
+        const payload = store.getRootField("userTyping");
         if (!payload) return;
 
-        const userId: string = String(payload.getValue("userId"));
-        const isTyping: boolean = Boolean(payload.getValue("isTyping"));
+        const userId = String(payload.getValue("userId"));
+        const isTyping = Boolean(payload.getValue("isTyping"));
 
-        const userRecord: RecordProxy | null | undefined = store.get(userId);
-        if (userRecord) {
-          userRecord.setValue(isTyping, "isTyping");
+        if (myId && userId === String(myId)) return;
+
+        if (chatType === "PRIVATE") {
+          const userRecord = store.get(userId);
+          if (userRecord) {
+            userRecord.setValue(isTyping, "isTyping");
+          }
         }
       },
     }),
-    [chatId],
+    [chatId, myId, chatType],
   );
 
   useSubscription<useTypingSubscriptionType>(subscriptionConfig);
 
-  return typingData;
+  return typingUsers.size > 0;
 }
 
 export function useSendTyping(chatId: string): {
