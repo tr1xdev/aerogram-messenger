@@ -71,8 +71,8 @@ dev-backend:
 dev-frontend:
 	@echo "$(GREEN)▶ Starting Frontend...$(RESET)"
 	@cd $(FRONTEND_DIR) && \
-	VITE_API_URL=https://localhost:8080/query \
-	VITE_WS_URL=wss://localhost:8080/query \
+	# VITE_API_URL=http://localhost:8080/query \
+	# VITE_WS_URL=wss://localhost:8080/query \
 	npm run dev
 
 # --- Code Generation ---
