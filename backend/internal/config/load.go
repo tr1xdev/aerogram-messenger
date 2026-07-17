@@ -78,8 +78,8 @@ func resolveConfigPath() (string, error) {
 
 func expandEnv(content string) string {
 	return os.Expand(content, func(key string) string {
-		if idx := strings.Index(key, ":-"); idx != -1 {
-			name, fallback := key[:idx], key[idx+2:]
+		if before, after, ok := strings.Cut(key, ":-"); ok {
+			name, fallback := before, after
 			if val := os.Getenv(name); val != "" {
 				return val
 			}
