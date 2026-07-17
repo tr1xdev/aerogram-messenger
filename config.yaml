@@ -41,7 +41,6 @@ s3:
 auth:
     jwt:
         secret: ${JWT_SECRET} # Secret for signing (from .env)
-        ttl_minutes: ${JWT_TTL:-60} # Access token lifetime in minutes
     two_fa:
         code_ttl: ${2FA_CODE_TTL:-1m} # Time-to-live for 2FA codes
         enabled: ${ENABLE_2FA:-false} # Master flag for 2FA availability
@@ -63,6 +62,9 @@ ratelimit:
             limit: 3 # 2FA/Email verification attempts
             window: 5m # Time window
     chat:
+        get:
+            limit: ${CHAT_GET_LIMIT:-60} # Allowed chat get attempts
+            window: 1m # Time window
         create:
             limit: ${CHAT_CREATE_LIMIT:-10} # Allowed chat creation attempts
             window: 10m # Time window

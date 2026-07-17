@@ -48,7 +48,7 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	db, err := database.NewPostgres(cfg.PostgresDSN())
+	db, err := database.NewPostgres(cfg.Database.Postgres.DSN())
 	if err != nil {
 		log.Fatalf("failed to connect to postgres: %v", err)
 	}
@@ -58,7 +58,7 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	rdb := database.NewRedis(cfg.RedisAddr(), cfg.Database.Redis.Password, cfg.Database.Redis.DB)
+	rdb := database.NewRedis(cfg.Database.Redis.Addr(), cfg.Database.Redis.Password, cfg.Database.Redis.DB)
 	defer rdb.Close()
 
 	pRepo := repositories.NewPresenceRepository(rdb)

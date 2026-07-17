@@ -1,14 +1,8 @@
 package config
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"strings"
 	"time"
-
-	"github.com/joho/godotenv"
-	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -27,6 +21,15 @@ type AppConfig struct {
 	Debug     bool   `mapstructure:"debug"`
 }
 
+func (a AppConfig) IsProduction() bool {
+	switch a.Env {
+	case "production", "prod":
+		return true
+	default:
+		return false
+	}
+}
+
 type ServerConfig struct {
 	HTTP HTTPConfig `mapstructure:"http"`
 	GRPC GRPCConfig `mapstructure:"grpc"`
@@ -36,6 +39,10 @@ type HTTPConfig struct {
 	Host    string        `mapstructure:"host"`
 	Port    int           `mapstructure:"port"`
 	Timeout TimeoutConfig `mapstructure:"timeout"`
+}
+
+func (h HTTPConfig) Addr() string {
+	return fmt.Sprintf("%s:%d", h.Host, h.Port)
 }
 
 type TimeoutConfig struct {
@@ -48,6 +55,10 @@ type GRPCConfig struct {
 	Host              string        `mapstructure:"host"`
 	Port              int           `mapstructure:"port"`
 	MaxConnectionIdle time.Duration `mapstructure:"max_connection_idle"`
+}
+
+func (g GRPCConfig) Addr() string {
+	return fmt.Sprintf("%s:%d", g.Host, g.Port)
 }
 
 type DatabaseConfig struct {
@@ -67,12 +78,23 @@ type PostgresConfig struct {
 	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
 }
 
+func (p PostgresConfig) DSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		p.Host, p.Port, p.User, p.Password, p.DBName, p.SSLMode,
+	)
+}
+
 type RedisConfig struct {
 	Host     string `mapstructure:"host"`
 	Port     int    `mapstructure:"port"`
 	DB       int    `mapstructure:"db"`
 	Password string `mapstructure:"password"`
 	PoolSize int    `mapstructure:"pool_size"`
+}
+
+func (r RedisConfig) Addr() string {
+	return fmt.Sprintf("%s:%d", r.Host, r.Port)
 }
 
 type AuthConfig struct {
@@ -113,6 +135,7 @@ type AuthLimitConfig struct {
 }
 
 type ChatLimitConfig struct {
+	Get    LimitEntry `mapstructure:"get"`
 	Create LimitEntry `mapstructure:"create"`
 	Delete LimitEntry `mapstructure:"delete"`
 }
@@ -147,61 +170,4 @@ type S3Config struct {
 	UseSSL     bool   `mapstructure:"use_ssl"`
 	Region     string `mapstructure:"region"`
 	PublicHost string `mapstructure:"public_host"`
-}
-
-func Load() (*Config, error) {
-	configPath := os.Getenv("CONFIG_PATH")
-	if configPath == "" {
-		locations := []string{"config.yaml", "config/config.yaml", "../config.yaml"}
-		for _, loc := range locations {
-			if _, err := os.Stat(loc); err == nil {
-				configPath = loc
-				break
-			}
-		}
-	}
-
-	if configPath == "" {
-		return nil, fmt.Errorf("config file not found")
-	}
-
-	_ = godotenv.Load()
-
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config at %s: %w", configPath, err)
-	}
-
-	expandedContent := os.Expand(string(content), func(s string) string {
-		if strings.Contains(s, ":-") {
-			parts := strings.SplitN(s, ":-", 2)
-			if val := os.Getenv(parts[0]); val != "" {
-				return val
-			}
-			return parts[1]
-		}
-		return os.Getenv(s)
-	})
-
-	viper.SetConfigType("yaml")
-	if err := viper.ReadConfig(bytes.NewBufferString(expandedContent)); err != nil {
-		return nil, err
-	}
-
-	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, err
-	}
-
-	return &cfg, nil
-}
-
-func (c *Config) PostgresDSN() string {
-	p := c.Database.Postgres
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		p.Host, p.Port, p.User, p.Password, p.DBName, p.SSLMode)
-}
-
-func (c *Config) RedisAddr() string {
-	return fmt.Sprintf("%s:%d", c.Database.Redis.Host, c.Database.Redis.Port)
 }

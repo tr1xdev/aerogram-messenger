@@ -35,10 +35,6 @@ const (
 
 const MaxAdminsLimit int = 50
 
-// TODO: move to config
-const getChatRateLimit = 60
-const getChatRateWindow = time.Minute
-
 type Server struct {
 	chatpb.UnimplementedChatServiceServer
 	db         *database.DB
@@ -414,7 +410,7 @@ func (s *Server) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chat
 		limitKey = "limiter:get_chat:guest"
 	}
 
-	if err := s.limiter.Check(ctx, limitKey, getChatRateLimit, getChatRateWindow); err != nil {
+	if err := s.limiter.Check(ctx, limitKey, s.cfg.Get.Limit, s.cfg.Get.Window); err != nil {
 		return nil, status.Error(codes.ResourceExhausted, "request limit exceeded, please try again later")
 	}
 
