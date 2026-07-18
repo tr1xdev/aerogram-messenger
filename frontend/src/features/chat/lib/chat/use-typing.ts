@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useRef, useEffect } from "react";
-import { graphql, useSubscription, useMutation } from "react-relay";
-import type { RecordSourceSelectorProxy, RecordProxy } from "relay-runtime";
+import { graphql, useSubscription, useMutation, useRelayEnvironment } from "react-relay";
+import type { RecordSourceSelectorProxy } from "relay-runtime";
 import type {
   useTypingSubscription as useTypingSubscriptionType,
   useTypingSubscription$data,
@@ -23,13 +23,29 @@ const sendTypingMutation = graphql`
   }
 `;
 
-interface TypingData {
-  userId: string;
-  isTyping: boolean;
+interface TypingUser {
+  id: string;
+  name: string;
 }
 
-export function useTypingSubscription(chatId: string): TypingData | null {
-  const [typingData, setTypingData] = useState<TypingData | null>(null);
+export interface TypingStatus {
+  text: string;
+  showDots: boolean;
+}
+
+export function useTypingSubscription(
+  chatId: string,
+  myId: string | undefined,
+  chatType?: "PRIVATE" | "GROUP" | "CHANNEL",
+): TypingStatus | null {
+  const environment = useRelayEnvironment();
+  const [prevChatId, setPrevChatId] = useState<string>(chatId);
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+
+  if (chatId !== prevChatId) {
+    setPrevChatId(chatId);
+    setTypingUsers([]);
+  }
 
   const subscriptionConfig = useMemo(
     () => ({
@@ -38,35 +54,66 @@ export function useTypingSubscription(chatId: string): TypingData | null {
       onNext: (
         response: useTypingSubscription$data | null | undefined,
       ): void => {
-        if (response?.userTyping) {
-          setTypingData({
-            userId: String(response.userTyping.userId),
-            isTyping: Boolean(response.userTyping.isTyping),
-          });
+        if (!response?.userTyping) return;
+
+        const userId = String(response.userTyping.userId);
+        const isTyping = Boolean(response.userTyping.isTyping);
+
+        if (myId && userId === String(myId)) return;
+
+        let userName = "Someone";
+        const userRecord = environment.getStore().getSource().get(userId);
+        if (userRecord && userRecord.displayName) {
+          userName = String(userRecord.displayName);
         }
+
+        setTypingUsers((prev) => {
+          const filtered = prev.filter((u) => u.id !== userId);
+          if (isTyping) {
+            return [...filtered, { id: userId, name: userName }];
+          }
+          return filtered;
+        });
       },
       updater: (
         store: RecordSourceSelectorProxy<useTypingSubscription$data>,
       ): void => {
-        const payload: RecordProxy | null | undefined =
-          store.getRootField("userTyping");
+        const payload = store.getRootField("userTyping");
         if (!payload) return;
 
-        const userId: string = String(payload.getValue("userId"));
-        const isTyping: boolean = Boolean(payload.getValue("isTyping"));
+        const userId = String(payload.getValue("userId"));
+        const isTyping = Boolean(payload.getValue("isTyping"));
 
-        const userRecord: RecordProxy | null | undefined = store.get(userId);
-        if (userRecord) {
-          userRecord.setValue(isTyping, "isTyping");
+        if (myId && userId === String(myId)) return;
+
+        if (chatType === "PRIVATE") {
+          const userRecord = store.get(userId);
+          if (userRecord) {
+            userRecord.setValue(isTyping, "isTyping");
+          }
         }
       },
     }),
-    [chatId],
+    [chatId, myId, chatType, environment],
   );
 
   useSubscription<useTypingSubscriptionType>(subscriptionConfig);
 
-  return typingData;
+  if (typingUsers.length === 0) return null;
+
+  if (chatType === "PRIVATE") {
+    return { text: "typing", showDots: true };
+  }
+
+  if (typingUsers.length === 1) {
+    return { text: `${typingUsers[0].name} is typing`, showDots: true };
+  }
+
+  if (typingUsers.length === 2) {
+    return { text: `${typingUsers[0].name} and ${typingUsers[1].name} are typing`, showDots: true };
+  }
+
+  return { text: "several people are typing", showDots: true };
 }
 
 export function useSendTyping(chatId: string): {
