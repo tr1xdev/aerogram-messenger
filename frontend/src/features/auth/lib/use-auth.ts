@@ -160,7 +160,7 @@ export const useVerifyEmail = (): {
   const setTokens = useAuthStore((state) => state.setTokens);
   const [error, setError] = useState<Error | null>(null);
   const [commit, isInFlight] =
-    useMutation<useAuthVerifyEmailMutation>(verifyEmailMutation);
+      useMutation<useAuthVerifyEmailMutation>(verifyEmailMutation);
 
   const mutate = useCallback(
     (params: {

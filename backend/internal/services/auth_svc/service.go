@@ -45,7 +45,7 @@ func NewServer(db *database.DB, authLimiter limiter.RateLimiter, rdb *redis.Clie
 	return &Server{
 		db:          db,
 		authLimiter: authLimiter,
-		authRepo:    repositories.NewAuthRepository(db, rdb, mailer, cfg.Auth.TwoFA.CodeTTL),
+		authRepo:    repositories.NewAuthRepository(db, rdb, mailer, cfg.Auth.TwoFA.CodeTTL, cfg.App.IsProduction()),
 		userRepo:    repositories.NewUserRepository(db),
 		cfg:         cfg,
 		rdb:         rdb,
@@ -98,7 +98,6 @@ func (s *Server) createAccessToken(userID, sessionID string, verified bool, isBo
 
 func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb.SignUpResponse, error) {
 	ip, _ := s.getMetadata(ctx)
-
 	limitCfg := s.cfg.RateLimit.Auth.SignUp
 	allowed, err := s.authLimiter.Allow(ctx, "limit:signup:"+ip, limitCfg.Limit, limitCfg.Window)
 	if err != nil {
@@ -107,21 +106,17 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 	if !allowed {
 		return nil, status.Error(codes.ResourceExhausted, "too many registration attempts from this IP")
 	}
-
 	if req.Email == "" || req.FirstName == "" || req.Password == "" {
 		return nil, status.Error(codes.InvalidArgument, "required fields missing")
 	}
-
 	_, err = s.userRepo.GetByEmail(ctx, req.Email)
 	if err == nil {
 		return nil, status.Error(codes.AlreadyExists, "email already registered")
 	}
-
 	pwHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to process password")
 	}
-
 	var lName, uName string
 	if req.LastName != nil {
 		lName = *req.LastName
@@ -129,7 +124,6 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 	if req.Username != nil {
 		uName = *req.Username
 	}
-
 	if !s.cfg.Auth.TwoFA.Enabled || !s.cfg.Auth.TwoFA.OnSignUp {
 		newID := uuid.New()
 		params := dbgen.CreateUserParams{
@@ -141,11 +135,9 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 			LastName:  database.ToNullString(&lName),
 			Username:  database.ToNullString(&uName),
 		}
-
 		if _, err := s.userRepo.CreateUser(ctx, params); err != nil {
 			return nil, status.Error(codes.Internal, "storage error")
 		}
-
 		sid := uuid.New()
 		_, err = s.db.Queries.CreateSession(ctx, dbgen.CreateSessionParams{
 			ID:        sid,
@@ -156,19 +148,16 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 		if err != nil {
 			return nil, status.Error(codes.Internal, "session creation failed")
 		}
-
 		token, err := s.createAccessToken(newID.String(), sid.String(), true, false)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "token error")
 		}
-
 		return &authpb.SignUpResponse{
 			UserId:       newID.String(),
 			AccessToken:  &token,
 			RefreshToken: &[]string{sid.String()}[0],
 		}, nil
 	}
-
 	verID := uuid.NewString()
 	pending := pendingUser{
 		Email:     req.Email,
@@ -177,26 +166,18 @@ func (s *Server) SignUp(ctx context.Context, req *authpb.SignUpRequest) (*authpb
 		Username:  uName,
 		Password:  string(pwHash),
 	}
-
 	data, _ := json.Marshal(pending)
 	err = s.rdb.Set(ctx, "pending_reg:"+verID, data, s.cfg.Auth.TwoFA.CodeTTL).Err()
 	if err != nil {
 		return nil, status.Error(codes.Internal, "cache error")
 	}
-
-	targetEmail := req.Email
-	if s.cfg.App.Env == "development" && s.cfg.App.TestEmail != "" {
-		targetEmail = s.cfg.App.TestEmail
-	}
-
 	go func(vID, email, name string) {
 		asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := s.authRepo.StoreAndSendCode(asyncCtx, vID, "PENDING", email, name); err != nil {
 			fmt.Printf("ASYNC MAIL ERROR: %v\n", err)
 		}
-	}(verID, targetEmail, req.FirstName)
-
+	}(verID, req.Email, req.FirstName)
 	return &authpb.SignUpResponse{UserId: verID}, nil
 }
 
@@ -209,24 +190,19 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 	if !allowed {
 		return nil, status.Error(codes.ResourceExhausted, "too many login attempts")
 	}
-
 	if req.Email == "" || req.Password == "" {
 		return nil, status.Error(codes.InvalidArgument, "email and password required")
 	}
-
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
-
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password.String), []byte(req.Password)); err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
-
 	if !s.cfg.Auth.TwoFA.Enabled || !s.cfg.Auth.TwoFA.OnSignIn {
 		ip, ua := s.getMetadata(ctx)
 		sid := uuid.New()
-
 		_, err = s.db.Queries.CreateSession(ctx, dbgen.CreateSessionParams{
 			ID:        sid,
 			UserID:    user.ID,
@@ -236,33 +212,24 @@ func (s *Server) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.L
 		if err != nil {
 			return nil, status.Error(codes.Internal, "session creation failed")
 		}
-
 		token, err := s.createAccessToken(user.ID.String(), sid.String(), true, false)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "token error")
 		}
-
 		return &authpb.LoginResponse{
 			UserId:       user.ID.String(),
 			AccessToken:  &token,
 			RefreshToken: &[]string{sid.String()}[0],
 		}, nil
 	}
-
 	verID := uuid.NewString()
-	targetEmail := user.Email.String
-	if s.cfg.App.Env == "development" && s.cfg.App.TestEmail != "" {
-		targetEmail = s.cfg.App.TestEmail
-	}
-
 	go func(vID, uID, email, name string) {
 		asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := s.authRepo.StoreAndSendCode(asyncCtx, vID, uID, email, name); err != nil {
 			fmt.Printf("ASYNC MAIL ERROR: %v\n", err)
 		}
-	}(verID, user.ID.String(), targetEmail, user.FirstName)
-
+	}(verID, user.ID.String(), user.Email.String, user.FirstName)
 	return &authpb.LoginResponse{UserId: verID}, nil
 }
 
