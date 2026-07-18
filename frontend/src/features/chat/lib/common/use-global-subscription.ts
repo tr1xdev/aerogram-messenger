@@ -85,6 +85,25 @@ const messageDeletedSubscription = graphql`
   }
 `;
 
+function extractUuid(id: string | undefined): string {
+  if (!id) return "";
+  if (id.includes("-") && !id.includes(":")) return id;
+  try {
+    const decoded = atob(id);
+    if (decoded.includes(":")) {
+      return decoded.split(":")[1] || id;
+    }
+  } catch {
+    return id;
+  }
+  return id;
+}
+
+function isSameId(idA: string | undefined, idB: string | undefined): boolean {
+  if (!idA || !idB) return false;
+  return extractUuid(idA) === extractUuid(idB);
+}
+
 export function useGlobalSubscriptions(
   chatId: string | undefined,
   myId: string | undefined,
@@ -124,7 +143,7 @@ export function useGlobalSubscriptions(
             const sender: RecordProxy | null | undefined =
               rootField.getLinkedRecord("sender");
             const senderId: string = String(sender?.getValue("id"));
-            const isFromMe: boolean = senderId === String(myId);
+            const isFromMe: boolean = isSameId(senderId, myId);
 
             const isCurrentChatActive: boolean =
               msgChatId === activeChatRef.current &&
@@ -220,7 +239,7 @@ export function useGlobalSubscriptions(
           if (!payload) return;
 
           const uId: string = String(payload.getValue("userId"));
-          if (uId === String(myId)) return;
+          if (isSameId(uId, myId)) return;
 
           if (chatType === "PRIVATE") {
             const userRecord: RecordProxy | null | undefined = store.get(uId);
@@ -251,7 +270,7 @@ export function useGlobalSubscriptions(
 
           const chatRecord: RecordProxy | null | undefined = store.get(cId);
           if (chatRecord) {
-            if (uId === String(myId)) {
+            if (isSameId(uId, myId)) {
               chatRecord.setValue(0, "unreadCount");
               chatRecord.setValue(lastSeq, "myReadSequence");
             } else {

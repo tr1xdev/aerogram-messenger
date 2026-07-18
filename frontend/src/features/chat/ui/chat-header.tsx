@@ -67,13 +67,11 @@ export function ChatHeader({
   const navigate = useNavigate();
   const [now, setNow] = useState<number>((): number => Date.now());
   const user = useFragment(ChatHeaderUserFragment, userRef);
-  const isSomeoneElseTyping = useTypingSubscription(id, myId, type);
+  const typingStatus = useTypingSubscription(id, myId, type);
 
   const isSavedMessages: boolean =
     type === "PRIVATE" && (title === "Saved Messages" || !userRef);
-  const isTyping: boolean = user?.isTyping ?? false;
-  const isGroupTyping: boolean =
-    (type === "GROUP" || type === "CHANNEL") && isSomeoneElseTyping;
+  const isTyping: boolean = (user?.isTyping ?? false) && user?.id !== myId;
   const rawStatus: string = user?.status ?? "offline";
   const isOnline: boolean = rawStatus.toLowerCase() === "online";
 
@@ -84,17 +82,35 @@ export function ChatHeader({
     return (): void => clearInterval(interval);
   }, []);
 
-  let statusText: string = formatLastSeen(rawStatus, new Date(now));
+  const renderDots = (): ReactNode => (
+    <span className="inline-flex items-center gap-0.5 ml-1 h-3 align-baseline">
+      <span className="typing-dot" />
+      <span className="typing-dot" />
+      <span className="typing-dot" />
+    </span>
+  );
+
+  let statusText: ReactNode = formatLastSeen(rawStatus, new Date(now));
   if (isSavedMessages) {
     statusText = user?.username ? `@${user.username}` : "";
   } else if (type === "CHANNEL" || type === "GROUP") {
-    if (isGroupTyping) {
-      statusText = "typing...";
+    if (typingStatus) {
+      statusText = (
+        <span className="flex items-center">
+          {typingStatus.text}
+          {typingStatus.showDots && renderDots()}
+        </span>
+      );
     } else {
       statusText = `${membersCount} ${membersCount === 1 ? "member" : "members"}`;
     }
   } else if (isTyping) {
-    statusText = "typing...";
+    statusText = (
+      <span className="flex items-center">
+        typing
+        {renderDots()}
+      </span>
+    );
   }
 
   const effectivePhotoUrl: string | undefined = isSavedMessages
@@ -132,7 +148,7 @@ export function ChatHeader({
           <span
             className={cn(
               "text-[11px] mt-1 font-medium leading-none h-3 flex items-center",
-              (type === "PRIVATE" && !isSavedMessages && (isTyping || isOnline)) || isGroupTyping
+              (type === "PRIVATE" && !isSavedMessages && (isTyping || isOnline)) || !!typingStatus
                 ? "text-primary"
                 : "text-muted-foreground",
             )}

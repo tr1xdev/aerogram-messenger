@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, useRef, useEffect } from "react";
-import { graphql, useSubscription, useMutation } from "react-relay";
+import { graphql, useSubscription, useMutation, useRelayEnvironment } from "react-relay";
 import type { RecordSourceSelectorProxy } from "relay-runtime";
 import type {
   useTypingSubscription as useTypingSubscriptionType,
@@ -23,23 +23,34 @@ const sendTypingMutation = graphql`
   }
 `;
 
+interface TypingUser {
+  id: string;
+  name: string;
+}
+
+export interface TypingStatus {
+  text: string;
+  showDots: boolean;
+}
+
 export function useTypingSubscription(
   chatId: string,
   myId: string | undefined,
   chatType?: "PRIVATE" | "GROUP" | "CHANNEL",
-): boolean {
+): TypingStatus | null {
+  const environment = useRelayEnvironment();
   const [prevChatId, setPrevChatId] = useState<string>(chatId);
-  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
 
   if (chatId !== prevChatId) {
     setPrevChatId(chatId);
-    setTypingUsers(new Set());
+    setTypingUsers([]);
   }
 
   const subscriptionConfig = useMemo(
     () => ({
       subscription: typingSubscription,
-      variables: ({ chatID: chatId } as useTypingSubscription$variables),
+      variables: { chatID: chatId } as useTypingSubscription$variables,
       onNext: (
         response: useTypingSubscription$data | null | undefined,
       ): void => {
@@ -50,14 +61,18 @@ export function useTypingSubscription(
 
         if (myId && userId === String(myId)) return;
 
+        let userName = "Someone";
+        const userRecord = environment.getStore().getSource().get(userId);
+        if (userRecord && userRecord.displayName) {
+          userName = String(userRecord.displayName);
+        }
+
         setTypingUsers((prev) => {
-          const next = new Set(prev);
+          const filtered = prev.filter((u) => u.id !== userId);
           if (isTyping) {
-            next.add(userId);
-          } else {
-            next.delete(userId);
+            return [...filtered, { id: userId, name: userName }];
           }
-          return next;
+          return filtered;
         });
       },
       updater: (
@@ -79,12 +94,26 @@ export function useTypingSubscription(
         }
       },
     }),
-    [chatId, myId, chatType],
+    [chatId, myId, chatType, environment],
   );
 
   useSubscription<useTypingSubscriptionType>(subscriptionConfig);
 
-  return typingUsers.size > 0;
+  if (typingUsers.length === 0) return null;
+
+  if (chatType === "PRIVATE") {
+    return { text: "typing", showDots: true };
+  }
+
+  if (typingUsers.length === 1) {
+    return { text: `${typingUsers[0].name} is typing`, showDots: true };
+  }
+
+  if (typingUsers.length === 2) {
+    return { text: `${typingUsers[0].name} and ${typingUsers[1].name} are typing`, showDots: true };
+  }
+
+  return { text: "several people are typing", showDots: true };
 }
 
 export function useSendTyping(chatId: string): {
