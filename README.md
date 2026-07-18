@@ -53,7 +53,7 @@ docker compose up --build -d
 
 3. **Access the application:**
 
-   Open **[https://localhost:8080](https://localhost:8080)** (backend API available at `/query`)
+   Open **[http://localhost:8080](http://localhost:8080)**.
 
 ### Local Development
 
@@ -72,7 +72,7 @@ make proto gql   # gRPC and GraphQL codegen
 3. **Run services** (in separate terminals):
 
 ```bash
-make dev-backend    # https://localhost:8080
+make dev-backend    # http://localhost:8080
 make dev-frontend   # http://localhost:5173
 ```
 
