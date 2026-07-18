@@ -31,7 +31,7 @@ Before running the application, you must set up your environment variables:
 cp .env.example .env
 ```
 
-2. Open `.env` and update the values (API keys, database credentials, etc.) to match your local environment.
+2. Open `.env` and update the values to match your local environment.
 
 ---
 

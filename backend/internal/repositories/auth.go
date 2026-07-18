@@ -26,14 +26,15 @@ type EmailProvider interface {
 }
 
 type AuthRepository struct {
-	db      *database.DB
-	rdb     *redis.Client
-	mailer  EmailProvider
-	codeTTL time.Duration
+	db           *database.DB
+	rdb          *redis.Client
+	mailer       EmailProvider
+	codeTTL      time.Duration
+	isProduction bool
 }
 
-func NewAuthRepository(db *database.DB, rdb *redis.Client, mailer EmailProvider, ttl time.Duration) *AuthRepository {
-	return &AuthRepository{db: db, rdb: rdb, mailer: mailer, codeTTL: ttl}
+func NewAuthRepository(db *database.DB, rdb *redis.Client, mailer EmailProvider, ttl time.Duration, isProduction bool) *AuthRepository {
+	return &AuthRepository{db: db, rdb: rdb, mailer: mailer, codeTTL: ttl, isProduction: isProduction}
 }
 
 func (r *AuthRepository) StoreAndSendCode(ctx context.Context, verID, userID, email, name string) error {
@@ -46,16 +47,19 @@ func (r *AuthRepository) StoreAndSendCode(ctx context.Context, verID, userID, em
 	hash := hex.EncodeToString(sum[:])
 	key := "auth:verify:" + verID
 
-	err := r.rdb.HSet(ctx, key, map[string]interface{}{
+	err := r.rdb.HSet(ctx, key, map[string]any{
 		"hash":     hash,
 		"user_id":  userID,
 		"attempts": 0,
 	}).Err()
-
 	if err != nil {
 		return err
 	}
 	r.rdb.Expire(ctx, key, r.codeTTL)
+
+	if !r.isProduction {
+		return nil
+	}
 
 	return r.mailer.SendCode(ctx, email, code, name)
 }
@@ -66,20 +70,17 @@ func (r *AuthRepository) VerifyCode(ctx context.Context, verID, code string) (st
 	if err != nil || len(data) == 0 {
 		return "", ErrCodeExpired
 	}
-
 	var attempts int
 	_, _ = fmt.Sscanf(data["attempts"], "%d", &attempts)
 	if attempts >= 5 {
 		r.rdb.Del(ctx, key)
 		return "", ErrTooManyAttempts
 	}
-
 	sum := sha256.Sum256([]byte(code))
 	if subtle.ConstantTimeCompare([]byte(data["hash"]), []byte(hex.EncodeToString(sum[:]))) != 1 {
 		r.rdb.HIncrBy(ctx, key, "attempts", 1)
 		return "", ErrCodeInvalid
 	}
-
 	r.rdb.Del(ctx, key)
 	return data["user_id"], nil
 }

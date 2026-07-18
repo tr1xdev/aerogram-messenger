@@ -45,7 +45,7 @@ func NewServer(db *database.DB, authLimiter limiter.RateLimiter, rdb *redis.Clie
 	return &Server{
 		db:          db,
 		authLimiter: authLimiter,
-		authRepo:    repositories.NewAuthRepository(db, rdb, mailer, cfg.Auth.TwoFA.CodeTTL),
+		authRepo:    repositories.NewAuthRepository(db, rdb, mailer, cfg.Auth.TwoFA.CodeTTL, cfg.App.IsProduction()),
 		userRepo:    repositories.NewUserRepository(db),
 		cfg:         cfg,
 		rdb:         rdb,
