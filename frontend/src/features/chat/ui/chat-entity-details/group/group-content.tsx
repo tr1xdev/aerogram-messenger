@@ -102,7 +102,7 @@ export function GroupContent({
                   badge="Group"
                 />
 
-                <div className="px-6 pb-6 mt-5">
+                <div className="px-6 pb-6 mt-5"> {/** added mt-5 here */}
                   <Tabs defaultValue="members" className="w-full">
                     <TabsList className="mb-6 w-full justify-start gap-1 bg-muted/20 p-1 h-11">
                       <TabsTrigger
@@ -167,7 +167,7 @@ export function GroupContent({
                               Invite members
                             </p>
                             <p className="text-sm text-muted-foreground mt-1.5">
-                              Add people to this group by name or link
+                              Add people by username or name
                             </p>
                           </div>
 
