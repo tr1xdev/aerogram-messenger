@@ -102,7 +102,7 @@ export function GroupContent({
                   badge="Group"
                 />
 
-                <div className="px-6 pb-6">
+                <div className="px-6 pb-6 mt-5">
                   <Tabs defaultValue="members" className="w-full">
                     <TabsList className="mb-6 w-full justify-start gap-1 bg-muted/20 p-1 h-11">
                       <TabsTrigger
