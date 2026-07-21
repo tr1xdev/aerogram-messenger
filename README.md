@@ -2,6 +2,10 @@
 
 # Aerogram
 
+<p align="center">
+  <img src="assets/preview-mockup.png" alt="Aerogram Browser Preview" width="100%">
+</p>
+
 ## About
 
 Aerogram is a real-time messaging platform built with **Go** and **React**. It is designed as a modular monolith focused on low-latency communication, type safety, and scalable architecture. The backend uses a **gRPC-based** internal system with a **GraphQL API** layer. The frontend is built with **React**, **Relay**, and **shadcn/ui**, using **Tailwind CSS** for styling and UI composition. The project provides a solid foundation for building modern real-time chat applications.
