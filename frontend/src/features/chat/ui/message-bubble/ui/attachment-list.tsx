@@ -30,22 +30,21 @@ export const ImageAttachmentItem = memo(function ImageAttachmentItem({
       file={{
         url: img.url ?? "",
         fileName: img.fileName ?? "image",
-        fileSize: img.fileSize ?? "0",
+        fileSize: img.fileSize ?? 0,
         contentType: img.contentType ?? "image/jpeg",
       }}
     >
-      <div className="relative cursor-pointer max-w-[220px] w-fit overflow-hidden bg-zinc-200 group">
-        {" "}
+      <div className="relative cursor-pointer max-w-[400px] min-h-[120px] min-w-[120px] w-fit rounded-lg overflow-hidden bg-zinc-200 group">
         {!isLoaded && (
           <div className="absolute inset-0 bg-zinc-300/70 animate-pulse z-10" />
         )}
         <img
           src={img.url ?? ""}
-          alt={img.fileName ?? ""}
+          alt={img.fileName ?? "Image attachment"}
           decoding="async"
           loading="lazy"
           className={cn(
-            "block h-auto w-full object-cover transition-all duration-200",
+            "block h-auto max-h-[350px] w-auto max-w-full object-contain transition-all duration-200",
             isLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95",
           )}
           draggable={false}
@@ -73,7 +72,7 @@ export const FileAttachmentItem = memo(function FileAttachmentItem({
       file={{
         url: file.url ?? "",
         fileName: file.fileName ?? "file",
-        fileSize: file.fileSize ?? "0",
+        fileSize: file.fileSize ?? 0,
         contentType: file.contentType ?? "application/octet-stream",
       }}
     >
@@ -99,7 +98,7 @@ export const FileAttachmentItem = memo(function FileAttachmentItem({
             {file.fileName}
           </span>
           <span className="text-[11px] opacity-60">
-            {(Number(file.fileSize || 0) / 1024).toFixed(1)} KB
+            {Math.max(0.1, Number(file.fileSize || 0) / 1024).toFixed(1)} KB
           </span>
         </div>
       </div>
