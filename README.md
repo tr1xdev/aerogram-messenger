@@ -3,7 +3,7 @@
 # aerogram-messenger
 
 <p align="center">
-  <img src="assets/preview-mockup.png" alt="Aerogram Browser Preview" width="100%">
+  <img src="assets/preview.png" alt="Aerogram Browser Preview" width="100%">
 </p>
 
 ## About
