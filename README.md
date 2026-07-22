@@ -1,6 +1,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) ![Status](https://img.shields.io/badge/status-wip-orange)
 
-# Aerogram
+# aerogram-messenger
 
 <p align="center">
   <img src="assets/preview-mockup.png" alt="Aerogram Browser Preview" width="100%">
