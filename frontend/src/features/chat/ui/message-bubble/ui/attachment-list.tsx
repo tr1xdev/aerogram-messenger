@@ -34,9 +34,9 @@ export const ImageAttachmentItem = memo(function ImageAttachmentItem({
         contentType: img.contentType ?? "image/jpeg",
       }}
     >
-      <div className="relative cursor-pointer max-w-[400px] min-h-[120px] min-w-[120px] w-fit rounded-lg overflow-hidden group">
+      <div className="relative cursor-pointer w-full h-full overflow-hidden group">
         {!isLoaded && (
-          <div className="absolute inset-0 bg-zinc-300/70 animate-pulse z-10" />
+          <div className="absolute inset-0 bg-zinc-300/70 animate-pulse z-10 aspect-video" />
         )}
         <img
           src={img.url ?? ""}
@@ -44,7 +44,8 @@ export const ImageAttachmentItem = memo(function ImageAttachmentItem({
           decoding="async"
           loading="lazy"
           className={cn(
-            "block h-auto max-h-[350px] w-auto max-w-full object-contain transition-all duration-200",
+            // h-full object-cover гарантирует одинаковую высоту и выравнивание в сетке коллажа
+            "w-full h-full min-h-[140px] max-h-[350px] object-cover transition-all duration-200 block",
             isLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95",
           )}
           draggable={false}

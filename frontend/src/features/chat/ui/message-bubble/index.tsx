@@ -184,9 +184,7 @@ export const MessageBubble = memo(function MessageBubble({
               style={{ borderRadius: bubbleRadius }}
               className={cn(
                 "relative flex flex-col min-w-[70px] max-w-[85%] sm:max-w-[550px] transition-all shadow-sm overflow-hidden border-0",
-                isMe
-                  ? "bg-white text-zinc-900"
-                  : "bg-muted text-foreground",
+                isMe ? "bg-white text-zinc-900" : "bg-muted text-foreground",
               )}
             >
               <div
@@ -197,37 +195,41 @@ export const MessageBubble = memo(function MessageBubble({
                 )}
               />
 
-              {hasImages && (
-                <div
-                  className={cn(
-                    "grid gap-1 w-full overflow-hidden",
-                    images.length === 1 ? "grid-cols-1" : "grid-cols-2",
-                  )}
-                >
-                  {images.map((img) => (
-                    <ImageAttachmentItem
-                      key={img.id}
-                      img={img}
-                      mappedAllFiles={mappedAllFiles}
-                    />
-                  ))}
-                </div>
-              )}
-
-              <div className="px-3.5 pt-2.5 pb-2 flex flex-col">
+              <div className="flex flex-col w-full">
                 {showName && (
                   <span
                     style={{ color: userColor.text }}
-                    className="text-[12px] font-bold truncate block relative z-10 mb-1"
+                    className="text-[12px] font-bold truncate block relative z-10 px-3.5 pt-2.5 mb-1"
                   >
                     {senderName}
                   </span>
                 )}
+
                 {message.replyTo && (
-                  <MessageReplyPreview replyTo={message.replyTo} isMe={isMe} />
+                  <div className="px-3.5 pt-2">
+                    <MessageReplyPreview replyTo={message.replyTo} isMe={isMe} />
+                  </div>
                 )}
+
+                {hasImages && (
+                  <div
+                    className={cn(
+                      "grid gap-1 w-full overflow-hidden",
+                      images.length === 1 ? "grid-cols-1" : "grid-cols-2",
+                    )}
+                  >
+                    {images.map((img) => (
+                      <ImageAttachmentItem
+                        key={img.id}
+                        img={img}
+                        mappedAllFiles={mappedAllFiles}
+                      />
+                    ))}
+                  </div>
+                )}
+
                 {files.length > 0 && (
-                  <div className="flex flex-col gap-1 mb-2">
+                  <div className="flex flex-col gap-1 px-3.5 pt-2 mb-2">
                     {files.map((file) => (
                       <FileAttachmentItem
                         key={file.id}
@@ -238,38 +240,41 @@ export const MessageBubble = memo(function MessageBubble({
                     ))}
                   </div>
                 )}
-                <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-3">
-                  {message.text && <MessageText text={message.text} />}
-                  <div
-                    className={cn(
-                      "flex items-center gap-1 h-4 select-none ml-auto text-[10px]",
-                      isMe ? "text-zinc-500" : "text-muted-foreground/85",
-                    )}
-                  >
-                    {message.isEdited && (
-                      <>
-                        <span className="font-normal">edited</span>
-                        <span className="text-[8px] px-0.5 select-none opacity-70">
-                          ·
-                        </span>
-                      </>
-                    )}
-                    <span className="font-medium">
-                      {new Date(message.sentAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    {isMe && !isChannel && (
-                      <MessageStatus
-                        messageId={message.id}
-                        isMe={isMe}
-                        chatType={chatType}
-                        sequence={Number(message.sequence)}
-                        lastReadSequence={lastReadSequence ?? 0}
-                        className="w-3.5 h-3.5 ml-0.5"
-                      />
-                    )}
+
+                <div className="px-3.5 pt-2 pb-2 flex flex-col">
+                  <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-3">
+                    {message.text && <MessageText text={message.text} />}
+                    <div
+                      className={cn(
+                        "flex items-center gap-1 h-4 select-none ml-auto text-[10px]",
+                        isMe ? "text-zinc-500" : "text-muted-foreground/85",
+                      )}
+                    >
+                      {message.isEdited && (
+                        <>
+                          <span className="font-normal">edited</span>
+                          <span className="text-[8px] px-0.5 select-none opacity-70">
+                            ·
+                          </span>
+                        </>
+                      )}
+                      <span className="font-medium">
+                        {new Date(message.sentAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {isMe && !isChannel && (
+                        <MessageStatus
+                          messageId={message.id}
+                          isMe={isMe}
+                          chatType={chatType}
+                          sequence={Number(message.sequence)}
+                          lastReadSequence={lastReadSequence ?? 0}
+                          className="w-3.5 h-3.5 ml-0.5"
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
