@@ -34,7 +34,7 @@ export const ImageAttachmentItem = memo(function ImageAttachmentItem({
         contentType: img.contentType ?? "image/jpeg",
       }}
     >
-      <div className="relative cursor-pointer max-w-[400px] min-h-[120px] min-w-[120px] w-fit rounded-lg overflow-hidden bg-zinc-200 group">
+      <div className="relative cursor-pointer max-w-[400px] min-h-[120px] min-w-[120px] w-fit rounded-lg overflow-hidden group">
         {!isLoaded && (
           <div className="absolute inset-0 bg-zinc-300/70 animate-pulse z-10" />
         )}
@@ -81,7 +81,7 @@ export const FileAttachmentItem = memo(function FileAttachmentItem({
           "flex items-center gap-3 p-3 rounded-xl border cursor-pointer active:scale-[0.98] transition-all w-fit max-w-[260px]",
           isMe
             ? "bg-neutral-50/80 border-neutral-200"
-            : "bg-background/60 border-border",
+            : "bg-background/60 border-border/50",
         )}
       >
         <div

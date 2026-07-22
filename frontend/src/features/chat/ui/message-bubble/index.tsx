@@ -183,12 +183,9 @@ export const MessageBubble = memo(function MessageBubble({
             <div
               style={{ borderRadius: bubbleRadius }}
               className={cn(
-                "relative flex flex-col min-w-[70px] max-w-[85%] sm:max-w-[550px] transition-all shadow-sm overflow-hidden",
+                "relative flex flex-col min-w-[70px] max-w-[85%] sm:max-w-[550px] transition-all shadow-sm overflow-hidden border-0",
                 isMe
-                  ? cn(
-                      "bg-white text-zinc-900",
-                      !hasImages && "border border-neutral-100",
-                    )
+                  ? "bg-white text-zinc-900"
                   : "bg-muted text-foreground",
               )}
             >
@@ -199,10 +196,24 @@ export const MessageBubble = memo(function MessageBubble({
                   !isMe && isHighlighted && "bg-primary/25",
                 )}
               />
+
+              {/* Имя отправителя теперь всегда в самом верху баббла */}
+              {showName && (
+                <div className="px-3.5 pt-2 pb-0">
+                  <span
+                    style={{ color: userColor.text }}
+                    className="text-[12px] font-bold truncate block relative z-10"
+                  >
+                    {senderName}
+                  </span>
+                </div>
+              )}
+
               {hasImages && (
                 <div
                   className={cn(
-                    "grid gap-1 w-full",
+                    "grid gap-1 w-full overflow-hidden",
+                    showName ? "mt-1" : "",
                     images.length === 1 ? "grid-cols-1" : "grid-cols-2",
                   )}
                 >
@@ -215,15 +226,8 @@ export const MessageBubble = memo(function MessageBubble({
                   ))}
                 </div>
               )}
+
               <div className="px-3.5 py-2">
-                {showName && (
-                  <span
-                    style={{ color: userColor.text }}
-                    className="text-[12px] font-bold mb-1 truncate block relative z-10"
-                  >
-                    {senderName}
-                  </span>
-                )}
                 {message.replyTo && (
                   <MessageReplyPreview replyTo={message.replyTo} isMe={isMe} />
                 )}
