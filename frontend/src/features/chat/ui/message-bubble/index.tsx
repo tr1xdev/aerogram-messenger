@@ -199,14 +199,14 @@ export const MessageBubble = memo(function MessageBubble({
                 {showName && (
                   <span
                     style={{ color: userColor.text }}
-                    className="text-[12px] font-bold truncate block relative z-10 px-3.5 pt-2.5 mb-1"
+                    className="text-[12px] font-bold truncate block relative z-10 px-3.5 pt-2"
                   >
                     {senderName}
                   </span>
                 )}
 
                 {message.replyTo && (
-                  <div className="px-3.5 pt-2">
+                  <div className={cn("px-3.5", showName ? "pt-1" : "pt-2")}>
                     <MessageReplyPreview replyTo={message.replyTo} isMe={isMe} />
                   </div>
                 )}
@@ -214,7 +214,8 @@ export const MessageBubble = memo(function MessageBubble({
                 {hasImages && (
                   <div
                     className={cn(
-                      "grid gap-1 w-full overflow-hidden",
+                      "grid gap-[2px] w-full overflow-hidden items-stretch",
+                      showName || message.replyTo ? "mt-1.5" : "",
                       images.length === 1 ? "grid-cols-1" : "grid-cols-2",
                     )}
                   >
@@ -229,7 +230,12 @@ export const MessageBubble = memo(function MessageBubble({
                 )}
 
                 {files.length > 0 && (
-                  <div className="flex flex-col gap-1 px-3.5 pt-2 mb-2">
+                  <div
+                    className={cn(
+                      "flex flex-col gap-1 px-3.5 mb-1.5",
+                      showName || message.replyTo || hasImages ? "pt-1.5" : "pt-2",
+                    )}
+                  >
                     {files.map((file) => (
                       <FileAttachmentItem
                         key={file.id}
@@ -241,7 +247,14 @@ export const MessageBubble = memo(function MessageBubble({
                   </div>
                 )}
 
-                <div className="px-3.5 pt-2 pb-2 flex flex-col">
+                <div
+                  className={cn(
+                    "px-3.5 pb-2 flex flex-col",
+                    showName || message.replyTo || hasImages || files.length > 0
+                      ? "pt-1"
+                      : "pt-2",
+                  )}
+                >
                   <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-3">
                     {message.text && <MessageText text={message.text} />}
                     <div
@@ -300,3 +313,5 @@ export const MessageBubble = memo(function MessageBubble({
     </>
   );
 });
+
+MessageBubble.displayName = "MessageBubble";
