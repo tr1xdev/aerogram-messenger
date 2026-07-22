@@ -183,7 +183,7 @@ export const MessageBubble = memo(function MessageBubble({
             <div
               style={{ borderRadius: bubbleRadius }}
               className={cn(
-                "relative flex flex-col min-w-[70px] max-w-[85%] sm:max-w-[70%] transition-all shadow-sm overflow-hidden",
+                "relative flex flex-col min-w-[70px] max-w-[85%] sm:max-w-[550px] transition-all shadow-sm overflow-hidden",
                 isMe
                   ? cn(
                       "bg-white text-zinc-900",

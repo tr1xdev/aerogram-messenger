@@ -193,7 +193,7 @@ export const MessageList = memo(function MessageList({
     <div className="h-full w-full relative bg-transparent overflow-hidden isolate flex flex-col">
       <ScrollArea ref={scrollRef} type="auto" className="flex-1 w-full min-h-0">
         <div
-          className="px-2 sm:px-4 py-6 mx-auto min-h-full flex flex-col w-full max-w-4xl min-w-0"
+          className="px-4 sm:px-6 py-6 mx-auto min-h-full flex flex-col w-full max-w-3xl min-w-0"
           style={{
             overflowAnchor: "none",
             contain: "inline-size",

@@ -417,68 +417,78 @@ export function ChatPage({ chatId }: { chatId: string }): ReactNode {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background w-full overflow-hidden">
-      <ChatHeader
-        id={chatId}
-        title={chatNode?.title}
-        photoUrl={chatNode?.photoUrl ?? undefined}
-        userRef={normalizedChatType === "PRIVATE" ? partnerUser : null}
-        totalUnread={totalUnread}
-        isLoading={isInitialLoading}
-        type={normalizedChatType}
-        membersCount={chatNode?.membersCount ?? 0}
-      />
-      <main className="flex-1 relative min-h-0 bg-background overflow-hidden">
-        {isInitialLoading ? (
-          <div className="absolute inset-0 p-4 flex flex-col gap-6">
-            <Skeleton className="h-10 w-[60%] self-end rounded-2xl" />
-            <Skeleton className="h-10 w-[50%] self-start rounded-2xl" />
-          </div>
-        ) : allMessages.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center p-6">
-            <div className="bg-muted/50 text-muted-foreground text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm">
-              {isBotChat ? "What can this bot do?" : "No messages yet"}
-            </div>
-          </div>
-        ) : (
-          <MessageList
-            chatId={chatId}
-            messages={
-              messagesFromHistory as unknown as messageList_metadata$key
-            }
-            myId={me?.id}
-            chatType={normalizedChatType}
-            lastReadSequence={Number(chatNode?.lastReadSequence) || 0}
-            canWrite={canWrite}
-            onMarkRead={markAsRead}
-            onReply={handleReplyInitiate}
-            onEdit={handleEditInitiate}
-            onDelete={handleDeleteMessage}
-            onForward={handleForwardMessage}
-            onScrollAtBottomChange={setIsAtBottom}
-          />
-        )}
-      </main>
-      {!isInitialLoading && (
-        <MessageComposer
-          isBot={isBotChat}
-          isEmpty={allMessages.length === 0}
-          input={input}
-          setInput={setInput}
-          onSend={handleSend}
-          onJoin={handleJoin}
-          onTyping={handleTyping}
-          disabled={false}
-          replyingTo={replyingTo}
-          editingMessage={editingMessage}
-          onCancelAction={cancelAction}
-          canWrite={canWrite}
-          isMember={isMember}
-          chatType={normalizedChatType}
-          myRole={chatNode?.myRole ?? undefined}
-          permissions={chatNode?.permissions ?? undefined}
+      <div className="flex flex-col h-full bg-background w-full overflow-hidden">
+        <ChatHeader
+          id={chatId}
+          title={chatNode?.title}
+          photoUrl={chatNode?.photoUrl ?? undefined}
+          userRef={normalizedChatType === "PRIVATE" ? partnerUser : null}
+          totalUnread={totalUnread}
+          isLoading={isInitialLoading}
+          type={normalizedChatType}
+          membersCount={chatNode?.membersCount ?? 0}
         />
-      )}
-    </div>
-  );
+
+        <div className="flex-1 flex flex-col min-h-0 w-full relative overflow-hidden">
+          <main className="flex-1 relative min-h-0 bg-background overflow-hidden w-full">
+            <div className="w-full max-w-[850px] mx-auto h-full relative flex flex-col px-4">
+              {isInitialLoading ? (
+                <div className="absolute inset-0 p-4 flex flex-col gap-6">
+                  <Skeleton className="h-10 w-[60%] self-end rounded-2xl" />
+                  <Skeleton className="h-10 w-[50%] self-start rounded-2xl" />
+                </div>
+              ) : allMessages.length === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center p-6">
+                  <div className="bg-muted/50 text-muted-foreground text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm">
+                    {isBotChat ? "What can this bot do?" : "No messages yet"}
+                  </div>
+                </div>
+              ) : (
+                <MessageList
+                  chatId={chatId}
+                  messages={
+                    messagesFromHistory as unknown as messageList_metadata$key
+                  }
+                  myId={me?.id}
+                  chatType={normalizedChatType}
+                  lastReadSequence={Number(chatNode?.lastReadSequence) || 0}
+                  canWrite={canWrite}
+                  onMarkRead={markAsRead}
+                  onReply={handleReplyInitiate}
+                  onEdit={handleEditInitiate}
+                  onDelete={handleDeleteMessage}
+                  onForward={handleForwardMessage}
+                  onScrollAtBottomChange={setIsAtBottom}
+                />
+              )}
+            </div>
+          </main>
+
+          {!isInitialLoading && (
+            <div className="w-full bg-background pb-2">
+              <div className="w-full max-w-[850px] mx-auto px-4">
+                <MessageComposer
+                  isBot={isBotChat}
+                  isEmpty={allMessages.length === 0}
+                  input={input}
+                  setInput={setInput}
+                  onSend={handleSend}
+                  onJoin={handleJoin}
+                  onTyping={handleTyping}
+                  disabled={false}
+                  replyingTo={replyingTo}
+                  editingMessage={editingMessage}
+                  onCancelAction={cancelAction}
+                  canWrite={canWrite}
+                  isMember={isMember}
+                  chatType={normalizedChatType}
+                  myRole={chatNode?.myRole ?? undefined}
+                  permissions={chatNode?.permissions ?? undefined}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
 }
