@@ -2,6 +2,16 @@ import { useState, useMemo, memo, type ReactElement } from "react";
 import { graphql, useFragment } from "react-relay";
 import { cn } from "@/lib/utils";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { UserAvatar } from "@/components/user-avatar";
 import { MessageInfoDialog } from "../message-info-dialog";
 import { MessageStatus } from "../message-status";
@@ -82,6 +92,7 @@ export const MessageBubble = memo(function MessageBubble({
   );
 
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const isHighlighted: boolean = useMessageHighlight(message.id);
 
   const isGroup: boolean = chatType === "GROUP";
@@ -153,6 +164,21 @@ export const MessageBubble = memo(function MessageBubble({
   }, [attachments]);
 
   const hasImages = images.length > 0;
+
+  const handleRequestDelete = (id: string): void => {
+    setPendingDeleteId(id);
+  };
+
+  const handleConfirmDelete = (): void => {
+    if (pendingDeleteId) {
+      onDelete?.(pendingDeleteId);
+    }
+    setPendingDeleteId(null);
+  };
+
+  const handleCancelDelete = (): void => {
+    setPendingDeleteId(null);
+  };
 
   return (
     <>
@@ -301,7 +327,7 @@ export const MessageBubble = memo(function MessageBubble({
           onReply={onReply}
           onEdit={onEdit}
           onForward={onForward}
-          onDelete={onDelete}
+          onDelete={onDelete ? handleRequestDelete : undefined}
           onShowInfo={(): void => setIsInfoOpen(true)}
         />
       </ContextMenu>
@@ -310,6 +336,32 @@ export const MessageBubble = memo(function MessageBubble({
         open={isInfoOpen}
         onOpenChange={setIsInfoOpen}
       />
+      <AlertDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open): void => {
+          if (!open) setPendingDeleteId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This message will be permanently deleted. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelDelete}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 });
